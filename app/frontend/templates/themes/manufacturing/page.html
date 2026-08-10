@@ -14,16 +14,21 @@
     <h1>{{ column.name }}</h1>
     {% if column.summary %}<p class="text-muted">{{ column.summary }}</p>{% endif %}
 
-    {# 栏目自定义字段（单图/文件类型作为下载或展示） #}
-    {% for fv in column.field_values %}
-      {% if fv.field.field_type == 'image' and fv.value %}
-        <div class="mb-3"><img src="{{ fv.value }}" class="img-fluid"></div>
-      {% elif fv.field.field_type == 'file' and fv.value %}
-        <div class="mb-3"><a href="{{ fv.value }}" class="btn btn-success"><i class="fas fa-download"></i> {{ fv.field.label }}</a></div>
-      {% elif fv.field.field_type == 'url' and fv.value %}
-        <div class="mb-3"><a href="{{ fv.value }}" target="_blank">{{ fv.field.label }}: {{ fv.value }}</a></div>
-      {% elif fv.field.field_type in ('text','textarea','number') and fv.value %}
-        <div class="mb-3"><strong>{{ fv.field.label }}:</strong> {{ fv.value }}</div>
+    {# 栏目自定义字段（仅前台可见字段，值在后台“单页字段内容”录入） #}
+    {% for f in fields %}
+      {% set v = column.get_field_value(f.id) %}
+      {% if v %}
+        {% if f.field_type == 'image' %}
+          <div class="mb-3"><img src="{{ v }}" class="img-fluid"></div>
+        {% elif f.field_type == 'file' %}
+          <div class="mb-3"><a href="{{ v }}" class="btn btn-success"><i class="fas fa-download"></i> {{ f.label }}</a></div>
+        {% elif f.field_type == 'url' %}
+          <div class="mb-3"><a href="{{ v }}" target="_blank">{{ f.label }}: {{ v }}</a></div>
+        {% elif f.field_type == 'richtext' %}
+          <div class="mb-3">{{ v|safe }}</div>
+        {% elif f.field_type in ('text','textarea','number') %}
+          <div class="mb-3"><strong>{{ f.label }}:</strong> {{ v }}</div>
+        {% endif %}
       {% endif %}
     {% endfor %}
 

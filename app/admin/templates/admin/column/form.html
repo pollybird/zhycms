@@ -1,4 +1,35 @@
 {% extends 'admin/base.html' %}
+
+{% macro page_field_input(field, column) %}
+{% set val = column.get_field_value(field.id) if column else '' %}
+<div class="form-group">
+  <label>{{ field.label }}{% if field.is_required %}<span class="text-danger">*</span>{% endif %}
+    <small class="text-muted">（{{ field.field_key }}）</small></label>
+  {% if field.field_type == 'text' %}
+    <input type="text" name="field_{{ field.id }}" class="form-control" value="{{ val }}">
+  {% elif field.field_type == 'textarea' %}
+    <textarea name="field_{{ field.id }}" rows="3" class="form-control">{{ val }}</textarea>
+  {% elif field.field_type == 'richtext' %}
+    <textarea name="field_{{ field.id }}" rows="6" class="form-control page-richtext" data-id="{{ field.id }}">{{ val }}</textarea>
+  {% elif field.field_type == 'image' %}
+    <input type="file" name="field_{{ field.id }}" class="form-control-file" accept="image/*">
+    {% if val %}<div class="mt-2"><img src="{{ val }}" style="max-height:120px;"><br><label><input type="checkbox" name="field_{{ field.id }}_remove"> 删除图片</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
+  {% elif field.field_type == 'url' %}
+    <input type="url" name="field_{{ field.id }}" class="form-control" value="{{ val }}">
+  {% elif field.field_type == 'number' %}
+    <input type="number" name="field_{{ field.id }}" class="form-control" value="{{ val }}">
+  {% elif field.field_type == 'file' %}
+    <input type="file" name="field_{{ field.id }}" class="form-control-file"
+      {% if field.allowed_exts %}accept=".{{ field.allowed_exts.replace(',', ',.') }}"{% endif %}>
+    <small class="form-text text-muted">
+      {% if field.allowed_exts %}允许后缀：{{ field.allowed_exts }}{% endif %}
+      {% if field.max_size %}，最大 {{ (field.max_size // 1024) }}KB{% endif %}
+    </small>
+    {% if val %}<div class="mt-1"><a href="{{ val }}" target="_blank">查看已上传文件</a> <label><input type="checkbox" name="field_{{ field.id }}_remove"> 删除</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
+  {% endif %}
+</div>
+{% endmacro %}
+
 {% block title %}{{ '编辑栏目' if column else '新增栏目' }} - {{ cms_name }}{% endblock %}
 {% block page_header %}{{ '编辑栏目' if column else '新增栏目' }}{% endblock %}
 {% set active_menu = 'column' %}
@@ -98,6 +129,24 @@
         <div class="card-header"><h3 class="card-title"><i class="fas fa-edit"></i> 单页内容</h3></div>
         <div class="card-body p-0">
           <textarea name="page_content" id="page_content" rows="10" class="form-control" style="border:0;">{{ column.page_content if column else '' }}</textarea>
+        </div>
+      </div>
+
+      {# 单页字段内容 - 仅单页栏目显示，录入本栏目自定义字段的“值” #}
+      <div class="card" id="page-fields-card" style="display:none;">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-list-alt"></i> 单页字段内容</h3></div>
+        <div class="card-body">
+          {% set page_fields = column.fields.filter_by(is_deleted=False).all() if column else [] %}
+          {% if page_fields %}
+            {% for f in page_fields %}
+              {{ page_field_input(f, column) }}
+            {% endfor %}
+          {% else %}
+            <p class="text-muted mb-0">
+              该单页栏目暂无自定义字段。请在下方「自定义字段」中添加字段并
+              <strong>保存栏目</strong>后，回到此处即可录入各字段的内容。
+            </p>
+          {% endif %}
         </div>
       </div>
 
@@ -269,6 +318,7 @@
   function toggle_type_blocks(){
     const t = $('#col-type').val();
     $('#page-content-card').toggle(t === 'page');
+    $('#page-fields-card').toggle(t === 'page');
     $('#list-config-block').toggle(t === 'list');
     $('#link-config-block').toggle(t === 'link');
     // 模板设置区块随类型切换
@@ -281,33 +331,45 @@
 
   // CKEditor 初始化单页内容
   let editor;
+  const pageCkConfig = {
+    toolbar: {
+      items: [
+        'heading', '|',
+        'bold', 'italic', 'underline', 'strikethrough', '|',
+        'fontColor', 'fontBackgroundColor', '|',
+        'alignment', '|',
+        'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+        'link', 'imageUpload', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
+        'undo', 'redo'
+      ]
+    },
+    image: {
+      toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
+    },
+    table: {
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+    },
+    ckfinder: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=column' }
+  };
   const ta = document.querySelector('#page_content');
   if (ta) {
-    ClassicEditor.create(ta, {
-      toolbar: {
-        items: [
-          'heading', '|',
-          'bold', 'italic', 'underline', 'strikethrough', '|',
-          'fontColor', 'fontBackgroundColor', '|',
-          'alignment', '|',
-          'bulletedList', 'numberedList', 'outdent', 'indent', '|',
-          'link', 'imageUpload', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
-          'undo', 'redo'
-        ]
-      },
-      image: {
-        toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
-      },
-      table: {
-        contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
-      },
-      ckfinder: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=column' }
-    }).then(e => { editor = e; })
+    ClassicEditor.create(ta, pageCkConfig).then(e => { editor = e; })
       .catch(err => console.error(err));
     $('#column-form').on('submit', function(){
       if (editor) ta.value = editor.getData();
     });
   }
+
+  // 单页富文本字段（field_type=richtext）也用 CKEditor，提交前回写各自 textarea
+  let pageFieldEditors = [];
+  document.querySelectorAll('.page-richtext').forEach(el => {
+    ClassicEditor.create(el, pageCkConfig).then(e => {
+      pageFieldEditors.push({el: el, editor: e});
+    }).catch(err => console.error(err));
+  });
+  $('#column-form').on('submit', function(){
+    pageFieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
+  });
 
   function add_field(){
     const html = `

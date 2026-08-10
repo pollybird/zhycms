@@ -71,6 +71,16 @@ class Column(db.Model):
         """是否可添加自有内容：必须是叶子栏目，且类型为 page 或 list。"""
         return self.is_leaf and self.type in ('page', 'list')
 
+    def get_field_value(self, field_id):
+        """取本栏目自身某自定义字段的值（仅单页栏目使用）。
+
+        与 Article.get_field_value 对称：单页栏目的字段值存于 ColumnFieldValue。
+        """
+        for v in self.field_values:
+            if v.field_id == field_id:
+                return v.value
+        return ''
+
     @classmethod
     def get_tree(cls, enabled_only=False, include_deleted=False):
         """返回排好序的栏目列表（按 parent_id + sort_order + created_at 倒序）。"""

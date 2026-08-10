@@ -168,10 +168,14 @@ def column_detail(slug):
     # 叶子栏目
     if col.type == 'page':
         # 单页栏目（使用栏目指定的 page 模板，默认 page）
+        # 传入前台可见的自定义字段，模板可用 column.get_field_value(field.id) 取值
+        fields = col.fields.filter_by(
+            is_deleted=False, is_frontend_visible=True
+        ).order_by(ColumnField.sort_order.desc()).all()
         tpl = get_column_template(col, 'page')
         return render_template(
             theme_template(tpl),
-            column=col, nav=nav, seo=_seo(column=col)
+            column=col, fields=fields, nav=nav, seo=_seo(column=col)
         )
     elif col.type == 'list':
         # 列表栏目分页（使用栏目指定的 list 模板，默认 list）

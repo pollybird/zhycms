@@ -8,6 +8,7 @@ from ..extensions import db
 from ..models.column import Column, ColumnField, ColumnFieldValue
 from ..utils.helpers import admin_required
 from ..utils.themes import list_theme_templates, TEMPLATE_CATEGORIES
+from ..utils.uploads import save_upload_file
 from . import admin_bp
 
 
@@ -202,8 +203,63 @@ def _save_column(column):
 
     _save_fields(column)
 
+    # 单页栏目：保存字段“值”到 ColumnFieldValue（列表栏目的字段值在文章里录入）
+    if col_type == 'page':
+        db.session.flush()  # 确保新字段已有 id
+        if _save_page_field_values(column) is None:
+            db.session.rollback()
+            return None
+
     db.session.commit()
     flash('栏目保存成功', 'success')
+    return column
+
+
+def _save_page_field_values(column):
+    """保存单页栏目自身的自定义字段值（存入 ColumnFieldValue）。
+
+    复刻文章字段值的处理：支持 text/textarea/richtext/url/number 与 image/file 上传，
+    做必填校验、旧值清理。返回 column；校验失败返回 None（由调用方回滚）。
+    """
+    fields = column.fields.filter_by(is_deleted=False).order_by(
+        ColumnField.sort_order.desc()
+    ).all()
+
+    # 清理旧值（字段可能被删除或改动，全量重写最简单可靠）
+    ColumnFieldValue.query.filter_by(column_id=column.id).delete()
+
+    for f in fields:
+        if f.field_type in ('image', 'file'):
+            file_obj = request.files.get(f'field_{f.id}')
+            if file_obj and file_obj.filename:
+                if f.field_type == 'file':
+                    allowed = f.allowed_exts.split(',') if f.allowed_exts else None
+                    maxsize = f.max_size
+                else:
+                    allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+                    maxsize = None
+                rel, url, err = save_upload_file(file_obj, sub_dir='column',
+                                                 allowed_exts=allowed, max_size=maxsize)
+                if err:
+                    flash(f'字段 {f.label} 上传失败：{err}', 'danger')
+                    return None
+                value = url
+            elif request.form.get(f'field_{f.id}_remove') == 'on':
+                value = ''
+            else:
+                value = (request.form.get(f'field_{f.id}_existing') or '')
+        else:
+            value = request.form.get(f'field_{f.id}') or ''
+
+        if f.is_required and not value:
+            flash(f'字段 {f.label} 为必填', 'danger')
+            return None
+
+        if value is not None:
+            db.session.add(ColumnFieldValue(
+                column_id=column.id, field_id=f.id, value=value
+            ))
+
     return column
 
 
