@@ -1,0 +1,155 @@
+{% extends theme_base %}
+{% block title %}{{ site_settings.site_name }} - {{ site_settings.site_subtitle }}{% endblock %}
+
+{% block banner %}
+{# ===== 顶部轮播 Banner ===== #}
+{% set banners = [] %}
+{% if site_fragments.home_banner_1 and site_fragments.home_banner_1.value %}{% set _ = banners.append(site_fragments.home_banner_1.value) %}{% endif %}
+{% if site_fragments.home_banner_2 and site_fragments.home_banner_2.value %}{% set _ = banners.append(site_fragments.home_banner_2.value) %}{% endif %}
+{% if site_fragments.home_banner_3 and site_fragments.home_banner_3.value %}{% set _ = banners.append(site_fragments.home_banner_3.value) %}{% endif %}
+{% if banners %}
+<div id="homeBanner" class="carousel slide" data-ride="carousel">
+  <ol class="carousel-indicators">
+    {% for b in banners %}
+    <li data-target="#homeBanner" data-slide-to="{{ loop.index0 }}" class="{{ 'active' if loop.first }}"></li>
+    {% endfor %}
+  </ol>
+  <div class="carousel-inner">
+    {% for b in banners %}
+    <div class="carousel-item {{ 'active' if loop.first }}">
+      <img src="{{ b }}" class="d-block w-100" style="height:400px;object-fit:cover;" alt="banner">
+      <div class="carousel-caption d-none d-md-block" style="background:rgba(14,124,102,.55);border-radius:6px;padding:16px;">
+        <h2 style="font-weight:700;">{{ site_settings.site_name }}</h2>
+        <p class="lead mb-0">{{ site_settings.site_subtitle }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if banners|length > 1 %}
+  <a class="carousel-control-prev" href="#homeBanner" role="button" data-slide="prev">
+    <span class="carousel-control-prev-icon"></span>
+  </a>
+  <a class="carousel-control-next" href="#homeBanner" role="button" data-slide="next">
+    <span class="carousel-control-next-icon"></span>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{# 公告 #}
+{% if site_fragments.home_notice and site_fragments.home_notice.value %}
+<div class="alert alert-warning">
+  <i class="fas fa-bullhorn"></i> {{ site_fragments.home_notice.value|safe }}
+</div>
+{% endif %}
+
+{# ===== 关于我们（置顶，突出服务业特点） ===== #}
+{% if about_col %}
+<section class="py-4">
+  <div class="row align-items-center">
+    <div class="col-md-5 mb-3">
+      {% if site_fragments.home_banner_2 and site_fragments.home_banner_2.value %}
+      <img src="{{ site_fragments.home_banner_2.value }}" class="img-fluid rounded shadow-sm" alt="{{ about_col.name }}">
+      {% endif %}
+    </div>
+    <div class="col-md-7">
+      <h2 class="mb-3" style="font-weight:700;color:var(--svc-primary);">{{ about_col.name }}</h2>
+      {% if about_col.summary %}<p class="text-muted">{{ about_col.summary }}</p>{% endif %}
+      <div class="article-content" style="max-height:260px;overflow:hidden;">
+        {{ about_col.page_content|safe }}
+      </div>
+      <a href="{{ url_for('frontend.column_detail', slug=about_col.slug) }}" class="btn btn-primary mt-2">查看详情 <i class="fas fa-arrow-right"></i></a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ===== 经营范围 / 服务项目 ===== #}
+{% if services %}
+<section class="py-4 bg-light" style="margin:0 -9999px;padding-left:9999px;padding-right:9999px;">
+  <div class="container">
+    <h2 class="section-title">{{ services_col.name if services_col else '经营范围' }}</h2>
+    <p class="section-sub">{{ services_col.summary if services_col and services_col.summary else '专业·务实·共创价值' }}</p>
+    <div class="row row-cols-2 row-cols-md-3 g-4">
+      {% for s in services %}
+      <div class="col mb-4">
+        <a href="{{ url_for('frontend.article_detail', slug=s.column.slug, aid=s.id) }}" class="card h-100 text-decoration-none text-dark">
+          {% if s.cover %}
+          <img src="{{ s.cover }}" class="card-img-top" alt="{{ s.title }}" style="height:170px;object-fit:cover;">
+          {% else %}
+          <div class="pt-4"><div class="service-icon"><i class="fas fa-concierge-bell"></i></div></div>
+          {% endif %}
+          <div class="card-body text-center">
+            <h5 class="card-title">{{ s.title|truncate_text(20) }}</h5>
+            <p class="card-text text-muted small">{{ s.summary|truncate_text(50) }}</p>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% if services_col %}
+    <div class="text-center mt-2">
+      <a href="{{ url_for('frontend.column_detail', slug=services_col.slug) }}" class="btn btn-outline-primary">查看全部服务 <i class="fas fa-arrow-right"></i></a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+<div class="row py-4">
+  {# ===== 行业动态 ===== #}
+  {% if news %}
+  <div class="col-md-7 mb-4">
+    <h3 class="mb-3" style="font-weight:700;border-left:4px solid var(--svc-primary);padding-left:10px;">
+      {{ news_col.name if news_col else '行业动态' }}
+    </h3>
+    <div class="list-group">
+      {% for a in news %}
+      <a href="{{ url_for('frontend.article_detail', slug=a.column.slug, aid=a.id) }}" class="list-group-item list-group-item-action list-article d-flex justify-content-between align-items-center">
+        <div class="text-truncate mr-2">
+          <i class="fas fa-angle-right text-primary"></i>
+          <strong>{{ a.title }}</strong>
+        </div>
+        <small class="text-muted flex-shrink-0">{{ a.published_at|date }}</small>
+      </a>
+      {% endfor %}
+    </div>
+    {% if news_col %}
+    <a href="{{ url_for('frontend.column_detail', slug=news_col.slug) }}" class="d-inline-block mt-2">查看更多 →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ===== 客户案例 ===== #}
+  {% if cases %}
+  <div class="col-md-5 mb-4">
+    <h3 class="mb-3" style="font-weight:700;border-left:4px solid var(--svc-accent);padding-left:10px;">
+      {{ cases_col.name if cases_col else '客户案例' }}
+    </h3>
+    <div class="list-group">
+      {% for a in cases %}
+      <a href="{{ url_for('frontend.article_detail', slug=a.column.slug, aid=a.id) }}" class="list-group-item list-group-item-action list-article">
+        <strong class="d-block text-truncate">{{ a.title }}</strong>
+        <small class="text-muted">{{ a.summary|truncate_text(40) }}</small>
+      </a>
+      {% endfor %}
+    </div>
+    {% if cases_col %}
+    <a href="{{ url_for('frontend.column_detail', slug=cases_col.slug) }}" class="d-inline-block mt-2">查看更多 →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{# ===== 友情链接 ===== #}
+{% if friend_links %}
+<section class="py-3 border-top">
+  <span class="text-muted mr-3"><i class="fas fa-link"></i> 友情链接：</span>
+  {% for l in friend_links %}
+  <a href="{{ l.url }}" target="{{ l.target }}" class="mr-3">{{ l.name }}</a>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

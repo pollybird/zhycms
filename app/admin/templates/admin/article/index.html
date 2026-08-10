@@ -1,0 +1,101 @@
+{% extends 'admin/base.html' %}
+{% block title %}文章管理 - {{ column.name }} - {{ cms_name }}{% endblock %}
+{% block page_header %}文章管理 - {{ column.name }}{% endblock %}
+{% set active_menu = 'column' %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.column_index') }}">栏目管理</a></li>
+  <li class="breadcrumb-item active">文章管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">文章列表（{{ pagination.total }}）</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.article_create', cid=column.id) }}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> 新增文章
+      </a>
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="get" class="form-inline mb-3">
+      <input type="text" name="keyword" class="form-control form-control-sm mr-2" placeholder="标题关键词" value="{{ keyword }}">
+      <select name="status" class="form-control form-control-sm mr-2">
+        <option value="">全部状态</option>
+        <option value="enabled" {{ 'selected' if status == 'enabled' }}>启用</option>
+        <option value="disabled" {{ 'selected' if status == 'disabled' }}>禁用</option>
+      </select>
+      <button type="submit" class="btn btn-default btn-sm"><i class="fas fa-search"></i> 筛选</button>
+    </form>
+
+    <form method="post" id="batch-form" action="{{ url_for('admin.article_batch', cid=column.id) }}">
+      <input type="hidden" name="action" id="batch-action">
+      <table class="table table-hover table-sm">
+        <thead>
+          <tr>
+            <th width="40"><input type="checkbox" id="check-all"></th>
+            <th>标题</th>
+            <th width="80">排序</th>
+            <th width="80">状态</th>
+            <th width="100">浏览</th>
+            <th width="140">发布时间</th>
+            <th width="200">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in articles %}
+          <tr>
+            <td><input type="checkbox" name="ids[]" value="{{ a.id }}" class="row-check"></td>
+            <td>
+              {{ a.title }}
+              {% if a.summary %}<br><small class="text-muted">{{ a.summary|truncate_text(40) }}</small>{% endif %}
+            </td>
+            <td>{{ a.sort_order }}</td>
+            <td>
+              {% if a.is_enabled %}<span class="badge badge-success">启用</span>
+              {% else %}<span class="badge badge-warning">禁用</span>{% endif %}
+            </td>
+            <td>{{ a.viewed }}</td>
+            <td>{{ a.published_at|datetime }}</td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('admin.article_edit', cid=column.id, aid=a.id) }}" class="btn btn-default" title="编辑"><i class="fas fa-edit"></i></a>
+                <form method="post" action="{{ url_for('admin.article_toggle', cid=column.id, aid=a.id) }}" class="d-inline">
+                  <button class="btn btn-default" title="切换状态"><i class="fas {{ 'fa-toggle-on text-success' if a.is_enabled else 'fa-toggle-off text-muted' }}"></i></button>
+                </form>
+                <a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=a.id) }}" target="_blank" class="btn btn-info" title="前台预览"><i class="fas fa-eye"></i></a>
+                <form method="post" action="{{ url_for('admin.article_delete', cid=column.id, aid=a.id) }}" class="d-inline" onsubmit="return confirm('确认删除？');">
+                  <button class="btn btn-danger" title="删除"><i class="fas fa-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">暂无文章</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </form>
+
+    {% include 'admin/_pagination.html' with context %}
+  </div>
+  <div class="card-footer">
+    <button type="button" class="btn btn-sm btn-success" onclick="batch_action('enable')"><i class="fas fa-check"></i> 批量启用</button>
+    <button type="button" class="btn btn-sm btn-warning" onclick="batch_action('disable')"><i class="fas fa-ban"></i> 批量禁用</button>
+    <button type="button" class="btn btn-sm btn-danger" onclick="batch_action('delete')"><i class="fas fa-trash"></i> 批量删除</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  $('#check-all').on('change', function(){ $('.row-check').prop('checked', this.checked); });
+  function batch_action(action){
+    if ($('.row-check:checked').length === 0){ alert('请先选择文章'); return; }
+    if (action === 'delete' && !confirm('确认批量删除？')) return;
+    $('#batch-action').val(action);
+    $('#batch-form').submit();
+  }
+</script>
+{% endblock %}

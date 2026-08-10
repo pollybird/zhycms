@@ -1,0 +1,108 @@
+{% extends 'admin/base.html' %}
+{% block title %}栏目管理 - {{ cms_name }}{% endblock %}
+{% block page_header %}栏目管理{% endblock %}
+{% set active_menu = 'column' %}
+
+{% block breadcrumb %}<li class="breadcrumb-item active">栏目管理</li>{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">栏目列表</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.column_create') }}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> 新增栏目
+      </a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <form method="post" id="batch-form" action="{{ url_for('admin.column_batch') }}">
+      <input type="hidden" name="action" id="batch-action">
+      <table class="table table-hover table-sm tree-grid mb-0">
+        <thead>
+          <tr>
+            <th width="40"><input type="checkbox" id="check-all"></th>
+            <th>栏目名称</th>
+            <th width="80">类型</th>
+            <th width="60">排序</th>
+            <th width="80">状态</th>
+            <th width="80">子栏目</th>
+            <th width="120">标识</th>
+            <th width="340">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for col in columns %}
+          <tr>
+            <td><input type="checkbox" name="ids[]" value="{{ col.id }}" class="row-check"></td>
+            <td>
+              {% if col._depth > 0 %}&nbsp;&nbsp;{% for i in range(col._depth) %}├─&nbsp;{% endfor %}{% endif %}
+              <strong>{{ col.name }}</strong>
+              {% if col.summary %}<br><small class="text-muted">{{ col.summary|truncate_text(40) }}</small>{% endif %}
+            </td>
+            <td>
+              {% if col.type == 'page' %}<span class="badge badge-info">单页</span>
+              {% elif col.type == 'list' %}<span class="badge badge-success">列表</span>
+              {% elif col.type == 'link' %}<span class="badge badge-secondary">链接</span>{% endif %}
+            </td>
+            <td>{{ col.sort_order }}</td>
+            <td>
+              {% if col.is_enabled %}<span class="badge badge-success">启用</span>
+              {% else %}<span class="badge badge-warning">禁用</span>{% endif %}
+            </td>
+            <td>
+              {% if col.is_parent %}<span class="badge badge-primary">父栏目</span>
+              {% else %}<span class="text-muted">-</span>{% endif %}
+            </td>
+            <td><code>{{ col.slug }}</code></td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('admin.column_edit', cid=col.id) }}" class="btn btn-default" title="编辑"><i class="fas fa-edit"></i></a>
+                {% if col.can_have_content and col.type == 'list' %}
+                <a href="{{ url_for('admin.article_index', cid=col.id) }}" class="btn btn-info" title="管理文章"><i class="fas fa-list"></i> 文章</a>
+                <a href="{{ url_for('admin.article_create', cid=col.id) }}" class="btn btn-success" title="添加文章"><i class="fas fa-plus"></i> 添加</a>
+                {% elif col.can_have_content and col.type == 'page' %}
+                <a href="{{ url_for('admin.column_edit', cid=col.id) }}" class="btn btn-info" title="编辑单页内容"><i class="fas fa-file-alt"></i> 编辑内容</a>
+                {% endif %}
+                <form method="post" action="{{ url_for('admin.column_toggle', cid=col.id) }}" class="d-inline">
+                  <button type="submit" class="btn btn-default" title="{{ '禁用' if col.is_enabled else '启用' }}">
+                    <i class="fas {{ 'fa-toggle-on text-success' if col.is_enabled else 'fa-toggle-off text-muted' }}"></i>
+                  </button>
+                </form>
+                <form method="post" action="{{ url_for('admin.column_delete', cid=col.id) }}" class="d-inline" onsubmit="return confirm('确认删除该栏目？删除后不可恢复。');">
+                  <button type="submit" class="btn btn-danger" title="删除"><i class="fas fa-trash"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">暂无栏目，点击右上角"新增栏目"开始创建</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </form>
+  </div>
+  <div class="card-footer">
+    <button type="button" class="btn btn-sm btn-success" onclick="batch_action('enable')"><i class="fas fa-check"></i> 批量启用</button>
+    <button type="button" class="btn btn-sm btn-warning" onclick="batch_action('disable')"><i class="fas fa-ban"></i> 批量禁用</button>
+    <button type="button" class="btn btn-sm btn-danger" onclick="batch_action('delete')"><i class="fas fa-trash"></i> 批量删除</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  $('#check-all').on('change', function(){
+    $('.row-check').prop('checked', this.checked);
+  });
+  function batch_action(action){
+    if ($('.row-check:checked').length === 0){
+      alert('请先选择栏目');
+      return;
+    }
+    if (action === 'delete' && !confirm('确认批量删除选中栏目？含子栏目的父栏目将跳过。')) return;
+    $('#batch-action').val(action);
+    $('#batch-form').submit();
+  }
+</script>
+{% endblock %}

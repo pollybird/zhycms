@@ -1,0 +1,37 @@
+{% extends theme_base %}
+{% block title %}{{ column.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
+    <li class="breadcrumb-item active">{{ column.name }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  <div class="col-md-12">
+    <h1>{{ column.name }}</h1>
+    {% if column.summary %}<p class="text-muted">{{ column.summary }}</p>{% endif %}
+
+    {# 栏目自定义字段（单图/文件类型作为下载或展示） #}
+    {% for fv in column.field_values %}
+      {% if fv.field.field_type == 'image' and fv.value %}
+        <div class="mb-3"><img src="{{ fv.value }}" class="img-fluid"></div>
+      {% elif fv.field.field_type == 'file' and fv.value %}
+        <div class="mb-3"><a href="{{ fv.value }}" class="btn btn-success"><i class="fas fa-download"></i> {{ fv.field.label }}</a></div>
+      {% elif fv.field.field_type == 'url' and fv.value %}
+        <div class="mb-3"><a href="{{ fv.value }}" target="_blank">{{ fv.field.label }}: {{ fv.value }}</a></div>
+      {% elif fv.field.field_type in ('text','textarea','number') and fv.value %}
+        <div class="mb-3"><strong>{{ fv.field.label }}:</strong> {{ fv.value }}</div>
+      {% endif %}
+    {% endfor %}
+
+    <hr>
+
+    <div class="article-content">
+      {{ column.page_content|safe }}
+    </div>
+  </div>
+</div>
+{% endblock %}

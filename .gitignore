@@ -1,0 +1,58 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# ===== 虚拟环境 =====
+.venv/
+venv/
+env/
+ENV/
+
+# ===== Flask instance（含 SQLite 数据库与数据库连接配置，切勿提交）=====
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# ===== 用户上传文件 =====
+app/static/uploads/
+
+# ===== 日志与临时文件 =====
+*.log
+*.pot
+*.pid
+*.bak
+*.tmp
+
+# ===== 环境变量（可能含密钥、数据库密码）=====
+.env
+.env.*
+!.env.example
+
+# ===== 测试与覆盖率 =====
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.cache/
+
+# ===== IDE / 编辑器 =====
+.idea/
+.vscode/
+.trae/
+*.swp
+*.swo
+*~
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db

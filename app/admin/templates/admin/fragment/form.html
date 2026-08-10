@@ -1,0 +1,118 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ '编辑碎片' if fragment else '新增碎片' }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ '编辑碎片' if fragment else '新增碎片' }}{% endblock %}
+{% set active_menu = 'fragment' %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.fragment_index') }}">碎片字段</a></li>
+  <li class="breadcrumb-item active">{{ '编辑' if fragment else '新增' }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" id="fragment-form">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">名称</label>
+            <input type="text" name="name" class="form-control" value="{{ fragment.name if fragment else '' }}" required>
+          </div>
+          <div class="form-group">
+            <label class="required-mark">调用标识（英文，创建后不可修改）</label>
+            <input type="text" name="slug" class="form-control" pattern="[a-zA-Z][a-zA-Z0-9_]*" value="{{ fragment.slug if fragment else '' }}" {{ 'readonly' if fragment else 'required' }}>
+            <small class="form-text text-muted">模板中通过 <code>{{ '{{ site_fragments.slug.value }}' }}</code> 调用</small>
+          </div>
+          <div class="form-group">
+            <label>所属分组</label>
+            <select name="group_id" class="form-control">
+              <option value="">— 无分组 —</option>
+              {% for g in groups %}
+              <option value="{{ g.id }}" {{ 'selected' if fragment and fragment.group_id == g.id }}>{{ g.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>字段类型</label>
+            <select name="field_type" id="field_type" class="form-control" {{ 'disabled' if fragment }}>
+              {% for v, label in field_types %}
+              <option value="{{ v }}" {{ 'selected' if fragment and fragment.field_type == v }}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            {% if fragment %}<input type="hidden" name="field_type" value="{{ fragment.field_type }}">{% endif %}
+          </div>
+
+          <div class="form-group" id="value-text-block">
+            <label>字段值</label>
+            {% if fragment and fragment.field_type == 'textarea' %}
+            <textarea name="value" rows="4" class="form-control">{{ fragment.value or '' }}</textarea>
+            {% elif fragment and fragment.field_type == 'richtext' %}
+            <textarea name="value" id="value_richtext" rows="8" class="form-control">{{ fragment.value or '' }}</textarea>
+            {% else %}
+            <input type="text" name="value" class="form-control" value="{{ fragment.value if fragment else '' }}">
+            {% endif %}
+          </div>
+
+          <div class="form-group" id="value-file-block" style="display:none;">
+            <label>上传文件</label>
+            <input type="file" name="value_file" class="form-control-file">
+            {% if fragment and fragment.value %}
+            <div class="mt-2">
+              {% if fragment.field_type == 'image' %}
+              <img src="{{ fragment.value }}" style="max-height:120px;">
+              {% else %}
+              <a href="{{ fragment.value }}" target="_blank">查看已上传文件</a>
+              {% endif %}
+              <br><label><input type="checkbox" name="value_remove"> 删除文件</label>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <label>排序优先级</label>
+            <input type="number" name="sort_order" class="form-control" value="{{ fragment.sort_order if fragment else 0 }}">
+          </div>
+          <div class="form-group">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled" {{ 'checked' if fragment is none or fragment.is_enabled }}>
+              <label class="custom-control-label" for="is_enabled">启用</label>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存</button>
+          <a href="{{ url_for('admin.fragment_index') }}" class="btn btn-default btn-block">返回</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block js %}
+{% if fragment and fragment.field_type == 'richtext' %}
+<script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
+<script>
+  let editor;
+  ClassicEditor.create(document.querySelector('#value_richtext'), {
+    ckfinder: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=fragment' }
+  }).then(e => { editor = e; });
+  $('#fragment-form').on('submit', function(){
+    if (editor) document.querySelector('#value_richtext').value = editor.getData();
+  });
+</script>
+{% endif %}
+<script>
+function toggle_blocks(){
+  const t = $('#field_type').val();
+  $('#value-text-block').toggle(['text','textarea','richtext','url','number'].includes(t));
+  $('#value-file-block').toggle(['image','file'].includes(t));
+}
+$('#field_type').on('change', toggle_blocks);
+toggle_blocks();
+</script>
+{% endblock %}

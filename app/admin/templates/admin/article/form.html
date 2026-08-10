@@ -1,0 +1,196 @@
+{% macro field_input(field, article) %}
+{% set val = article.get_field_value(field.id) if article else '' %}
+<div class="form-group field-row" data-id="{{ field.id }}">
+  <label>{{ field.label }}{% if field.is_required %}<span class="text-danger">*</span>{% endif %}</label>
+
+  {% if field.field_type == 'text' %}
+    <input type="text" name="field_{{ field.id }}" class="form-control" value="{{ val }}">
+
+  {% elif field.field_type == 'textarea' %}
+    <textarea name="field_{{ field.id }}" rows="3" class="form-control">{{ val }}</textarea>
+
+  {% elif field.field_type == 'richtext' %}
+    <textarea name="field_{{ field.id }}" rows="6" class="form-control richtext" data-id="{{ field.id }}">{{ val }}</textarea>
+
+  {% elif field.field_type == 'image' %}
+    <input type="file" name="field_{{ field.id }}" class="form-control-file" accept="image/*">
+    {% if val %}<div class="mt-2"><img src="{{ val }}" style="max-height:120px;"><br><label><input type="checkbox" name="field_{{ field.id }}_remove"> 删除图片</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
+
+  {% elif field.field_type == 'url' %}
+    <input type="url" name="field_{{ field.id }}" class="form-control" value="{{ val }}">
+
+  {% elif field.field_type == 'number' %}
+    <input type="number" name="field_{{ field.id }}" class="form-control" value="{{ val }}">
+
+  {% elif field.field_type == 'file' %}
+    <input type="file" name="field_{{ field.id }}" class="form-control-file"
+      {% if field.allowed_exts %}accept=".{{ (field.allowed_exts.replace(',', ',.') if field.allowed_exts else '') }}"{% endif %}>
+    <small class="form-text text-muted">
+      {% if field.allowed_exts %}允许后缀：{{ field.allowed_exts }}{% endif %}
+      {% if field.max_size %}，最大 {{ (field.max_size // 1024) }}KB{% endif %}
+    </small>
+    {% if val %}<div class="mt-1"><a href="{{ val }}" target="_blank">查看已上传文件</a> <label><input type="checkbox" name="field_{{ field.id }}_remove"> 删除</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
+
+  {% endif %}
+</div>
+{% endmacro %}
+
+
+{% extends 'admin/base.html' %}
+{% block title %}{{ '编辑文章' if article else '新增文章' }} - {{ column.name }}{% endblock %}
+{% block page_header %}{{ '编辑文章' if article else '新增文章' }}{% endblock %}
+{% set active_menu = 'column' %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.column_index') }}">栏目管理</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.article_index', cid=column.id) }}">{{ column.name }}</a></li>
+  <li class="breadcrumb-item active">{{ '编辑' if article else '新增' }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" id="article-form">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">标题</label>
+            <input type="text" name="title" class="form-control form-control-lg" value="{{ article.title if article else '' }}" required>
+          </div>
+          <div class="form-group">
+            <label>摘要</label>
+            <textarea name="summary" rows="2" class="form-control">{{ article.summary if article else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-edit"></i> 正文内容</h3></div>
+        <div class="card-body p-0">
+          <textarea name="content" id="content" rows="15" class="form-control" style="border:0;">{{ article.content if article else '' }}</textarea>
+        </div>
+      </div>
+
+      {% if fields %}
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">自定义字段</h3></div>
+        <div class="card-body">
+          {% for f in fields %}
+            {{ field_input(f, article) }}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">发布设置</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>排序优先级</label>
+            <input type="number" name="sort_order" class="form-control" value="{{ article.sort_order if article else 0 }}">
+          </div>
+          <div class="form-group">
+            <label>发布时间</label>
+            <input type="text" name="published_at" class="form-control" value="{{ article.published_at|datetime('%Y-%m-%d %H:%M') if article and article.published_at else '' }}" placeholder="YYYY-MM-DD HH:MM">
+          </div>
+          <div class="form-group">
+            <label>作者</label>
+            <input type="text" name="author" class="form-control" value="{{ article.author if article else '' }}">
+          </div>
+          <div class="form-group">
+            <label>来源</label>
+            <input type="text" name="source" class="form-control" value="{{ article.source if article else '' }}">
+          </div>
+          <div class="form-group">
+            <label>封面图</label>
+            <input type="file" name="cover" class="form-control-file" accept="image/*">
+            {% if article and article.cover %}
+            <div class="mt-2"><img src="{{ article.cover }}" style="max-height:100px;"></div>
+            <label><input type="checkbox" name="cover_remove"> 删除封面</label>
+            {% endif %}
+          </div>
+          <div class="form-group">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled" {{ 'checked' if article is none or article.is_enabled }}>
+              <label class="custom-control-label" for="is_enabled">启用</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">SEO</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>SEO 标题</label>
+            <input type="text" name="seo_title" class="form-control" value="{{ article.seo_title if article else '' }}">
+          </div>
+          <div class="form-group">
+            <label>SEO 关键词</label>
+            <input type="text" name="seo_keywords" class="form-control" value="{{ article.seo_keywords if article else '' }}">
+          </div>
+          <div class="form-group">
+            <label>SEO 描述</label>
+            <textarea name="seo_description" rows="2" class="form-control">{{ article.seo_description if article else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存文章</button>
+          <a href="{{ url_for('admin.article_index', cid=column.id) }}" class="btn btn-default btn-block">返回列表</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block js %}
+<script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
+<style>
+  .ck.ck-editor__editable_inline { min-height: 600px; }
+  .ck.ck-content { font-size: 15px; line-height: 1.8; }
+</style>
+<script>
+  const ckConfig = {
+    toolbar: {
+      items: [
+        'heading', '|',
+        'bold', 'italic', 'underline', 'strikethrough', '|',
+        'fontColor', 'fontBackgroundColor', '|',
+        'alignment', '|',
+        'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+        'link', 'imageUpload', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
+        'undo', 'redo'
+      ]
+    },
+    image: {
+      toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
+    },
+    table: {
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+    },
+    ckfinder: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=article' }
+  };
+
+  let mainEditor, fieldEditors = [];
+  ClassicEditor.create(document.querySelector('#content'), ckConfig)
+    .then(e => { mainEditor = e; })
+    .catch(err => console.error(err));
+
+  document.querySelectorAll('.richtext').forEach(el => {
+    ClassicEditor.create(el, ckConfig).then(e => {
+      fieldEditors.push({el: el, editor: e});
+    }).catch(err => console.error(err));
+  });
+
+  $('#article-form').on('submit', function(){
+    if (mainEditor) document.querySelector('#content').value = mainEditor.getData();
+    fieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
+  });
+</script>
+{% endblock %}

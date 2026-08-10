@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>zhycms 使用手册 Wiki</title>
+<style>
+  :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:#1f2933; background:var(--bg); line-height:1.75; }
+  .layout { display:flex; max-width:1200px; margin:0 auto; }
+  /* 侧边目录 */
+  nav.toc { position:sticky; top:0; align-self:flex-start; width:260px; height:100vh; overflow-y:auto;
+    padding:24px 16px; background:#fff; border-right:1px solid var(--border); font-size:14px; }
+  nav.toc h2 { font-size:15px; color:var(--brand); margin:0 0 12px; }
+  nav.toc a { display:block; color:#4a5568; text-decoration:none; padding:5px 8px; border-radius:6px; }
+  nav.toc a:hover { background:var(--bg); color:var(--brand); }
+  nav.toc a.sub { padding-left:22px; font-size:13px; color:#718096; }
+  /* 正文 */
+  main { flex:1; min-width:0; padding:40px 48px; background:#fff; }
+  header.hero { background:linear-gradient(135deg,var(--brand) 0%,var(--brand-dark) 100%);
+    color:#fff; padding:36px 48px; border-radius:14px; margin-bottom:32px; }
+  header.hero h1 { margin:0 0 8px; font-size:30px; }
+  header.hero p { margin:0; opacity:.92; }
+  h2 { font-size:24px; margin-top:48px; padding-bottom:8px; border-bottom:2px solid var(--border); }
+  h3 { font-size:19px; margin-top:32px; color:#2d3748; }
+  h4 { font-size:16px; margin-top:24px; color:#4a5568; }
+  p, li { font-size:15px; }
+  code { background:var(--code-bg); padding:2px 6px; border-radius:4px; font-size:13.5px;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace; color:#c7254e; }
+  pre { background:#1e293b; color:#e2e8f0; padding:16px 18px; border-radius:10px; overflow-x:auto;
+    font-size:13.5px; line-height:1.6; }
+  pre code { background:none; color:inherit; padding:0; }
+  table { border-collapse:collapse; width:100%; margin:16px 0; font-size:14px; }
+  th, td { border:1px solid var(--border); padding:9px 12px; text-align:left; vertical-align:top; }
+  th { background:var(--bg); font-weight:600; }
+  tr:nth-child(even) td { background:#fafbfc; }
+  .note { background:#eef5ff; border-left:4px solid var(--brand); padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .warn { background:#fff7ed; border-left:4px solid #ea8a2e; padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0; }
+  .tag { display:inline-block; background:var(--brand); color:#fff; font-size:12px; padding:1px 8px; border-radius:10px; vertical-align:middle; }
+  ul.check { list-style:none; padding-left:0; }
+  ul.check li::before { content:"\2610"; margin-right:8px; color:var(--brand); }
+  footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--border); color:#94a3b8; font-size:13px; }
+  a { color:var(--brand); }
+  @media (max-width:820px){ nav.toc{display:none;} main{padding:24px;} header.hero{padding:24px;} }
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc">
+  <h2>目录</h2>
+  <a href="#intro">项目简介</a>
+  <a href="#features">特性一览</a>
+  <a href="#structure">一、目录结构</a>
+  <a href="#install">二、安装与初始化</a>
+  <a href="#install-env" class="sub">环境要求</a>
+  <a href="#install-step" class="sub">安装步骤</a>
+  <a href="#install-setup" class="sub">初始化向导</a>
+  <a href="#install-db" class="sub">数据库选择</a>
+  <a href="#deploy">三、部署</a>
+  <a href="#deploy-dev" class="sub">开发模式</a>
+  <a href="#deploy-prod" class="sub">生产部署</a>
+  <a href="#deploy-env" class="sub">环境变量</a>
+  <a href="#identity">四、CMS 与网站标识</a>
+  <a href="#demo">五、演示数据与行业主题</a>
+  <a href="#template">六、模板制作教程</a>
+  <a href="#tpl-theme" class="sub">主题目录结构</a>
+  <a href="#tpl-new" class="sub">创建新主题</a>
+  <a href="#tpl-base" class="sub">模板继承</a>
+  <a href="#tpl-vars" class="sub">模板变量</a>
+  <a href="#tpl-objs" class="sub">对象字段速查</a>
+  <a href="#tpl-url" class="sub">URL 与过滤器</a>
+  <a href="#tpl-column" class="sub">栏目级备选模板</a>
+  <a href="#tpl-checklist" class="sub">检查清单</a>
+  <a href="#tpl-debug" class="sub">调试技巧</a>
+</nav>
+
+<main>
+<header class="hero">
+  <h1>zhycms 使用手册</h1>
+  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 模板制作教程</p>
+</header>
+
+<section id="intro">
+<h2>项目简介</h2>
+<p>zhycms 是一个基于 <b>Flask + SQLAlchemy</b> 的轻量级内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化等能力，适合搭建企业官网、资讯门户、产品展示站等。</p>
+</section>
+
+<section id="features">
+<h2>特性一览</h2>
+<ul>
+  <li><b>多主题模板系统</b>：前台模板按主题组织，后台一键切换。内置 <code>default</code>、<code>blue</code> 两套通用聚合主题，以及 <code>manufacturing</code>（制造业）、<code>service</code>（服务业）两套行业专用主题。</li>
+  <li><b>演示数据一键生成</b>：初始化时可选「制造业」或「服务业」示例，自动生成栏目、文章、碎片、友情链接与演示图片并切换主题。</li>
+  <li><b>CMS 标识与企业标识分离</b>：后台 CMS 名称/版权固定不可改，前台网站名称/版权可独立配置。</li>
+  <li><b>栏目级模板选择</b>：每个栏目可指定独立的列表页/内容页/单页模板，未指定自动回退默认。</li>
+  <li><b>自定义字段</b>：栏目和文章支持自定义字段（文本/富文本/图片/文件/URL/数字等）。</li>
+  <li><b>表单收集</b>：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，带图形验证码防刷，提交数据可导出。</li>
+  <li><b>SEO 优化 / 碎片管理 / 友情链接 / 图片上传（压缩·水印） / 验证码登录 / 首次初始化引导</b>。</li>
+</ul>
+</section>
+
+<section id="structure">
+<h2>一、目录结构</h2>
+<pre><code>zhycms/
+&#9500;&#9472;&#9472; app/
+&#9474;   &#9500;&#9472;&#9472; admin/              # 后台模块（栏目、文章、表单、设置等）
+&#9474;   &#9500;&#9472;&#9472; frontend/           # 前台模块（路由与视图）
+&#9474;   &#9474;   &#9492;&#9472;&#9472; templates/
+&#9474;   &#9474;       &#9492;&#9472;&#9472; themes/     # &#9733; 前台主题模板目录
+&#9474;   &#9474;           &#9500;&#9472;&#9472; default/        # 通用聚合主题
+&#9474;   &#9474;           &#9500;&#9472;&#9472; blue/           # 通用聚合主题（蓝色）
+&#9474;   &#9474;           &#9500;&#9472;&#9472; manufacturing/  # 制造业行业专用主题（产品置顶）
+&#9474;   &#9474;           &#9492;&#9472;&#9472; service/        # 服务业行业专用主题（公司介绍置顶）
+&#9474;   &#9500;&#9472;&#9472; models/             # 数据模型
+&#9474;   &#9500;&#9472;&#9472; utils/              # 工具模块（主题、上传、验证码、数据库配置等）
+&#9474;   &#9500;&#9472;&#9472; static/             # 静态资源（uploads/ 上传文件、admin/ 后台资源）
+&#9474;   &#9500;&#9472;&#9472; __init__.py         # 应用工厂 create_app
+&#9474;   &#9500;&#9472;&#9472; config.py           # 配置（含数据库 URI 解析）
+&#9474;   &#9492;&#9472;&#9472; extensions.py       # 扩展初始化
+&#9500;&#9472;&#9472; instance/               # 实例数据（zhycms.db 数据库、db_config.json 连接配置）
+&#9500;&#9472;&#9472; requirements.txt        # 依赖清单（含 MySQL/PostgreSQL 驱动）
+&#9500;&#9472;&#9472; run.py                  # 启动入口
+&#9500;&#9472;&#9472; .gitignore
+&#9492;&#9472;&#9472; LICENSE                 # Apache 2.0</code></pre>
+<div class="note"><b>提示：</b><code>instance/</code> 目录存放 SQLite 数据库与 <code>db_config.json</code>（含数据库连接信息，可能包含密码），已在 <code>.gitignore</code> 中排除，切勿提交到版本库。</div>
+</section>
+
+<section id="install">
+<h2>二、安装与初始化</h2>
+
+<h3 id="install-env">环境要求</h3>
+<ul>
+  <li>Python 3.9+</li>
+  <li>SQLite（默认，开箱即用）或 MySQL / PostgreSQL</li>
+</ul>
+
+<h3 id="install-step">安装步骤</h3>
+<pre><code># 克隆代码
+git clone &lt;your-repo-url&gt; zhycms
+cd zhycms
+
+# 创建虚拟环境
+python -m venv .venv
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
+
+# 安装依赖（国内建议使用镜像源加速）
+pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+# 清华源： -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 启动开发服务器
+python run.py</code></pre>
+<div class="note"><code>requirements.txt</code> 已内置 MySQL 驱动 <code>PyMySQL</code> 与 PostgreSQL 驱动 <code>psycopg2-binary</code>，初始化时选择对应数据库类型即可，无需额外安装。</div>
+
+<h3 id="install-setup">初始化向导</h3>
+<p>浏览器访问 <a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a>，首次访问会自动跳转到 <code>/admin/setup</code> 初始化向导。向导中需要填写：</p>
+<ul>
+  <li><b>管理员账号</b>（至少 3 个字符）与<b>密码</b>（至少 6 个字符，需二次确认）</li>
+  <li><b>数据库类型</b>：SQLite / MySQL / PostgreSQL（见下）</li>
+  <li><b>演示数据</b>：不生成 / 制造业 / 服务业</li>
+</ul>
+<p>提交后系统会创建管理员、写入默认设置，并按选择生成演示数据，随后跳转登录页。</p>
+
+<h3 id="install-db">数据库选择</h3>
+<table>
+  <tr><th>类型</th><th>说明</th><th>需要填写</th></tr>
+  <tr><td><b>SQLite</b></td><td>默认，直接生成 <code>instance/zhycms.db</code> 文件，零配置</td><td>无</td></tr>
+  <tr><td><b>MySQL</b></td><td>连接已有 MySQL 服务，默认端口 3306</td><td>主机、端口、数据库名、用户名、密码</td></tr>
+  <tr><td><b>PostgreSQL</b></td><td>连接已有 PostgreSQL 服务，默认端口 5432</td><td>主机、端口、数据库名、用户名、密码</td></tr>
+</table>
+<div class="note">选择 MySQL/PostgreSQL 时，向导会先<b>测试连接</b>，成功后才将连接信息写入 <code>instance/db_config.json</code> 并热切换数据库引擎；若切换失败会自动回滚到原库，保证应用可继续运行。</div>
+<div class="warn"><b>数据库 URI 解析优先级</b>（见 <code>app/config.py</code>）：<br>环境变量 <code>ZHOCMS_DB_URI</code> &gt; <code>instance/db_config.json</code>（初始化向导所存） &gt; 默认 SQLite。</div>
+</section>
+
+<section id="deploy">
+<h2>三、部署</h2>
+
+<h3 id="deploy-dev">开发模式</h3>
+<pre><code>python run.py
+# 监听 0.0.0.0:5000，默认开启 DEBUG，代码/模板改动自动重载</code></pre>
+
+<h3 id="deploy-prod">生产部署</h3>
+<pre><code># 直接运行（关闭 DEBUG）
+ZHOCMS_ENV=production ZHOCMS_SECRET_KEY=your-secret python run.py
+
+# 或使用 gunicorn（推荐）
+gunicorn -w 4 -b 0.0.0.0:5000 "run:app"</code></pre>
+<div class="warn"><b>生产环境注意：</b>务必通过 <code>ZHOCMS_SECRET_KEY</code> 设置自定义会话密钥；建议在 gunicorn 前置 Nginx 反向代理并托管 <code>app/static/</code> 静态资源。</div>
+
+<h3 id="deploy-env">环境变量</h3>
+<table>
+  <tr><th>变量</th><th>默认值</th><th>说明</th></tr>
+  <tr><td><code>ZHOCMS_ENV</code></td><td><code>development</code></td><td>配置模式：<code>development</code> / <code>production</code></td></tr>
+  <tr><td><code>ZHOCMS_SECRET_KEY</code></td><td>内置默认值</td><td>会话加密密钥，<b>生产环境必须修改</b></td></tr>
+  <tr><td><code>ZHOCMS_DB_URI</code></td><td><code>sqlite:///instance/zhycms.db</code></td><td>数据库 URI，可换成 MySQL/PostgreSQL；优先级最高</td></tr>
+</table>
+</section>
+
+<section id="identity">
+<h2>四、CMS 标识与网站标识</h2>
+<p>系统严格区分「CMS 自身标识」与「前台企业标识」四个概念，避免演示数据或用户配置误改后台品牌：</p>
+<table>
+  <tr><th>概念</th><th>显示位置</th><th>取值来源</th><th>可否修改</th></tr>
+  <tr><td><b>CMS 名称</b></td><td>后台顶栏 / 登录页 / 后台标题</td><td><code>Setting.CMS_NAME</code> 固定常量</td><td>&#10060; 不可改</td></tr>
+  <tr><td><b>后台版权</b></td><td>后台底部</td><td><code>Setting.CMS_COPYRIGHT</code> 固定常量</td><td>&#10060; 不可改</td></tr>
+  <tr><td><b>网站名称</b></td><td>前台导航 / 首页 / 页脚</td><td><code>Setting 'site_name'</code>（企业名）</td><td>&#9989; 网站设置可改</td></tr>
+  <tr><td><b>前台版权</b></td><td>前台底部</td><td><code>Setting 'footer_copyright'</code></td><td>&#9989; 网站设置可改</td></tr>
+</table>
+<div class="note"><b>约定：</b>后台模板一律使用 <code>cms_name</code> / <code>cms_copyright</code>（由 <code>app/__init__.py</code> 的上下文处理器注入），<b>不得</b>读取 <code>site_settings.site_name</code> / <code>site_settings.footer_copyright</code>（那是前台企业信息）；前台模板则相反。</div>
+</section>
+
+<section id="demo">
+<h2>五、演示数据与行业主题</h2>
+<table>
+  <tr><th>选项</th><th>生成内容</th><th>自动切换主题</th></tr>
+  <tr><td>不生成</td><td>仅创建管理员，空站点</td><td>保持 <code>default</code></td></tr>
+  <tr><td>制造业</td><td>精密机械制造企业示例：关于我们、产品中心、新闻中心、联系我们等栏目 + 文章 + 碎片 + 友情链接 + 演示图片</td><td><code>manufacturing</code>（产品置顶）</td></tr>
+  <tr><td>服务业</td><td>企业管理咨询公司示例：关于我们、服务项目、行业动态、客户案例、联系我们等栏目 + 文章 + 碎片 + 友情链接 + 演示图片</td><td><code>service</code>（公司介绍置顶）</td></tr>
+</table>
+<ul>
+  <li>演示数据由 <code>app/utils/bootstrap.py</code> 的 <code>generate_demo_data(industry)</code> 生成。</li>
+  <li>每次生成会先调用 <code>_clean_demo_data()</code> 按外键依赖顺序清理旧数据（表单 &rarr; 文章 &rarr; 栏目 &rarr; 碎片 &rarr; 友情链接），因此可在两个行业间反复切换而不会触发 <code>slug</code> 唯一约束冲突。</li>
+  <li>演示图片位于 <code>app/static/uploads/demo/</code>（制造业 <code>mfg_*</code>、服务业 <code>svc_*</code>），无需联网即可展示。</li>
+  <li>演示数据只写入<b>前台企业信息</b>，不会改动后台 CMS 名称与版权。</li>
+</ul>
+</section>
+
+<section id="template">
+<h2>六、模板制作教程</h2>
+<p>zhycms 前台采用 <b>多主题 + 栏目级模板</b> 的双层机制，主题可在网站设置一键切换，栏目可单独指定列表/内容/单页模板。模板基于 <b>Jinja2 + Bootstrap 4</b>。</p>
+
+<h3 id="tpl-theme">1. 主题目录结构</h3>
+<p>所有主题存放在 <code>app/frontend/templates/themes/</code> 下，每个主题是一个独立目录，目录名即主题名：</p>
+<pre><code>themes/default/
+&#9500;&#9472;&#9472; base.html            # 基础布局（必须）
+&#9500;&#9472;&#9472; index.html           # 首页（必须）
+&#9500;&#9472;&#9472; list.html            # 列表页默认模板（必须）
+&#9500;&#9472;&#9472; article.html         # 文章详情默认模板（必须）
+&#9500;&#9472;&#9472; page.html            # 单页默认模板（必须）
+&#9500;&#9472;&#9472; list_card.html       # 卡片式列表（可选，栏目备选模板）
+&#9500;&#9472;&#9472; column_children.html # 父栏目展示子栏目列表
+&#9500;&#9472;&#9472; search.html          # 搜索结果页
+&#9500;&#9472;&#9472; form.html            # 表单提交页（含验证码）
+&#9500;&#9472;&#9472; form_closed.html     # 表单关闭提示页
+&#9500;&#9472;&#9472; closed.html          # 站点关闭提示页
+&#9500;&#9472;&#9472; 404.html
+&#9492;&#9472;&#9472; 500.html</code></pre>
+
+<h4>必备模板</h4>
+<table>
+  <tr><th>文件</th><th>用途</th></tr>
+  <tr><td><code>base.html</code></td><td>全站基础骨架，所有页面通过 <code>{% extends theme_base %}</code> 继承</td></tr>
+  <tr><td><code>index.html</code></td><td>站点首页</td></tr>
+  <tr><td><code>list.html</code></td><td>列表栏目默认列表页（名称固定 <code>list</code>）</td></tr>
+  <tr><td><code>article.html</code></td><td>文章详情默认页（名称固定 <code>article</code>）</td></tr>
+  <tr><td><code>page.html</code></td><td>单页栏目默认页（名称固定 <code>page</code>）</td></tr>
+  <tr><td><code>404.html</code> / <code>500.html</code></td><td>错误页</td></tr>
+  <tr><td><code>closed.html</code></td><td>站点关闭时展示</td></tr>
+</table>
+
+<h4>可选模板（栏目级备选）</h4>
+<p>凡以 <code>list</code>、<code>article</code>、<code>page</code> 开头的 <code>.html</code> 文件，会<b>自动</b>出现在后台栏目编辑页的下拉选项中：</p>
+<ul>
+  <li><code>list_xxx.html</code> &rarr; 列表栏目可选用</li>
+  <li><code>article_xxx.html</code> &rarr; 文章详情页可选用</li>
+  <li><code>page_xxx.html</code> &rarr; 单页栏目可选用</li>
+</ul>
+<div class="note"><b>受保护模板</b>（即使以上述前缀开头也不会列为栏目备选，因为它们是系统级模板）：<br><code>base</code>、<code>404</code>、<code>500</code>、<code>closed</code>、<code>form_closed</code>、<code>index</code>、<code>search</code>、<code>column_children</code>、<code>form</code></div>
+
+<h3 id="tpl-new">2. 创建一个新主题</h3>
+<p>以创建名为 <code>green</code> 的绿色风格主题为例：</p>
+<h4>步骤 1：复制默认主题作为起点</h4>
+<pre><code>cp -r app/frontend/templates/themes/default app/frontend/templates/themes/green</code></pre>
+<h4>步骤 2：修改 base.html 中的样式</h4>
+<pre><code>/* 主题色：绿色 */
+.navbar { background: linear-gradient(135deg,#2e7d32 0%,#1b5e20 100%) !important; }
+.footer { background: linear-gradient(135deg,#2e7d32 0%,#1b5e20 100%); color:#e8f5e9; }
+.card-header { background:#2e7d32; color:#fff; }
+.btn-primary { background-color:#2e7d32; border-color:#2e7d32; }
+a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
+<h4>步骤 3：在后台启用</h4>
+<p>进入 <b>后台 &rarr; 网站设置 &rarr; 前台主题</b>，下拉框会自动出现 <code>green</code> 选项，选中保存即可。</p>
+<div class="note">主题的发现是<b>自动</b>的：扫描 <code>themes/</code> 下所有子目录，无需在代码中注册。</div>
+
+<h3 id="tpl-base">3. 模板继承与 theme_base</h3>
+<p>所有页面模板通过 <code>{% extends theme_base %}</code> 继承当前主题的 <code>base.html</code>，而不是写死路径：</p>
+<pre><code>{% extends theme_base %}
+{% block title %}页面标题{% endblock %}
+{% block content %}
+  页面内容
+{% endblock %}</code></pre>
+<p><code>theme_base</code> 由上下文处理器注入，值类似 <code>themes/default/base.html</code>，切换主题时自动找到对应的 <code>base.html</code>。</p>
+<h4>base.html 必须提供的 block</h4>
+<table>
+  <tr><th>Block 名</th><th>用途</th></tr>
+  <tr><td><code>title</code></td><td>&lt;title&gt; 标签内容</td></tr>
+  <tr><td><code>css</code></td><td>页面级 CSS（在 &lt;head&gt; 内）</td></tr>
+  <tr><td><code>content</code></td><td>主体内容</td></tr>
+  <tr><td><code>js</code></td><td>页面级 JS（在 &lt;/body&gt; 前）</td></tr>
+</table>
+
+<h3 id="tpl-vars">4. 全局模板变量</h3>
+<p>以下变量在所有前台模板中可直接使用（由 <code>app/__init__.py</code> 的 <code>context_processor</code> 注入）：</p>
+<table>
+  <tr><th>变量</th><th>类型</th><th>说明</th></tr>
+  <tr><td><code>site_settings</code></td><td>dict</td><td>站点设置，含前台企业标识：<code>site_name</code>、<code>site_subtitle</code>、<code>site_logo</code>、<code>footer_copyright</code> 等</td></tr>
+  <tr><td><code>site_fragments</code></td><td>dict</td><td>碎片内容，键为碎片 <code>slug</code>，值为 Fragment 对象（访问 <code>.value</code>）</td></tr>
+  <tr><td><code>nav_columns</code></td><td>list</td><td>顶层栏目列表</td></tr>
+  <tr><td><code>current_theme</code></td><td>str</td><td>当前主题名（如 <code>default</code>）</td></tr>
+  <tr><td><code>theme_base</code></td><td>str</td><td>当前主题 base 模板路径</td></tr>
+  <tr><td><code>cms_name</code> / <code>cms_copyright</code></td><td>str</td><td>CMS 名称 / 后台版权（固定），仅后台使用</td></tr>
+</table>
+<h4>视图函数传入的常用变量</h4>
+<ul>
+  <li><b>首页</b> <code>index.html</code>：<code>nav</code>、<code>first_page</code>、<code>latest_articles</code>、<code>friend_links</code>、<code>seo</code>；行业主题另有 <code>about_col</code>、<code>products_col/products</code>、<code>services_col/services</code>、<code>news_col/news</code>、<code>cases_col/cases</code>（按 slug 约定收集，通用主题忽略）</li>
+  <li><b>列表页</b> <code>list.html</code>：<code>column</code>、<code>articles</code>、<code>pagination</code>、<code>nav</code>、<code>seo</code></li>
+  <li><b>文章详情</b> <code>article.html</code>：<code>column</code>、<code>article</code>、<code>fields</code>、<code>latest_articles</code>、<code>prev_article</code>、<code>next_article</code>、<code>nav</code>、<code>seo</code></li>
+  <li><b>单页</b> <code>page.html</code>：<code>column</code>、<code>nav</code>、<code>seo</code></li>
+  <li><b>表单</b> <code>form.html</code>：<code>form</code>、<code>fields</code>、<code>nav</code>、<code>seo</code></li>
+  <li><b>搜索</b> <code>search.html</code>：<code>keyword</code>、<code>results</code>、<code>nav</code>、<code>seo</code></li>
+  <li><b>父栏目</b> <code>column_children.html</code>：<code>column</code>、<code>children</code>、<code>nav</code>、<code>seo</code></li>
+</ul>
+
+<h3 id="tpl-objs">5. 常用对象字段速查</h3>
+<h4>Article（文章）</h4>
+<pre><code>{{ article.title }}
+{{ article.summary }}
+{{ article.content|safe }}           {# 富文本，必须用 safe #}
+{{ article.cover }}                  {# 封面图 URL #}
+{{ article.author }}  {{ article.source }}  {{ article.viewed }}
+{{ article.published_at|date }}       {# 发布日期 #}
+{{ article.published_at|datetime }}   {# 发布日期时间 #}
+{{ article.get_field_value(field_id) }}  {# 自定义字段值 #}</code></pre>
+<h4>Column（栏目）</h4>
+<pre><code>{{ column.name }}  {{ column.slug }}  {{ column.summary }}
+{{ column.type }}                    {# list / page / link #}
+{{ column.page_content|safe }}        {# 单页栏目富文本 #}
+{{ column.page_size }}  {{ column.list_template }}
+{{ column.detail_template }}  {{ column.page_template }}</code></pre>
+<h4>Pagination（分页）</h4>
+<pre><code>{{ pagination.page }}  {{ pagination.pages }}
+{{ pagination.has_prev }}  {{ pagination.has_next }}
+{{ pagination.prev_num }}  {{ pagination.next_num }}
+{% for p in pagination.iter_pages() %} ... {% endfor %}</code></pre>
+<h4>Fragment（碎片）</h4>
+<pre><code>{% if site_fragments.contact_phone and site_fragments.contact_phone.value %}
+  {{ site_fragments.contact_phone.value }}
+{% endif %}
+{{ site_fragments.home_notice.value|safe }}   {# 富文本碎片用 safe #}</code></pre>
+
+<h3 id="tpl-url">6. URL 生成与自定义过滤器</h3>
+<pre><code>{{ url_for('frontend.index') }}                                   {# 首页 #}
+{{ url_for('frontend.column_detail', slug=column.slug) }}         {# 栏目页 #}
+{{ url_for('frontend.column_detail', slug=column.slug, page=2) }} {# 带分页 #}
+{{ url_for('frontend.article_detail', slug=column.slug, aid=article.id) }} {# 文章 #}
+{{ url_for('frontend.form_submit', slug=form.slug) }}             {# 表单 #}
+{{ url_for('frontend.search') }}                                  {# 搜索 #}</code></pre>
+<table>
+  <tr><th>过滤器</th><th>用途</th><th>示例</th></tr>
+  <tr><td><code>date</code></td><td>格式化日期</td><td><code>{{ article.published_at|date }}</code> &rarr; 2026-08-06</td></tr>
+  <tr><td><code>datetime</code></td><td>格式化日期时间</td><td><code>{{ article.published_at|datetime }}</code> &rarr; 2026-08-06 22:30</td></tr>
+  <tr><td><code>truncate_text</code></td><td>截断文本</td><td><code>{{ article.summary|truncate_text(80) }}</code></td></tr>
+</table>
+
+<h3 id="tpl-column">7. 制作栏目级备选模板</h3>
+<p>以制作「卡片式列表模板」为例。<b>步骤 1</b>：在主题目录下创建以 <code>list</code> 开头的文件 <code>list_card.html</code>。<b>步骤 2</b>：编写模板内容（继承 <code>theme_base</code>，遍历 <code>articles</code> 渲染卡片，用 <code>pagination</code> 生成分页）。<b>步骤 3</b>：进入后台栏目编辑页，「列表页模板」下拉框会出现 <code>list_card</code> 选项，选中保存即可。</p>
+<table>
+  <tr><th>前缀</th><th>对应栏目模板类型</th><th>出现位置</th></tr>
+  <tr><td><code>list_*</code></td><td>列表页模板</td><td>列表栏目的「列表页模板」下拉</td></tr>
+  <tr><td><code>article_*</code></td><td>内容页模板</td><td>列表栏目的「内容页模板」下拉</td></tr>
+  <tr><td><code>page_*</code></td><td>单页模板</td><td>单页栏目的「单页模板」下拉</td></tr>
+</table>
+<div class="note">若栏目指定的模板在当前主题中不存在（如切换主题后新主题没有该模板），系统会<b>自动回退</b>到默认模板（<code>list</code> / <code>article</code> / <code>page</code>），不会报错。</div>
+
+<h4>自定义字段渲染示例（文章详情页片段）</h4>
+<pre><code>{% for f in fields %}
+  {% set val = article.get_field_value(f.id) %}
+  {% if val %}
+  &lt;tr&gt;&lt;th&gt;{{ f.label }}&lt;/th&gt;&lt;td&gt;
+    {% if f.field_type == 'image' %}&lt;img src="{{ val }}"&gt;
+    {% elif f.field_type == 'file' %}&lt;a href="{{ val }}"&gt;下载&lt;/a&gt;
+    {% elif f.field_type == 'url' %}&lt;a href="{{ val }}" target="_blank"&gt;{{ val }}&lt;/a&gt;
+    {% elif f.field_type == 'richtext' %}{{ val|safe }}
+    {% else %}{{ val }}{% endif %}
+  &lt;/td&gt;&lt;/tr&gt;
+  {% endif %}
+{% endfor %}</code></pre>
+
+<h3 id="tpl-checklist">8. 模板制作检查清单</h3>
+<ul class="check">
+  <li>目录 <code>app/frontend/templates/themes/&lt;主题名&gt;/</code> 已创建</li>
+  <li>包含必备文件：<code>base / index / list / article / page / 404 / 500 / closed</code></li>
+  <li>所有页面通过 <code>{% extends theme_base %}</code> 继承（不硬编码主题路径）</li>
+  <li><code>base.html</code> 提供 <code>title / css / content / js</code> 四个 block</li>
+  <li>富文本内容使用 <code>|safe</code> 过滤器</li>
+  <li>列表页、文章页的分页链接正确使用 <code>pagination</code> 对象</li>
+  <li>后台「网站设置 &rarr; 前台主题」下拉框能看到新主题</li>
+  <li>切换到新主题后，首页、栏目页、文章页、单页、404 均能正常访问</li>
+  <li>自定义字段按 <code>field_type</code> 区分图片/文件/URL/富文本正确渲染</li>
+</ul>
+
+<h3 id="tpl-debug">9. 调试技巧</h3>
+<ul>
+  <li><b>调试模式</b>：<code>python run.py</code> 默认开启 DEBUG，模板修改自动重载。</li>
+  <li><b>查看当前主题</b>：在任意模板中输出 <code>{{ current_theme }}</code>。</li>
+  <li><b>查看可用模板</b>：Python Shell 中执行 <code>list_themes()</code> / <code>list_theme_templates(category='list')</code>（见 <code>app/utils/themes.py</code>）。</li>
+  <li><b>模板找不到报错</b>：检查文件名是否准确（区分大小写），是否放在正确的主题目录下。</li>
+</ul>
+</section>
+
+<footer>
+  <p>zhycms 使用手册 · 基于 Apache License 2.0 开源 · 本页为离线 HTML 单文件，可直接双击在浏览器打开。</p>
+</footer>
+</main>
+</div>
+</body>
+</html>

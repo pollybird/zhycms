@@ -1,0 +1,72 @@
+{% extends 'admin/base.html' %}
+{% block title %}网站设置 - {{ cms_name }}{% endblock %}
+{% block page_header %}网站设置{% endblock %}
+{% set active_menu = 'setting_site' %}
+
+{% block breadcrumb %}<li class="breadcrumb-item active">网站设置</li>{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">网站名称</label>
+            <input type="text" name="site_name" class="form-control" value="{{ settings.site_name }}" required>
+            <small class="form-text text-muted">前台展示的企业名称（与后台 CMS 名称「{{ cms_name }}」相互独立）。</small>
+          </div>
+          <div class="form-group">
+            <label>网站副标题</label>
+            <input type="text" name="site_subtitle" class="form-control" value="{{ settings.site_subtitle }}">
+          </div>
+          <div class="form-group">
+            <label>前台版权信息</label>
+            <textarea name="footer_copyright" rows="2" class="form-control">{{ settings.footer_copyright }}</textarea>
+            <small class="form-text text-muted">前台底部显示的企业版权。后台版权固定为「{{ cms_copyright }}」，不受此处影响。</small>
+          </div>
+          <div class="form-group">
+            <label>网站状态</label>
+            <select name="site_status" class="form-control">
+              <option value="open" {{ 'selected' if settings.site_status == 'open' }}>正常开放</option>
+              <option value="closed" {{ 'selected' if settings.site_status == 'closed' }}>维护关闭</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>关闭原因（站点关闭时显示）</label>
+            <textarea name="site_close_reason" rows="2" class="form-control">{{ settings.site_close_reason }}</textarea>
+          </div>
+          <div class="form-group">
+            <label>前台主题</label>
+            <select name="site_theme" class="form-control">
+              {% for name, label in themes %}
+              <option value="{{ name }}" {{ 'selected' if settings.site_theme == name }}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <small class="form-text text-muted">切换前台站点使用的模板主题，主题目录位于 app/frontend/templates/themes/</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">网站 LOGO</h3></div>
+        <div class="card-body">
+          <input type="file" name="site_logo" class="form-control-file" accept="image/*">
+          {% if settings.site_logo %}
+          <div class="mt-2 text-center">
+            <img src="{{ settings.site_logo }}" style="max-height:80px;max-width:100%;">
+          </div>
+          <label><input type="checkbox" name="site_logo_remove"> 删除 LOGO</label>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-body">
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

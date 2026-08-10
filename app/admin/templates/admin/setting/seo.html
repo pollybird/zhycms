@@ -1,0 +1,32 @@
+{% extends 'admin/base.html' %}
+{% block title %}SEO 默认配置 - {{ cms_name }}{% endblock %}
+{% block page_header %}全站 SEO 默认配置{% endblock %}
+{% set active_menu = 'setting_seo' %}
+
+{% block breadcrumb %}<li class="breadcrumb-item active">SEO 默认配置</li>{% endblock %}
+
+{% block content %}
+<form method="post">
+  <div class="card">
+    <div class="card-body">
+      <div class="form-group">
+        <label>默认 SEO 标题</label>
+        <input type="text" name="seo_title" class="form-control" value="{{ settings.seo_title }}">
+        <small class="form-text text-muted">栏目未单独配置 SEO 时使用此默认值</small>
+      </div>
+      <div class="form-group">
+        <label>默认 SEO 关键词</label>
+        <input type="text" name="seo_keywords" class="form-control" value="{{ settings.seo_keywords }}">
+        <small class="form-text text-muted">多个关键词用英文逗号分隔</small>
+      </div>
+      <div class="form-group">
+        <label>默认 SEO 描述</label>
+        <textarea name="seo_description" rows="3" class="form-control">{{ settings.seo_description }}</textarea>
+      </div>
+    </div>
+    <div class="card-footer">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> 保存配置</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

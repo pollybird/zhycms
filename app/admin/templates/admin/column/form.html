@@ -1,0 +1,367 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ '编辑栏目' if column else '新增栏目' }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ '编辑栏目' if column else '新增栏目' }}{% endblock %}
+{% set active_menu = 'column' %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.column_index') }}">栏目管理</a></li>
+  <li class="breadcrumb-item active">{{ '编辑' if column else '新增' }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" id="column-form">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">基本信息</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">栏目名称</label>
+            <input type="text" name="name" class="form-control" value="{{ column.name if column else '' }}" required>
+          </div>
+
+          <div class="form-group">
+            <label class="required-mark">栏目标识（英文，创建后不可修改）</label>
+            <input type="text" name="slug" class="form-control" pattern="[a-zA-Z][a-zA-Z0-9_\-]*" value="{{ column.slug if column else '' }}" {{ 'readonly' if column else 'required' }}>
+            <small class="form-text text-muted">仅字母、数字、下划线、横线，且必须以字母开头</small>
+          </div>
+
+          <div class="form-group">
+            <label>父栏目</label>
+            <select name="parent_id" class="form-control">
+              <option value="">— 顶级栏目 —</option>
+              {% for p in parent_options %}
+                {% if not column or p.id != column.id %}
+                <option value="{{ p.id }}" {{ 'selected' if column and column.parent_id == p.id else '' }}>
+                  {% if p._depth > 0 %}{% for i in range(p._depth) %}├─&nbsp;{% endfor %}{% endif %}{{ p.name }}
+                </option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <small class="form-text text-muted">有子栏目的栏目自动成为"父栏目"，无法添加自有内容</small>
+          </div>
+
+          <div class="form-group">
+            <label>栏目类型</label>
+            <select name="type" id="col-type" class="form-control" {{ 'disabled' if column and column.is_parent }}>
+              <option value="page" {{ 'selected' if (column is none or column.type == 'page') }}>单页栏目</option>
+              <option value="list" {{ 'selected' if column and column.type == 'list' }}>列表栏目</option>
+              <option value="link" {{ 'selected' if column and column.type == 'link' }}>链接栏目</option>
+            </select>
+            {% if column and column.is_parent %}
+            <input type="hidden" name="type" value="{{ column.type }}">
+            <small class="form-text text-warning">该栏目已是父栏目，类型不可修改</small>
+            {% endif %}
+          </div>
+
+          <div class="form-group">
+            <label>栏目简介</label>
+            <textarea name="summary" rows="3" class="form-control">{{ column.summary if column else '' }}</textarea>
+          </div>
+
+          {# 列表配置 #}
+          <div class="form-group" id="list-config-block" style="display:none;">
+            <label>每页显示条数</label>
+            <input type="number" name="page_size" min="1" max="100" class="form-control" value="{{ column.page_size if column and column.page_size else 10 }}">
+            <small class="form-text text-muted">前台列表栏目每页显示的文章数</small>
+          </div>
+
+          {# 链接配置 #}
+          <div id="link-config-block" style="display:none;">
+            <div class="form-group">
+              <label class="required-mark">跳转 URL</label>
+              <input type="text" name="link_url" class="form-control" value="{{ column.link_url if column else '' }}" placeholder="https:// 或 /about">
+            </div>
+            <div class="form-group">
+              <label>打开方式</label>
+              <select name="link_target" class="form-control">
+                <option value="_self" {{ 'selected' if column is none or column.link_target == '_self' }}>当前窗口</option>
+                <option value="_blank" {{ 'selected' if column and column.link_target == '_blank' }}>新窗口</option>
+              </select>
+            </div>
+          </div>
+
+          {# 父栏目访问模式 #}
+          <div class="form-group" id="parent-mode-block">
+            <label>父栏目前台访问模式</label>
+            <select name="parent_mode" class="form-control">
+              <option value="first_child" {{ 'selected' if column is none or column.parent_mode == 'first_child' }}>自动跳转第一个子栏目</option>
+              <option value="list_children" {{ 'selected' if column and column.parent_mode == 'list_children' }}>展示所有子栏目列表</option>
+            </select>
+            <small class="form-text text-muted">仅当栏目作为父栏目（含子栏目）时生效</small>
+          </div>
+        </div>
+      </div>
+
+      {# 单页内容 - 独立大卡片 #}
+      <div class="card" id="page-content-card" style="display:none;">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-edit"></i> 单页内容</h3></div>
+        <div class="card-body p-0">
+          <textarea name="page_content" id="page_content" rows="10" class="form-control" style="border:0;">{{ column.page_content if column else '' }}</textarea>
+        </div>
+      </div>
+
+      {# 自定义字段 #}
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">自定义字段</h3>
+          <div class="card-tools">
+            <button type="button" class="btn btn-success btn-sm" onclick="add_field()"><i class="fas fa-plus"></i> 添加字段</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="fields-container">
+            {% if column %}
+              {% for f in column.fields.filter_by(is_deleted=False).all() %}
+              <div class="field-row border rounded p-2 mb-2" data-index="{{ loop.index0 }}">
+                <input type="hidden" name="field_id[]" value="{{ f.id }}">
+                <div class="form-row">
+                  <div class="col-md-2">
+                    <input type="text" name="field_label[]" class="form-control form-control-sm mb-1" placeholder="字段名称" value="{{ f.label }}" required>
+                  </div>
+                  <div class="col-md-2">
+                    <input type="text" name="field_key[]" class="form-control form-control-sm mb-1" placeholder="英文标识" value="{{ f.field_key }}" pattern="[a-zA-Z][a-zA-Z0-9_]*" required>
+                  </div>
+                  <div class="col-md-2">
+                    <select name="field_type[]" class="form-control form-control-sm mb-1 field-type-select">
+                      {% for v, label in field_types %}
+                      <option value="{{ v }}" {{ 'selected' if f.field_type == v }}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-md-1 text-center">
+                    <label class="small">
+                      <input type="checkbox" name="field_required[]" value="{{ loop.index0 }}" {{ 'checked' if f.is_required }}>
+                      必填
+                    </label>
+                  </div>
+                  <div class="col-md-1 text-center">
+                    <label class="small">
+                      <input type="checkbox" name="field_visible[]" value="{{ loop.index0 }}" {{ 'checked' if f.is_frontend_visible }}>
+                      显示
+                    </label>
+                  </div>
+                  <div class="col-md-3 file-config" style="{{ '' if f.field_type == 'file' else 'display:none;' }}">
+                    <input type="text" name="field_exts[]" class="form-control form-control-sm mb-1" placeholder="允许后缀(逗号分隔)" value="{{ f.allowed_exts or '' }}">
+                  </div>
+                  <div class="col-md-1">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="remove_field(this)"><i class="fas fa-times"></i></button>
+                  </div>
+                </div>
+                <div class="form-row file-config" style="{{ '' if f.field_type == 'file' else 'display:none;' }}">
+                  <div class="col-md-3">
+                    <input type="number" name="field_maxsize[]" class="form-control form-control-sm" placeholder="最大KB" value="{{ (f.max_size // 1024) if f.max_size else '' }}">
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+          <small class="form-text text-muted">字段标识用于模板调用，全局唯一；文件类型字段需配置允许的后缀和大小限制</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">发布设置</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>排序优先级</label>
+            <input type="number" name="sort_order" class="form-control" value="{{ column.sort_order if column else 0 }}">
+            <small class="form-text text-muted">数值越大越靠前</small>
+          </div>
+          <div class="form-group">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled" {{ 'checked' if column is none or column.is_enabled }}>
+              <label class="custom-control-label" for="is_enabled">启用栏目</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="template-card">
+        <div class="card-header"><h3 class="card-title">模板设置</h3></div>
+        <div class="card-body">
+          {# 列表栏目：列表页 + 内容页模板 #}
+          <div id="tpl-list-block" style="display:none;">
+            <div class="form-group">
+              <label>列表页模板</label>
+              <select name="list_template" class="form-control">
+                <option value="">默认（list）</option>
+                {% for name, label in template_options.list %}
+                <option value="{{ name }}" {{ 'selected' if column and column.list_template == name }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small class="form-text text-muted">该栏目文章列表页使用的模板，不选则使用默认 list.html</small>
+            </div>
+            <div class="form-group">
+              <label>内容页模板</label>
+              <select name="detail_template" class="form-control">
+                <option value="">默认（article）</option>
+                {% for name, label in template_options.detail %}
+                <option value="{{ name }}" {{ 'selected' if column and column.detail_template == name }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small class="form-text text-muted">该栏目下文章详情页使用的模板，不选则使用默认 article.html</small>
+            </div>
+          </div>
+
+          {# 单页栏目：单页模板 #}
+          <div id="tpl-page-block" style="display:none;">
+            <div class="form-group">
+              <label>单页模板</label>
+              <select name="page_template" class="form-control">
+                <option value="">默认（page）</option>
+                {% for name, label in template_options.page %}
+                <option value="{{ name }}" {{ 'selected' if column and column.page_template == name }}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small class="form-text text-muted">该单页栏目展示时使用的模板，不选则使用默认 page.html</small>
+            </div>
+          </div>
+
+          <div id="tpl-link-block" style="display:none;">
+            <p class="text-muted small mb-0">链接栏目无需模板配置</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">SEO 设置</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>SEO 标题</label>
+            <input type="text" name="seo_title" class="form-control" value="{{ column.seo_title if column else '' }}">
+          </div>
+          <div class="form-group">
+            <label>SEO 关键词</label>
+            <input type="text" name="seo_keywords" class="form-control" value="{{ column.seo_keywords if column else '' }}">
+            <small class="form-text text-muted">多个关键词用英文逗号分隔</small>
+          </div>
+          <div class="form-group">
+            <label>SEO 描述</label>
+            <textarea name="seo_description" rows="3" class="form-control">{{ column.seo_description if column else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存栏目</button>
+          <a href="{{ url_for('admin.column_index') }}" class="btn btn-default btn-block">取消</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block js %}
+<script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
+<style>
+  .ck.ck-editor__editable_inline { min-height: 500px; }
+  .ck.ck-content { font-size: 15px; line-height: 1.8; }
+</style>
+<script>
+  let fieldIndex = $('#fields-container .field-row').length;
+
+  function toggle_type_blocks(){
+    const t = $('#col-type').val();
+    $('#page-content-card').toggle(t === 'page');
+    $('#list-config-block').toggle(t === 'list');
+    $('#link-config-block').toggle(t === 'link');
+    // 模板设置区块随类型切换
+    $('#tpl-list-block').toggle(t === 'list');
+    $('#tpl-page-block').toggle(t === 'page');
+    $('#tpl-link-block').toggle(t === 'link');
+  }
+  $('#col-type').on('change', toggle_type_blocks);
+  toggle_type_blocks();
+
+  // CKEditor 初始化单页内容
+  let editor;
+  const ta = document.querySelector('#page_content');
+  if (ta) {
+    ClassicEditor.create(ta, {
+      toolbar: {
+        items: [
+          'heading', '|',
+          'bold', 'italic', 'underline', 'strikethrough', '|',
+          'fontColor', 'fontBackgroundColor', '|',
+          'alignment', '|',
+          'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+          'link', 'imageUpload', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
+          'undo', 'redo'
+        ]
+      },
+      image: {
+        toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
+      },
+      table: {
+        contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+      },
+      ckfinder: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=column' }
+    }).then(e => { editor = e; })
+      .catch(err => console.error(err));
+    $('#column-form').on('submit', function(){
+      if (editor) ta.value = editor.getData();
+    });
+  }
+
+  function add_field(){
+    const html = `
+      <div class="field-row border rounded p-2 mb-2" data-index="${fieldIndex}">
+        <input type="hidden" name="field_id[]" value="">
+        <div class="form-row">
+          <div class="col-md-2">
+            <input type="text" name="field_label[]" class="form-control form-control-sm mb-1" placeholder="字段名称" required>
+          </div>
+          <div class="col-md-2">
+            <input type="text" name="field_key[]" class="form-control form-control-sm mb-1" placeholder="英文标识" pattern="[a-zA-Z][a-zA-Z0-9_]*" required>
+          </div>
+          <div class="col-md-2">
+            <select name="field_type[]" class="form-control form-control-sm field-type-select">
+              {% for v, label in field_types %}
+              <option value="{{ v }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-1 text-center">
+            <label class="small">
+              <input type="checkbox" name="field_required[]" value="${fieldIndex}"> 必填
+            </label>
+          </div>
+          <div class="col-md-1 text-center">
+            <label class="small">
+              <input type="checkbox" name="field_visible[]" value="${fieldIndex}" checked> 显示
+            </label>
+          </div>
+          <div class="col-md-3 file-config" style="display:none;">
+            <input type="text" name="field_exts[]" class="form-control form-control-sm mb-1" placeholder="允许后缀(逗号分隔)">
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-danger btn-sm" onclick="remove_field(this)"><i class="fas fa-times"></i></button>
+          </div>
+        </div>
+        <div class="form-row file-config" style="display:none;">
+          <div class="col-md-3">
+            <input type="number" name="field_maxsize[]" class="form-control form-control-sm" placeholder="最大KB">
+          </div>
+        </div>
+      </div>`;
+    $('#fields-container').append(html);
+    fieldIndex++;
+  }
+
+  function remove_field(btn){
+    $(btn).closest('.field-row').remove();
+  }
+
+  // 字段类型切换
+  $('#fields-container').on('change', '.field-type-select', function(){
+    const isFile = $(this).val() === 'file';
+    $(this).closest('.field-row').find('.file-config').toggle(isFile);
+  });
+</script>
+{% endblock %}

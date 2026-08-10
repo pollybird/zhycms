@@ -1,0 +1,97 @@
+{% extends theme_base %}
+{% block title %}{{ article.title }} - {{ column.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.column_detail', slug=column.slug) }}">{{ column.name }}</a></li>
+    <li class="breadcrumb-item active">{{ article.title|truncate_text(30) }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  <div class="col-md-9">
+    <article>
+      <h1>{{ article.title }}</h1>
+      <div class="text-muted mb-3 small">
+        <span><i class="far fa-clock"></i> {{ article.published_at|datetime }}</span>
+        {% if article.author %}<span class="ml-3"><i class="fas fa-user"></i> {{ article.author }}</span>{% endif %}
+        {% if article.source %}<span class="ml-3"><i class="fas fa-bookmark"></i> {{ article.source }}</span>{% endif %}
+        <span class="ml-3"><i class="far fa-eye"></i> {{ article.viewed }} 浏览</span>
+      </div>
+
+      {% if article.summary %}
+      <div class="alert alert-light border">
+        <i class="fas fa-quote-left text-muted"></i> {{ article.summary }}
+      </div>
+      {% endif %}
+
+      <div class="article-content">
+        {{ article.content|safe }}
+      </div>
+
+      {# 文章自定义字段 #}
+      {% if fields %}
+      <hr>
+      <div class="card bg-light">
+        <div class="card-body">
+          <h6 class="card-title">详细信息</h6>
+          <table class="table table-sm mb-0">
+            {% for f in fields %}
+              {% set val = article.get_field_value(f.id) %}
+              {% if val %}
+              <tr>
+                <th width="120">{{ f.label }}</th>
+                <td>
+                  {% if f.field_type == 'image' %}<img src="{{ val }}" class="img-fluid" style="max-height:300px;">
+                  {% elif f.field_type == 'file' %}<a href="{{ val }}" class="btn btn-sm btn-success"><i class="fas fa-download"></i> 下载附件</a>
+                  {% elif f.field_type == 'url' %}<a href="{{ val }}" target="_blank">{{ val }}</a>
+                  {% elif f.field_type == 'richtext' %}{{ val|safe }}
+                  {% else %}{{ val }}
+                  {% endif %}
+                </td>
+              </tr>
+              {% endif %}
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {# 上一篇/下一篇 #}
+      <div class="row mt-4">
+        <div class="col-6">
+          {% if prev_article %}
+          <a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=prev_article.id) }}" class="btn btn-outline-secondary btn-block text-left">
+            <small>上一篇</small><br>{{ prev_article.title|truncate_text(20) }}
+          </a>
+          {% endif %}
+        </div>
+        <div class="col-6">
+          {% if next_article %}
+          <a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=next_article.id) }}" class="btn btn-outline-secondary btn-block text-right">
+            <small>下一篇</small><br>{{ next_article.title|truncate_text(20) }}
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-list"></i> 最新文章</div>
+      <div class="list-group list-group-flush">
+        {% for a in latest_articles %}
+        <a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=a.id) }}" class="list-group-item list-group-item-action small {{ 'active' if a.id == article.id }}">
+          {{ a.title|truncate_text(25) }}
+        </a>
+        {% else %}
+        <div class="list-group-item text-muted small">暂无其他文章</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
