@@ -95,12 +95,51 @@
 
 {% block js %}
 {% if fragment and fragment.field_type == 'richtext' %}
-<script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
+<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
+<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
 <script>
+  // super-build 全功能富文本（字体颜色/背景色/字号/字体/对齐/缩进/高亮等）
+  // 自托管 super-build + GPL 许可证（CDN 分发不接受 'GPL' key）。
   let editor;
-  ClassicEditor.create(document.querySelector('#value_richtext'), {
-    ckfinder: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=fragment' }
-  }).then(e => { editor = e; });
+  CKEDITOR.ClassicEditor.create(document.querySelector('#value_richtext'), {
+    licenseKey: 'GPL',
+    language: 'zh-cn',
+    placeholder: '在此输入内容……',
+    toolbar: {
+      items: [
+        'undo', 'redo', '|',
+        'heading', '|',
+        'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
+        'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'code', '|',
+        'alignment', '|',
+        'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+        'link', 'imageUpload', 'insertTable', 'blockQuote', 'highlight',
+        'codeBlock', 'horizontalLine', 'specialCharacters', '|',
+        'removeFormat', 'sourceEditing'
+      ],
+      shouldNotGroupWhenFull: true
+    },
+    removePlugins: [
+      'AIAssistant', 'AITextAdapter', 'OpenAITextAdapter', 'AWSTextAdapter',
+      'CKBox', 'CKFinder', 'EasyImage', 'RealTimeCollaborativeComments',
+      'RealTimeCollaborativeTrackChanges', 'RealTimeCollaborativeRevisionHistory',
+      'PresenceList', 'Comments', 'TrackChanges', 'TrackChangesData', 'RevisionHistory',
+      'Pagination', 'WProofreader', 'MathType', 'SlashCommand', 'Template',
+      'DocumentOutline', 'FormatPainter', 'TableOfContents', 'PasteFromOfficeEnhanced',
+      'CaseChange'
+    ],
+    image: {
+      toolbar: ['imageTextAlternative', 'toggleImageCaption', '|',
+                'imageStyle:inline', 'imageStyle:block', 'imageStyle:side']
+    },
+    table: {
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties']
+    },
+    fontSize: {
+      options: [9, 10, 11, 12, 13, 'default', 15, 17, 19, 21, 24, 28, 32, 40]
+    },
+    simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=fragment' }
+  }).then(e => { editor = e; }).catch(err => console.error(err));
   $('#fragment-form').on('submit', function(){
     if (editor) document.querySelector('#value_richtext').value = editor.getData();
   });

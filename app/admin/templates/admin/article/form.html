@@ -150,40 +150,66 @@
 {% endblock %}
 
 {% block js %}
-<script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
+<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
+<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
 <style>
   .ck.ck-editor__editable_inline { min-height: 600px; }
   .ck.ck-content { font-size: 15px; line-height: 1.8; }
 </style>
 <script>
+  // 使用 CKEditor5 super-build（内置全部官方插件）以支持字体颜色、背景色、字号、字体、
+  // 段落对齐、缩进、高亮、上下标、清除格式等富文本功能。
+  // 自托管（本地 static 引用）+ GPL 许可证；CDN 分发不接受 'GPL' key，故改为本地托管。
   const ckConfig = {
+    licenseKey: 'GPL',
+    language: 'zh-cn',
+    placeholder: '在此输入内容……',
     toolbar: {
       items: [
+        'undo', 'redo', '|',
         'heading', '|',
-        'bold', 'italic', 'underline', 'strikethrough', '|',
-        'fontColor', 'fontBackgroundColor', '|',
+        'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
+        'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'code', '|',
         'alignment', '|',
         'bulletedList', 'numberedList', 'outdent', 'indent', '|',
-        'link', 'imageUpload', 'insertTable', 'blockQuote', 'codeBlock', 'horizontalLine', '|',
-        'undo', 'redo'
-      ]
+        'link', 'imageUpload', 'insertTable', 'blockQuote', 'highlight',
+        'codeBlock', 'horizontalLine', 'specialCharacters', '|',
+        'removeFormat', 'sourceEditing'
+      ],
+      shouldNotGroupWhenFull: true
     },
+    // super-build 含大量插件，禁用当前不需要的协作/云端/Markdown/AI 等；
+    // 其中 AIAssistant 等商业插件会强制校验 license（GPL key 无效会触发
+    // ai-invalid-license-key 并锁死编辑器），必须移除。
+    removePlugins: [
+      'AIAssistant', 'AITextAdapter', 'OpenAITextAdapter', 'AWSTextAdapter',
+      'CKBox', 'CKFinder', 'EasyImage', 'RealTimeCollaborativeComments',
+      'RealTimeCollaborativeTrackChanges', 'RealTimeCollaborativeRevisionHistory',
+      'PresenceList', 'Comments', 'TrackChanges', 'TrackChangesData', 'RevisionHistory',
+      'Pagination', 'WProofreader', 'MathType', 'SlashCommand', 'Template',
+      'DocumentOutline', 'FormatPainter', 'TableOfContents', 'PasteFromOfficeEnhanced',
+      'CaseChange'
+    ],
     image: {
-      toolbar: ['imageTextAlternative', 'imageStyle:full', 'imageStyle:side']
+      toolbar: ['imageTextAlternative', 'toggleImageCaption', '|',
+                'imageStyle:inline', 'imageStyle:block', 'imageStyle:side']
     },
     table: {
-      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties']
     },
-    ckfinder: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=article' }
+    fontSize: {
+      options: [9, 10, 11, 12, 13, 'default', 15, 17, 19, 21, 24, 28, 32, 40]
+    },
+    simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=article' }
   };
 
   let mainEditor, fieldEditors = [];
-  ClassicEditor.create(document.querySelector('#content'), ckConfig)
+  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), ckConfig)
     .then(e => { mainEditor = e; })
     .catch(err => console.error(err));
 
   document.querySelectorAll('.richtext').forEach(el => {
-    ClassicEditor.create(el, ckConfig).then(e => {
+    CKEDITOR.ClassicEditor.create(el, ckConfig).then(e => {
       fieldEditors.push({el: el, editor: e});
     }).catch(err => console.error(err));
   });
