@@ -3,7 +3,6 @@ import uuid
 from datetime import datetime
 
 from flask import current_app, url_for
-from werkzeug.utils import secure_filename
 
 
 def allowed_file(filename, allowed_exts=None):
@@ -41,11 +40,14 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None)
     if size > max_size:
         return None, None, f'文件大小超过限制（最大 {max_size // 1024} KB）'
 
-    filename = secure_filename(file_storage.filename or '')
-    if not filename:
+    # 后缀从「原始文件名」提取：secure_filename 会剥离中文等非 ASCII 字符，
+    # 导致中文文件名（如“报告.doc”）丢失后缀而被误判为类型不允许。
+    original_name = file_storage.filename or ''
+    if '.' not in original_name:
         return None, None, '文件名无效'
+    ext = original_name.rsplit('.', 1)[1].lower()
 
-    if not allowed_file(filename, allowed_exts):
+    if not allowed_file(original_name, allowed_exts):
         return None, None, f'文件类型不允许，仅支持：{", ".join(allowed_exts)}'
 
     # 按日期分子目录
@@ -54,8 +56,7 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None)
     save_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], sub_dir, date_dir)
     os.makedirs(save_dir, exist_ok=True)
 
-    # 生成唯一文件名
-    ext = filename.rsplit('.', 1)[1].lower()
+    # 生成唯一文件名（存储名用 UUID，不含原始名，无需 secure_filename）
     new_name = f'{uuid.uuid4().hex}.{ext}'
     save_path = os.path.join(save_dir, new_name)
     file_storage.save(save_path)
