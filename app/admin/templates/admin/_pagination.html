@@ -1,20 +1,22 @@
 {% if pagination.pages > 1 %}
+{# 合并路径参数(view_args，如 cid)与查询参数(args)，否则带路径参数的路由(如 article_index)构建 URL 会缺参报 BuildError #}
+{% set url_args = dict(request.view_args or {}, **request.args) %}
 <nav class="mt-3">
   <ul class="pagination pagination-sm justify-content-center">
     <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
-      <a class="page-link" href="{{ url_for(request.endpoint, **dict(request.args, page=pagination.prev_num if pagination.has_prev else 1)) }}">&laquo;</a>
+      <a class="page-link" href="{{ url_for(request.endpoint, **dict(url_args, page=pagination.prev_num if pagination.has_prev else 1)) }}">&laquo;</a>
     </li>
     {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
       {% if p %}
         <li class="page-item {{ 'active' if p == pagination.page }}">
-          <a class="page-link" href="{{ url_for(request.endpoint, **dict(request.args, page=p)) }}">{{ p }}</a>
+          <a class="page-link" href="{{ url_for(request.endpoint, **dict(url_args, page=p)) }}">{{ p }}</a>
         </li>
       {% else %}
         <li class="page-item disabled"><span class="page-link">…</span></li>
       {% endif %}
     {% endfor %}
     <li class="page-item {{ 'disabled' if not pagination.has_next }}">
-      <a class="page-link" href="{{ url_for(request.endpoint, **dict(request.args, page=pagination.next_num if pagination.has_next else pagination.page)) }}">&raquo;</a>
+      <a class="page-link" href="{{ url_for(request.endpoint, **dict(url_args, page=pagination.next_num if pagination.has_next else pagination.page)) }}">&raquo;</a>
     </li>
   </ul>
 </nav>
