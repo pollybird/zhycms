@@ -3,7 +3,7 @@ from datetime import datetime
 
 from flask import (
     render_template, redirect, url_for, request,
-    flash, abort, jsonify
+    flash, abort, jsonify, current_app
 )
 from flask_login import current_user
 
@@ -12,6 +12,7 @@ from ..models.column import Column, ColumnField
 from ..models.article import Article, ArticleFieldValue
 from ..utils.helpers import admin_required
 from ..utils.uploads import save_upload_file
+from ..utils.word_import import convert_docx_to_html
 from . import admin_bp
 
 
@@ -91,6 +92,29 @@ def article_edit(cid, aid):
         'admin/article/form.html',
         column=col, article=article, fields=fields
     )
+
+
+@admin_bp.route('/columns/<int:cid>/articles/import-word', methods=['POST'])
+@admin_required
+def article_import_word(cid):
+    """接收 Word(.docx) 文件，转换为干净 HTML 返回给前端编辑器。"""
+    Column.query.get_or_404(cid)
+
+    file_storage = request.files.get('docx')
+    if not file_storage or not file_storage.filename:
+        return jsonify({'error': '未选择文件'}), 400
+
+    name = file_storage.filename
+    if '.' not in name or name.rsplit('.', 1)[1].lower() != 'docx':
+        return jsonify({'error': '仅支持 .docx 格式（旧版 .doc 请先另存为 .docx）'}), 400
+
+    try:
+        html, messages = convert_docx_to_html(file_storage)
+    except Exception as e:  # noqa: BLE001 - 转换失败统一返回可读错误
+        current_app.logger.exception('Word 导入失败')
+        return jsonify({'error': f'解析文档失败：{e}'}), 500
+
+    return jsonify({'html': html, 'messages': messages})
 
 
 def _save_article(article, column, fields):

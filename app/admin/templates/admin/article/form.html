@@ -65,7 +65,15 @@
       </div>
 
       <div class="card">
-        <div class="card-header"><h3 class="card-title"><i class="fas fa-edit"></i> 正文内容</h3></div>
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-edit"></i> 正文内容</h3>
+          <div class="card-tools">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="import-word-btn">
+              <i class="fas fa-file-word"></i> 从 Word 导入
+            </button>
+            <input type="file" id="import-word-file" accept=".docx" style="display:none;">
+          </div>
+        </div>
         <div class="card-body p-0">
           <textarea name="content" id="content" rows="15" class="form-control" style="border:0;">{{ article.content if article else '' }}</textarea>
         </div>
@@ -218,5 +226,55 @@
     if (mainEditor) document.querySelector('#content').value = mainEditor.getData();
     fieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
   });
+
+  // 从 Word(.docx) 导入正文：上传→后端转干净 HTML→灌入编辑器
+  (function(){
+    const btn = document.getElementById('import-word-btn');
+    const fileInput = document.getElementById('import-word-file');
+    if (!btn || !fileInput) return;
+    const importUrl = '{{ url_for("admin.article_import_word", cid=column.id) }}';
+
+    btn.addEventListener('click', function(){ fileInput.click(); });
+
+    fileInput.addEventListener('change', function(){
+      const file = fileInput.files[0];
+      if (!file) return;
+      if (!/\.docx$/i.test(file.name)) {
+        alert('仅支持 .docx 格式（旧版 .doc 请先在 Word 中另存为 .docx）');
+        fileInput.value = '';
+        return;
+      }
+      const fd = new FormData();
+      fd.append('docx', file);
+
+      const original = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 导入中…';
+
+      fetch(importUrl, { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} })
+        .then(r => r.json().then(data => ({ok: r.ok, data})))
+        .then(({ok, data}) => {
+          if (!ok || data.error) throw new Error(data.error || '导入失败');
+          if (!mainEditor) { alert('编辑器尚未就绪，请稍候重试'); return; }
+          const current = (mainEditor.getData() || '').trim();
+          if (current && !confirm('正文已有内容。点击“确定”在末尾追加导入内容，点击“取消”则替换全部内容。')) {
+            mainEditor.setData(data.html);           // 取消 → 替换
+          } else if (current) {
+            mainEditor.setData(current + data.html); // 确定 → 追加
+          } else {
+            mainEditor.setData(data.html);           // 原本为空 → 直接填入
+          }
+          if (data.messages && data.messages.length) {
+            console.warn('Word 导入提示：', data.messages);
+          }
+        })
+        .catch(err => { alert('Word 导入失败：' + err.message); })
+        .finally(() => {
+          btn.disabled = false;
+          btn.innerHTML = original;
+          fileInput.value = '';
+        });
+    });
+  })();
 </script>
 {% endblock %}
