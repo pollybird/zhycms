@@ -1,0 +1,183 @@
+{% extends 'admin/base.html' %}
+{% block title %}备份运维 - {{ cms_name }}{% endblock %}
+{% block page_header %}备份列表{% endblock %}
+{% set active_menu = 'backup_list' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">备份运维</li>
+<li class="breadcrumb-item active">备份列表</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-4">
+    <div class="card card-outline card-primary">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-hdd"></i> 系统状态</h3></div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <tr><th width="130">磁盘占用</th>
+              <td>{{ stats.get('disk_used_gb', '-') }} GB / {{ stats.get('disk_total_gb', '-') }} GB
+                  ({{ stats.get('disk_used_pct', '-') }}%)</td></tr>
+          <tr><th>数据库大小</th><td>{{ stats.get('db_size_mb', '-') }} MB</td></tr>
+          <tr><th>DB 运行状态</th><td>
+            {% if stats.get('db_alive') %}<span class="badge badge-success">正常</span>
+            {% else %}<span class="badge badge-danger">异常</span>{% endif %}
+          </td></tr>
+          <tr><th>站点运行时长</th><td>
+            {% set up = stats.get('uptime_seconds', 0) or 0 %}
+            {% if up >= 86400 %}{{ (up // 86400)|int }} 天 {{ ((up % 86400) // 3600)|int }} 小时
+            {% elif up >= 3600 %}{{ (up // 3600)|int }} 小时 {{ ((up % 3600) // 60)|int }} 分
+            {% else %}{{ (up // 60)|int }} 分{% endif %}
+          </td></tr>
+          <tr><th>备份占用</th><td>{{ stats.get('backup_total_mb', 0) }} MB / {{ stats.get('backup_count', 0) }} 个文件</td></tr>
+        </table>
+      </div>
+      <div class="card-footer">
+        <form method="post" action="{{ url_for('admin.backup_manual') }}">
+          <button type="submit" class="btn btn-primary btn-block" onclick="return confirm('确认执行一次数据库手动备份？');">
+            <i class="fas fa-save"></i> 立即手动备份
+          </button>
+        </form>
+        <a href="{{ url_for('admin.monitor_page') }}" class="btn btn-outline-secondary btn-block btn-sm mt-2">
+          <i class="fas fa-chart-line"></i> 查看系统监控详情
+        </a>
+      </div>
+    </div>
+
+    <div class="card card-outline card-warning">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-clock"></i> 定时备份配置</h3></div>
+      <form method="post" action="{{ url_for('admin.setting_backup_save') }}" class="card-body">
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="backup_enable_scheduled" value="on" id="be" {{ 'checked' if schedule_settings.get('backup_enable_scheduled') == 'on' }}>
+            <label for="be">启用自动备份</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>周期</label>
+          <select name="backup_schedule_mode" class="form-control form-control-sm">
+            <option value="daily" {{ 'selected' if schedule_settings.get('backup_schedule_mode') == 'daily' }}>每日</option>
+            <option value="weekly" {{ 'selected' if schedule_settings.get('backup_schedule_mode') == 'weekly' }}>每周一</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>执行时间（HH:MM，24 小时制）</label>
+          <input type="text" name="backup_schedule_time" class="form-control form-control-sm" pattern="([01]\d|2[0-3]):[0-5]\d"
+            value="{{ schedule_settings.get('backup_schedule_time', '03:00') }}">
+        </div>
+        <div class="form-group">
+          <label>留存天数（0 = 不自动清理）</label>
+          <input type="number" name="backup_keep_days" class="form-control form-control-sm" min="0" max="3650"
+            value="{{ schedule_settings.get('backup_keep_days', '30') }}">
+        </div>
+        <div class="icheck-primary mb-2">
+          <input type="checkbox" name="backup_auto_clean" value="on" id="bac" {{ 'checked' if schedule_settings.get('backup_auto_clean') == 'on' }}>
+          <label for="bac">启用过期自动清理</label>
+        </div>
+        <button type="submit" class="btn btn-warning btn-block btn-sm"><i class="fas fa-save"></i> 保存定时配置</button>
+        <small class="form-text text-muted">保存后定时任务即时重新调度，无需重启。</small>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div class="card card-outline card-success">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-list"></i> 备份历史（{{ backups|length }} 条）</h3>
+        <div class="card-tools">
+          {% if current_user.is_super %}
+          <button type="button" class="btn btn-sm btn-outline-info" data-toggle="modal" data-target="#restoreUploadModal">
+            <i class="fas fa-upload"></i> 上传并恢复
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover table-sm mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>文件名</th>
+              <th>触发</th>
+              <th>大小</th>
+              <th>状态</th>
+              <th>创建时间</th>
+              <th width="200">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in backups %}
+            <tr>
+              <td>{{ b.id }}</td>
+              <td><code>{{ b.filename }}</code>{% if b.remark %}<br><small class="text-muted">{{ b.remark }}</small>{% endif %}</td>
+              <td>
+                {% if b.trigger == 'manual' %}<span class="badge badge-success">手动</span>
+                {% elif b.trigger == 'scheduled' %}<span class="badge badge-info">定时</span>
+                {% else %}<span class="badge badge-secondary">{{ b.trigger }}</span>{% endif %}
+              </td>
+              <td>{{ (b.file_size or 0)|filesize }}</td>
+              <td>
+                {% if b.status == 'ok' %}<span class="badge badge-success">成功</span>
+                {% else %}<span class="badge badge-danger" title="{{ b.error_msg or '' }}">失败</span>{% endif %}
+              </td>
+              <td style="white-space:nowrap;">{{ b.created_at.strftime('%Y-%m-%d %H:%M') if b.created_at else '-' }}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  {% if b.status == 'ok' %}
+                  <a href="{{ url_for('admin.backup_download', bid=b.id) }}" class="btn btn-default" title="下载"><i class="fas fa-download"></i></a>
+                  {% if current_user.is_super %}
+                  <form method="post" action="{{ url_for('admin.backup_restore', bid=b.id) }}" class="d-inline"
+                    onsubmit="return confirm('警告：恢复将用此备份覆盖当前数据库！建议先手动备份一次。确认继续？');">
+                    <input type="hidden" name="confirm" value="YES_I_UNDERSTAND">
+                    <button type="submit" class="btn btn-warning" title="恢复此备份"><i class="fas fa-undo"></i></button>
+                  </form>
+                  {% endif %}
+                  {% endif %}
+                  <form method="post" action="{{ url_for('admin.backup_delete', bid=b.id) }}" class="d-inline"
+                    onsubmit="return confirm('确认删除此备份记录与物理文件？');">
+                    <button type="submit" class="btn btn-danger" title="删除"><i class="fas fa-trash"></i></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">暂无备份记录，点击左上方「立即手动备份」创建第一个备份</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if pagination.pages > 1 %}
+      <div class="card-footer">{% include 'admin/_pagination.html' %}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="restoreUploadModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog">
+    <form method="post" action="{{ url_for('admin.backup_restore_upload') }}" enctype="multipart/form-data" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">上传备份文件并恢复</h5>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle"></i> 恢复将用备份文件覆盖当前数据库所有数据，建议先手动备份一次再操作。
+        </div>
+        <div class="form-group">
+          <label>备份文件（.sql / .json / .gz）</label>
+          <input type="file" name="backup_file" accept=".sql,.json,.gz" required>
+        </div>
+        <div class="icheck-danger">
+          <input type="checkbox" name="confirm_upload" value="YES_I_UNDERSTAND" id="ru-confirm" required>
+          <label for="ru-confirm">我已清楚：恢复将覆盖现有数据库</label>
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-warning">上传并恢复</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

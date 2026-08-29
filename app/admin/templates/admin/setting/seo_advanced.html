@@ -1,0 +1,121 @@
+{% extends 'admin/base.html' %}
+{% block title %}SEO 高级配置 - {{ cms_name }}{% endblock %}
+{% block page_header %}SEO 高级配置{% endblock %}
+{% set active_menu = 'setting_seo_advanced' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">系统设置</li>
+<li class="breadcrumb-item active">SEO 高级</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+<div class="row">
+  <div class="col-md-6">
+    <div class="card card-outline card-primary">
+      <div class="card-header"><h3 class="card-title">伪静态与缓存</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="seo_rewrite_enable" value="on" id="sre" {{ 'checked' if settings.seo_rewrite_enable == 'on' }}>
+            <label for="sre">开启伪静态（URL 去除动态参数，生成 slug.html 与 article-id.html）</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="cache_enable" value="on" id="ce" {{ 'checked' if settings.cache_enable == 'on' }}>
+            <label for="ce">开启全站页面缓存（内容更新自动清缓存）</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-4">
+            <label>首页 TTL（秒）</label>
+            <input type="number" name="cache_ttl_index" class="form-control" min="0" value="{{ settings.cache_ttl_index }}">
+          </div>
+          <div class="form-group col-md-4">
+            <label>栏目页 TTL（秒）</label>
+            <input type="number" name="cache_ttl_column" class="form-control" min="0" value="{{ settings.cache_ttl_column }}">
+          </div>
+          <div class="form-group col-md-4">
+            <label>文章页 TTL（秒）</label>
+            <input type="number" name="cache_ttl_article" class="form-control" min="0" value="{{ settings.cache_ttl_article }}">
+          </div>
+        </div>
+        <small class="form-text text-muted">TTL 设为 0 表示该类页面不缓存。修改内容后相关页面缓存会自动清除。</small>
+      </div>
+    </div>
+
+    <div class="card card-outline card-info">
+      <div class="card-header"><h3 class="card-title">sitemap.xml 抓取参数</h3></div>
+      <div class="card-body">
+        {% set changefreq_opts = ['always','hourly','daily','weekly','monthly','yearly','never'] %}
+        {% set priority_opts = ['1.0','0.9','0.8','0.7','0.6','0.5','0.4','0.3','0.2','0.1','0.0'] %}
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>栏目更新频率</label>
+            <select name="seo_sitemap_changefreq_column" class="form-control">
+              {% for v in changefreq_opts %}
+              <option value="{{ v }}" {{ 'selected' if settings.seo_sitemap_changefreq_column == v }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group col-md-6">
+            <label>栏目优先级</label>
+            <select name="seo_sitemap_priority_column" class="form-control">
+              {% for v in priority_opts %}
+              <option value="{{ v }}" {{ 'selected' if settings.seo_sitemap_priority_column == v }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>文章更新频率</label>
+            <select name="seo_sitemap_changefreq_article" class="form-control">
+              {% for v in changefreq_opts %}
+              <option value="{{ v }}" {{ 'selected' if settings.seo_sitemap_changefreq_article == v }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group col-md-6">
+            <label>文章优先级</label>
+            <select name="seo_sitemap_priority_article" class="form-control">
+              {% for v in priority_opts %}
+              <option value="{{ v }}" {{ 'selected' if settings.seo_sitemap_priority_article == v }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card card-outline card-warning">
+      <div class="card-header"><h3 class="card-title">robots.txt 自定义规则</h3></div>
+      <div class="card-body">
+        <textarea name="seo_robots_custom" rows="10" class="form-control font-monospace text-sm"
+          placeholder="Allow: /special-page&#10;Disallow: /private/&#10;Sitemap: https://example.com/sitemap.xml">{{ settings.seo_robots_custom or '' }}</textarea>
+        <small class="form-text text-muted">每行一条规则。动态生成的默认规则（含后台路径 Disallow）始终存在，此处内容会追加在其后。</small>
+      </div>
+    </div>
+
+    <div class="card card-outline card-success">
+      <div class="card-header"><h3 class="card-title">图片 ALT 默认值（SEO 兜底）</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>默认 ALT 文案</label>
+          <input type="text" name="seo_image_alt_default" class="form-control" value="{{ settings.seo_image_alt_default or '' }}"
+            placeholder="如：企业官网图片">
+          <small class="form-text text-muted">前台渲染时，若 &lt;img&gt; 缺少 alt 或 alt 为空，将自动注入此默认值提升 SEO。</small>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存 SEO 高级配置</button>
+        <a href="{{ url_for('admin.tool_image_alt') }}" class="btn btn-outline-secondary btn-block mt-2">
+          <i class="fas fa-images"></i> 前往「图片ALT批量管理」
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

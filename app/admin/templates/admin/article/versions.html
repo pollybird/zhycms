@@ -1,0 +1,91 @@
+{% extends 'admin/base.html' %}
+{% block title %}历史版本 - {{ cms_name }}{% endblock %}
+{% block page_header %}历史版本 · {{ article.title or '（无标题）' }}{% endblock %}
+{% set active_menu = 'column' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">内容管理</li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.article_index', cid=article.column_id) }}">文章列表</a></li>
+<li class="breadcrumb-item active">历史版本</li>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-8">
+        <h5>{{ article.title or '（无标题）' }}</h5>
+        <div class="mb-1">
+          <span class="badge badge-info mr-1">{{ article.column.name if article.column else '-' }}</span>
+          <span class="badge badge-{{ 'success' if article.status=='published' else 'warning' if article.status=='review' else 'secondary' if article.status=='archived' else 'dark' }} mr-1">
+            {{ article.status|status_label }}
+          </span>
+          {% if article.reject_reason %}<span class="badge badge-danger">驳回</span>{% endif %}
+        </div>
+        {% if article.reject_reason %}
+        <div class="alert alert-danger mb-0">
+          <strong>驳回原因：</strong>{{ article.reject_reason }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="col-md-4 text-right">
+        <a href="{{ url_for('admin.article_edit', cid=article.column_id, aid=article.id) }}" class="btn btn-default btn-sm">
+          <i class="fas fa-edit"></i> 返回编辑
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">共 {{ versions.total }} 个历史快照（最新在前）</h3>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+        <tr>
+          <th width="80">版本号</th>
+          <th width="120">状态</th>
+          <th>标题快照</th>
+          <th>摘要 / 备注</th>
+          <th width="120">保存人</th>
+          <th width="160">保存时间</th>
+          <th width="100">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in versions.items %}
+        <tr>
+          <td><strong>#{{ v.version_no }}</strong></td>
+          <td>
+            <span class="badge badge-{{ 'success' if v.status_snapshot=='published' else 'warning' if v.status_snapshot=='review' else 'secondary' if v.status_snapshot=='archived' else 'dark' }}">
+              {{ v.status_snapshot|status_label }}
+            </span>
+          </td>
+          <td>{{ v.title or '-' }}</td>
+          <td style="max-width:400px;"><small>{{ v.note or v.summary or '-' }}</small></td>
+          <td>{{ v.creator.username if v.creator else '-' }}</td>
+          <td style="white-space:nowrap;">{{ v.created_at.strftime('%Y-%m-%d %H:%M:%S') if v.created_at else '-' }}</td>
+          <td>
+            {% if article.status != 'published' or current_user.is_super or current_user.has_permission('content:rollback') %}
+            <form method="post" action="{{ url_for('admin.article_rollback', cid=article.column_id, aid=article.id, vid=v.id) }}"
+              onsubmit="return confirm('确认回滚到版本 #{{ v.version_no }}？当前内容会被覆盖，并自动回到草稿状态。');" class="d-inline">
+              <button type="submit" class="btn btn-warning btn-sm"><i class="fas fa-undo"></i> 回滚</button>
+            </form>
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">暂无历史版本，首次保存文章后将自动生成版本快照。</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if versions.pages > 1 %}
+  <div class="card-footer">{% include 'admin/_pagination.html' %}</div>
+  {% endif %}
+</div>
+{% endblock %}

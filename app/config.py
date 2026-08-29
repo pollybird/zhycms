@@ -35,6 +35,7 @@ class Config:
 
     # 文件上传
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'app', 'static', 'uploads')
+    BACKUP_FOLDER = os.path.join(BASE_DIR, 'instance', 'backups')
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 默认 50MB，单字段可在数据库配置中再约束
 
     # 会话
@@ -47,10 +48,21 @@ class Config:
     # 后台每页显示条数
     ADMIN_PAGE_SIZE = 15
 
+    # 模块8：Flask-Caching 配置（默认 SimpleCache，单进程够用；生产可切 filesystem / redis）
+    CACHE_TYPE = 'SimpleCache'
+    CACHE_DEFAULT_TIMEOUT = 3600
+    CACHE_DIR = os.path.join(BASE_DIR, 'instance', 'cache')
+
+    # 图片缩略图与压缩临时目录
+    IMAGE_TEMP_DIR = os.path.join(BASE_DIR, 'instance', 'image_cache')
+
     @staticmethod
     def init_app(app):
         os.makedirs(os.path.join(BASE_DIR, 'instance'), exist_ok=True)
         os.makedirs(os.path.join(BASE_DIR, 'app', 'static', 'uploads'), exist_ok=True)
+        os.makedirs(os.path.join(BASE_DIR, 'instance', 'backups'), exist_ok=True)
+        os.makedirs(Config.CACHE_DIR, exist_ok=True)
+        os.makedirs(Config.IMAGE_TEMP_DIR, exist_ok=True)
 
 
 class DevelopmentConfig(Config):

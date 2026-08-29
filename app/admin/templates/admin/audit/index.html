@@ -1,0 +1,133 @@
+{% extends 'admin/base.html' %}
+{% block title %}审计日志 - {{ cms_name }}{% endblock %}
+{% block page_header %}审计日志{% endblock %}
+{% set active_menu = 'audit' %}
+
+{% block breadcrumb %}<li class="breadcrumb-item active">审计日志</li>{% endblock %}
+
+{% set module_labels = {} %}
+{% for v, label in module_choices %}{% set _ = module_labels.update({v: label}) %}{% endfor %}
+{% set op_labels = {} %}
+{% for v, label in op_type_choices %}{% set _ = op_labels.update({v: label}) %}{% endfor %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">操作审计记录 <span class="badge badge-info ml-1">共 {{ total_count }} 条</span></h3>
+    <div class="card-tools">
+      <button type="button" class="btn btn-sm btn-outline-danger" data-toggle="modal" data-target="#cleanModal">
+        <i class="fas fa-broom"></i> 清理过期日志
+      </button>
+      <a href="{{ url_for('admin.audit_export') }}?{{ request.query_string.decode() }}" class="btn btn-sm btn-outline-success ml-1">
+        <i class="fas fa-file-export"></i> 导出 CSV
+      </a>
+    </div>
+  </div>
+  <div class="card-body border-bottom">
+    <form method="get" class="form-inline">
+      <div class="input-group input-group-sm mr-2 mb-2">
+        <div class="input-group-prepend"><span class="input-group-text">关键词</span></div>
+        <input type="text" name="keyword" class="form-control" value="{{ keyword }}" placeholder="详情/目标/账号/IP">
+      </div>
+      <div class="input-group input-group-sm mr-2 mb-2">
+        <div class="input-group-prepend"><span class="input-group-text">模块</span></div>
+        <select name="module" class="form-control">
+          <option value="">全部</option>
+          {% for v, label in module_choices %}
+          <option value="{{ v }}" {{ 'selected' if module == v }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="input-group input-group-sm mr-2 mb-2">
+        <div class="input-group-prepend"><span class="input-group-text">操作</span></div>
+        <select name="op_type" class="form-control">
+          <option value="">全部</option>
+          {% for v, label in op_type_choices %}
+          <option value="{{ v }}" {{ 'selected' if op_type == v }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="input-group input-group-sm mr-2 mb-2">
+        <div class="input-group-prepend"><span class="input-group-text">开始</span></div>
+        <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+      </div>
+      <div class="input-group input-group-sm mr-2 mb-2">
+        <div class="input-group-prepend"><span class="input-group-text">结束</span></div>
+        <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+      </div>
+      <div class="input-group input-group-sm mr-2 mb-2">
+        <div class="input-group-prepend"><span class="input-group-text">账号</span></div>
+        <input type="text" name="username" class="form-control" value="{{ username }}">
+      </div>
+      <button type="submit" class="btn btn-sm btn-default mb-2"><i class="fas fa-search"></i> 筛选</button>
+      <a href="{{ url_for('admin.audit_index') }}" class="btn btn-sm btn-link mb-2">重置</a>
+    </form>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+        <tr>
+          <th width="70">ID</th>
+          <th width="140">时间</th>
+          <th width="100">账号</th>
+          <th width="110">IP</th>
+          <th width="100">模块</th>
+          <th width="110">操作</th>
+          <th>详情</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td>{{ log.id }}</td>
+          <td style="white-space:nowrap;">{{ log.created_at.strftime('%m-%d %H:%M:%S') if log.created_at else '-' }}</td>
+          <td>{{ log.username or '-' }}</td>
+          <td>{{ log.ip or '-' }}</td>
+          <td><span class="badge badge-info">{{ module_labels.get(log.module, log.module) }}</span></td>
+          <td>
+            <span class="badge badge-{{ 'success' if log.op_type in ['login','create','export','upload'] else 'primary' if log.op_type in ['review_pass','publish','rollback'] else 'warning' if log.op_type in ['update','config_change','user_manage','backup_create','backup_restore','batch'] else 'danger' if log.op_type in ['delete','review_reject','logout'] else 'secondary' }}">
+              {{ op_labels.get(log.op_type, log.op_type) }}
+            </span>
+          </td>
+          <td style="max-width:480px;">
+            <small>
+              {% if log.target_name %}<strong>{{ log.target_name }}</strong> {% endif %}
+              {{ log.detail or '' }}
+            </small>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">暂无符合条件的审计记录</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="card-footer">
+    {% include 'admin/_pagination.html' %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="modal fade" id="cleanModal" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-sm">
+    <form method="post" action="{{ url_for('admin.audit_clean') }}" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">清理审计日志</h5>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>保留最近天数</label>
+          <input type="number" name="keep_days" class="form-control" value="90" min="1" max="3650" required>
+          <small class="form-text text-muted">将删除指定天数之前的所有审计记录，且不可恢复。系统每日 02:30 也会按「系统设置」中的保留天数自动清理。</small>
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-danger" onclick="return confirm('确认清理？此操作不可撤销。');">确认清理</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends 'admin/base.html' %}
+{% block title %}消息通知配置 - {{ cms_name }}{% endblock %}
+{% block page_header %}消息通知配置{% endblock %}
+{% set active_menu = 'setting_notify' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">系统设置</li>
+<li class="breadcrumb-item active">消息通知</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+<div class="row">
+  <div class="col-md-5">
+    <div class="card card-outline card-primary">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-bell"></i> 通知总开关</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="form_notify_enable" value="on" id="fne" {{ 'checked' if settings.form_notify_enable == 'on' }}>
+            <label for="fne">开启前台表单提交通知（访客成功提交任意前台表单后推送）</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>推送渠道（可多选）</label>
+          <div>
+            {% set channels = (settings.form_notify_channels or '').split(',') if settings.form_notify_channels else [] %}
+            <div class="icheck-primary d-inline mr-4">
+              <input type="checkbox" name="channels" value="email" id="ch-email" {{ 'checked' if 'email' in channels }}>
+              <label for="ch-email"><i class="fas fa-envelope"></i> 邮件通知</label>
+            </div>
+            <div class="icheck-primary d-inline">
+              <input type="checkbox" name="channels" value="wework" id="ch-wework" {{ 'checked' if 'wework' in channels }}>
+              <label for="ch-wework"><i class="fab fa-weixin"></i> 企业微信 Webhook</label>
+            </div>
+          </div>
+        </div>
+        <div class="alert alert-info mb-0">
+          <small>通知内容包含：提交时间、访客 IP、提交页面 URL、表单所有字段的名称与填写值。</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-outline card-success">
+      <div class="card-header"><h3 class="card-title"><i class="fab fa-weixin"></i> 企业微信 Webhook</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>Webhook 地址（完整 URL）</label>
+          <input type="text" name="notify_wework_webhook" class="form-control"
+            placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
+            value="{{ settings.notify_wework_webhook or '' }}">
+        </div>
+        <div class="form-group">
+          <label>@ 手机号（多个用英文逗号分隔，可选）</label>
+          <input type="text" name="notify_wework_mobiles" class="form-control" placeholder="13800138000,13900139000"
+            value="{{ settings.notify_wework_mobiles or '' }}">
+        </div>
+        <small class="form-text text-muted">Webhook 地址在企业微信群「添加机器人」中获取。</small>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card card-outline card-warning">
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-envelope"></i> 邮件 SMTP 配置</h3></div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group col-md-8">
+            <label>SMTP 服务器</label>
+            <input type="text" name="notify_email_smtp_host" class="form-control" placeholder="如 smtp.qq.com"
+              value="{{ settings.notify_email_smtp_host or '' }}">
+          </div>
+          <div class="form-group col-md-4">
+            <label>端口</label>
+            <input type="number" name="notify_email_smtp_port" class="form-control" placeholder="465 / 587 / 25"
+              value="{{ settings.notify_email_smtp_port or 465 }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="notify_email_smtp_ssl" value="on" id="ssl" {{ 'checked' if settings.notify_email_smtp_ssl == 'on' }}>
+            <label for="ssl">使用 SSL/TLS（465 端口勾选；587 端口请取消勾选改用 STARTTLS）</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>SMTP 登录用户名</label>
+          <input type="text" name="notify_email_smtp_user" class="form-control" placeholder="如 no-reply@example.com"
+            value="{{ settings.notify_email_smtp_user or '' }}">
+        </div>
+        <div class="form-group">
+          <label>SMTP 登录密码 / 授权码</label>
+          <input type="password" name="notify_email_smtp_password" class="form-control" autocomplete="new-password"
+            placeholder="{{ '已配置（留空保持不变）' if settings.notify_email_smtp_password else '尚未配置' }}">
+          <small class="form-text text-muted">QQ/163 等邮箱需使用「授权码」而非常规登录密码；保存后密码不回显。</small>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>发件人邮箱</label>
+            <input type="email" name="notify_email_sender" class="form-control" placeholder="no-reply@example.com"
+              value="{{ settings.notify_email_sender or '' }}">
+          </div>
+          <div class="form-group col-md-6">
+            <label>发件人显示名</label>
+            <input type="text" name="notify_email_sender_name" class="form-control" placeholder="企业官网线索中心"
+              value="{{ settings.notify_email_sender_name or '' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>接收人邮箱（多个用英文逗号分隔）</label>
+          <input type="text" name="notify_email_receivers" class="form-control" placeholder="admin@example.com,sales@example.com"
+            value="{{ settings.notify_email_receivers or '' }}">
+        </div>
+      </div>
+      <div class="card-footer">
+        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存通知配置</button>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

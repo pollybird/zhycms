@@ -31,17 +31,40 @@ def init_default_settings():
 
 
 def create_admin(username, password, nickname='超级管理员'):
-    """创建管理员账号。"""
+    """创建第一个管理员账号（超级管理员），并分配 RBAC 超级管理员角色。"""
     if User.query.filter_by(is_deleted=False).first():
         return None
     admin = User(
         username=username,
         nickname=nickname,
         email='',
-        is_super=True,
+        is_super=True,   # 兜底全权限
+        is_active_flag=True,
     )
     admin.set_password(password)
     db.session.add(admin)
+    db.session.flush()
+
+    # 确保 RBAC 预设已写入（首次初始化不一定触发 app/__init__.py 的 ensure_presets）
+    from app.models import rbac as _rbac_mod
+    try:
+        _rbac_mod.Permission.ensure_presets()
+        _rbac_mod.Role.ensure_presets()
+        db.session.flush()
+    except Exception:
+        db.session.rollback()
+
+    # 给首个管理员绑定 super_admin 角色
+    try:
+        super_role = _rbac_mod.Role.get_by_code(_rbac_mod.ROLE_SUPER_ADMIN)
+        if super_role:
+            from app.models.rbac import UserRole
+            ur = UserRole.query.filter_by(user_id=admin.id, role_id=super_role.id).first()
+            if not ur:
+                db.session.add(UserRole(user_id=admin.id, role_id=super_role.id))
+    except Exception:
+        db.session.rollback()
+
     db.session.commit()
     return admin
 

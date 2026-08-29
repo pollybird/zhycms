@@ -111,6 +111,54 @@
             </ul>
           </li>
 
+          {% if current_user.is_super or current_user.has_permission('system:user_manage') %}
+          <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('user') }}">
+            <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('user') }}">
+              <i class="nav-icon fas fa-users-cog"></i><p>用户权限<i class="right fas fa-angle-left"></i></p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="{{ url_for('admin.user_index') }}" class="nav-link {{ 'active' if active_menu == 'user_list' }}">
+                  <i class="far fa-circle nav-icon"></i><p>用户列表</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.role_index') }}" class="nav-link {{ 'active' if active_menu == 'user_role' }}">
+                  <i class="far fa-circle nav-icon"></i><p>角色与权限</p>
+                </a>
+              </li>
+            </ul>
+          </li>
+          {% endif %}
+
+          {% if current_user.is_super or current_user.has_permission('system:audit_log') %}
+          <li class="nav-item">
+            <a href="{{ url_for('admin.audit_index') }}" class="nav-link {{ 'active' if active_menu == 'audit' }}">
+              <i class="nav-icon fas fa-clipboard-list"></i><p>审计日志</p>
+            </a>
+          </li>
+          {% endif %}
+
+          {% if current_user.is_super or current_user.has_permission('system:backup') %}
+          <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('backup') or active_menu == 'monitor' }}">
+            <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('backup') or active_menu == 'monitor') }}">
+              <i class="nav-icon fas fa-database"></i><p>备份运维<i class="right fas fa-angle-left"></i></p>
+            </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="{{ url_for('admin.backup_index') }}" class="nav-link {{ 'active' if active_menu == 'backup_list' }}">
+                  <i class="far fa-circle nav-icon"></i><p>备份列表</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.monitor_page') }}" class="nav-link {{ 'active' if active_menu == 'monitor' }}">
+                  <i class="far fa-circle nav-icon"></i><p>系统监控</p>
+                </a>
+              </li>
+            </ul>
+          </li>
+          {% endif %}
+
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and (active_menu.startswith('setting') or active_menu in ['profile','password','logs']) }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('setting') or active_menu in ['profile','password','logs']) }}">
               <i class="nav-icon fas fa-cog"></i><p>系统设置<i class="right fas fa-angle-left"></i></p>
@@ -126,11 +174,30 @@
                   <i class="far fa-circle nav-icon"></i><p>SEO 默认配置</p>
                 </a>
               </li>
+              {% if current_user.is_super or current_user.has_permission('system:settings') %}
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_seo_advanced') }}" class="nav-link {{ 'active' if active_menu == 'setting_seo_advanced' }}">
+                  <i class="far fa-circle nav-icon"></i><p>SEO 高级</p>
+                </a>
+              </li>
+              {% endif %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_upload') }}" class="nav-link {{ 'active' if active_menu == 'setting_upload' }}">
                   <i class="far fa-circle nav-icon"></i><p>上传配置</p>
                 </a>
               </li>
+              {% if current_user.is_super or current_user.has_permission('system:settings') %}
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_upload_security') }}" class="nav-link {{ 'active' if active_menu == 'setting_upload_security' }}">
+                  <i class="far fa-circle nav-icon"></i><p>上传安全</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_notify') }}" class="nav-link {{ 'active' if active_menu == 'setting_notify' }}">
+                  <i class="far fa-circle nav-icon"></i><p>消息通知</p>
+                </a>
+              </li>
+              {% endif %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_security') }}" class="nav-link {{ 'active' if active_menu == 'setting_security' }}">
                   <i class="far fa-circle nav-icon"></i><p>后台安全</p>
@@ -151,6 +218,13 @@
                   <i class="far fa-circle nav-icon"></i><p>登录日志</p>
                 </a>
               </li>
+              {% if current_user.is_super or current_user.has_permission('system:settings') %}
+              <li class="nav-item">
+                <a href="{{ url_for('admin.tool_image_alt') }}" class="nav-link {{ 'active' if active_menu == 'tool_image_alt' }}">
+                  <i class="far fa-circle nav-icon"></i><p>图片ALT批量管理</p>
+                </a>
+              </li>
+              {% endif %}
             </ul>
           </li>
 
@@ -197,7 +271,7 @@
   <footer class="main-footer">
     <strong>{{ cms_copyright }}</strong>
     <span class="ml-1">官网：<a href="https://www.tzzhy.cn/" target="_blank" rel="noopener">https://www.tzzhy.cn/</a></span>
-    <div class="float-right d-none d-sm-inline-block"><b>Version</b> 1.1.0</div>
+    <div class="float-right d-none d-sm-inline-block"><b>Version</b> 2.0.0</div>
   </footer>
 </div>
 

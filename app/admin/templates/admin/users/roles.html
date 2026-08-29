@@ -1,0 +1,103 @@
+{% extends 'admin/base.html' %}
+{% block title %}角色与权限 - {{ cms_name }}{% endblock %}
+{% block page_header %}角色与权限{% endblock %}
+{% set active_menu = 'user_role' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">用户权限</li>
+<li class="breadcrumb-item active">角色与权限</li>
+{% endblock %}
+
+{% set group_labels = {
+  'system': '系统权限（设置/用户/备份/审计）',
+  'column': '栏目管理',
+  'content_manage': '全局内容管理',
+  'content': '内容工作流（创建/编辑/审核/发布/归档/回滚）',
+  'form': '自定义表单'
+} %}
+
+{% block content %}
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">角色列表（共 {{ roles|length }} 个）</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.role_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 新增自定义角色</a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+        <tr><th width="60">ID</th><th>代码</th><th>名称</th><th>描述</th><th width="100">类型</th><th width="100">权限数</th><th width="120">操作</th></tr>
+      </thead>
+      <tbody>
+        {% for r in roles %}
+        <tr>
+          <td>{{ r.id }}</td>
+          <td><code>{{ r.code }}</code></td>
+          <td><strong>{{ r.name }}</strong></td>
+          <td><small>{{ r.description or '-' }}</small></td>
+          <td>{% if r.is_system %}<span class="badge badge-secondary">系统预设</span>{% else %}<span class="badge badge-info">自定义</span>{% endif %}</td>
+          <td>{{ r.permission_codes|length }}</td>
+          <td>
+            {% if r.code != 'super_admin' %}
+            <a href="#role-card-{{ r.id }}" class="btn btn-sm btn-default"><i class="fas fa-edit"></i> 配置权限</a>
+            {% if not r.is_system %}
+            <form method="post" action="{{ url_for('admin.role_delete', rid=r.id) }}" class="d-inline"
+              onsubmit="return confirm('确认删除角色 {{ r.name }}？');">
+              <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+            </form>
+            {% endif %}
+            {% else %}
+            <span class="text-muted">内置角色</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row">
+  {% for role in roles %}
+  <div class="col-md-6" id="role-card-{{ role.id }}">
+    <form method="post" action="{{ url_for('admin.role_save_permissions', rid=role.id) }}">
+    <div class="card card-outline card-{{ 'danger' if role.code=='super_admin' else 'primary' }}">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-user-tag"></i> {{ role.name }} <code class="ml-1">{{ role.code }}</code></h3>
+      </div>
+      <div class="card-body">
+        {% if role.code == 'super_admin' %}
+        <div class="alert alert-danger mb-0">超级管理员权限由 is_super 字段运行时兜底，无需也无法在此修改。</div>
+        {% else %}
+          {% for gkey, perms in permission_groups.items() %}
+          <div class="mb-3">
+            <h6 class="border-bottom pb-1 mb-2"><strong>{{ group_labels.get(gkey, gkey) }}</strong></h6>
+            <div class="row">
+              {% for p in perms %}
+              <div class="col-sm-6 mb-1">
+                <div class="icheck-primary d-inline">
+                  <input type="checkbox" name="permission_codes[]" value="{{ p.code }}"
+                    id="p{{ role.id }}-{{ loop.index }}" {{ 'checked' if p.code in role.permission_codes }}>
+                  <label for="p{{ role.id }}-{{ loop.index }}" class="font-weight-normal mb-0">
+                    {{ p.name }} <small class="text-muted">({{ p.code }})</small>
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
+      {% if role.code != 'super_admin' %}
+      <div class="card-footer">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-save"></i> 保存「{{ role.name }}」权限</button>
+      </div>
+      {% endif %}
+    </div>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

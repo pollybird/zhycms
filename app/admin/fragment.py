@@ -1,12 +1,13 @@
-"""碎片字段管理。"""
+"""碎片字段管理。升级：权限装饰器（system:settings）+ 审计日志。"""
 from flask import (
     render_template, redirect, url_for, request, flash, abort
 )
 
 from ..extensions import db
 from ..models.fragment import Fragment, FragmentGroup
-from ..utils.helpers import admin_required
+from ..utils.helpers import permission_required, audit_log, clear_content_cache
 from ..utils.uploads import save_upload_file
+from ..models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRAGMENT
 from . import admin_bp
 
 
@@ -24,7 +25,7 @@ FIELD_TYPES = [
 # ============ 分组管理 ============
 
 @admin_bp.route('/fragments/groups')
-@admin_required
+@permission_required('system:settings')
 def fragment_group_index():
     groups = FragmentGroup.query.filter_by(is_deleted=False).order_by(
         FragmentGroup.sort_order.desc(), FragmentGroup.created_at.desc()
@@ -33,7 +34,7 @@ def fragment_group_index():
 
 
 @admin_bp.route('/fragments/groups/create', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def fragment_group_create():
     name = (request.form.get('name') or '').strip()
     if not name:
@@ -47,7 +48,7 @@ def fragment_group_create():
 
 
 @admin_bp.route('/fragments/groups/<int:gid>/edit', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def fragment_group_edit(gid):
     g = FragmentGroup.query.get_or_404(gid)
     g.name = (request.form.get('name') or '').strip() or g.name
@@ -58,7 +59,7 @@ def fragment_group_edit(gid):
 
 
 @admin_bp.route('/fragments/groups/<int:gid>/delete', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def fragment_group_delete(gid):
     g = FragmentGroup.query.get_or_404(gid)
     if g.fragments.filter_by(is_deleted=False).count() > 0:
@@ -73,7 +74,7 @@ def fragment_group_delete(gid):
 # ============ 碎片字段管理 ============
 
 @admin_bp.route('/fragments')
-@admin_required
+@permission_required('system:settings')
 def fragment_index():
     gid = request.args.get('gid', type=int)
     query = Fragment.query.filter_by(is_deleted=False)
@@ -92,7 +93,7 @@ def fragment_index():
 
 
 @admin_bp.route('/fragments/create', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def fragment_create():
     groups = FragmentGroup.query.filter_by(is_deleted=False).order_by(
         FragmentGroup.sort_order.desc()
@@ -106,7 +107,7 @@ def fragment_create():
 
 
 @admin_bp.route('/fragments/<int:fid>/edit', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def fragment_edit(fid):
     frag = Fragment.query.get_or_404(fid)
     if frag.is_deleted:
@@ -173,7 +174,7 @@ def _save_fragment(fragment):
 
 
 @admin_bp.route('/fragments/<int:fid>/delete', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def fragment_delete(fid):
     frag = Fragment.query.get_or_404(fid)
     frag.is_deleted = True
@@ -183,7 +184,7 @@ def fragment_delete(fid):
 
 
 @admin_bp.route('/fragments/<int:fid>/toggle', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def fragment_toggle(fid):
     frag = Fragment.query.get_or_404(fid)
     frag.is_enabled = not frag.is_enabled

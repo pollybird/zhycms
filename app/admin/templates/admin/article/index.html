@@ -3,6 +3,17 @@
 {% block page_header %}文章管理 - {{ column.name }}{% endblock %}
 {% set active_menu = 'column' %}
 
+{# 当前用户在本栏目下的各项操作权限（超管兜底） #}
+{% set in_col = current_user.is_super or current_user.can_access_column(column.id) %}
+{% set can_edit = in_col and (current_user.is_super or current_user.has_permission('content:edit')) %}
+{% set can_create = in_col and (current_user.is_super or current_user.has_permission('content:create')) %}
+{% set can_submit = in_col and (current_user.is_super or current_user.has_permission('content:submit_review')) %}
+{% set can_review = in_col and (current_user.is_super or current_user.has_permission('content:review')) and current_user.column_flag('can_review', column.id) %}
+{% set can_publish = in_col and (current_user.is_super or current_user.has_permission('content:publish')) and current_user.column_flag('can_publish', column.id) %}
+{% set can_archive = in_col and (current_user.is_super or current_user.has_permission('content:archive')) %}
+{% set can_delete = in_col and (current_user.is_super or current_user.has_permission('content:delete')) %}
+{% set can_batch = in_col and (current_user.is_super or current_user.has_permission('content:batch')) %}
+
 {% block breadcrumb %}
   <li class="breadcrumb-item"><a href="{{ url_for('admin.column_index') }}">栏目管理</a></li>
   <li class="breadcrumb-item active">文章管理</li>
@@ -11,22 +22,28 @@
 {% block content %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">文章列表（{{ pagination.total }}）</h3>
-    <div class="card-tools">
-      <a href="{{ url_for('admin.article_create', cid=column.id) }}" class="btn btn-primary btn-sm">
+    <h3 class="card-title">
+      文章列表（{{ pagination.total }}）
+      {% if can_create %}
+      <a href="{{ url_for('admin.article_create', cid=column.id) }}" class="btn btn-primary btn-sm ml-2">
         <i class="fas fa-plus"></i> 新增文章
       </a>
-    </div>
+      {% endif %}
+    </h3>
   </div>
   <div class="card-body">
     <form method="get" class="form-inline mb-3">
       <input type="text" name="keyword" class="form-control form-control-sm mr-2" placeholder="标题关键词" value="{{ keyword }}">
       <select name="status" class="form-control form-control-sm mr-2">
         <option value="">全部状态</option>
-        <option value="enabled" {{ 'selected' if status == 'enabled' }}>启用</option>
-        <option value="disabled" {{ 'selected' if status == 'disabled' }}>禁用</option>
+        {% for v, label in status_choices %}
+        <option value="{{ v }}" {{ 'selected' if status == v }}>{{ label }}</option>
+        {% endfor %}
+        <option value="enabled" {{ 'selected' if status == 'enabled' }}>启用（旧）</option>
+        <option value="disabled" {{ 'selected' if status == 'disabled' }}>禁用（旧）</option>
       </select>
       <button type="submit" class="btn btn-default btn-sm"><i class="fas fa-search"></i> 筛选</button>
+      <a href="{{ url_for('admin.article_index', cid=column.id) }}" class="btn btn-link btn-sm">重置</a>
     </form>
 
     <form method="post" id="batch-form" action="{{ url_for('admin.article_batch', cid=column.id) }}">
@@ -37,10 +54,10 @@
             <th width="40"><input type="checkbox" id="check-all"></th>
             <th>标题</th>
             <th width="80">排序</th>
-            <th width="80">状态</th>
-            <th width="100">浏览</th>
+            <th width="100">状态</th>
+            <th width="70">浏览</th>
             <th width="140">发布时间</th>
-            <th width="200">操作</th>
+            <th width="260">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -53,21 +70,53 @@
             </td>
             <td>{{ a.sort_order }}</td>
             <td>
-              {% if a.is_enabled %}<span class="badge badge-success">启用</span>
-              {% else %}<span class="badge badge-warning">禁用</span>{% endif %}
+              <span class="badge badge-{{ 'success' if a.status=='published' else 'warning' if a.status=='review' else 'secondary' if a.status=='archived' else 'dark' }}">
+                {{ a.status|status_label }}
+              </span>
+              {% if a.reject_reason %}
+              <i class="fas fa-exclamation-circle text-danger" title="驳回原因：{{ a.reject_reason }}"></i>
+              {% endif %}
             </td>
             <td>{{ a.viewed }}</td>
             <td>{{ a.published_at|datetime }}</td>
             <td>
               <div class="btn-group btn-group-sm">
+                {% if can_edit %}
                 <a href="{{ url_for('admin.article_edit', cid=column.id, aid=a.id) }}" class="btn btn-default" title="编辑"><i class="fas fa-edit"></i></a>
-                <form method="post" action="{{ url_for('admin.article_toggle', cid=column.id, aid=a.id) }}" class="d-inline">
-                  <button class="btn btn-default" title="切换状态"><i class="fas {{ 'fa-toggle-on text-success' if a.is_enabled else 'fa-toggle-off text-muted' }}"></i></button>
+                {% endif %}
+                {% if can_submit and a.status in ['draft', 'archived'] %}
+                <form method="post" action="{{ url_for('admin.article_submit_review', cid=column.id, aid=a.id) }}" class="d-inline"
+                  onsubmit="return confirm('确认提交《{{ a.title|truncate_text(20) }}》进入审核流程？');">
+                  <button class="btn btn-outline-info" title="提交审核"><i class="fas fa-paper-plane"></i></button>
                 </form>
+                {% endif %}
+                {% if can_review and a.status == 'review' %}
+                <form method="post" action="{{ url_for('admin.article_review_pass', cid=column.id, aid=a.id) }}" class="d-inline"
+                  onsubmit="return confirm('确认审核通过《{{ a.title|truncate_text(20) }}》？通过后立即发布。');">
+                  <button class="btn btn-outline-success" title="审核通过"><i class="fas fa-check-double"></i></button>
+                </form>
+                <a href="{{ url_for('admin.article_edit', cid=column.id, aid=a.id) }}#reject-modal" class="btn btn-outline-danger"
+                   title="驳回（进入编辑页填写驳回原因）"><i class="fas fa-times"></i></a>
+                {% endif %}
+                {% if can_publish and a.status in ['draft', 'review', 'archived'] %}
+                <form method="post" action="{{ url_for('admin.article_publish', cid=column.id, aid=a.id) }}" class="d-inline"
+                  onsubmit="return confirm('确认直接发布《{{ a.title|truncate_text(20) }}》？');">
+                  <button class="btn btn-outline-success" title="直接发布"><i class="fas fa-upload"></i></button>
+                </form>
+                {% endif %}
+                {% if can_archive and a.status in ['published', 'draft', 'review'] %}
+                <form method="post" action="{{ url_for('admin.article_archive', cid=column.id, aid=a.id) }}" class="d-inline"
+                  onsubmit="return confirm('确认归档《{{ a.title|truncate_text(20) }}》？归档后前台不再展示。');">
+                  <button class="btn btn-outline-secondary" title="归档"><i class="fas fa-archive"></i></button>
+                </form>
+                {% endif %}
                 <a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=a.id) }}" target="_blank" class="btn btn-info" title="前台预览"><i class="fas fa-eye"></i></a>
+                <a href="{{ url_for('admin.article_versions', cid=column.id, aid=a.id) }}" class="btn btn-outline-primary" title="历史版本"><i class="fas fa-history"></i></a>
+                {% if can_delete %}
                 <form method="post" action="{{ url_for('admin.article_delete', cid=column.id, aid=a.id) }}" class="d-inline" onsubmit="return confirm('确认删除？');">
                   <button class="btn btn-danger" title="删除"><i class="fas fa-trash"></i></button>
                 </form>
+                {% endif %}
               </div>
             </td>
           </tr>
@@ -80,22 +129,70 @@
 
     {% include 'admin/_pagination.html' with context %}
   </div>
+  {% if can_batch %}
   <div class="card-footer">
-    <button type="button" class="btn btn-sm btn-success" onclick="batch_action('enable')"><i class="fas fa-check"></i> 批量启用</button>
-    <button type="button" class="btn btn-sm btn-warning" onclick="batch_action('disable')"><i class="fas fa-ban"></i> 批量禁用</button>
-    <button type="button" class="btn btn-sm btn-danger" onclick="batch_action('delete')"><i class="fas fa-trash"></i> 批量删除</button>
+    <div class="d-flex flex-wrap align-items-center">
+      <button type="button" class="btn btn-sm btn-outline-info mr-1 mb-1" onclick="batch_action('submit_review')">
+        <i class="fas fa-paper-plane"></i> 批量提交审核
+      </button>
+      <button type="button" class="btn btn-sm btn-success mr-1 mb-1" onclick="batch_action('publish')">
+        <i class="fas fa-upload"></i> 批量发布
+      </button>
+      <button type="button" class="btn btn-sm btn-secondary mr-1 mb-1" onclick="batch_action('archive')">
+        <i class="fas fa-archive"></i> 批量归档
+      </button>
+      <button type="button" class="btn btn-sm btn-warning mr-1 mb-1" onclick="batch_action('delete')">
+        <i class="fas fa-trash"></i> 批量删除
+      </button>
+      <div class="input-group input-group-sm mr-1 mb-1" style="width:220px;">
+        <select id="move-target" class="form-control">
+          <option value="">移动到栏目…</option>
+          {% for c in list_columns %}
+          {% if c.id != column.id %}
+          <option value="{{ c.id }}">{{ '— ' * c._depth }}{{ c.name }}</option>
+          {% endif %}
+          {% endfor %}
+        </select>
+        <div class="input-group-append">
+          <button type="button" class="btn btn-outline-primary" onclick="batch_move()" title="批量移动">
+            <i class="fas fa-arrows-alt"></i> 移动
+          </button>
+        </div>
+      </div>
+      <small class="text-muted ml-1">未选择文章时操作无效</small>
+    </div>
   </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block js %}
 <script>
   $('#check-all').on('change', function(){ $('.row-check').prop('checked', this.checked); });
+  function checked_ids(){
+    return $('.row-check:checked').length;
+  }
   function batch_action(action){
-    if ($('.row-check:checked').length === 0){ alert('请先选择文章'); return; }
-    if (action === 'delete' && !confirm('确认批量删除？')) return;
+    if (checked_ids() === 0){ alert('请先选择文章'); return; }
+    var tips = {
+      'submit_review': '确认将所选文章批量提交审核？（仅草稿/归档状态生效）',
+      'publish': '确认批量发布所选文章？发布后前台立即可见。',
+      'archive': '确认批量归档所选文章？归档后前台不再展示。',
+      'delete': '确认批量删除所选文章？删除后不可恢复。'
+    };
+    if (tips[action] && !confirm(tips[action])) return;
     $('#batch-action').val(action);
     $('#batch-form').submit();
+  }
+  function batch_move(){
+    if (checked_ids() === 0){ alert('请先选择文章'); return; }
+    var target = $('#move-target').val();
+    if (!target){ alert('请先选择目标栏目'); return; }
+    if (!confirm('确认将所选文章移动到目标栏目？')) return;
+    var $f = $('#batch-form');
+    $f.append('<input type="hidden" name="target_column_id" value="' + target + '">');
+    $('#batch-action').val('move');
+    $f.submit();
   }
 </script>
 {% endblock %}

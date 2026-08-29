@@ -48,19 +48,19 @@
     <nav>
       <ul class="pagination justify-content-center">
         <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
-          <a class="page-link" href="{{ url_for('frontend.column_detail', slug=column.slug, page=pagination.prev_num or 1) }}">&laquo; 上一页</a>
+          <a class="page-link" href="{{ frontend_pager_url(column, pagination.prev_num or 1) }}">&laquo; 上一页</a>
         </li>
         {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
           {% if p %}
           <li class="page-item {{ 'active' if p == pagination.page }}">
-            <a class="page-link" href="{{ url_for('frontend.column_detail', slug=column.slug, page=p) }}">{{ p }}</a>
+            <a class="page-link" href="{{ frontend_pager_url(column, p) }}">{{ p }}</a>
           </li>
           {% else %}
           <li class="page-item disabled"><span class="page-link">…</span></li>
           {% endif %}
         {% endfor %}
         <li class="page-item {{ 'disabled' if not pagination.has_next }}">
-          <a class="page-link" href="{{ url_for('frontend.column_detail', slug=column.slug, page=pagination.next_num or pagination.page) }}">下一页 &raquo;</a>
+          <a class="page-link" href="{{ frontend_pager_url(column, pagination.next_num or pagination.page) }}">下一页 &raquo;</a>
         </li>
       </ul>
     </nav>

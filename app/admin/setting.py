@@ -1,33 +1,73 @@
-"""系统设置：网站全局、SEO、上传配置、个人资料、密码、登录日志。"""
+"""系统设置：网站全局、SEO、上传配置、个人资料、密码、登录日志。
+升级点（对应模块5/6/7/8）：
+  - 登录安全：登录失败次数/锁定时间/异地IP提醒 + 自定义后台路由即时生效
+  - 上传安全：MIME二次校验、单文件MB限制、图片压缩质量/缩略图/去重开关
+  - 消息通知：邮件 SMTP + 企业微信 Webhook 配置
+  - SEO高级：伪静态开关、sitemap更新频率/优先级、robots自定义文本、默认图片ALT、缓存开关+TTL
+  - 备份周期：直接复用 app/admin/backup.py 的 setting_backup_save POST 路由
+"""
 from datetime import datetime
 
 from flask import (
-    render_template, redirect, url_for, request, flash, abort
+    render_template, redirect, url_for, request, flash, abort, current_app
 )
 from flask_login import current_user
 
 from ..extensions import db
 from ..models.user import User, LoginLog
 from ..models.setting import Setting
-from ..utils.helpers import admin_required
+from ..utils.helpers import admin_required, permission_required, audit_log, clear_content_cache
 from ..utils.uploads import save_upload_file
 from ..utils.themes import list_themes
 from ..utils.admin_prefix import load_admin_prefix, validate_prefix, save_admin_prefix
+from ..models.audit import (
+    OP_CONFIG_CHANGE, OP_UPDATE, MODULE_SETTING,
+)
 from . import admin_bp
 
 
-# ============ 网站设置 ============
+# ============================================================
+# 工具：触发后台动态路由即时生效（调用 app.__init__._register_dynamic_admin_rules）
+# ============================================================
+
+def _rebuild_admin_rules_now():
+    """保存路由前缀后立刻重建，而不必等下一次请求。"""
+    try:
+        from app import _register_dynamic_admin_rules
+        _register_dynamic_admin_rules(current_app._get_current_object())
+    except Exception:
+        current_app.logger.exception('rebuild dynamic admin rules failed')
+
+
+def _onoff(name):
+    return 'on' if request.form.get(name) == 'on' else 'off'
+
+
+def _int_safe(name, default=0):
+    try:
+        return int(request.form.get(name) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+# ============ 网站设置（需要 system:settings）============
 
 @admin_bp.route('/settings/site', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def setting_site():
     if request.method == 'POST':
-        Setting.set('site_name', (request.form.get('site_name') or '').strip())
-        Setting.set('site_subtitle', (request.form.get('site_subtitle') or '').strip())
-        Setting.set('site_status', request.form.get('site_status') or 'open')
-        Setting.set('site_close_reason', (request.form.get('site_close_reason') or '').strip())
-        Setting.set('footer_copyright', (request.form.get('footer_copyright') or '').strip())
-        Setting.set('site_theme', (request.form.get('site_theme') or 'default').strip())
+        changed = {}
+        for key in ('site_name', 'site_subtitle', 'site_close_reason',
+                    'footer_copyright', 'site_theme', 'site_status'):
+            val = (request.form.get(key) or '').strip()
+            if key == 'site_status':
+                val = val or 'open'
+            if key == 'site_theme':
+                val = val or 'default'
+            old = Setting.get(key)
+            if old != val:
+                Setting.set(key, val)
+                changed[key] = val
 
         # LOGO
         logo_file = request.files.get('site_logo')
@@ -38,48 +78,130 @@ def setting_site():
                 flash(f'LOGO 上传失败：{err}', 'danger')
             else:
                 Setting.set('site_logo', url)
+                changed['site_logo'] = url
         elif request.form.get('site_logo_remove') == 'on':
             Setting.set('site_logo', '')
+            changed['site_logo'] = ''
 
         db.session.commit()
+        clear_content_cache()
         flash('网站设置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'site', 'changed_keys': list(changed.keys())})
         return redirect(url_for('admin.setting_site'))
 
-    return render_template('admin/setting/site.html', settings=Setting.get_dict(), themes=list_themes())
+    return render_template('admin/setting/site.html',
+                           settings=Setting.get_dict(), themes=list_themes())
 
+
+# ============ SEO 默认 + SEO 高级（伪静态/sitemap/robots/缓存/图片ALT）============
 
 @admin_bp.route('/settings/seo', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def setting_seo():
     if request.method == 'POST':
-        Setting.set('seo_title', (request.form.get('seo_title') or '').strip())
-        Setting.set('seo_keywords', (request.form.get('seo_keywords') or '').strip())
-        Setting.set('seo_description', (request.form.get('seo_description') or '').strip())
+        changed = {}
+        for key in ('seo_title', 'seo_keywords', 'seo_description'):
+            val = (request.form.get(key) or '').strip()
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
         db.session.commit()
+        clear_content_cache()
         flash('SEO 默认配置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'seo', 'changed_keys': list(changed.keys())})
         return redirect(url_for('admin.setting_seo'))
     return render_template('admin/setting/seo.html', settings=Setting.get_dict())
 
 
+@admin_bp.route('/settings/seo-advanced', methods=['GET', 'POST'])
+@permission_required('system:settings')
+def setting_seo_advanced():
+    """SEO高级：伪静态开关、sitemap更新频率/优先级、robots自定义文本、缓存开关+TTL、图片默认ALT。"""
+    if request.method == 'POST':
+        changed = {}
+        # 伪静态
+        for key in ('seo_rewrite_enable',):
+            val = _onoff(key)
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        # sitemap changefreq / priority
+        for key in ('seo_sitemap_changefreq_column', 'seo_sitemap_changefreq_article',
+                    'seo_sitemap_priority_column', 'seo_sitemap_priority_article'):
+            val = (request.form.get(key) or '').strip()
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        # robots 自定义文本
+        val = request.form.get('seo_robots_custom') or ''
+        if Setting.get('seo_robots_custom') != val:
+            Setting.set('seo_robots_custom', val)
+            changed['seo_robots_custom'] = val
+        # 默认图片 ALT
+        val = (request.form.get('seo_image_alt_default') or '').strip()
+        if Setting.get('seo_image_alt_default') != val:
+            Setting.set('seo_image_alt_default', val)
+            changed['seo_image_alt_default'] = val
+        # 缓存
+        for key in ('cache_enable',):
+            val = _onoff(key)
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        for key in ('cache_ttl_index', 'cache_ttl_column', 'cache_ttl_article'):
+            val = str(max(0, _int_safe(key, default=600)))
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        db.session.commit()
+        clear_content_cache()
+        flash('SEO 高级配置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'seo_advanced', 'changed': changed})
+        return redirect(url_for('admin.setting_seo_advanced'))
+    settings = Setting.get_dict()
+    # TTL 回显成整数
+    for k in ('cache_ttl_index', 'cache_ttl_column', 'cache_ttl_article'):
+        try:
+            settings[k] = int(settings.get(k, 600))
+        except (TypeError, ValueError):
+            settings[k] = 600
+    return render_template('admin/setting/seo_advanced.html', settings=settings)
+
+
+# ============ 上传基础 + 上传扩展（模块6）============
+
 @admin_bp.route('/settings/upload', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def setting_upload():
     if request.method == 'POST':
+        changed = {}
         try:
             max_size = int(request.form.get('upload_max_size') or 0)
-            # KB 转 Byte
-            Setting.set('upload_max_size', str(max_size * 1024))
+            val = str(max_size * 1024)
         except ValueError:
             flash('文件大小必须是数字', 'danger')
             return redirect(url_for('admin.setting_upload'))
-
-        Setting.set('upload_allowed_exts', (request.form.get('upload_allowed_exts') or '').strip())
+        if Setting.get('upload_max_size') != val:
+            Setting.set('upload_max_size', val)
+            changed['upload_max_size_kb'] = max_size
+        val = (request.form.get('upload_allowed_exts') or '').strip()
+        if Setting.get('upload_allowed_exts') != val:
+            Setting.set('upload_allowed_exts', val)
+            changed['upload_allowed_exts'] = val
         db.session.commit()
-        flash('上传配置已保存', 'success')
+        flash('上传基础配置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'upload', 'changed': changed})
         return redirect(url_for('admin.setting_upload'))
 
     settings = Setting.get_dict()
-    # 转回 KB 显示
     try:
         settings['upload_max_size_kb'] = int(settings.get('upload_max_size', 0)) // 1024
     except ValueError:
@@ -87,29 +209,182 @@ def setting_upload():
     return render_template('admin/setting/upload.html', settings=settings)
 
 
-# ============ 后台安全（自定义后台路由前缀）============
+@admin_bp.route('/settings/upload-security', methods=['GET', 'POST'])
+@permission_required('system:settings')
+def setting_upload_security():
+    """模块6上传安全：MIME、单文件MB、压缩、缩略图、去重。"""
+    if request.method == 'POST':
+        changed = {}
+        # 开关类
+        for key in ('upload_enable_mime_check', 'upload_image_auto_compress',
+                    'upload_image_thumb_enable', 'upload_enable_dedup'):
+            val = _onoff(key)
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        # 数值类
+        # upload_single_max_size_mb：MB
+        mb_val = max(0, _int_safe('upload_single_max_size_mb', default=10))
+        val = str(mb_val)
+        if Setting.get('upload_single_max_size_mb') != val:
+            Setting.set('upload_single_max_size_mb', val)
+            changed['upload_single_max_size_mb'] = val
+        # 图片压缩质量 0-100
+        q = min(100, max(1, _int_safe('upload_image_compress_quality', default=80)))
+        val = str(q)
+        if Setting.get('upload_image_compress_quality') != val:
+            Setting.set('upload_image_compress_quality', val)
+            changed['upload_image_compress_quality'] = val
+        # 缩略图宽度 px
+        w = max(50, _int_safe('upload_image_thumb_width', default=300))
+        val = str(w)
+        if Setting.get('upload_image_thumb_width') != val:
+            Setting.set('upload_image_thumb_width', val)
+            changed['upload_image_thumb_width'] = val
+        db.session.commit()
+        flash('上传安全与图片优化配置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'upload_security', 'changed': changed})
+        return redirect(url_for('admin.setting_upload_security'))
+    settings = Setting.get_dict()
+    for k, d in (('upload_single_max_size_mb', 10),
+                 ('upload_image_compress_quality', 80),
+                 ('upload_image_thumb_width', 300)):
+        try:
+            settings[k] = int(settings.get(k, d))
+        except (TypeError, ValueError):
+            settings[k] = d
+    return render_template('admin/setting/upload_security.html', settings=settings)
+
+
+# ============ 后台安全（模块5：登录锁定 + 自定义后台前缀即时生效）============
 
 @admin_bp.route('/settings/security', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def setting_security():
-    """管理员可自定义后台路由前缀，避免后台地址被轻易猜测。
-
-    前缀落盘到 instance/admin_config.json，因 Flask 蓝本前缀只在启动时注册一次，
-    修改后需重启服务方能生效。
-    """
     if request.method == 'POST':
-        ok, result = validate_prefix(request.form.get('admin_prefix'))
-        if not ok:
-            flash(result, 'danger')
-            return redirect(url_for('admin.setting_security'))
+        changed = {}
+        # 1. 自定义路由前缀（即时生效）
+        prefix = request.form.get('admin_prefix') or ''
+        if prefix:
+            ok, result = validate_prefix(prefix)
+            if not ok:
+                flash(result, 'danger')
+                return redirect(url_for('admin.setting_security'))
+            old_prefix = load_admin_prefix()
+            save_admin_prefix(result)
+            if old_prefix != result:
+                changed['admin_prefix'] = (old_prefix, result)
+                _rebuild_admin_rules_now()
+                flash(f'后台路由已即时切换为 /{result}/ ，新地址立即可用，旧地址同步失效。', 'success')
+            else:
+                flash(f'后台路由未变（仍为 /{result}/）。', 'info')
+        # 2. 登录安全：失败次数/锁定分钟/异地IP提醒
+        max_fail = max(3, min(50, _int_safe('login_max_fail', default=5)))
+        lock_min = max(1, min(600, _int_safe('login_lock_minutes', default=10)))
+        if Setting.get('login_max_fail') != str(max_fail):
+            Setting.set('login_max_fail', str(max_fail))
+            changed['login_max_fail'] = max_fail
+        if Setting.get('login_lock_minutes') != str(lock_min):
+            Setting.set('login_lock_minutes', str(lock_min))
+            changed['login_lock_minutes'] = lock_min
+        val = _onoff('login_abnormal_city_alert')
+        if Setting.get('login_abnormal_city_alert') != val:
+            Setting.set('login_abnormal_city_alert', val)
+            changed['login_abnormal_city_alert'] = val
+        db.session.commit()
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'security', 'changed': changed})
+        if 'admin_prefix' not in changed and not (set(changed.keys()) - {'admin_prefix'}):
+            flash('登录安全配置已保存', 'success')
+        # 若改变了前缀，url_for 在本次请求中使用的旧 URL adapter 已与新 url_map 不匹配，
+        # 直接字面量拼新前缀下的 security 设置页 URL，避免 BuildError。
+        from app.utils.admin_prefix import load_admin_prefix as _lap
+        return redirect('/' + _lap() + '/settings/security')
 
-        save_admin_prefix(result)
-        flash(f'后台路由已保存为 /{result}，请重启服务后使用新地址 /{result}/login 访问后台。'
-              f'旧地址将失效，请牢记新地址。', 'success')
-        return redirect(url_for('admin.setting_security'))
-
+    settings = Setting.get_dict()
+    for k, d in (('login_max_fail', 5), ('login_lock_minutes', 10)):
+        try:
+            settings[k] = int(settings.get(k, d))
+        except (TypeError, ValueError):
+            settings[k] = d
     return render_template('admin/setting/security.html',
-                           admin_prefix=load_admin_prefix())
+                           admin_prefix=load_admin_prefix(), settings=settings)
+
+
+# ============ 消息通知（模块7）============
+
+@admin_bp.route('/settings/notify', methods=['GET', 'POST'])
+@permission_required('system:settings')
+def setting_notify():
+    """模块7：消息通知配置（邮件 + 企业微信 Webhook）。"""
+    if request.method == 'POST':
+        changed = {}
+        # 总开关
+        val = _onoff('form_notify_enable')
+        if Setting.get('form_notify_enable') != val:
+            Setting.set('form_notify_enable', val)
+            changed['form_notify_enable'] = val
+        # 渠道选择（用逗号分隔 email,wework）
+        channels_raw = request.form.getlist('form_notify_channels[]')
+        channels = ','.join(channels_raw) if channels_raw else ''
+        if Setting.get('form_notify_channels') != channels:
+            Setting.set('form_notify_channels', channels)
+            changed['form_notify_channels'] = channels
+        # 邮件 SMTP
+        for key in ('notify_email_smtp_host', 'notify_email_sender_name',
+                    'notify_email_sender_address', 'notify_email_receivers'):
+            val = (request.form.get(key) or '').strip()
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        for key in ('notify_email_smtp_port',):
+            val = str(_int_safe(key, default=465))
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        val = _onoff('notify_email_smtp_ssl')
+        if Setting.get('notify_email_smtp_ssl') != val:
+            Setting.set('notify_email_smtp_ssl', val)
+            changed['notify_email_smtp_ssl'] = val
+        for key in ('notify_email_smtp_user',):
+            val = (request.form.get(key) or '').strip()
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        # 密码单独处理（未变更不覆写为空）
+        pwd = request.form.get('notify_email_smtp_password') or ''
+        if pwd:
+            if Setting.get('notify_email_smtp_password') != pwd:
+                Setting.set('notify_email_smtp_password', pwd)
+                changed['notify_email_smtp_password'] = '***changed***'
+        # 企业微信
+        for key in ('notify_wework_webhook', 'notify_wework_mentioned_mobiles'):
+            val = (request.form.get(key) or '').strip()
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        db.session.commit()
+        flash('消息通知配置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'notify', 'changed_keys': list(changed.keys())})
+        return redirect(url_for('admin.setting_notify'))
+    return render_template('admin/setting/notify.html', settings=Setting.get_dict())
+
+
+# ============ 图片 ALT 批量管理（模块8）============
+
+@admin_bp.route('/tools/image-alt')
+@permission_required('system:settings')
+def tool_image_alt():
+    """页面入口：后台展示站点范围内所有缺失或可批量修改的图片ALT条目。
+    前台具体渲染时会用 Setting.seo_image_alt_default 作为兜底。"""
+    # 简单返回模板，静态逻辑在前端页面实现（通过API加载文章/栏目/碎片的img标签）
+    return render_template('admin/setting/image_alt.html',
+                           settings=Setting.get_dict())
 
 
 # ============ 个人资料 / 密码 ============
@@ -119,10 +394,17 @@ def setting_security():
 def profile():
     if request.method == 'POST':
         user = current_user
+        old_nick = user.nickname
+        old_email = user.email
         user.nickname = (request.form.get('nickname') or '').strip()
         user.email = (request.form.get('email') or '').strip()
         db.session.commit()
         flash('个人资料已更新', 'success')
+        if old_nick != user.nickname or old_email != user.email:
+            audit_log(OP_UPDATE, MODULE_SETTING, user.id, user.username,
+                      {'action': 'profile',
+                       'nickname': (old_nick, user.nickname),
+                       'email': (old_email, user.email)})
         return redirect(url_for('admin.profile'))
     return render_template('admin/setting/profile.html', user=current_user)
 
@@ -147,8 +429,13 @@ def password():
             return redirect(url_for('admin.password'))
 
         user.set_password(new_pwd)
+        # 修改密码清除锁定状态
+        user.login_fail_count = 0
+        user.locked_until = None
         db.session.commit()
         flash('密码修改成功', 'success')
+        audit_log(OP_UPDATE, MODULE_SETTING, user.id, user.username,
+                  {'action': 'change_password'})
         return redirect(url_for('admin.password'))
     return render_template('admin/setting/password.html')
 
@@ -156,7 +443,7 @@ def password():
 # ============ 登录日志 ============
 
 @admin_bp.route('/logs')
-@admin_required
+@permission_required('system:audit_log')
 def logs():
     page = max(int(request.args.get('page', 1)), 1)
     pagination = LoginLog.query.order_by(LoginLog.created_at.desc()).paginate(

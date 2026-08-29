@@ -1,0 +1,208 @@
+# zhycms v1.1 → v2.0 升级迁移指南
+
+本指南帮助运行 v1.1（及更早 1.x）版本的站点安全升级到 **v2.0**。v2.0 新增了 RBAC 权限、审计日志、内容工作流、备份恢复、登录安全加固、上传安全、表单消息通知、SEO 与站点性能八大模块，涉及**新建 9 张数据表、旧表补 12 列、新增 4 个依赖与一批新配置项**，请完整阅读本文后再操作。
+
+---
+
+## 一、升级前必读：四个关键变化
+
+### 1. 用户权限语义变化（最重要）
+
+v1.1 中 `users.is_super` 默认为 `True`，**所有用户都是超级管理员**；v2.0 中默认改为 `False`，并引入角色权限体系（预设 4 个角色：超级管理员、内容审核员、内容编辑、只读查看员）。
+
+- **升级不会改动任何用户的 `is_super` 值**：v1.1 已创建的用户升级后仍拥有全部权限。
+- 升级完成、登录后台后，请立即进入 **用户权限 → 用户列表** 审查：非管理员账号应将「超级管理员」关闭，并为其分配合适角色（如「内容编辑」）。
+- 升级后新建的用户默认无任何权限，必须显式绑定角色才能操作后台。
+
+### 2. 文章状态从开关升级为工作流
+
+v1.1 文章只有 `is_enabled` 启用/停用开关；v2.0 引入 `status` 工作流状态（草稿 draft → 待审核 pending → 已发布 published / 已驳回 rejected）。
+
+- 迁移时自动回填：`is_enabled=1 → published`，`is_enabled=0 → draft`（前台展示效果与 v1.1 完全一致）。
+- `is_enabled` 字段保留并与 status 同步维护，旧的自定义模板/查询不受影响。
+- 升级后新建文章默认为**草稿**；无发布权限的用户提交后进入待审核。
+
+### 3. 登录安全机制默认启用
+
+- 连续失败 5 次（可配置）账号自动锁定 10 分钟（可配置）。
+- 登录页增加图形验证码（所有版本用户均需输入）。
+- 异地 IP 登录会展示一次性提醒横幅。
+- 升级前若存在被暴力尝试的弱密码账号，建议升级时一并修改密码。
+
+### 4. 上传行为变化（仅影响新上传）
+
+后缀 + MIME 双重校验、SHA-256 去重、图片压缩与缩略图**默认开启**，已有文件不受影响；伪装成图片的脚本文件将无法再上传。
+
+---
+
+## 二、兼容性说明
+
+| 项目 | v1.1 | v2.0 | 升级影响 |
+| --- | --- | --- | --- |
+| Python | 3.9+ | 3.9+ | 无 |
+| SQLite / MySQL / PostgreSQL | 支持 | 支持 | 无（迁移脚本三种库通用） |
+| Flask / Werkzeug | 3.0.3+ | 3.0.3+ | 无 |
+| 已有主题模板 | — | 兼容 | 列表模板分页链接建议改用 `frontend_pager_url`（可选，见下文第五节） |
+| 已有自定义字段/表单/碎片 | — | 兼容 | 无 |
+| `instance/db_config.json` | — | 兼容 | 无需改动 |
+| `instance/admin_config.json` | — | 兼容 | 无需改动（后台前缀修改 v2.0 起即时生效） |
+
+**新增依赖 4 个**（`requirements.txt`）：`Flask-Caching`（页面缓存）、`APScheduler`（计划任务）、`requests`（企业微信通知）、`python-magic`（MIME 校验，Linux 需系统库 `libmagic`：Debian/Ubuntu `apt install libmagic1`，CentOS `yum install file-libs`；Windows 建议 `pip install python-magic-bin`）。
+
+---
+
+## 三、升级步骤（推荐：自动迁移脚本）
+
+### 第 0 步：备份（必做）
+
+- 备份整个站点目录与数据库（v1.1 可用 `mysqldump`，SQLite 直接复制 `instance/zhycms.db`）。
+- v2.0 起可在后台「备份运维」中一键备份，但**本次升级的备份必须在升级前完成**。
+
+### 第 1 步：停服并更新代码
+
+```bash
+# 停止运行中的服务（gunicorn/systemd 等）
+cd /path/to/zhycms
+git fetch && git checkout v2.0     # 或下载 v2.0 发布包覆盖
+```
+
+### 第 2 步：更新依赖
+
+```bash
+source .venv/bin/activate
+pip install -r requirements.txt
+# Debian/Ubuntu 需补系统库（python-magic 依赖）：
+sudo apt install -y libmagic1
+```
+
+### 第 3 步：执行迁移脚本（幂等，可重复运行）
+
+```bash
+# 使用 instance/db_config.json 中配置的数据库
+.venv/bin/python scripts/upgrade_v2.py
+
+# 或显式指定数据库 URI
+ZHOCMS_DB_URI='mysql+pymysql://user:pass@127.0.0.1:3306/zhycms?charset=utf8mb4' \
+    .venv/bin/python scripts/upgrade_v2.py
+```
+
+脚本会依次完成（全部幂等，中断后重跑安全）：
+
+1. 创建 9 张新表（roles、permissions、role_permissions、user_roles、user_column_permissions、audit_logs、article_versions、backup_records、uploaded_files）；
+2. 为旧表补列：`users` +4 列（is_active_flag、login_fail_count、locked_until、last_login_city）、`articles` +6 列（status、reject_reason、reviewed_by、reviewed_at、created_by、updated_by）、`login_logs` +2 列（user_id、city）；
+3. **回填 `articles.status`**（按 is_enabled 映射，通过 `schema_migrations` 版本记录保证只执行一次，重跑不会覆盖运行期数据）；
+4. 创建 `articles.status` 索引；
+5. 初始化 RBAC 预设角色与权限点；
+6. 输出自检报告（列/表/数据分布/角色数量）。
+
+> **注意**：仅启动程序无法正确完成迁移——`db.create_all()` 只建新表、不会给旧表加列；而 `ALTER ADD COLUMN ... DEFAULT` 会把旧行全部填默认值，若不执行脚本的数据回填步骤，原本隐藏的文章会被错误公开。请务必运行本脚本。
+
+### 第 4 步：启动服务并核对自检报告
+
+```bash
+.venv/bin/python run.py          # 开发模式
+# 或 gunicorn -w 4 -b 0.0.0.0:5000 "run:app"
+```
+
+---
+
+## 四、手工迁移（不使用脚本时）
+
+若受环境限制无法运行脚本，可按顺序手工执行以下 SQL（**MySQL 示例**；SQLite 将 `TINYINT(1)` 换成 `INTEGER`、其余相同），然后启动一次服务让 `create_all` 建新表：
+
+```sql
+-- 1. 旧表补列（逐条执行，若列已存在会报 1060 错误，跳过即可）
+ALTER TABLE users     ADD COLUMN is_active_flag   TINYINT(1)  NOT NULL DEFAULT 1;
+ALTER TABLE users     ADD COLUMN login_fail_count INT         NOT NULL DEFAULT 0;
+ALTER TABLE users     ADD COLUMN locked_until     DATETIME    NULL;
+ALTER TABLE users     ADD COLUMN last_login_city  VARCHAR(64) NULL;
+
+ALTER TABLE articles  ADD COLUMN status        VARCHAR(16) NOT NULL DEFAULT 'published';
+ALTER TABLE articles  ADD COLUMN reject_reason VARCHAR(500) NULL;
+ALTER TABLE articles  ADD COLUMN reviewed_by   INT NULL;
+ALTER TABLE articles  ADD COLUMN reviewed_at   DATETIME NULL;
+ALTER TABLE articles  ADD COLUMN created_by    INT NULL;
+ALTER TABLE articles  ADD COLUMN updated_by    INT NULL;
+
+ALTER TABLE login_logs ADD COLUMN user_id INT NULL;
+ALTER TABLE login_logs ADD COLUMN city    VARCHAR(64) NULL;
+
+-- 2. 数据回填（必须在补列后立即执行！）
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(32) PRIMARY KEY, applied_at DATETIME);
+UPDATE articles SET status = CASE WHEN is_enabled = 1
+    THEN 'published' ELSE 'draft' END;
+INSERT INTO schema_migrations (version, applied_at) VALUES ('v2.0_articles_status', NOW());
+
+-- 3. 状态索引
+CREATE INDEX ix_articles_status ON articles(status);
+-- 4. 新表由首次启动的 db.create_all() 自动创建，预设角色自动初始化
+```
+
+**警告**：第 2 步不可省略，也不可重复执行（重跑会把运行期已修改的文章状态覆盖回去）；脚本方式通过版本记录规避了该风险，推荐使用脚本。
+
+---
+
+## 五、升级后验证清单
+
+- [ ] 访问首页/栏目页/文章页正常，原本隐藏的文章（is_enabled=0）**仍然不可见**
+- [ ] 后台用原账号登录正常（需输入图形验证码）
+- [ ] 连续输错 5 次密码后账号被锁定，10 分钟后自动解锁
+- [ ] **用户权限 → 用户列表**：审查 is_super 用户，关闭非管理员的超管标志并分配角色
+- [ ] 用户权限 → 角色与权限：可见 4 个预设角色与权限点
+- [ ] 新建一篇文章：默认为草稿，能提交审核/发布
+- [ ] 文章编辑页有「版本历史」；修改文章后前台刷新立即更新（缓存自动清理）
+- [ ] 上传一张 JPG：生成缩略图且体积缩小；上传伪装 .jpg 的脚本文件被拒绝
+- [ ] 系统设置 → 后台安全：修改后台前缀，**无需重启**新前缀立即生效
+- [ ] 系统设置 → SEO 高级：开启伪静态后 `/栏目slug.html`、`/栏目slug-2.html`、`/文章id.html` 均可访问，分页链接自动变为伪静态格式
+- [ ] 系统设置 → 消息通知：配置 SMTP 后提交一条测试表单可收到邮件
+- [ ] 备份运维 → 备份列表：执行一次 MySQL 备份并下载验证
+- [ ] 自定义主题的列表模板：分页链接建议替换为 `frontend_pager_url(column, page)`（不替换也可正常工作，但无法享受伪静态分页）：
+
+```jinja
+<a href="{{ frontend_pager_url(column, pagination.prev_num or 1) }}">&laquo; 上一页</a>
+{% for p in pagination.iter_pages() %}
+  <a href="{{ frontend_pager_url(column, p) }}">{{ p }}</a>
+{% endfor %}
+```
+
+---
+
+## 六、回滚方案
+
+升级失败或需要回退时：
+
+1. 停止服务；
+2. 恢复第 0 步备份的代码目录与数据库（v2.0 新增的表/列留在库中不影响 v1.1 运行，v1.1 代码不感知这些结构；也可用备份直接还原）；
+3. 重启服务，确认站点恢复 v1.1 行为。
+
+> 由于迁移不删除任何既有数据、不修改任何业务数据（除 articles.status 回填外），且 v1.1 结构是 v2.0 的子集，多数情况下**直接用 v1.1 代码启动即可回滚**。
+
+---
+
+## 七、附录：v2.0 结构变更明细
+
+**新增数据表（9）**：`roles`、`permissions`、`role_permissions`、`user_roles`、`user_column_permissions`、`audit_logs`、`article_versions`、`backup_records`、`uploaded_files`；另建迁移记录表 `schema_migrations`。
+
+**旧表新增列（12）**：
+
+| 表 | 列 | 类型 | 说明 |
+| --- | --- | --- | --- |
+| users | is_active_flag | BOOLEAN NOT NULL DEFAULT 1 | 账号启用/禁用 |
+| users | login_fail_count | INTEGER NOT NULL DEFAULT 0 | 连续登录失败次数 |
+| users | locked_until | DATETIME NULL | 锁定截止时间 |
+| users | last_login_city | VARCHAR(64) NULL | 上次登录城市（异地提醒） |
+| articles | status | VARCHAR(16) NOT NULL DEFAULT 'published' | 工作流状态 |
+| articles | reject_reason | VARCHAR(500) NULL | 最近驳回原因 |
+| articles | reviewed_by / reviewed_at | INT / DATETIME NULL | 最近审核人与时间 |
+| articles | created_by / updated_by | INT NULL | 创建人/最近编辑人 |
+| login_logs | user_id | INT NULL | 关联用户 |
+| login_logs | city | VARCHAR(64) NULL | 登录 IP 归属地 |
+
+**新增配置项**（存于 `Setting.DEFAULTS`，旧库无需插入数据，自动生效默认值）：登录安全（login_max_fail/login_lock_minutes/login_abnormal_city_alert）、上传安全（upload_enable_mime_check/upload_enable_dedup/upload_image_*）、消息通知（form_notify_enable/form_notify_channels/notify_email_*/notify_wework_*）、SEO（seo_rewrite_enable/seo_sitemap_*/seo_robots_custom/seo_image_alt_default）、页面缓存（cache_enable/cache_ttl_*）。
+
+**新增依赖（4）**：Flask-Caching、APScheduler、requests、python-magic（系统依赖 libmagic）。
+
+---
+
+如遇问题，请优先运行 `scripts/upgrade_v2.py` 查看自检报告，或提交 Issue 附带脚本完整输出。

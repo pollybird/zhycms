@@ -50,6 +50,7 @@
 <div class="layout">
 <nav class="toc">
   <h2>目录</h2>
+  <a href="#upgrade" style="background:#fff7ed;color:#c2410c;font-weight:600;">&#9733; v1.1 &rarr; v2.0 升级迁移</a>
   <a href="#intro">项目简介</a>
   <a href="#features">特性一览</a>
   <a href="#structure">一、目录结构</a>
@@ -74,17 +75,30 @@
   <a href="#tpl-column" class="sub">栏目级备选模板</a>
   <a href="#tpl-checklist" class="sub">检查清单</a>
   <a href="#tpl-debug" class="sub">调试技巧</a>
+  <a href="#rbac">七、用户、角色与权限</a>
+  <a href="#workflow">八、内容工作流与版本</a>
+  <a href="#backup">九、备份与恢复</a>
+  <a href="#notify">十、表单消息通知</a>
+  <a href="#seo">十一、SEO 与站点性能</a>
+  <a href="#seo-rewrite" class="sub">伪静态 URL</a>
+  <a href="#seo-cache" class="sub">页面缓存与图片 ALT</a>
+  <a href="#security">十二、安全加固</a>
+  <a href="#sec-login" class="sub">登录防暴破</a>
+  <a href="#sec-upload" class="sub">上传安全</a>
+  <a href="#sec-audit" class="sub">审计日志</a>
 </nav>
 
 <main>
 <header class="hero">
-  <h1>zhycms 使用手册</h1>
-  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 模板制作教程</p>
+  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.0</span></h1>
+  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>v1.1&rarr;v2.0 升级迁移</b></p>
 </header>
 
 <section id="intro">
 <h2>项目简介</h2>
 <p>zhycms 是一个基于 <b>Flask + SQLAlchemy</b> 的轻量级内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化等能力，适合搭建企业官网、资讯门户、产品展示站等。</p>
+<p><b>v2.0</b> 围绕「企业级安全、可控、可运维」新增八大模块：<b>RBAC 权限体系、审计日志、内容工作流、备份恢复、登录安全加固、上传安全与图片优化、表单消息通知、SEO 与站点性能</b>。</p>
+<div class="warn"><b>从 v1.1 升级：</b>v2.0 新增 9 张数据表、旧表补 12 列与 4 个依赖，请先阅读项目根目录的 <b><code>UPGRADE.md</code> 升级迁移指南</b>，并执行幂等迁移脚本 <code>scripts/upgrade_v2.py</code> 完成数据库迁移（仅启动程序无法完成迁移，且可能把原本隐藏的文章错误公开）。</div>
 </section>
 
 <section id="features">
@@ -95,8 +109,9 @@
   <li><b>CMS 标识与企业标识分离</b>：后台 CMS 名称/版权固定不可改，前台网站名称/版权可独立配置。</li>
   <li><b>栏目级模板选择</b>：每个栏目可指定独立的列表页/内容页/单页模板，未指定自动回退默认。</li>
   <li><b>自定义字段</b>：栏目和文章支持自定义字段（文本/富文本/图片/文件/URL/数字等）。</li>
-  <li><b>表单收集</b>：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，带图形验证码防刷，提交数据可导出。</li>
-  <li><b>SEO 优化 / 碎片管理 / 友情链接 / 图片上传（压缩·水印） / 验证码登录 / 首次初始化引导</b>。</li>
+  <li><b>表单收集</b>：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，带图形验证码防刷，提交数据可导出；<span class="tag">v2.0</span> 支持提交后邮件/企业微信实时通知。</li>
+  <li><b>SEO 优化 / 碎片管理 / 友情链接 / 图片上传 / 验证码登录 / 首次初始化引导</b>。</li>
+  <li><span class="tag">v2.0</span> <b>企业级能力</b>：RBAC 角色权限、审计日志、内容工作流与版本还原、数据库备份恢复、登录防暴破、上传内容安全校验、伪静态与页面缓存。</li>
 </ul>
 </section>
 
@@ -104,7 +119,7 @@
 <h2>一、目录结构</h2>
 <pre><code>zhycms/
 &#9500;&#9472;&#9472; app/
-&#9474;   &#9500;&#9472;&#9472; admin/              # 后台模块（栏目、文章、表单、设置等）
+&#9474;   &#9500;&#9472;&#9472; admin/              # 后台模块（栏目、文章、表单、设置、用户、角色、审计、备份等）
 &#9474;   &#9500;&#9472;&#9472; frontend/           # 前台模块（路由与视图）
 &#9474;   &#9474;   &#9492;&#9472;&#9472; templates/
 &#9474;   &#9474;       &#9492;&#9472;&#9472; themes/     # &#9733; 前台主题模板目录
@@ -113,17 +128,28 @@
 &#9474;   &#9474;           &#9500;&#9472;&#9472; manufacturing/  # 制造业行业专用主题（产品置顶）
 &#9474;   &#9474;           &#9492;&#9472;&#9472; service/        # 服务业行业专用主题（公司介绍置顶）
 &#9474;   &#9500;&#9472;&#9472; models/             # 数据模型
-&#9474;   &#9500;&#9472;&#9472; utils/              # 工具模块（主题、上传、验证码、数据库配置等）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; user.py / rbac.py     # 用户与角色权限（v2.0）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; audit.py              # 审计日志（v2.0）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; workflow.py           # 内容工作流与版本（v2.0）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; backup.py / upload.py # 备份记录 / 上传文件索引（v2.0）
+&#9474;   &#9474;   &#9492;&#9472;&#9472; article.py / column.py / form.py / setting.py ...
+&#9474;   &#9500;&#9472;&#9472; utils/              # 工具模块
+&#9474;   &#9474;   &#9500;&#9472;&#9472; uploads.py            # 上传安全：MIME 校验、SHA-256 去重、压缩缩略图（v2.0）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; notify_utils.py       # 表单消息通知：邮件 + 企业微信（v2.0）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; backup_utils.py       # 备份恢复引擎（v2.0）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; admin_prefix.py       # 后台动态路由前缀（v2.0 即时生效）
+&#9474;   &#9474;   &#9492;&#9472;&#9472; themes.py / captcha.py / bootstrap.py / ip_locator.py ...
 &#9474;   &#9500;&#9472;&#9472; static/             # 静态资源（uploads/ 上传文件、admin/ 后台资源）
 &#9474;   &#9500;&#9472;&#9472; __init__.py         # 应用工厂 create_app
 &#9474;   &#9500;&#9472;&#9472; config.py           # 配置（含数据库 URI 解析）
 &#9474;   &#9492;&#9472;&#9472; extensions.py       # 扩展初始化
-&#9500;&#9472;&#9472; instance/               # 实例数据（zhycms.db 数据库、db_config.json 连接配置）
+&#9500;&#9472;&#9472; instance/               # 实例数据（数据库、db_config.json、admin_config.json、backups/）
 &#9500;&#9472;&#9472; requirements.txt        # 依赖清单（含 MySQL/PostgreSQL 驱动）
 &#9500;&#9472;&#9472; run.py                  # 启动入口
+&#9500;&#9472;&#9472; wiki.html               # 本使用手册（离线单文件）
 &#9500;&#9472;&#9472; .gitignore
 &#9492;&#9472;&#9472; LICENSE                 # Apache 2.0</code></pre>
-<div class="note"><b>提示：</b><code>instance/</code> 目录存放 SQLite 数据库与 <code>db_config.json</code>（含数据库连接信息，可能包含密码），已在 <code>.gitignore</code> 中排除，切勿提交到版本库。</div>
+<div class="note"><b>提示：</b><code>instance/</code> 目录存放 SQLite 数据库与 <code>db_config.json</code>（含数据库连接信息，可能包含密码），以及 <code>admin_config.json</code>（后台路由前缀）与 <code>backups/</code>（备份文件），已在 <code>.gitignore</code> 中排除，切勿提交到版本库。</div>
 </section>
 
 <section id="install">
@@ -355,6 +381,14 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
 {{ url_for('frontend.article_detail', slug=column.slug, aid=article.id) }} {# 文章 #}
 {{ url_for('frontend.form_submit', slug=form.slug) }}             {# 表单 #}
 {{ url_for('frontend.search') }}                                  {# 搜索 #}</code></pre>
+<h4>伪静态分页助手（v2.0）</h4>
+<p>v2.0 起全局注入 <code>frontend_pager_url(column, page)</code>：<b>SEO 高级中开启伪静态</b>时自动输出 <code>/{slug}-{N}.html</code>（第 1 页为 <code>/{slug}.html</code>），关闭时输出 <code>/column/{slug}?page=N</code>。<b>自定义列表模板的分页链接请统一使用该助手</b>，不要写死动态 URL：</p>
+<pre><code>&lt;a href="{{ frontend_pager_url(column, pagination.prev_num or 1) }}"&gt;&amp;laquo; 上一页&lt;/a&gt;
+{% for p in pagination.iter_pages() %}
+  &lt;a href="{{ frontend_pager_url(column, p) }}"&gt;{{ p }}&lt;/a&gt;
+{% endfor %}
+&lt;a href="{{ frontend_pager_url(column, pagination.next_num or pagination.page) }}"&gt;下一页 &amp;raquo;&lt;/a&gt;</code></pre>
+<div class="note">文章详情页可直接使用 <code>url_for('frontend.article_detail', ...)</code>，系统会自动识别；伪静态开启时也可直接输出 <code>/{{ article.id }}.html</code>。</div>
 <table>
   <tr><th>过滤器</th><th>用途</th><th>示例</th></tr>
   <tr><td><code>date</code></td><td>格式化日期</td><td><code>{{ article.published_at|date }}</code> &rarr; 2026-08-06</td></tr>
@@ -393,7 +427,7 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
   <li>所有页面通过 <code>{% extends theme_base %}</code> 继承（不硬编码主题路径）</li>
   <li><code>base.html</code> 提供 <code>title / css / content / js</code> 四个 block</li>
   <li>富文本内容使用 <code>|safe</code> 过滤器</li>
-  <li>列表页、文章页的分页链接正确使用 <code>pagination</code> 对象</li>
+  <li>列表页、文章页的分页链接正确使用 <code>pagination</code> 对象；分页链接统一使用 <code>frontend_pager_url(column, page)</code> 助手以兼容伪静态开关</li>
   <li>后台「网站设置 &rarr; 前台主题」下拉框能看到新主题</li>
   <li>切换到新主题后，首页、栏目页、文章页、单页、404 均能正常访问</li>
   <li>自定义字段按 <code>field_type</code> 区分图片/文件/URL/富文本正确渲染</li>
@@ -406,6 +440,177 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
   <li><b>查看可用模板</b>：Python Shell 中执行 <code>list_themes()</code> / <code>list_theme_templates(category='list')</code>（见 <code>app/utils/themes.py</code>）。</li>
   <li><b>模板找不到报错</b>：检查文件名是否准确（区分大小写），是否放在正确的主题目录下。</li>
 </ul>
+</section>
+
+<section id="rbac">
+<h2>七、用户、角色与权限（RBAC）</h2>
+<p>后台菜单 <b>用户权限 &rarr; 用户列表 / 角色与权限</b>（v2.0 新增）。</p>
+<h3 id="rbac-model">权限模型</h3>
+<ul>
+  <li><b>权限点两级授权</b>：角色可勾选一组权限点，同时控制后台<b>菜单可见性</b>与<b>操作按钮/接口</b>（如文章发布、备份恢复、配置修改、用户管理）。</li>
+  <li><b>多角色并集</b>：一个用户可绑定多个角色，最终权限为所有角色权限点的并集。</li>
+  <li><b>内容粒度授权</b>：支持按栏目授予文章管理权限（如「只管理新闻中心」），实现内容运营岗位的最小权限分配。</li>
+  <li><b>超级管理员</b>：内置超管不受任何权限限制，普通用户未授权的菜单不可见、直接访问接口返回 <code>403</code> 并记录审计日志。</li>
+</ul>
+<div class="note">角色删除前会先解除用户绑定；用户被禁用后立即无法登录，已有会话在下一次请求时失效。</div>
+</section>
+
+<section id="workflow">
+<h2>八、内容工作流与版本管理</h2>
+<p>文章编辑流程从 v1.1 的「直接发布」升级为可审核的工作流（v2.0 新增）：</p>
+<h3 id="wf-flow">状态流转</h3>
+<pre><code>草稿(draft) ──提交审核──&gt; 待审核(pending) ──审核通过──&gt; 已发布(published)
+    ▲                          │
+    └────────驳回──────────────┘ 已驳回(rejected，需填写驳回原因)</code></pre>
+<ul>
+  <li>无发布权限的作者只能保存草稿并提交审核；有发布权限的编辑可直接发布。</li>
+  <li>待审核文章只有具备审核权限的用户可见可操作，前台不展示。</li>
+  <li>驳回时必须填写原因，作者可在文章列表看到驳回原因并修改后重新提交。</li>
+</ul>
+<h3 id="wf-version">版本快照</h3>
+<ul>
+  <li>文章每次保存自动生成版本快照，记录标题/正文/摘要等完整内容与操作时间。</li>
+  <li>文章编辑页 <b>版本历史</b> 中可查看任意两个版本的差异，支持<b>一键还原</b>到指定版本（还原动作本身也会生成新版本，可安全撤销）。</li>
+</ul>
+</section>
+
+<section id="backup">
+<h2>九、备份与恢复</h2>
+<p>后台菜单 <b>备份运维 &rarr; 备份列表</b>（v2.0 新增），备份文件存放于 <code>instance/backups/</code>。</p>
+<h3 id="backup-way">备份方式</h3>
+<table>
+  <tr><th>方式</th><th>适用</th><th>说明</th></tr>
+  <tr><td><b>MySQL 逻辑备份</b></td><td>MySQL / MariaDB</td><td>调用 <code>mysqldump</code> 导出全库结构与数据，gzip 压缩为 <code>.sql.gz</code></td></tr>
+  <tr><td><b>PostgreSQL 备份</b></td><td>PostgreSQL</td><td>调用 <code>pg_dump</code>，同样 gzip 压缩</td></tr>
+  <tr><td><b>JSON 备份</b></td><td>任意数据库</td><td>与数据库类型无关的通用格式，适合小站点迁移或跨库切换</td></tr>
+</table>
+<h3 id="backup-ops">操作说明</h3>
+<ul>
+  <li><b>立即备份</b>：选择备份方式一键执行，完成后列表显示文件名、大小、耗时与操作人。</li>
+  <li><b>下载</b>：将备份文件下载到本地异地保存。</li>
+  <li><b>恢复</b>：从备份文件一键恢复。恢复前系统自动提交并释放数据库连接池，避免 DROP TABLE 时被自身连接的元数据锁阻塞。</li>
+  <li><b>删除</b>：清理过期备份文件与记录。</li>
+</ul>
+<div class="warn"><b>恢复前务必确认：</b>恢复操作会用备份内容<b>覆盖当前数据库全部数据</b>，且要求运行环境具备 <code>mysqldump</code> / <code>pg_dump</code> 命令（JSON 方式除外）。建议先下载一份当前备份再执行恢复。</div>
+</section>
+
+<section id="notify">
+<h2>十、表单消息通知</h2>
+<p>后台菜单 <b>系统设置 &rarr; 消息通知</b>（v2.0 新增）。配置后，前台表单每收到一条提交都会实时推送到指定渠道。</p>
+<h3 id="notify-email">邮件通知</h3>
+<table>
+  <tr><th>配置项</th><th>说明</th></tr>
+  <tr><td><code>SMTP 服务器 / 端口 / SSL</code></td><td>如 <code>smtp.exmail.qq.com</code> / <code>465</code> / 开启</td></tr>
+  <tr><td><code>SMTP 账号 / 密码</code></td><td>登录邮箱与授权码</td></tr>
+  <tr><td><code>发件人显示名 / 发件地址</code></td><td>如「官网线索通知」/ <code>noreply@example.com</code></td></tr>
+  <tr><td><code>收件人列表</code></td><td>逗号分隔多个，如销售、客服各一份</td></tr>
+</table>
+<p>邮件正文为 HTML 表格，包含：<b>表单名称、提交时间、访客 IP、来源页面</b>与<b>全部字段值</b>。</p>
+<h3 id="notify-wework">企业微信通知</h3>
+<p>填写群机器人 <code>Webhook</code> 地址即可，支持配置 <b>@ 的手机号列表</b>（逗号分隔），消息为 markdown 格式，含与邮件一致的完整信息。</p>
+<h3 id="notify-switch">开关逻辑</h3>
+<ul>
+  <li>「邮件通知」「企业微信通知」两个渠道均有<b>独立开关</b>。</li>
+  <li>「全局通知开关」总控：关闭时调用方静默跳过，不发送任何消息，也不影响表单正常提交入库。</li>
+  <li>配置保存与每次通知触发均写入审计日志，便于追查「有没有发出去」。</li>
+</ul>
+<div class="note"><b>建议：</b>配置完成后，在前台提交一条测试表单验证两个渠道；企业微信 Webhook 可先用 curl 推一条测试消息确认机器人有效。</div>
+</section>
+
+<section id="seo">
+<h2>十一、SEO 与站点性能</h2>
+<p>后台菜单 <b>系统设置 &rarr; SEO 高级</b>（v2.0 新增）。</p>
+<h3 id="seo-rewrite">伪静态 URL</h3>
+<p>开启伪静态后，前台自动支持以下 URL（关闭后这些地址返回 404，动态 URL 照常可用）：</p>
+<table>
+  <tr><th>URL</th><th>含义</th><th>等价动态 URL</th></tr>
+  <tr><td><code>/about.html</code></td><td>栏目页（第一页）</td><td><code>/column/about</code></td></tr>
+  <tr><td><code>/about-2.html</code></td><td>栏目列表页第 2 页</td><td><code>/column/about?page=2</code></td></tr>
+  <tr><td><code>/article-12.html</code></td><td>文章详情</td><td><code>/column/{slug}/article/12</code></td></tr>
+</table>
+<ul>
+  <li>页面中的栏目、文章、<b>分页链接</b>会同步输出为伪静态格式（第 1 页输出 <code>/about.html</code>，不带 <code>-1</code> 后缀；第 N 页输出 <code>/about-N.html</code>）。</li>
+  <li>访问 <code>/about-1.html</code> 会 301/302 规范化到 <code>/about.html</code>，避免搜索引擎收录重复页面。</li>
+  <li>含连字符数字的栏目 slug（如 <code>news-2024</code>）可正确解析，不会被误切分为栏目 + 页码。</li>
+  <li>开关即时生效，无需重启；自定义模板请使用全局助手 <code>frontend_pager_url(column, page)</code> 生成分页链接（见模板教程第 6 节）。</li>
+</ul>
+<h3 id="seo-sitemap">sitemap 与 robots</h3>
+<ul>
+  <li><b>sitemap.xml</b>：自动收录全部栏目与文章，栏目页/文章页的更新频率（changefreq）与优先级（priority）独立配置；伪静态开启时输出 <code>.html</code> 地址。</li>
+  <li><b>robots.txt</b>：内置默认规则（跟随后台前缀 Disallow、屏蔽 <code>/form/</code> 表单地址、声明 Sitemap），支持追加自定义规则；后台前缀变更后默认规则自动跟随。</li>
+</ul>
+<h3 id="seo-cache">页面缓存与图片 ALT</h3>
+<ul>
+  <li><b>页面缓存</b>：基于 Flask-Caching，首页 / 栏目列表页 / 文章详情页可分别设置 TTL（默认 3600 / 1800 / 7200 秒）；发布、编辑、删除内容后自动清理对应缓存，不会出现「改了前台不更新」。</li>
+  <li><b>图片默认 ALT</b>：设置默认值后，前台渲染时自动为缺失或空 <code>alt</code> 的 <code>&lt;img&gt;</code> 填充（已设置 alt 的保留原值），提升无障碍访问与图片 SEO。</li>
+  <li><b>图片ALT批量管理</b>（系统设置 &rarr; 图片ALT批量管理）：后台工具页，批量排查全站文章/单页正文中的图片 ALT 缺失情况。</li>
+</ul>
+</section>
+
+<section id="security">
+<h2>十二、安全加固</h2>
+<h3 id="sec-login">登录防暴破（v2.0）</h3>
+<ul>
+  <li>连续输错密码达到阈值（默认 <b>5 次</b>）自动锁定账号，锁定期内即使密码正确也会被拒绝；锁定时长默认 <b>10 分钟</b>，到期自动解锁。次数与时长均可在 <b>系统设置 &rarr; 后台安全</b> 中调整。</li>
+  <li>登录页配备<b>图形验证码</b>；验证码错误会记录失败日志但<b>不累计</b>密码失败次数（验证码先于密码验证）。</li>
+  <li><b>异地登录提醒</b>：检测到与上次登录不同的 IP 城市时，登录成功后顶部展示一次性安全提醒横幅（可在设置中关闭）。</li>
+  <li>所有登录行为（成功/失败/锁定）均写入 <b>登录日志</b>（系统设置 &rarr; 登录日志）。</li>
+</ul>
+<h3 id="sec-admin-prefix">后台路由前缀即时生效（v2.0）</h3>
+<p><b>系统设置 &rarr; 后台安全</b> 中修改后台前缀（如 <code>admin</code> &rarr; <code>manage-x8y2</code>）后，v2.0 起<b>即时生效、无需重启服务</b>：新前缀立即可访问，旧前缀立即失效（404），后台页内跳转自动使用新前缀。历史前缀保存在 <code>instance/admin_config.json</code>，忘记路由时删除该文件可恢复默认 <code>admin</code>。</p>
+<h3 id="sec-upload">上传安全与图片优化（v2.0）</h3>
+<p>后台菜单 <b>系统设置 &rarr; 上传安全</b>，以下能力默认开启：</p>
+<ul>
+  <li><b>后缀 + MIME 双重校验</b>：除了校验后缀白名单，还检查文件真实内容（magic bytes）；伪装成 <code>.jpg</code> 的 PHP/Shell/可执行文件（含 <code>&lt;?php</code>、<code>#!</code>、<code>MZ</code>、<code>ELF</code> 等特征）直接拒绝；图片后缀强制要求内容为真实图片。</li>
+  <li><b>SHA-256 内容去重</b>：相同内容的文件全局只保存一份，多处引用自动计数（删除引用计数归零才真正清理磁盘）。</li>
+  <li><b>图片自动压缩 + 缩略图</b>：JPG/PNG 上传后自动压缩（质量默认 80，可调）并生成 300px 宽缩略图（可调），显著降低磁盘与流量开销。</li>
+  <li><b>单文件大小上限</b>默认 10MB，可配置；超限直接拒绝并给出明确提示。</li>
+  <li>所有上传文件建立<b>统一索引</b>（原始大小/压缩后大小/宽高/缩略图路径/引用计数），可在后台查看与管理。</li>
+</ul>
+<h3 id="sec-audit">审计日志（v2.0）</h3>
+<p>后台菜单 <b>审计日志</b>：登录/登出、配置变更、内容增删改与发布审核、备份恢复、用户与权限调整等关键操作全量留痕，记录<b>操作人、IP、操作时间、操作类型与详情</b>；支持按模块、操作类型、操作人与时间范围检索，为安全追溯提供依据。</p>
+</section>
+
+<section id="upgrade">
+<h2>十三、v1.1 &rarr; v2.0 升级迁移</h2>
+<p>正在运行 v1.1 及更早 1.x 版本的站点升级到 v2.0 前，请务必完整阅读项目根目录的 <b><code>UPGRADE.md</code></b>（升级迁移指南）。本章为速览。</p>
+
+<h3 id="upgrade-key">升级前必读：四个关键变化</h3>
+<table>
+  <tr><th>变化</th><th>说明</th><th>需要做的事</th></tr>
+  <tr><td><b>用户权限语义</b></td><td>v1.1 所有用户默认超级管理员；v2.0 引入 RBAC，新建用户默认无权限</td><td>升级后到「用户权限 &rarr; 用户列表」收紧非管理员的超管标志并分配角色</td></tr>
+  <tr><td><b>文章状态机</b></td><td><code>is_enabled</code> 开关升级为工作流状态（迁移自动回填，前台展示效果不变）</td><td>无需手工处理；确认隐藏文章升级后仍不可见</td></tr>
+  <tr><td><b>登录安全默认启用</b></td><td>失败 5 次锁定 10 分钟、图形验证码、异地提醒</td><td>告知全体后台用户；弱密码账号建议一并改密</td></tr>
+  <tr><td><b>上传行为变化</b></td><td>MIME 双重校验/SHA-256 去重/压缩缩略图默认开启，仅影响新上传</td><td>伪装成图片的脚本将无法上传</td></tr>
+</table>
+
+<h3 id="upgrade-steps">升级步骤速览</h3>
+<pre><code># 0. 备份站点目录与数据库（必做！）
+
+# 1. 停服并更新代码到 v2.0
+git fetch &amp;&amp; git checkout v2.0
+
+# 2. 更新依赖（新增 4 个；Linux 需补系统库 libmagic）
+pip install -r requirements.txt
+sudo apt install -y libmagic1        # Debian/Ubuntu
+
+# 3. 执行数据库迁移（幂等脚本，可重复运行）
+.venv/bin/python scripts/upgrade_v2.py
+
+# 4. 启动服务，按 UPGRADE.md 的验证清单逐项核对</code></pre>
+
+<h3 id="upgrade-why">为什么必须运行迁移脚本</h3>
+<div class="warn">v2.0 新增 <b>9 张数据表</b>、旧表补 <b>12 列</b>并回填文章状态。仅启动程序<b>无法完成迁移</b>：<code>db.create_all()</code> 只建新表、不会给旧表加列；若跳过数据回填，<code>ALTER ADD COLUMN ... DEFAULT 'published'</code> 会让<b>原本隐藏的文章被错误公开</b>。迁移脚本已通过版本记录保证幂等，可安全重复执行。</div>
+
+<h3 id="upgrade-check">升级后验证要点</h3>
+<ul class="check">
+  <li>原本隐藏的文章（is_enabled=0）升级后仍然不可见</li>
+  <li>后台登录正常（需输入图形验证码）；连续错 5 次密码会锁定 10 分钟</li>
+  <li>用户列表已审查 is_super 标志，普通用户已分配角色</li>
+  <li>新建文章默认草稿，可提交审核/发布；版本历史可用</li>
+  <li>上传 JPG 生成缩略图且压缩；伪静态、消息通知、备份按需配置验证</li>
+</ul>
+<p>完整内容（手工 SQL、回滚方案、变更明细附录）见 <b><code>UPGRADE.md</code></b>。</p>
 </section>
 
 <footer>

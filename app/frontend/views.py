@@ -1,7 +1,18 @@
-"""前台路由：首页、栏目、文章、表单提交。"""
+"""前台路由：首页、栏目、文章、表单提交、根文件（favicon/robots/sitemap）。
+升级点：
+  - 模块7：表单提交成功后触发 notify_utils.notify_form_submission（邮件+企业微信）
+  - 模块8：缓存装饰器（基于 Flask-Caching）作用在首页/栏目/文章页面，Setting TTL 控制
+  - 模块8：伪静态 URL（seo_rewrite_enable=on 时生效 /<slug>.html /article-<aid>.html）
+  - 模块8：sitemap.xml 读取 Setting 的 changefreq/priority 配置（栏目/文章分别）
+  - 模块8：robots.txt 追加 Setting.seo_robots_custom 自定义文本
+  - 模块8：图片缺省时注入默认 ALT（Setting.seo_image_alt_default）
+  - 工作流：所有前台公开 Article 查询强制 status=STATUS_PUBLISHED（防御式，和 is_enabled 等价）
+"""
 import os
+import re
 import time
 from datetime import datetime
+from functools import wraps
 
 from flask import (
     render_template, redirect, url_for, request,
@@ -15,11 +26,102 @@ from ..models.fragment import Fragment
 from ..models.friend_link import FriendLink
 from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
 from ..models.setting import Setting
+from ..models.workflow import STATUS_PUBLISHED
 from ..utils.uploads import save_upload_file
 from ..utils.themes import theme_template, get_column_template
 from ..utils.captcha import generate_captcha
 from . import frontend_bp
 
+
+def frontend_pager_url(column, page):
+    """前台列表分页 URL 生成（模块8 伪静态适配）。
+
+    - seo_rewrite_enable=on：第一页 /{slug}.html，第 N 页 /{slug}-{N}.html
+    - 关闭：/column/{slug}?page=N（动态查询参数，原有行为）
+    供 Jinja 全局使用（8 个主题列表模板的分页链接统一走这里）。
+    """
+    try:
+        page = int(page or 1)
+    except (TypeError, ValueError):
+        page = 1
+    if Setting.get('seo_rewrite_enable') == 'on':
+        if page <= 1:
+            return f'/{column.slug}.html'
+        return f'/{column.slug}-{page}.html'
+    return url_for('frontend.column_detail', slug=column.slug, page=page)
+
+
+# ============================================================
+# 模块8：缓存 / 伪静态 / 图片ALT 工具
+# ============================================================
+
+def _cache_enabled():
+    return Setting.get('cache_enable') == 'on'
+
+
+def _try_cache(key, ttl_setting_key, default_ttl=600):
+    """页面缓存装饰器（简易）：根据 Setting.cache_enable 开关决定是否走缓存。"""
+    from ..extensions import cache
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            if not _cache_enabled():
+                return view_func(*args, **kwargs)
+            try:
+                ttl = int(Setting.get(ttl_setting_key, default_ttl))
+            except (TypeError, ValueError):
+                ttl = default_ttl
+            cache_key = f'frontend/{key}/' + '/'.join(
+                [str(v) for v in args] + [f'{k}={v}' for k, v in sorted(kwargs.items())]
+            ) + request.query_string.decode('utf-8', errors='ignore')
+            try:
+                cached = cache.get(cache_key)
+                if cached is not None:
+                    return cached
+            except Exception:
+                pass
+            resp = view_func(*args, **kwargs)
+            try:
+                cache.set(cache_key, resp, timeout=ttl)
+            except Exception:
+                pass
+            return resp
+        return wrapper
+    return decorator
+
+
+def _inject_default_alt(html):
+    """模块8：把 HTML 中 <img ... alt="" 或缺失 alt> 的 alt 补充为 Setting 默认值。"""
+    if not html:
+        return html
+    default_alt = Setting.get('seo_image_alt_default') or ''
+    if not default_alt:
+        return html
+    default_alt = default_alt.replace('"', '&quot;')
+
+    def _rep(match):
+        tag = match.group(0)
+        if re.search(r'alt\s*=\s*"[^"]+"', tag) or re.search(r"alt\s*=\s*'[^']+'", tag):
+            # 已有 alt 属性且非空
+            m2 = re.search(r'alt\s*=\s*"([^"]*)"', tag) or re.search(r"alt\s*=\s*'([^']*)'", tag)
+            if m2 and m2.group(1).strip():
+                return tag
+        # 补 alt
+        if 'alt=' in tag.lower():
+            # 有 alt 但为空字符串：替换其值
+            tag_new = re.sub(r'alt\s*=\s*""', f'alt="{default_alt}"', tag)
+            tag_new = re.sub(r"alt\s*=\s*''", f"alt='{default_alt}'", tag_new)
+            return tag_new
+        # 完全缺失：在 <img 后插入
+        return re.sub(r'(<img\b)', r'\1 alt="' + default_alt + r'"', tag, count=1, flags=re.IGNORECASE)
+
+    return re.sub(r'<img\b[^>]*>', _rep, html, flags=re.IGNORECASE)
+
+
+# ============================================================
+# 通用辅助
+# ============================================================
 
 def _build_nav():
     """构建导航树。"""
@@ -54,7 +156,9 @@ def check_site_status():
     """站点维护模式拦截（除首页提示外，所有前台路由都跳到关闭页）。"""
     if Setting.get('site_status') == 'closed':
         # 允许访问 admin 蓝本（已在另一个蓝本注册，这里不影响）
-        if request.path.startswith('/admin'):
+        from ..utils.admin_prefix import load_admin_prefix
+        admin_prefix = load_admin_prefix()
+        if request.path.startswith('/' + admin_prefix):
             return
         # 站点根文件（favicon/robots/sitemap）不受维护模式影响，保证收录与图标正常
         if request.endpoint in ('frontend.favicon', 'frontend.robots', 'frontend.sitemap'):
@@ -63,10 +167,7 @@ def check_site_status():
 
 
 def _home_column_articles(slug, limit=8):
-    """按 slug 查找栏目，收集其（含子栏目）下的文章，用于首页展示。
-
-    返回 (column, [articles])；栏目不存在返回 (None, [])。
-    """
+    """按 slug 查找栏目，收集其（含子栏目）下的文章，用于首页展示。"""
     col = Column.query.filter_by(
         slug=slug, is_enabled=True, is_deleted=False
     ).first()
@@ -81,18 +182,21 @@ def _home_column_articles(slug, limit=8):
     articles = Article.query.filter(
         Article.column_id.in_(col_ids),
         Article.is_deleted == False,
-        Article.is_enabled == True,
+        Article.status == STATUS_PUBLISHED,  # 工作流：只显示已发布
     ).order_by(
         Article.sort_order.desc(), Article.published_at.desc()
     ).limit(limit).all()
     return col, articles
 
 
+# ============================================================
+# 首页（模块8缓存：cache_ttl_index）
+# ============================================================
+
 @frontend_bp.route('/')
+@_try_cache('index', 'cache_ttl_index', 600)
 def index():
-    # 首页默认取第一个单页栏目或自定义首页
     nav = _build_nav()
-    # 取第一个单页栏目作为首页内容（或显示一个聚合首页）
     top_pages = Column.query.filter_by(
         parent_id=None, type='page', is_enabled=True, is_deleted=False
     ).order_by(Column.sort_order.desc()).first()
@@ -101,30 +205,26 @@ def index():
         is_enabled=True, is_deleted=False
     ).order_by(FriendLink.sort_order.desc()).all()
 
-    # 最新动态：取列表栏目下的最新文章
     list_columns = Column.query.filter_by(
         type='list', is_enabled=True, is_deleted=False
     ).all()
     latest_articles = []
     for col in list_columns[:3]:
         for a in col.articles.filter_by(
-            is_enabled=True, is_deleted=False
+            is_deleted=False, status=STATUS_PUBLISHED
         ).order_by(Article.published_at.desc()).limit(5).all():
             latest_articles.append((col, a))
 
-    # ===== 行业主题首页所需数据（对通用主题无副作用）=====
-    # 关于我们单页
+    # 行业主题首页数据
     about_col = Column.query.filter_by(
         slug='about', is_enabled=True, is_deleted=False
     ).first()
-    # 产品中心 / 服务项目（制造业=products，服务业=services）
     products_col, products = _home_column_articles('products', limit=8)
     services_col, services = _home_column_articles('services', limit=6)
-    # 新闻中心 / 新闻动态
     news_col, news = _home_column_articles('news', limit=6)
-    # 客户案例（服务业）
     cases_col, cases = _home_column_articles('cases', limit=4)
 
+    # 图片默认 ALT 注入（对内容型单页的 page_content，留空由单页渲染处处理）
     return render_template(
         theme_template('index'),
         nav=nav, friend_links=friend_links,
@@ -138,8 +238,57 @@ def index():
     )
 
 
+# ============================================================
+# 模块8：伪静态 URL（仅 seo_rewrite_enable=on 时启用）
+# ============================================================
+
+@frontend_bp.route('/<slug>.html')
+def rewrite_column(slug):
+    """伪静态：/about.html → /column/about；仅 seo_rewrite_enable=on 生效，否则 404。"""
+    if Setting.get('seo_rewrite_enable') != 'on':
+        abort(404)
+    return column_detail(slug)
+
+
+@frontend_bp.route('/<slug>-<int:page>.html')
+def rewrite_column_page(slug, page):
+    """伪静态列表分页：/about-2.html → /column/about?page=2。
+
+    Werkzeug 对静态段更多的规则优先匹配（已实测）：
+    - /about.html          → rewrite_column
+    - /about-2.html        → 本视图（slug='about', page=2）
+    - /news-2024-2.html    → 本视图（slug='news-2024', page=2），含 -数字 的 slug 不会误切
+    """
+    if Setting.get('seo_rewrite_enable') != 'on':
+        abort(404)
+    if page <= 1:
+        # /about-1.html 与 /about.html 等价，规范到不带分页后缀的 URL
+        return redirect(f'/{slug}.html')
+    return column_detail(slug, page=page)
+
+
+@frontend_bp.route('/article-<int:aid>.html')
+def rewrite_article(aid):
+    """伪静态：/article-123.html。"""
+    if Setting.get('seo_rewrite_enable') != 'on':
+        abort(404)
+    article = Article.query.get_or_404(aid)
+    if article.is_deleted or article.status != STATUS_PUBLISHED:
+        abort(404)
+    col = Column.query.get(article.column_id)
+    if col is None or col.is_deleted or not col.is_enabled:
+        abort(404)
+    # 直接按栏目详情渲染，避免跳回动态参数 URL（伪静态的意义就在于此）
+    return article_detail(col.slug, aid)
+
+
+# ============================================================
+# 栏目详情
+# ============================================================
+
 @frontend_bp.route('/column/<slug>')
-def column_detail(slug):
+@_try_cache('column', 'cache_ttl_column', 600)
+def column_detail(slug, page=None):
     col = Column.query.filter_by(slug=slug, is_deleted=False).first_or_404()
     if not col.is_enabled:
         abort(404)
@@ -159,7 +308,6 @@ def column_detail(slug):
             abort(404)
         if col.parent_mode == 'first_child':
             return redirect(url_for('frontend.column_detail', slug=children[0].slug))
-        # 展示子栏目列表
         return render_template(
             theme_template('column_children'),
             column=col, children=children, nav=nav, seo=_seo(column=col)
@@ -167,22 +315,31 @@ def column_detail(slug):
 
     # 叶子栏目
     if col.type == 'page':
-        # 单页栏目（使用栏目指定的 page 模板，默认 page）
-        # 传入前台可见的自定义字段，模板可用 column.get_field_value(field.id) 取值
         fields = col.fields.filter_by(
             is_deleted=False, is_frontend_visible=True
         ).order_by(ColumnField.sort_order.desc()).all()
+        # 模块8：对单页 HTML 注入默认 ALT（在临时副本上改，避免污染 ORM identity_map 中的真实对象）
+        render_col = col
+        if col.page_content:
+            from copy import copy as _shallow_copy
+            render_col = _shallow_copy(col)
+            render_col.page_content = _inject_default_alt(col.page_content)
         tpl = get_column_template(col, 'page')
         return render_template(
             theme_template(tpl),
-            column=col, fields=fields, nav=nav, seo=_seo(column=col)
+            column=render_col, fields=fields, nav=nav, seo=_seo(column=col)
         )
     elif col.type == 'list':
-        # 列表栏目分页（使用栏目指定的 list 模板，默认 list）
-        page = max(int(request.args.get('page', 1)), 1)
+        # 分页来源：伪静态路由直接传参（/about-2.html）或查询参数（/column/about?page=2）
+        if page is None:
+            page = request.args.get('page', 1)
+        try:
+            page = max(int(page), 1)
+        except (TypeError, ValueError):
+            page = 1
         per_page = col.page_size or 10
         pagination = Article.query.filter_by(
-            column_id=col.id, is_deleted=False, is_enabled=True
+            column_id=col.id, is_deleted=False, status=STATUS_PUBLISHED
         ).order_by(
             Article.sort_order.desc(), Article.published_at.desc()
         ).paginate(page=page, per_page=per_page, error_out=False)
@@ -196,15 +353,19 @@ def column_detail(slug):
     abort(404)
 
 
+# ============================================================
+# 文章详情
+# ============================================================
+
 @frontend_bp.route('/column/<slug>/article/<int:aid>')
+@_try_cache('article', 'cache_ttl_article', 900)
 def article_detail(slug, aid):
-    # 兼容旧链接格式
     col = Column.query.filter_by(slug=slug, is_deleted=False).first_or_404()
     article = Article.query.get_or_404(aid)
-    if article.column_id != col.id or article.is_deleted or not article.is_enabled:
+    if article.column_id != col.id or article.is_deleted or article.status != STATUS_PUBLISHED:
         abort(404)
 
-    # 浏览量 +1（写入失败不影响页面渲染）
+    # 浏览量 +1（写库时暂时绕过缓存副作用）
     try:
         article.viewed = (article.viewed or 0) + 1
         db.session.commit()
@@ -218,28 +379,35 @@ def article_detail(slug, aid):
 
     # 侧边栏最新文章
     latest_articles = col.articles.filter_by(
-        is_enabled=True, is_deleted=False
+        is_deleted=False, status=STATUS_PUBLISHED
     ).order_by(Article.published_at.desc()).limit(8).all()
 
     # 上一篇/下一篇
     prev_article = Article.query.filter(
         Article.column_id == col.id,
         Article.is_deleted == False,
-        Article.is_enabled == True,
+        Article.status == STATUS_PUBLISHED,
         Article.id < article.id
     ).order_by(Article.id.desc()).first()
     next_article = Article.query.filter(
         Article.column_id == col.id,
         Article.is_deleted == False,
-        Article.is_enabled == True,
+        Article.status == STATUS_PUBLISHED,
         Article.id > article.id
     ).order_by(Article.id.asc()).first()
 
-    # 使用栏目指定的 detail 模板，默认 article
+    # 模块8：对正文内容、摘要注入默认图片ALT（临时副本，不污染 ORM 对象）
+    from copy import copy as _shallow_copy
+    render_article = _shallow_copy(article)
+    if render_article.content:
+        render_article.content = _inject_default_alt(article.content)
+    if render_article.summary:
+        render_article.summary = _inject_default_alt(article.summary)
+
     tpl = get_column_template(col, 'detail')
     return render_template(
         theme_template(tpl),
-        column=col, article=article, fields=fields,
+        column=col, article=render_article, fields=fields,
         latest_articles=latest_articles,
         prev_article=prev_article, next_article=next_article,
         nav=nav, seo=_seo(article=article)
@@ -250,9 +418,15 @@ def article_detail(slug, aid):
 @frontend_bp.route('/article/<int:aid>')
 def article_short(aid):
     article = Article.query.get_or_404(aid)
+    if article.is_deleted or article.status != STATUS_PUBLISHED:
+        abort(404)
     return redirect(url_for('frontend.article_detail',
                             slug=article.column.slug, aid=article.id))
 
+
+# ============================================================
+# 表单提交（模块7：提交成功后触发消息通知）
+# ============================================================
 
 @frontend_bp.route('/form/<slug>', methods=['GET', 'POST'])
 def form_submit(slug):
@@ -265,7 +439,6 @@ def form_submit(slug):
     fields = form.fields.filter_by(is_deleted=False).order_by(FormField.sort_order.asc()).all()
 
     if request.method == 'POST':
-        # 防重复提交：基于 IP + form_id
         if form.submit_interval > 0:
             cache_key = f'form_submit_{form.id}_{request.remote_addr}'
             last = session.get(cache_key, 0)
@@ -274,10 +447,9 @@ def form_submit(slug):
                 flash(f'提交过于频繁，请 {form.submit_interval - (now - last)} 秒后再试', 'danger')
                 return redirect(url_for('frontend.form_submit', slug=slug))
 
-        # 图形验证码校验：防止脚本恶意反复提交
+        # 图形验证码
         captcha = (request.form.get('captcha') or '').strip().lower()
         session_captcha = (session.get('form_captcha') or '').lower()
-        # 验证码为一次性，无论成败都作废，避免重放
         session.pop('form_captcha', None)
         if not session_captcha or captcha != session_captcha:
             flash('验证码错误，请重新输入', 'danger')
@@ -291,7 +463,6 @@ def form_submit(slug):
             if f.is_required and not val and not (file_obj and file_obj.filename):
                 errors.append(f'{f.label} 为必填项')
 
-        # 邮箱/手机号格式校验
         for f in fields:
             val = (request.form.get(f'field_{f.id}') or '').strip()
             if not val:
@@ -315,6 +486,7 @@ def form_submit(slug):
         db.session.add(sub)
         db.session.flush()
 
+        fields_list = []  # 用于通知模块7：(label, value)
         for f in fields:
             value = None
             if f.field_type == 'file':
@@ -339,10 +511,21 @@ def form_submit(slug):
             if value is not None:
                 v = FormSubmissionValue(submission_id=sub.id, field_id=f.id, value=value)
                 db.session.add(v)
+                fields_list.append((f.label, value))
 
         db.session.commit()
         if form.submit_interval > 0:
             session[cache_key] = int(time.time())
+
+        # 模块7：消息通知推送（异常不影响用户提交成功提示）
+        if Setting.get('form_notify_enable') == 'on':
+            try:
+                from ..utils.notify_utils import notify_form_submission
+                submit_page = request.referrer or url_for('frontend.form_submit',
+                                                          slug=slug, _external=True)
+                notify_form_submission(form, sub, fields_list, submit_page=submit_page)
+            except Exception:
+                current_app.logger.exception('notify form submission failed')
 
         flash(form.success_message, 'success')
         return redirect(url_for('frontend.form_submit', slug=slug))
@@ -353,16 +536,15 @@ def form_submit(slug):
     )
 
 
+# ============================================================
+# 验证码 / 搜索 / 根文件
+# ============================================================
+
 @frontend_bp.route('/captcha')
 def captcha():
-    """前台图形验证码：用于自定义表单提交防刷。
-
-    与后台登录验证码分开存储（session 键为 form_captcha），互不干扰。
-    """
     code, image_data = generate_captcha()
     session['form_captcha'] = code
     resp = current_app.response_class(image_data, mimetype='image/png')
-    # 禁止缓存，保证每次刷新都拿到新验证码
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
     return resp
@@ -370,15 +552,16 @@ def captcha():
 
 @frontend_bp.route('/search')
 def search():
-    """全站简单搜索（仅文章标题）。"""
+    """全站搜索（仅已发布文章）。"""
     keyword = (request.args.get('q') or '').strip()
     results = []
     if keyword:
         results = Article.query.filter(
             Article.is_deleted == False,
-            Article.is_enabled == True,
+            Article.status == STATUS_PUBLISHED,
             Article.title.like(f'%{keyword}%')
         ).order_by(Article.published_at.desc()).limit(50).all()
+    # 默认 ALT 注入对搜索摘要页无副作用
     return render_template(
         theme_template('search'), keyword=keyword, results=results,
         nav=_build_nav(), seo=_seo()
@@ -387,10 +570,6 @@ def search():
 
 @frontend_bp.route('/favicon.ico')
 def favicon():
-    """站点图标：浏览器默认请求 /favicon.ico。
-
-    图标来源为 https://www.tzzhy.cn/ 的站点图标，已复制到 static/img/favicon.ico。
-    """
     return send_from_directory(
         os.path.join(current_app.static_folder, 'img'),
         'favicon.ico', mimetype='image/vnd.microsoft.icon'
@@ -399,7 +578,7 @@ def favicon():
 
 @frontend_bp.route('/robots.txt')
 def robots():
-    """爬虫协议：允许收录前台内容，禁止收录后台与上传目录，声明站点地图。"""
+    """爬虫协议：默认规则 + Setting.seo_robots_custom 追加自定义规则。"""
     from ..utils.admin_prefix import load_admin_prefix
 
     admin_prefix = load_admin_prefix()
@@ -414,6 +593,12 @@ def robots():
         f'Sitemap: {site_url}/sitemap.xml',
         '',
     ]
+    # 模块8：追加后台自定义的 robots 规则
+    extra = Setting.get('seo_robots_custom') or ''
+    if extra:
+        lines.append('# 自定义规则（来自网站设置→SEO高级）')
+        lines.append(extra.rstrip('\n'))
+        lines.append('')
     return current_app.response_class(
         '\n'.join(lines), mimetype='text/plain'
     )
@@ -421,15 +606,19 @@ def robots():
 
 @frontend_bp.route('/sitemap.xml')
 def sitemap():
-    """站点地图：列出首页、栏目页与文章页，供搜索引擎收录。
-
-    仅收录启用且未删除的内容；链接栏目（跳转外链）不纳入。
-    lastmod 取内容的更新时间（文章优先用发布时间）。
+    """站点地图：使用 Setting 配置的更新频率与优先级（栏目/文章分开）。
+    只收录：首页 + 启用未删除的非外链栏目 + 启用未删除且已发布文章。
     """
     from xml.sax.saxutils import escape
 
     def _lastmod(dt):
         return dt.strftime('%Y-%m-%d') if dt else ''
+
+    # 模块8：读取 Setting 自定义频率/优先级
+    cfg_col_cf = Setting.get('seo_sitemap_changefreq_column') or 'weekly'
+    cfg_art_cf = Setting.get('seo_sitemap_changefreq_article') or 'monthly'
+    cfg_col_pri = Setting.get('seo_sitemap_priority_column') or '0.8'
+    cfg_art_pri = Setting.get('seo_sitemap_priority_article') or '0.6'
 
     urls = []
 
@@ -448,25 +637,35 @@ def sitemap():
         Column.type != 'link',
     ).order_by(Column.sort_order.desc()).all()
     for col in columns:
+        loc = url_for('frontend.column_detail', slug=col.slug, _external=True)
+        # 模块8：伪静态开启时使用伪静态链接（可选）
+        if Setting.get('seo_rewrite_enable') == 'on':
+            root = request.url_root.rstrip('/')
+            loc = f'{root}/{col.slug}.html'
         urls.append({
-            'loc': url_for('frontend.column_detail', slug=col.slug, _external=True),
+            'loc': loc,
             'lastmod': _lastmod(col.updated_at),
-            'changefreq': 'weekly',
-            'priority': '0.8',
+            'changefreq': cfg_col_cf,
+            'priority': cfg_col_pri,
         })
 
     # 文章页
     articles = Article.query.filter(
-        Article.is_enabled == True,
+        Article.status == STATUS_PUBLISHED,
         Article.is_deleted == False,
     ).order_by(Article.published_at.desc()).all()
     for a in articles:
+        if Setting.get('seo_rewrite_enable') == 'on':
+            root = request.url_root.rstrip('/')
+            loc = f'{root}/article-{a.id}.html'
+        else:
+            loc = url_for('frontend.article_detail', slug=a.column.slug,
+                          aid=a.id, _external=True)
         urls.append({
-            'loc': url_for('frontend.article_detail', slug=a.column.slug,
-                           aid=a.id, _external=True),
+            'loc': loc,
             'lastmod': _lastmod(a.updated_at or a.published_at),
-            'changefreq': 'monthly',
-            'priority': '0.6',
+            'changefreq': cfg_art_cf,
+            'priority': cfg_art_pri,
         })
 
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',

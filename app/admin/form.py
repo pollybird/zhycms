@@ -1,4 +1,6 @@
-"""自定义表单管理 + 前台提交处理。"""
+"""自定义表单管理 + 前台提交处理。
+升级：权限（form:manage 表单配置 / form:view 查看导出）+ 审计日志 + 表单导出记录。
+"""
 import io
 import json
 import time
@@ -13,8 +15,12 @@ from openpyxl import Workbook
 from ..extensions import db
 from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
 from ..models.setting import Setting
-from ..utils.helpers import admin_required
+from ..utils.helpers import permission_required, audit_log
 from ..utils.uploads import save_upload_file
+from ..models.audit import (
+    OP_CREATE, OP_UPDATE, OP_DELETE, OP_EXPORT, OP_BATCH,
+    MODULE_FORM, MODULE_FORM_SUBMISSION,
+)
 from . import admin_bp
 
 
@@ -33,14 +39,14 @@ FIELD_TYPES = [
 # ============ 表单管理 ============
 
 @admin_bp.route('/forms')
-@admin_required
+@permission_required('form:view')
 def form_index():
     forms = Form.query.filter_by(is_deleted=False).order_by(Form.created_at.desc()).all()
     return render_template('admin/form/index.html', forms=forms)
 
 
 @admin_bp.route('/forms/create', methods=['GET', 'POST'])
-@admin_required
+@permission_required('form:manage')
 def form_create():
     if request.method == 'POST':
         form = _save_form(None)
@@ -51,7 +57,7 @@ def form_create():
 
 
 @admin_bp.route('/forms/<int:fid>/edit', methods=['GET', 'POST'])
-@admin_required
+@permission_required('form:manage')
 def form_edit(fid):
     form = Form.query.get_or_404(fid)
     if form.is_deleted:
@@ -98,6 +104,8 @@ def _save_form(form):
 
     db.session.commit()
     flash('表单已保存', 'success')
+    audit_log(OP_CREATE if is_new else OP_UPDATE, MODULE_FORM, form.id, form.name,
+              {'slug': form.slug})
     return form
 
 
@@ -181,19 +189,20 @@ def _save_form_fields(form):
 
 
 @admin_bp.route('/forms/<int:fid>/delete', methods=['POST'])
-@admin_required
+@permission_required('form:manage')
 def form_delete(fid):
     form = Form.query.get_or_404(fid)
     form.is_deleted = True
     db.session.commit()
     flash('表单已删除', 'success')
+    audit_log(OP_DELETE, MODULE_FORM, form.id, form.name, {})
     return redirect(url_for('admin.form_index'))
 
 
 # ============ 表单数据管理 ============
 
 @admin_bp.route('/forms/<int:fid>/submissions')
-@admin_required
+@permission_required('form:view')
 def form_submissions(fid):
     form = Form.query.get_or_404(fid)
     page = max(int(request.args.get('page', 1)), 1)
@@ -217,7 +226,7 @@ def form_submissions(fid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/<int:sid>')
-@admin_required
+@permission_required('form:view')
 def form_submission_detail(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
     if sub.form_id != fid or sub.is_deleted:
@@ -230,7 +239,7 @@ def form_submission_detail(fid, sid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/<int:sid>/toggle-read', methods=['POST'])
-@admin_required
+@permission_required('form:view')
 def form_submission_toggle_read(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
     if sub.form_id != fid:
@@ -241,7 +250,7 @@ def form_submission_toggle_read(fid, sid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/<int:sid>/delete', methods=['POST'])
-@admin_required
+@permission_required('form:manage')
 def form_submission_delete(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
     sub.is_deleted = True
@@ -251,7 +260,7 @@ def form_submission_delete(fid, sid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/batch', methods=['POST'])
-@admin_required
+@permission_required('form:manage')
 def form_submission_batch(fid):
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
@@ -272,7 +281,7 @@ def form_submission_batch(fid):
 
 
 @admin_bp.route('/forms/<int:fid>/export')
-@admin_required
+@permission_required('form:view')
 def form_export(fid):
     """导出表单数据为 Excel。"""
     form = Form.query.get_or_404(fid)
@@ -310,6 +319,8 @@ def form_export(fid):
     buf.seek(0)
 
     filename = f'{form.slug}_submissions_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    audit_log(OP_EXPORT, MODULE_FORM_SUBMISSION, None, form.name,
+              {'form_id': fid, 'rows': len(subs), 'filename': filename})
     return send_file(
         buf,
         as_attachment=True,

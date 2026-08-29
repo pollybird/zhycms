@@ -1,8 +1,24 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_caching import Cache
 
 db = SQLAlchemy()
 login_manager = LoginManager()
 login_manager.login_view = 'admin_auth.login'
 login_manager.login_message = '请先登录后再访问该页面'
 login_manager.login_message_category = 'warning'
+
+# 模块8：全站缓存（默认用 SimpleCache，生产环境可在 config 切 Redis/Filesystem）
+cache = Cache()
+
+# 调度器（APScheduler）在 app/__init__.py 中延迟初始化，避免与多进程环境冲突
+_scheduler_instance = {'scheduler': None}
+
+
+def get_scheduler():
+    """返回全局 scheduler 实例（懒加载）。"""
+    return _scheduler_instance['scheduler']
+
+
+def set_scheduler(sched):
+    _scheduler_instance['scheduler'] = sched

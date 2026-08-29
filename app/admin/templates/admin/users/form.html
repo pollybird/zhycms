@@ -1,0 +1,120 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ '编辑用户' if user else '新增用户' }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ '编辑用户' if user else '新增用户' }}{% endblock %}
+{% set active_menu = 'user_list' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">用户权限</li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.user_index') }}">用户列表</a></li>
+<li class="breadcrumb-item active">{{ '编辑' if user else '新增' }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+<div class="row">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">账号基本信息</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="required-mark">登录用户名</label>
+          <input type="text" name="username" class="form-control" value="{{ user.username if user else '' }}" required {{ 'readonly' if user }}>
+          {% if not user %}<small class="form-text text-muted">创建后不可修改；至少 3 位</small>{% endif %}
+        </div>
+        <div class="form-group">
+          <label>昵称 / 显示名</label>
+          <input type="text" name="nickname" class="form-control" value="{{ user.nickname if user else '' }}">
+        </div>
+        <div class="form-group">
+          <label>邮箱</label>
+          <input type="email" name="email" class="form-control" value="{{ user.email if user else '' }}">
+        </div>
+        <div class="form-group">
+          <label class="{{ 'required-mark' if not user }}">{{ '登录密码（留空不修改）' if user else '登录密码' }}</label>
+          <input type="password" name="password" class="form-control" {{ 'required' if not user }} autocomplete="new-password">
+          {% if not user %}<small class="form-text text-muted">至少 6 位</small>{% endif %}
+        </div>
+        <div class="form-group">
+          <label>确认密码{{ '（修改密码时需填写）' if user else '' }}</label>
+          <input type="password" name="confirm_password" class="form-control" {{ 'required' if not user }} autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="is_active_flag" value="on" id="act" {{ 'checked' if not user or user.is_active_flag }}>
+            <label for="act">账号启用（取消勾选即禁用登录）</label>
+          </div>
+        </div>
+        {% if current_user.is_super %}
+        <div class="form-group">
+          <div class="icheck-danger">
+            <input type="checkbox" name="is_super" value="on" id="issuper" {{ 'checked' if user and user.is_super }}>
+            <label for="issuper">超级管理员（拥有全部权限，请谨慎授予）</label>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">角色分配</h3></div>
+      <div class="card-body">
+        {% if user and user.is_super %}
+        <div class="alert alert-info">该账号为超级管理员，权限由 is_super 字段兜底，角色分配仅作展示。</div>
+        {% endif %}
+        <div class="row">
+          {% for r in roles %}
+          <div class="col-sm-6 mb-2">
+            <div class="icheck-primary">
+              <input type="checkbox" name="role_ids[]" value="{{ r.id }}" id="r{{ r.id }}"
+                {{ 'checked' if user and r.id in (user_role_ids or []) }}>
+              <label for="r{{ r.id }}">
+                <strong>{{ r.name }}</strong>
+                {% if r.is_system %}<span class="badge badge-secondary">预设</span>{% endif %}
+                <br><small class="text-muted">{{ r.description or '-' }}</small>
+              </label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">栏目专属权限（可选）</h3></div>
+      <div class="card-body">
+        <small class="text-muted d-block mb-2">勾选后，该账号仅可操作所勾选的栏目；不勾选任何栏目时，若拥有「全局内容管理」权限则可访问所有栏目，否则无法访问文章功能。</small>
+        <div style="max-height:300px;overflow:auto;border:1px solid #eee;padding:8px;">
+          {% for col in columns %}
+          <div class="mb-2">
+            <div class="icheck-primary d-inline">
+              <input type="checkbox" name="column_ids[]" value="{{ col.id }}" id="c{{ col.id }}" class="col-check"
+                {{ 'checked' if user and col.id in (user_column_ids or []) }}>
+              <label for="c{{ col.id }}">
+                {% if col._depth %}{% for i in range(col._depth) %}&nbsp;&nbsp;{% endfor %}├ {% endif %}
+                <strong>{{ col.name }}</strong>
+                <span class="badge badge-light">{{ col.slug }}</span>
+              </label>
+            </div>
+            <div class="d-inline ml-3 text-nowrap">
+              <label class="mr-2 mb-0"><input type="checkbox" name="can_review_ids[]" value="{{ col.id }}"
+                {{ 'checked' if user and can_review_map.get(col.id) }}> 可审核</label>
+              <label class="mb-0"><input type="checkbox" name="can_publish_ids[]" value="{{ col.id }}"
+                {{ 'checked' if user and can_publish_map.get(col.id) }}> 可发布</label>
+            </div>
+          </div>
+          {% else %}
+          <div class="text-muted">暂无栏目，请先到「栏目管理」创建。</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存</button>
+        <a href="{{ url_for('admin.user_index') }}" class="btn btn-default btn-block mt-2">返回列表</a>
+      </div>
+    </div>
+  </div>
+</div>
+</form>
+{% endblock %}

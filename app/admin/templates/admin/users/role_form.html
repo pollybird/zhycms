@@ -1,0 +1,40 @@
+{% extends 'admin/base.html' %}
+{% block title %}新增角色 - {{ cms_name }}{% endblock %}
+{% block page_header %}新增自定义角色{% endblock %}
+{% set active_menu = 'user_role' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">用户权限</li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.role_index') }}">角色与权限</a></li>
+<li class="breadcrumb-item active">新增角色</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-6 offset-md-3">
+    <div class="card card-outline card-primary">
+      <div class="card-header"><h3 class="card-title">角色信息</h3></div>
+      <form method="post" class="card-body">
+        <div class="form-group">
+          <label class="required-mark">角色代码（英文/数字/下划线）</label>
+          <input type="text" name="code" class="form-control" pattern="[a-zA-Z0-9_]+" placeholder="如：marketing" required>
+          <small class="form-text text-muted">创建后不可修改，用于程序内部识别。</small>
+        </div>
+        <div class="form-group">
+          <label class="required-mark">角色名称</label>
+          <input type="text" name="name" class="form-control" placeholder="如：市场人员" required>
+        </div>
+        <div class="form-group">
+          <label>描述</label>
+          <textarea name="description" rows="3" class="form-control" placeholder="可选，说明该角色的职责范围"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> 创建角色</button>
+        <a href="{{ url_for('admin.role_index') }}" class="btn btn-default btn-block mt-2">返回</a>
+      </form>
+    </div>
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle"></i> 创建成功后，请回到「角色与权限」列表页，点击对应角色的权限勾选框完成授权，再到「用户列表」把角色分配给具体账号。
+    </div>
+  </div>
+</div>
+{% endblock %}

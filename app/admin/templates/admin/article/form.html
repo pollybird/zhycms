@@ -48,9 +48,19 @@
 {% endblock %}
 
 {% block content %}
+{% set in_col = current_user.is_super or current_user.can_access_column(column.id) %}
+{% set can_review = in_col and (current_user.is_super or current_user.has_permission('content:review')) and current_user.column_flag('can_review', column.id) %}
+{% set can_publish = in_col and (current_user.is_super or current_user.has_permission('content:publish')) and current_user.column_flag('can_publish', column.id) %}
 <form method="post" enctype="multipart/form-data" id="article-form">
   <div class="row">
     <div class="col-md-8">
+      {% if article and article.reject_reason %}
+      <div class="alert alert-danger">
+        <h5 class="mb-1"><i class="fas fa-times-circle"></i> 该文章已被驳回</h5>
+        <p class="mb-0"><strong>驳回原因：</strong>{{ article.reject_reason }}</p>
+        <small class="text-muted">请修改内容后重新提交审核。</small>
+      </div>
+      {% endif %}
       <div class="card">
         <div class="card-body">
           <div class="form-group">
@@ -120,11 +130,30 @@
             {% endif %}
           </div>
           <div class="form-group">
-            <div class="custom-control custom-switch">
-              <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled" {{ 'checked' if article is none or article.is_enabled }}>
-              <label class="custom-control-label" for="is_enabled">启用</label>
-            </div>
+            <label>工作流状态</label>
+            <select name="status" class="form-control">
+              {% for v, label in status_choices %}
+              {% if v != 'published' or can_publish %}
+              <option value="{{ v }}" {{ 'selected' if (article and article.status == v) or (not article and v == default_status) }}>{{ label }}</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+            <small class="form-text text-muted">
+              草稿：仅后台可见；待审核：等待审核员处理；已发布：前台展示；已归档：不再展示。
+              {% if not can_review %}您无审核权限，建议保存为草稿后提交审核。{% endif %}
+            </small>
           </div>
+          {% if article %}
+          <div class="form-group">
+            <label>历史版本</label>
+            <div>
+              <a href="{{ url_for('admin.article_versions', cid=column.id, aid=article.id) }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-history"></i> 查看 / 回滚历史版本（{{ versions|length }}）
+              </a>
+            </div>
+            <small class="form-text text-muted">每次保存自动生成版本快照，可随时回滚。</small>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -155,6 +184,33 @@
     </div>
   </div>
 </form>
+
+{% if article and can_review and article.status == 'review' %}
+<div class="modal fade" id="reject-modal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('admin.article_review_reject', cid=column.id, aid=article.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-times-circle text-danger"></i> 驳回文章</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span>&times;</span></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">驳回后文章将回到<strong>草稿</strong>状态，驳回原因会展示给编辑供修改。</p>
+          <div class="form-group">
+            <label class="required-mark">驳回原因（必填）</label>
+            <textarea name="reject_reason" rows="4" class="form-control" required
+              placeholder="请说明需要修改的问题，如：数据未更新、图片模糊、错别字等"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-danger" onclick="return confirm('确认驳回该文章？');"><i class="fas fa-times"></i> 确认驳回</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block js %}
@@ -276,5 +332,10 @@
         });
     });
   })();
+
+  // 列表页「驳回」按钮通过 #reject-modal 锚点跳转过来时自动打开驳回弹窗
+  if (window.location.hash === '#reject-modal') {
+    $('#reject-modal').modal('show');
+  }
 </script>
 {% endblock %}

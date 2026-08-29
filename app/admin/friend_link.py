@@ -1,17 +1,18 @@
-"""友情链接管理。"""
+"""友情链接管理。升级：权限 + 审计日志。"""
 from flask import (
     render_template, redirect, url_for, request, flash
 )
 
 from ..extensions import db
 from ..models.friend_link import FriendLink
-from ..utils.helpers import admin_required
+from ..utils.helpers import permission_required, audit_log, clear_content_cache
 from ..utils.uploads import save_upload_file
+from ..models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRIEND_LINK
 from . import admin_bp
 
 
 @admin_bp.route('/friend-links')
-@admin_required
+@permission_required('system:settings')
 def friend_link_index():
     links = FriendLink.query.filter_by(is_deleted=False).order_by(
         FriendLink.sort_order.desc(), FriendLink.created_at.desc()
@@ -20,7 +21,7 @@ def friend_link_index():
 
 
 @admin_bp.route('/friend-links/create', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def friend_link_create():
     if request.method == 'POST':
         link = _save_link(None)
@@ -31,7 +32,7 @@ def friend_link_create():
 
 
 @admin_bp.route('/friend-links/<int:lid>/edit', methods=['GET', 'POST'])
-@admin_required
+@permission_required('system:settings')
 def friend_link_edit(lid):
     link = FriendLink.query.get_or_404(lid)
     if request.method == 'POST':
@@ -79,7 +80,7 @@ def _save_link(link):
 
 
 @admin_bp.route('/friend-links/<int:lid>/delete', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def friend_link_delete(lid):
     link = FriendLink.query.get_or_404(lid)
     link.is_deleted = True
@@ -89,7 +90,7 @@ def friend_link_delete(lid):
 
 
 @admin_bp.route('/friend-links/<int:lid>/toggle', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def friend_link_toggle(lid):
     link = FriendLink.query.get_or_404(lid)
     link.is_enabled = not link.is_enabled
@@ -98,7 +99,7 @@ def friend_link_toggle(lid):
 
 
 @admin_bp.route('/friend-links/batch', methods=['POST'])
-@admin_required
+@permission_required('system:settings')
 def friend_link_batch():
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]

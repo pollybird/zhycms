@@ -16,3 +16,9 @@ from . import friend_link  # noqa: E402,F401
 from . import form  # noqa: E402,F401
 from . import setting  # noqa: E402,F401
 from . import upload  # noqa: E402,F401
+# 模块1 RBAC：用户与角色管理
+from . import users  # noqa: E402,F401
+# 模块2 审计日志
+from . import audit  # noqa: E402,F401
+# 模块4 备份运维
+from . import backup  # noqa: E402,F401

@@ -2,8 +2,10 @@
 Flask>=3.0.3,<4.0
 Flask-SQLAlchemy>=3.1.1,<4.0
 Flask-Login>=0.6.3,<1.0
+Flask-Caching>=2.3.0,<3.0
 SQLAlchemy>=2.0.30,<3.0
 Werkzeug>=3.0.3,<4.0
+APScheduler>=3.10.4,<4.0
 # 以下为工具/驱动类库，向后兼容良好，仅约束最低版本
 openpyxl>=3.1.2
 mammoth>=1.12.1
@@ -11,3 +13,5 @@ email-validator>=2.1.1
 Pillow>=10.3.0
 PyMySQL>=1.1.1
 psycopg2-binary>=2.9.9
+requests>=2.31.0
+python-magic>=0.4.27

@@ -1,10 +1,13 @@
-"""通用文件上传接口（供后台富文本编辑器、图片选择等使用）。"""
-from flask import request, jsonify
+"""通用文件上传接口（供后台富文本编辑器、图片选择等使用）。
+升级：权限（permission_required + upload:模块审计日志）。
+"""
+from flask import request, jsonify, current_app
 
 from ..models.setting import Setting
 from ..utils.uploads import save_upload_file
+from ..utils.helpers import admin_required, audit_log
+from ..models.audit import OP_UPLOAD, MODULE_UPLOAD
 from . import admin_bp
-from ..utils.helpers import admin_required
 
 
 @admin_bp.route('/upload', methods=['POST'])
@@ -33,6 +36,13 @@ def upload_file():
                 f'"{func_num}", "", "{err}");</script>'
             ), 200
         return jsonify({'error': err}), 400
+
+    # 上传成功审计日志（忽略失败，不影响上传）
+    try:
+        audit_log(OP_UPLOAD, MODULE_UPLOAD, None, file_storage.filename,
+                  {'sub_dir': sub_dir, 'url': file_url, 'path': rel_path})
+    except Exception:
+        current_app.logger.exception('upload audit failed')
 
     if func_num:
         return (
