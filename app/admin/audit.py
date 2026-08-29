@@ -87,13 +87,20 @@ def audit_index():
     )
     # 总条数概览
     total_count = query.order_by(None).count()
+    # 详情人性化翻译用的 ID→名称映射
+    from ..models.rbac import Role
+    from ..models.column import Column
+    audit_maps = {
+        'roles': {r.id: r.name for r in Role.query.all()},
+        'columns': {c.id: c.name for c in Column.query.filter_by(is_deleted=False).all()},
+    }
     return render_template(
         'admin/audit/index.html',
         logs=pagination.items, pagination=pagination,
         keyword=keyword, module=module, op_type=op_type,
         date_from=date_from, date_to=date_to, username=username,
         module_choices=MODULE_CHOICES, op_type_choices=OP_TYPE_CHOICES,
-        total_count=total_count,
+        total_count=total_count, audit_maps=audit_maps,
     )
 
 

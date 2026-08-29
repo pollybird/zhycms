@@ -53,7 +53,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for u in users.items %}
+        {% for u in users %}
         <tr>
           <td>{{ u.id }}</td>
           <td>
@@ -63,7 +63,7 @@
           <td>{{ u.nickname or '-' }}</td>
           <td>{{ u.email or '-' }}</td>
           <td>
-            {% for r in u.roles %}
+            {% for r in u._roles %}
             <span class="badge badge-info mr-1">{{ r.name }}</span>
             {% else %}
             <span class="text-muted">-</span>

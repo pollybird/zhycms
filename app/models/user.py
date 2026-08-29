@@ -79,6 +79,10 @@ class User(UserMixin, db.Model):
             return []
         return Role.query.filter(Role.id.in_(self.role_ids)).all()
 
+    def has_any_permission(self, *perm_codes):
+        """判断用户是否具备任一权限点（菜单/入口可见性判断用；超级管理员永远为真）。"""
+        return any(self.has_permission(c) for c in perm_codes)
+
     def has_permission(self, perm_code):
         """判断用户是否具备指定权限（超级管理员 is_super=True 永远全放行）。"""
         from ..models.rbac import Role, RolePermission, Permission

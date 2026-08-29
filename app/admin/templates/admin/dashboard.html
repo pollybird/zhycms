@@ -12,7 +12,9 @@
         <p>栏目总数</p>
       </div>
       <div class="icon"><i class="fas fa-sitemap"></i></div>
+      {% if current_user.has_any_permission('column:manage', 'content_manage:all_columns', 'content:create', 'content:edit', 'content:delete', 'content:submit_review', 'content:review', 'content:publish', 'content:archive', 'content:batch', 'content:rollback') %}
       <a href="{{ url_for('admin.column_index') }}" class="small-box-footer">查看栏目 <i class="fas fa-arrow-circle-right"></i></a>
+      {% endif %}
     </div>
   </div>
   <div class="col-lg-3 col-6">
@@ -22,7 +24,9 @@
         <p>文章总数</p>
       </div>
       <div class="icon"><i class="fas fa-file-alt"></i></div>
+      {% if current_user.has_any_permission('column:manage', 'content_manage:all_columns', 'content:create', 'content:edit', 'content:delete', 'content:submit_review', 'content:review', 'content:publish', 'content:archive', 'content:batch', 'content:rollback') %}
       <a href="{{ url_for('admin.column_index') }}" class="small-box-footer">前往文章管理 <i class="fas fa-arrow-circle-right"></i></a>
+      {% endif %}
     </div>
   </div>
   <div class="col-lg-3 col-6">

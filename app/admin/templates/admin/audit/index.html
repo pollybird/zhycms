@@ -92,7 +92,7 @@
           <td style="max-width:480px;">
             <small>
               {% if log.target_name %}<strong>{{ log.target_name }}</strong> {% endif %}
-              {{ log.detail or '' }}
+              {{ log.detail|audit_detail(audit_maps)|safe }}
             </small>
           </td>
         </tr>

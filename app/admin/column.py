@@ -71,7 +71,12 @@ def _parse_field_form(column_id=None):
 
 
 @admin_bp.route('/columns')
-@permission_required('column:manage')
+@permission_required('column:manage', any_of=[
+    'content_manage:all_columns',
+    'content:create', 'content:edit', 'content:delete', 'content:submit_review',
+    'content:review', 'content:publish', 'content:archive', 'content:batch',
+    'content:rollback',
+])
 def column_index():
     columns = Column.get_tree(include_deleted=False)
     # 非超级管理员 & 无全局栏目权限：只看被分配栏目专属权限的栏目树

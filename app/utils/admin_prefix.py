@@ -5,8 +5,8 @@
 
 - 前缀以 ``instance/admin_config.json`` 落盘（chmod 600），与数据库配置
   ``db_config.json`` 采用同一套落盘/容错模式（见 ``app/utils/dbconfig.py``）。
-- 因为 Flask 的 ``register_blueprint(url_prefix=...)`` 只在 ``create_app()``
-  启动时执行一次，运行中无法热切换前缀，故修改后需重启服务方能生效。
+- v2.0 起运行中修改前缀即时生效（无需重启）：``_register_dynamic_admin_rules``
+  直接重建 ``url_map`` 中的路由规则，旧前缀立即失效。
 - 应用启动时 ``app/__init__.py`` 在注册后台蓝本前调用 ``get_admin_url_prefix()``。
 """
 import json

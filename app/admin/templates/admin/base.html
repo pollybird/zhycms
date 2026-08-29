@@ -61,6 +61,7 @@
             </a>
           </li>
 
+          {% if current_user.has_any_permission('column:manage', 'content_manage:all_columns', 'content:create', 'content:edit', 'content:delete', 'content:submit_review', 'content:review', 'content:publish', 'content:archive', 'content:batch', 'content:rollback') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('column') or active_menu and active_menu.startswith('article') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('column') or active_menu.startswith('article')) }}">
               <i class="nav-icon fas fa-sitemap"></i><p>内容管理<i class="right fas fa-angle-left"></i></p>
@@ -73,7 +74,9 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
+          {% if current_user.has_permission('system:settings') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('fragment') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('fragment') }}">
               <i class="nav-icon fas fa-puzzle-piece"></i><p>碎片管理<i class="right fas fa-angle-left"></i></p>
@@ -91,13 +94,17 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
+          {% if current_user.has_permission('system:settings') %}
           <li class="nav-item">
             <a href="{{ url_for('admin.friend_link_index') }}" class="nav-link {{ 'active' if active_menu == 'friend_link' }}">
               <i class="nav-icon fas fa-link"></i><p>友情链接</p>
             </a>
           </li>
+          {% endif %}
 
+          {% if current_user.has_permission('form:view') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('form') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('form') }}">
               <i class="nav-icon fas fa-comments"></i><p>自定义表单<i class="right fas fa-angle-left"></i></p>
@@ -110,6 +117,7 @@
               </li>
             </ul>
           </li>
+          {% endif %}
 
           {% if current_user.is_super or current_user.has_permission('system:user_manage') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('user') }}">
@@ -164,6 +172,7 @@
               <i class="nav-icon fas fa-cog"></i><p>系统设置<i class="right fas fa-angle-left"></i></p>
             </a>
             <ul class="nav nav-treeview">
+              {% if current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_site') }}" class="nav-link {{ 'active' if active_menu == 'setting_site' }}">
                   <i class="far fa-circle nav-icon"></i><p>网站设置</p>
@@ -174,6 +183,7 @@
                   <i class="far fa-circle nav-icon"></i><p>SEO 默认配置</p>
                 </a>
               </li>
+              {% endif %}
               {% if current_user.is_super or current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_seo_advanced') }}" class="nav-link {{ 'active' if active_menu == 'setting_seo_advanced' }}">
@@ -181,11 +191,13 @@
                 </a>
               </li>
               {% endif %}
+              {% if current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_upload') }}" class="nav-link {{ 'active' if active_menu == 'setting_upload' }}">
                   <i class="far fa-circle nav-icon"></i><p>上传配置</p>
                 </a>
               </li>
+              {% endif %}
               {% if current_user.is_super or current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_upload_security') }}" class="nav-link {{ 'active' if active_menu == 'setting_upload_security' }}">
@@ -198,11 +210,13 @@
                 </a>
               </li>
               {% endif %}
+              {% if current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_security') }}" class="nav-link {{ 'active' if active_menu == 'setting_security' }}">
                   <i class="far fa-circle nav-icon"></i><p>后台安全</p>
                 </a>
               </li>
+              {% endif %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.profile') }}" class="nav-link {{ 'active' if active_menu == 'profile' }}">
                   <i class="far fa-circle nav-icon"></i><p>个人资料</p>
@@ -213,11 +227,13 @@
                   <i class="far fa-circle nav-icon"></i><p>修改密码</p>
                 </a>
               </li>
+              {% if current_user.has_permission('system:audit_log') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if active_menu == 'logs' }}">
                   <i class="far fa-circle nav-icon"></i><p>登录日志</p>
                 </a>
               </li>
+              {% endif %}
               {% if current_user.is_super or current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.tool_image_alt') }}" class="nav-link {{ 'active' if active_menu == 'tool_image_alt' }}">
@@ -271,7 +287,7 @@
   <footer class="main-footer">
     <strong>{{ cms_copyright }}</strong>
     <span class="ml-1">官网：<a href="https://www.tzzhy.cn/" target="_blank" rel="noopener">https://www.tzzhy.cn/</a></span>
-    <div class="float-right d-none d-sm-inline-block"><b>Version</b> 2.0.0</div>
+    <div class="float-right d-none d-sm-inline-block"><b>Version</b> {{ cms_version }}</div>
   </footer>
 </div>
 

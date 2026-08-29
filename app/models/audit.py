@@ -88,14 +88,21 @@ class AuditLog(db.Model):
         """快捷记录一条审计日志。
 
         user 可取 current_user；ip/user_agent 留空时从 request 填充。
+        无请求上下文（定时任务/命令行）时跳过 request/current_user 兜底，
+        保证审计写入不会因此静默丢失。
         """
-        from flask import request
+        from flask import has_request_context, request
         from flask_login import current_user as _cu
         try:
-            u = user if user is not None else (_cu if _cu.is_authenticated else None)
-            _ip = ip or (request.remote_addr if request else '')
+            if user is not None:
+                u = user
+            elif has_request_context():
+                u = _cu if _cu.is_authenticated else None
+            else:
+                u = None
+            _ip = ip or (request.remote_addr if has_request_context() else '')
             _ua = user_agent
-            if _ua is None and request and request.user_agent:
+            if _ua is None and has_request_context() and request.user_agent:
                 _ua = request.user_agent.string[:255]
             log = cls(
                 user_id=u.id if u else None,

@@ -356,6 +356,7 @@ def create_app(config_name=None):
             # CMS 自身标识（后台使用，与前台企业名称/版权严格区分，固定不可改）
             cms_name=Setting.CMS_NAME,
             cms_copyright=Setting.CMS_COPYRIGHT,
+            cms_version=Setting.CMS_VERSION,
         )
 
     # 注册蓝本
