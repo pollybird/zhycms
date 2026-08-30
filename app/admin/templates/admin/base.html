@@ -119,6 +119,24 @@
           </li>
           {% endif %}
 
+          {# v2.2.0 插件菜单：启用且当前用户有权限才显示 #}
+          {% for pm in plugin_admin_menus %}
+          <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith(pm['slug']) }}">
+            <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith(pm['slug']) }}">
+              <i class="nav-icon fas {{ pm['icon'] }}"></i><p>{{ pm['name'] }}<i class="right fas fa-angle-left"></i></p>
+            </a>
+            <ul class="nav nav-treeview">
+              {% for m in pm['items'] %}
+              <li class="nav-item">
+                <a href="{{ url_for(m.endpoint) }}" class="nav-link {{ 'active' if active_menu == m.active_prefix }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ m.label }}</p>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </li>
+          {% endfor %}
+
           {% if current_user.is_super or current_user.has_permission('system:user_manage') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('user') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('user') }}">
@@ -238,6 +256,16 @@
               <li class="nav-item">
                 <a href="{{ url_for('admin.tool_image_alt') }}" class="nav-link {{ 'active' if active_menu == 'tool_image_alt' }}">
                   <i class="far fa-circle nav-icon"></i><p>图片ALT批量管理</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.plugin_index') }}" class="nav-link {{ 'active' if active_menu == 'plugin' }}">
+                  <i class="far fa-circle nav-icon"></i><p>插件管理</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_api') }}" class="nav-link {{ 'active' if active_menu == 'setting_api' }}">
+                  <i class="far fa-circle nav-icon"></i><p>内容 API</p>
                 </a>
               </li>
               {% endif %}

@@ -22,3 +22,5 @@ from . import users  # noqa: E402,F401
 from . import audit  # noqa: E402,F401
 # 模块4 备份运维
 from . import backup  # noqa: E402,F401
+# v2.2.0 插件管理
+from . import plugins  # noqa: E402,F401

@@ -28,7 +28,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '2.1.1'
+    CMS_VERSION = '2.2.0'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -98,6 +98,12 @@ class Setting(db.Model):
         'backup_schedule_time': '03:00',     # 执行时间 HH:MM
         'backup_keep_days': '30',            # 备份保留天数
         'backup_auto_clean': 'on',           # 过期自动清理
+
+        # ===== v2.2.0：内容 API =====
+        'api_enable': 'on',                  # on=启用 / off=整体 404
+        'api_token': '',                     # 非空时要求请求头 X-API-Token
+        'api_cache_ttl': '60',               # 接口缓存秒数（0=不缓存）
+        'api_cors_origins': '',              # 跨域白名单，逗号分隔，* 全部
     }
 
     @classmethod

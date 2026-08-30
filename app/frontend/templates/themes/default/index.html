@@ -2,6 +2,8 @@
 {% block title %}{{ site_settings.site_name }} - {{ site_settings.site_subtitle }}{% endblock %}
 
 {% block content %}
+{# v2.2.0 轮播图插件：首页大图轮播位（插件未启用或无图片时自动隐藏） #}
+{% include 'banner/hero_carousel.html' %}
 <div class="row">
   <div class="col-md-9">
     {% if first_page %}

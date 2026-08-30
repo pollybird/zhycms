@@ -46,6 +46,10 @@ def _is_initialized():
     return User.query.filter_by(is_deleted=False).first() is not None
 
 
+# 向导可勾选的官方插件（与 plugins/ 目录一一对应；第三方插件请在插件管理页启用）
+SETUP_PLUGINS = ('banner', 'product')
+
+
 def _form_ctx(request):
     return {
         'username': (request.form.get('username') or '').strip(),
@@ -56,6 +60,8 @@ def _form_ctx(request):
         'db_port': (request.form.get('db_port') or '').strip(),
         'db_name': (request.form.get('db_name') or '').strip(),
         'db_user': (request.form.get('db_user') or '').strip(),
+        'plugins': [s for s in request.form.getlist('plugins')
+                    if s in SETUP_PLUGINS],
     }
 
 
@@ -139,19 +145,35 @@ def setup():
             return redirect(url_for('admin_auth.login'))
 
         if demo_type in ('manufacturing', 'service'):
+            # v2.2.0：先启用向导勾选的插件（种子权限/建表/写启用清单），
+            # 再生成核心演示数据，最后调用插件演示数据钩子（轮播图/产品）
+            from ..plugin_system import enable_plugin, run_demo_data_hooks
+            for slug in ctx['plugins']:
+                err = enable_plugin(slug)
+                if err:
+                    flash(f'插件启用失败：{err}', 'warning')
             try:
                 generate_demo_data(industry=demo_type)
+                for slug, err in run_demo_data_hooks(demo_type):
+                    flash(f'插件 {slug} 演示数据生成失败：{err}', 'warning')
                 label = '制造业' if demo_type == 'manufacturing' else '服务业'
                 flash(f'系统初始化完成，{label}演示数据已生成', 'success')
             except Exception as e:
                 db.session.rollback()
                 flash(f'演示数据生成失败：{e}', 'warning')
         else:
+            # 不生成演示数据时同样启用勾选的插件
+            from ..plugin_system import enable_plugin
+            for slug in ctx['plugins']:
+                err = enable_plugin(slug)
+                if err:
+                    flash(f'插件启用失败：{err}', 'warning')
             flash('系统初始化完成，请登录后台开始配置', 'success')
 
         return redirect(url_for('admin_auth.login'))
 
-    return render_template('admin/setup.html')
+    # 默认勾选官方轮播图 + 产品插件（可取消）
+    return render_template('admin/setup.html', plugins=list(SETUP_PLUGINS))
 
 
 # ============================================================

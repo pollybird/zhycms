@@ -1,0 +1,54 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ '编辑分组' if group else '新增分组' }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ '编辑分组' if group else '新增分组' }}{% endblock %}
+{% set active_menu = 'banner' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.banner_group_index') }}">轮播图</a></li>
+<li class="breadcrumb-item active">{{ '编辑分组' if group else '新增分组' }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">分组名称</label>
+            <input type="text" name="name" class="form-control" value="{{ group.name if group else '' }}"
+                   placeholder="如：首页大图" required>
+          </div>
+          <div class="form-group">
+            <label class="required-mark">调用标识（创建后建议不再修改）</label>
+            <input type="text" name="slug" class="form-control" pattern="[a-zA-Z][a-zA-Z0-9_-]*"
+                   value="{{ group.slug if group else '' }}" placeholder="如：home-hero" required>
+            <small class="form-text text-muted">模板中通过 <code>{{ '{{' }} banner_items('调用标识') {{ '}}' }}</code> 调用</small>
+          </div>
+          <div class="form-group">
+            <label>说明</label>
+            <input type="text" name="remark" class="form-control" value="{{ group.remark if group else '' }}"
+                   placeholder="选填，便于后台识别">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled"
+                     {{ 'checked' if group is none or group.is_enabled }}>
+              <label class="custom-control-label" for="is_enabled">启用</label>
+            </div>
+            <small class="form-text text-muted">停用后前台该轮播位自动隐藏（数据保留）。</small>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存</button>
+          <a href="{{ url_for('admin.banner_group_index') }}" class="btn btn-default btn-block">返回</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

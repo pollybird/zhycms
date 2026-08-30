@@ -387,6 +387,47 @@ def tool_image_alt():
                            settings=Setting.get_dict())
 
 
+# ============ 内容 API（v2.2.0）============
+
+@admin_bp.route('/settings/api', methods=['GET', 'POST'])
+@permission_required('system:settings')
+def setting_api():
+    """内容 API：总开关、Token 鉴权、接口缓存 TTL、跨域白名单。"""
+    if request.method == 'POST':
+        changed = {}
+        for key in ('api_enable',):
+            val = _onoff(key)
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        # Token：留空表示公开只读
+        val = (request.form.get('api_token') or '').strip()
+        if Setting.get('api_token') != val:
+            Setting.set('api_token', val)
+            changed['api_token'] = '已设置' if val else '已清空（公开访问）'
+        val = str(max(0, _int_safe('api_cache_ttl', default=60)))
+        if Setting.get('api_cache_ttl') != val:
+            Setting.set('api_cache_ttl', val)
+            changed['api_cache_ttl'] = val
+        val = (request.form.get('api_cors_origins') or '').strip()
+        if Setting.get('api_cors_origins') != val:
+            Setting.set('api_cors_origins', val)
+            changed['api_cors_origins'] = val
+        db.session.commit()
+        flash('内容 API 配置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'api', 'changed': changed})
+        return redirect(url_for('admin.setting_api'))
+
+    settings = Setting.get_dict()
+    try:
+        settings['api_cache_ttl'] = int(settings.get('api_cache_ttl', 60))
+    except (TypeError, ValueError):
+        settings['api_cache_ttl'] = 60
+    return render_template('admin/setting/api.html', settings=settings)
+
+
 # ============ 个人资料 / 密码 ============
 
 @admin_bp.route('/profile', methods=['GET', 'POST'])

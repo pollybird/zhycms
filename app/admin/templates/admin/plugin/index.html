@@ -1,0 +1,89 @@
+{% extends 'admin/base.html' %}
+{% block title %}插件管理 - {{ cms_name }}{% endblock %}
+{% block page_header %}插件管理{% endblock %}
+{% set active_menu = 'plugin' %}
+
+{% block breadcrumb %}<li class="breadcrumb-item active">插件管理</li>{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">已发现插件</h3>
+    <div class="card-tools">
+      <span class="badge badge-info">启停即时生效，无需重启</span>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>插件</th>
+          <th width="90">版本</th>
+          <th>功能说明</th>
+          <th width="140">权限点</th>
+          <th width="110">状态</th>
+          <th width="120">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in plugins %}
+        <tr>
+          <td>
+            <i class="fas fa-plug text-muted mr-1"></i> <b>{{ p.name }}</b>
+            <span class="text-muted">（{{ p.slug }}）</span>
+            {% if p.author %}<span class="text-muted" style="font-size:12px;">{{ p.author }}</span>{% endif %}
+          </td>
+          <td>{{ p.version }}</td>
+          <td>
+            {{ p.description }}
+            {% if p.menu %}
+            <div class="text-muted" style="font-size:12px;">
+              菜单：{% for m in p.menu %}{{ m.label }}{% if not loop.last %}、{% endif %}{% endfor %}
+            </div>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.permissions %}
+              {% for code, label, desc in p.permissions %}
+              <span class="badge badge-light">{{ code }}</span>
+              {% endfor %}
+            {% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td>
+            {% if p.error %}
+              <span class="badge badge-danger" title="{{ p.error }}">加载失败</span>
+            {% elif p.enabled %}
+              <span class="badge badge-success">已启用</span>
+            {% else %}
+              <span class="badge badge-secondary">未启用</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if not p.error %}
+            <form method="post" action="{{ url_for('admin.plugin_toggle', slug=p.slug) }}" class="d-inline">
+              {% if p.enabled %}
+              <button class="btn btn-warning btn-sm" onclick="return confirm('禁用后其后台菜单、前台路由与模板函数将立即失效（数据保留），确认禁用？')">
+                <i class="fas fa-toggle-off"></i> 禁用</button>
+              {% else %}
+              <button class="btn btn-success btn-sm">
+                <i class="fas fa-toggle-on"></i> 启用</button>
+              {% endif %}
+            </form>
+            {% else %}
+            <span class="text-muted" style="font-size:12px;" title="{{ p.error }}">查看错误</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">
+          未发现任何插件（请将插件放入项目根 plugins/ 目录并重启服务）
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted" style="font-size:12px;">
+    提示：启用插件将自动创建其权限点并授权给预设角色；禁用不删除数据，重新启用后原样恢复。
+  </div>
+</div>
+{% endblock %}

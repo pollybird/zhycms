@@ -94,12 +94,18 @@ def audit_index():
         'roles': {r.id: r.name for r in Role.query.all()},
         'columns': {c.id: c.name for c in Column.query.filter_by(is_deleted=False).all()},
     }
+    # v2.2.0：模块筛选下拉追加启用插件的审计模块（如 product→产品管理）
+    try:
+        from ..plugin_system import plugin_audit_modules
+        module_choices = list(MODULE_CHOICES) + list(plugin_audit_modules())
+    except Exception:
+        module_choices = MODULE_CHOICES
     return render_template(
         'admin/audit/index.html',
         logs=pagination.items, pagination=pagination,
         keyword=keyword, module=module, op_type=op_type,
         date_from=date_from, date_to=date_to, username=username,
-        module_choices=MODULE_CHOICES, op_type_choices=OP_TYPE_CHOICES,
+        module_choices=module_choices, op_type_choices=OP_TYPE_CHOICES,
         total_count=total_count, audit_maps=audit_maps,
     )
 

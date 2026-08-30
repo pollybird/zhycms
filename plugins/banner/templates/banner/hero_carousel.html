@@ -1,0 +1,61 @@
+{# 轮播图插件：前台首页轮播位（自包含 partial，主题 index.html 直接 include）。
+   调用标识固定 home-hero；插件未启用 / 无有效图片时整块输出为空，不影响页面。
+   交互为纯 CSS + 少量原生 JS（5s 自动淡切），不依赖第三方库。 #}
+{% set hero_banners = banner_items('home-hero') %}
+{% if hero_banners %}
+<div class="zh-hero mb-4" id="zhHeroBanner">
+  {% for b in hero_banners %}
+  <a href="{{ b.link_url or 'javascript:;' }}" target="{{ b.link_target }}"
+     class="zh-hero-slide{{ ' active' if loop.first }}">
+    <img src="{{ b.image_url }}" alt="{{ b.title }}">
+    {% if b.title %}<span class="zh-hero-caption">{{ b.title }}</span>{% endif %}
+  </a>
+  {% endfor %}
+  {% if hero_banners|length > 1 %}
+  <div class="zh-hero-dots">
+    {% for b in hero_banners %}
+    <span data-slide="{{ loop.index0 }}"{{ ' class="active"' if loop.first }}></span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+<style>
+.zh-hero{position:relative;overflow:hidden;border-radius:.25rem;background:#f2f4f7;}
+.zh-hero-slide{display:none;position:relative;}
+.zh-hero-slide.active{display:block;}
+.zh-hero-slide img{width:100%;max-height:420px;object-fit:cover;display:block;}
+.zh-hero-caption{position:absolute;left:0;right:0;bottom:0;padding:10px 16px;color:#fff;
+  font-size:15px;background:linear-gradient(transparent,rgba(0,0,0,.55));}
+.zh-hero-dots{position:absolute;right:14px;bottom:14px;line-height:1;}
+.zh-hero-dots span{display:inline-block;width:10px;height:10px;border-radius:50%;
+  background:rgba(255,255,255,.55);margin-left:6px;cursor:pointer;}
+.zh-hero-dots span.active{background:#fff;}
+</style>
+{% if hero_banners|length > 1 %}
+<script>
+(function(){
+  var hero = document.getElementById('zhHeroBanner');
+  if (!hero) return;
+  var slides = hero.querySelectorAll('.zh-hero-slide');
+  var dots = hero.querySelectorAll('.zh-hero-dots span');
+  if (slides.length < 2) return;
+  var cur = 0, timer = null;
+  function show(i){
+    slides[cur].classList.remove('active');
+    if (dots[cur]) dots[cur].classList.remove('active');
+    cur = (i + slides.length) % slides.length;
+    slides[cur].classList.add('active');
+    if (dots[cur]) dots[cur].classList.add('active');
+  }
+  function play(){ if (timer) clearInterval(timer); timer = setInterval(function(){ show(cur + 1); }, 5000); }
+  Array.prototype.forEach.call(dots, function(d){
+    d.addEventListener('click', function(){
+      show(parseInt(d.getAttribute('data-slide'), 10) || 0);
+      play();
+    });
+  });
+  play();
+})();
+</script>
+{% endif %}
+{% endif %}

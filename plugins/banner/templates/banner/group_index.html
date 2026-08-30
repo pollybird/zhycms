@@ -1,0 +1,61 @@
+{% extends 'admin/base.html' %}
+{% block title %}轮播图管理 - {{ cms_name }}{% endblock %}
+{% block page_header %}轮播图管理{% endblock %}
+{% set active_menu = 'banner' %}
+
+{% block breadcrumb %}<li class="breadcrumb-item active">轮播图</li>{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">轮播分组</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.banner_group_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 新增分组</a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>名称</th>
+          <th>调用标识</th>
+          <th width="80">图片数</th>
+          <th>说明</th>
+          <th width="80">状态</th>
+          <th width="260">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in groups %}
+        <tr>
+          <td><i class="far fa-images text-muted mr-1"></i> <b>{{ g.name }}</b></td>
+          <td><code>{{ g.slug }}</code></td>
+          <td>{{ g.items.count() }}</td>
+          <td class="text-muted">{{ g.remark or '—' }}</td>
+          <td>
+            {% if g.is_enabled %}<span class="badge badge-success">启用</span>
+            {% else %}<span class="badge badge-secondary">停用</span>{% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('admin.banner_group_items', gid=g.id) }}" class="btn btn-info btn-sm"><i class="fas fa-images"></i> 管理图片</a>
+            <a href="{{ url_for('admin.banner_group_edit', gid=g.id) }}" class="btn btn-default btn-sm"><i class="fas fa-edit"></i> 编辑</a>
+            <form method="post" action="{{ url_for('admin.banner_group_delete', gid=g.id) }}" class="d-inline"
+                  onsubmit="return confirm('删除分组将同时删除组内图片记录（不可恢复），确认删除？')">
+              <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> 删除</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">
+          暂无分组，请先新增（如「首页大图」，调用标识 home-hero）
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted" style="font-size:12px;">
+    前台调用：<code>{{ '{{' }} banner_items('分组调用标识') {{ '}}' }}</code>；
+    四套主题首页已内置首页轮播位（调用标识 <code>home-hero</code>），分组停用或无图片时该区域自动隐藏。
+  </div>
+</div>
+{% endblock %}

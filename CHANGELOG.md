@@ -5,6 +5,56 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.2.0] - 2026-08-31
+
+**插件优先架构**大版本。**无数据库结构变更，v2.1.x 直接覆盖代码即可升级**；插件模型表随 `db.create_all()` 自动补齐，插件启停仅改 Setting 值、无需重启。
+
+### Added
+
+- **主题管理机制（Theme Manager）**：
+  - 新增后台「主题管理」页（系统设置子菜单，权限 `system:settings`）：列表展示名称/版本/作者/说明/模板数/产品列表支持徽标/状态（使用中·绿色高亮 / 未启用 / 模板不完整·标红含缺失模板明细）。
+  - 主题压缩包上传（`.zip / .tar.gz / .tgz`）：8 步校验——扩展名白名单、压缩包完整性、路径穿越双重拦截（预检 + `_safe_join`）、符号链接静默跳过、manifest 合法性 + slug 格式正则、必备模板全量存在、形态 A（单目录）/ B（平铺）自动归一化、内置主题禁止覆盖 + 同名自定义主题先删后传；全程使用临时目录，任何失败不写入 `themes/`，finally 彻底清理。
+  - 一键启用：启用前强检必备模板（`index/list/article/page/base/404/500.html` + manifest `template_required` 额外声明），缺失拒绝并给出补齐指引；启用动作写入 `OP_CONFIG_CHANGE` 审计；前台即时切换、无需重启。
+  - 主题兜底：`get_active_theme()` 引用的主题目录不存在或模板不全时自动回退 `default`，杜绝前台空白页。
+  - 4 套内置主题 manifest 标记 `builtin: true`，禁止删除与覆盖。
+- **主题静态资源目录（css / js / images / fonts）**：每套主题目录下新增 `css/`、`js/`、`images/`、`fonts/` 独立目录，`base.html` 中的内联 `<style>` 全部移至 `css/style.css`；新增前台资源路由 `GET /themes/<主题>/css|js|images|fonts/*`（slug 正则 + 仅放行四个资源子目录 + 路径穿越拦截 + `Cache-Control` 缓存头），样式、脚本、图片、字体随主题目录分发，manifest 与模板文件不对外暴露。
+- **插件压缩包上传**：后台「插件管理」支持直接上传开发好的插件压缩包（`.zip / .tar.gz / .tgz`）解压至 `plugins/`；8 层顺序校验（扩展名白名单 → 压缩包完整性 → 路径穿越拦截 → 符号链接处理 → 插件根识别 → 必备文件 `manifest.json`/`__init__.py` → manifest 合法性 → 目标目录存在性），非法包整体拒绝；成功后写入 `OP_UPLOAD` 审计。
+- **插件 / 主题打包下载**：两个管理页操作列新增「下载」按钮，将插件/主题目录打包为 zip（单目录形态，与上传校验完全兼容）下载；内置、启用中、加载失败的插件与主题均可下载；下载动作写入 `OP_EXPORT` 审计（含版本/文件数/大小）。下载包可在其他站点直接重新上传复用。
+- **插件 / 主题卸载删除（危险操作二次确认）**：
+  - 列表操作列新增「卸载 / 删除」按钮：内置（灰显提示原因）、启用中（灰显要求先禁用/切换）不可操作；其余点击后弹出红色警告模态框，告知后果并要求输入图形验证码确认（验证码一次性消费防重放，独立于登录验证码，图片点击可刷新）。
+  - 卸载即物理删除 `plugins/<slug>/`（或 `themes/<slug>/`）目录：slug 正则校验防穿越 → 内置拒绝 → 启用中拒绝 → 删除 → 审计（`OP_DELETE`）。
+  - 插件卸载同步移除运行期注册表并清理 `sys.modules` 缓存：菜单/列表/sitemap/审计聚合立即消失，同进程重新上传同名包即可恢复；**数据表与数据保留**。
+  - 主题删除后若为当前启用主题系统自动兜底回退 `default`（删除前已双重拦截启用中主题）。
+- **插件机制（Plugin First Architecture）**：
+  - `plugins/<slug>/` 目录 + `manifest.json` + `PluginBase` 基类，零侵入扩展后台页面、前台路由/模板函数、数据表、只读 API、后台菜单、sitemap、演示数据钩子、审计筛选。
+  - 运行时门控 `site_settings.enabled_plugins`；启用自动种子权限/预设角色授权/建表；禁用仅移除清单、不删数据、前端隐身。
+  - 后台「插件管理」页：发现清单、启停、导入错误标红、导入错误提示。
+  - 初始化向导新增「功能插件」步骤，默认勾选**轮播图 + 产品展示 + 友情链接**（可取消）。
+- **轮播图插件 `banner`（官方内置）**：分组/排序/链接/开关/封面；后台管理页 + 审计；`banner_items()` 模板函数 + `banner/hero_carousel.html` partial；四套主题首页自动接入；`GET /api/v1/banners/<slug>`；制造业/服务业演示数据各 3 张。
+- **产品展示插件 `product`（官方内置）**：产品模型归属栏目树（复用授权/伪静态/SEO/缓存），相册有序可拖拽、规格参数分组 JSON；动态 + 伪静态详情路由；4 套主题 `list_product.html` 列表模板；制造业首页优先展示产品卡片；`GET /api/v1/columns/<slug>/products` + `GET /api/v1/products/<id>`；制造业演示数据 2 子栏目共 6 产品附相册/规格；sitemap 收录 2000 条内启用产品。
+- **友情链接插件 `friend_link`（官方内置，v2.2.0 起由核心功能转为插件）**：
+  - 新增 `plugins/friend_link/`（manifest / 模型 / 后台路由 / 前台模板函数 / 演示数据钩子 / 管理页模板），后台路由挂核心 `admin_bp`，路径与端点名与核心版完全一致（`/<admin>/friend-links`、`admin.friend_link_*`），升级后书签与习惯零变化。
+  - 权限点改为插件自有 `friend_link:manage`（沿用核心时代策略：仅超级管理员默认可管理，可在「角色权限」自行授权）；操作全部写入审计（module=`friend_link`，核心版原本未落审计）。
+  - 前台模板改用插件全局函数 `friend_links()`（核心自动包裹启用守卫，未启用返回 `[]`），default / blue / manufacturing / service 四套主题首页已同步切换，禁用插件时友链区块自动隐藏、页面零报错。
+  - 核心移除：`app/models/friend_link.py`、`app/admin/friend_link.py`、首页视图注入、后台侧边栏固定菜单项、审计核心下拉项、演示数据 `_init_friend_links()`；友情链接演示数据改由插件 `generate_demo_data` 钩子生成（幂等，内容沿用核心演示数据）。
+  - **老站升级自动迁移**：v2.1.x 升级后首次启动自动启用友情链接插件一次（`friend_link_plugin_migrated` Setting 标记，新装站点在初始化时写入、不触发）；旧 `friend_links` 表结构不变、数据无缝保留，历史审计日志经插件 `audit_modules` 声明（module 代码同为 `friend_link`）自动正常翻译。
+- **REST 内容 API（核心）**：`/api/v1` 蓝本、统一 `{code,message,data,meta}` 包、`api_cache` 装饰器、核心 4 个端点（栏目树/栏目详情/栏目文章列表/文章详情）、`api_enable` 总开关 + `api_token` 鉴权 + `api_cors_origins` CORS；后台「内容 API」可视化配置页与审计留痕。
+- **sitemap 聚合**：`collect_sitemap_urls()` 聚合启用插件 URL 到 `sitemap.xml`。
+- **审计模块聚合**：`plugin_audit_modules()` 把启用插件审计模块拼入筛选下拉与列表徽标翻译。
+
+### Changed
+
+- **初始化向导行业演示数据与官方插件联动**：选择任一行业演示数据（制造业/服务业）时，**轮播图（banner）、友情链接（friend_link）自动启用**，无需勾选；选择**制造业**演示数据时，**产品展示（product）**同样自动启用——制造业演示数据的产品页依赖该插件（多图相册/规格参数/伪静态详情），演示钩子自动将「精密零部件 / 自动化设备」子栏目切换为 `list_product` 列表模板。不生成演示数据时仍按向导勾选启用；向导页补充联动规则提示。
+- **初始化轮播数据改由 banner 插件生成**：制造业/服务业演示数据不再写入 `home_banner_1/2/3` 碎片，首页轮播统一由 banner 插件演示钩子生成 `home-hero` 分组 3 张图；行业主题中的碎片轮播兜底逻辑保留，老站升级后行为不变。
+- 初始化向导：「演示数据」后新增「功能插件」复选步骤，安装结果提示随启用插件变化。
+- **网站设置页前台主题设置项迁移**：移除原主题下拉框，替换为引导卡片（展示当前启用主题并链接到「主题管理」）；主题切换、上传、删除统一在「主题管理」完成。
+- 制造业主题首页：产品插件启用时优先 `product_latest()`，否则回退原文章卡片。
+- 4 套主题（default/blue/manufacturing/service）新增 `list_product.html` 栏目列表备选模板。
+
+### Fixed
+
+- 后台插件/主题管理页脚本块误用 `{% block scripts %}`（父模板不存在该块）导致整个页面脚本未输出，「卸载 / 删除」确认弹窗点击无反应；统一修正为 `{% block js %}`。
+
 ## [2.1.1] - 2026-08-30
 
 配置与治理完善版本，**无数据库结构变更**，v2.1.0 直接覆盖代码即可升级。
@@ -80,7 +130,8 @@ v2.0 的体验优化与缺陷修复版本，**无数据库结构变更**，v2.0 
 - 修复带路径参数路由（如文章列表）分页链接 BuildError。
 - 修复单页栏目自定义字段内容录入问题。
 
-[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.1.1...HEAD
+[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.2.0...HEAD
+[2.2.0]: https://gitee.com/pollybird/zhycms/compare/v2.1.1...v2.2.0
 [2.1.1]: https://gitee.com/pollybird/zhycms/compare/v2.1.0...v2.1.1
 [2.1.0]: https://gitee.com/pollybird/zhycms/compare/v2.0...v2.1.0
 [2.0.0]: https://gitee.com/pollybird/zhycms/compare/a717ad4...v2.0

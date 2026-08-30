@@ -58,6 +58,7 @@ MODULE_SETTING = 'setting'
 MODULE_AUDIT = 'audit'
 MODULE_BACKUP = 'backup'
 MODULE_UPLOAD = 'upload'
+MODULE_PLUGIN = 'plugin'   # v2.2.0 插件管理
 MODULE_OTHER = 'other'
 
 

@@ -668,6 +668,13 @@ def sitemap():
             'priority': cfg_art_pri,
         })
 
+    # v2.2.0：聚合启用插件贡献的 URL（轮播图无详情页、产品详情页等）
+    try:
+        from ..plugin_system import collect_sitemap_urls
+        urls.extend(collect_sitemap_urls())
+    except Exception:
+        pass
+
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for u in urls:

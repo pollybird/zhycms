@@ -1,0 +1,8 @@
+{
+  "slug": "product",
+  "name": "产品展示",
+  "version": "1.0.0",
+  "description": "产品多图相册与规格参数表，归属栏目树管理，区别普通文章，适合制造业企业",
+  "author": "ZhyCMS 官方",
+  "min_core_version": "2.2.0"
+}

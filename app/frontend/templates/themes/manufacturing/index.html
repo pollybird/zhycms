@@ -2,7 +2,11 @@
 {% block title %}{{ site_settings.site_name }} - {{ site_settings.site_subtitle }}{% endblock %}
 
 {% block banner %}
-{# ===== 顶部轮播 Banner ===== #}
+{# ===== 顶部轮播 Banner（v2.2.0 轮播图插件优先，碎片兜底） ===== #}
+{% set hero_banners = banner_items('home-hero') %}
+{% if hero_banners %}
+{% include 'banner/hero_carousel.html' %}
+{% else %}
 {% set banners = [] %}
 {% if site_fragments.home_banner_1 and site_fragments.home_banner_1.value %}{% set _ = banners.append(site_fragments.home_banner_1.value) %}{% endif %}
 {% if site_fragments.home_banner_2 and site_fragments.home_banner_2.value %}{% set _ = banners.append(site_fragments.home_banner_2.value) %}{% endif %}
@@ -35,6 +39,7 @@
   {% endif %}
 </div>
 {% endif %}
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -45,8 +50,37 @@
 </div>
 {% endif %}
 
-{# ===== 产品展示（置顶，突出制造业特点） ===== #}
-{% if products %}
+{# ===== 产品展示（置顶，突出制造业特点；v2.2.0 产品插件优先，文章兜底） ===== #}
+{% set prods = product_latest('products', 8) %}
+{% if prods %}
+<section class="py-4">
+  <h2 class="section-title">{{ products_col.name if products_col else '产品展示' }}</h2>
+  <p class="section-sub">{{ products_col.summary if products_col and products_col.summary else '提供值得信赖的行业解决方案' }}</p>
+  <div class="row row-cols-2 row-cols-md-4 g-4">
+    {% for p in prods %}
+    <div class="col mb-4">
+      <a href="{{ p.url }}" class="card h-100 text-decoration-none text-dark">
+        {% if p.cover %}
+        <img src="{{ p.cover }}" class="card-img-top" alt="{{ p.title }}" style="height:180px;object-fit:cover;">
+        {% else %}
+        <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height:180px;">
+          <i class="fas fa-cog text-muted" style="font-size:36px;"></i>
+        </div>
+        {% endif %}
+        <div class="card-body text-center py-3">
+          <h6 class="card-title mb-0 text-truncate">{{ p.title }}</h6>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% if products_col %}
+  <div class="text-center mt-2">
+    <a href="{{ url_for('frontend.column_detail', slug=products_col.slug) }}" class="btn btn-outline-primary">查看全部产品 <i class="fas fa-arrow-right"></i></a>
+  </div>
+  {% endif %}
+</section>
+{% elif products %}
 <section class="py-4">
   <h2 class="section-title">{{ products_col.name if products_col else '产品展示' }}</h2>
   <p class="section-sub">{{ products_col.summary if products_col and products_col.summary else '提供值得信赖的行业解决方案' }}</p>

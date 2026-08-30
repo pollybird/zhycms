@@ -1,0 +1,166 @@
+{% extends 'admin/base.html' %}
+{% block title %}产品管理 - {{ cms_name }}{% endblock %}
+{% block page_header %}产品管理{% endblock %}
+{% set active_menu = 'product' %}
+
+{# 当前用户对内容操作的能力（超管兜底；具体栏目校验在服务端） #}
+{% set can_create = current_user.is_super or current_user.has_permission('content:create') %}
+{% set can_edit = current_user.is_super or current_user.has_permission('content:edit') %}
+{% set can_delete = current_user.is_super or current_user.has_permission('content:delete') %}
+{% set can_batch = current_user.is_super or current_user.has_permission('content:batch') %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item active">产品管理</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">
+      产品列表（{{ pagination.total }}）
+      {% if column %}· 栏目「{{ column.name }}」{% endif %}
+      {% if can_create %}
+      <a href="{{ url_for('admin.product_create', cid=column.id if column else none) }}" class="btn btn-primary btn-sm ml-2">
+        <i class="fas fa-plus"></i> 新增产品
+      </a>
+      {% endif %}
+    </h3>
+  </div>
+  <div class="card-body">
+    <form method="get" class="form-inline mb-3">
+      <select name="cid" class="form-control form-control-sm mr-2">
+        <option value="">全部栏目</option>
+        {% for c in list_columns %}
+        <option value="{{ c.id }}" {{ 'selected' if column and column.id == c.id }}>{{ c.name }}（{{ c.slug }}）</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="keyword" class="form-control form-control-sm mr-2" placeholder="标题关键词" value="{{ keyword }}">
+      <select name="status" class="form-control form-control-sm mr-2">
+        <option value="">全部状态</option>
+        <option value="enabled" {{ 'selected' if status == 'enabled' }}>启用</option>
+        <option value="disabled" {{ 'selected' if status == 'disabled' }}>停用</option>
+      </select>
+      <button type="submit" class="btn btn-default btn-sm"><i class="fas fa-search"></i> 筛选</button>
+      <a href="{{ url_for('admin.product_index') }}" class="btn btn-link btn-sm">重置</a>
+    </form>
+
+    <form method="post" id="batch-form" action="{{ url_for('admin.product_batch') }}">
+      <input type="hidden" name="action" id="batch-action">
+      <table class="table table-hover table-sm">
+        <thead>
+          <tr>
+            <th width="40"><input type="checkbox" id="check-all"></th>
+            <th width="80">封面</th>
+            <th>标题</th>
+            <th width="140">所属栏目</th>
+            <th width="70">排序</th>
+            <th width="80">状态</th>
+            <th width="110">更新时间</th>
+            <th width="150">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr>
+            <td><input type="checkbox" name="ids[]" value="{{ p.id }}" class="row-check"></td>
+            <td>
+              {% if p.cover_url() %}
+              <img src="{{ p.cover_url() }}" alt="{{ p.title }}" style="max-height:44px;max-width:72px;">
+              {% else %}
+              <i class="fas fa-image text-muted" title="无封面（取相册第一张）"></i>
+              {% endif %}
+            </td>
+            <td>
+              {{ p.title }}
+              {% if p.gallery_urls() %}<span class="badge badge-light border ml-1" title="相册图片数">{{ p.gallery_urls()|length }} 图</span>{% endif %}
+              {% if p.specs %}<span class="badge badge-light border ml-1" title="含规格参数">规格</span>{% endif %}
+            </td>
+            <td class="text-muted">{{ p.column.name if p.column else '—' }}</td>
+            <td>{{ p.sort_order }}</td>
+            <td>
+              {% if p.is_enabled %}<span class="badge badge-success">启用</span>
+              {% else %}<span class="badge badge-secondary">停用</span>{% endif %}
+            </td>
+            <td class="text-muted" style="font-size:12px;">{{ p.updated_at|datetime('%Y-%m-%d') }}</td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                {% if can_edit %}
+                <a href="{{ url_for('admin.product_edit', pid=p.id) }}" class="btn btn-default" title="编辑"><i class="fas fa-edit"></i></a>
+                {% endif %}
+                <a href="{{ frontend_product_url(p) }}" target="_blank" class="btn btn-info" title="前台预览"><i class="fas fa-eye"></i></a>
+                {% if can_delete %}
+                <form method="post" action="{{ url_for('admin.product_delete', pid=p.id) }}" class="d-inline" onsubmit="return confirm('确认删除《{{ p.title|truncate_text(20) }}》？');">
+                  <button class="btn btn-danger" title="删除"><i class="fas fa-trash"></i></button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">暂无产品，点击右上角「新增产品」创建第一个产品</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </form>
+
+    {% include 'admin/_pagination.html' with context %}
+  </div>
+  {% if can_batch and products %}
+  <div class="card-footer">
+    <div class="d-flex flex-wrap align-items-center">
+      <button type="button" class="btn btn-sm btn-success mr-1 mb-1" onclick="batch('enable')">
+        <i class="fas fa-check"></i> 批量启用
+      </button>
+      <button type="button" class="btn btn-sm btn-warning mr-1 mb-1" onclick="batch('disable')">
+        <i class="fas fa-pause"></i> 批量停用
+      </button>
+      <button type="button" class="btn btn-sm btn-danger mr-1 mb-1" onclick="batch('delete')">
+        <i class="fas fa-trash"></i> 批量删除
+      </button>
+      <div class="input-group input-group-sm mr-1 mb-1" style="width:220px;">
+        <select id="move-target" class="form-control">
+          <option value="">移动到栏目…</option>
+          {% for c in list_columns %}
+          <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+        <div class="input-group-append">
+          <button type="button" class="btn btn-outline-primary" onclick="batch_move()" title="批量移动">
+            <i class="fas fa-arrows-alt"></i> 移动
+          </button>
+        </div>
+      </div>
+      <small class="text-muted ml-1">未选择产品时操作无效</small>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  $('#check-all').on('change', function(){ $('.row-check').prop('checked', this.checked); });
+  function checked_ids(){ return $('.row-check:checked').length; }
+  function batch(action){
+    if (checked_ids() === 0){ alert('请先选择产品'); return; }
+    var tips = {
+      'enable': '确认批量启用所选产品？',
+      'disable': '确认批量停用所选产品？停用后前台不再展示。',
+      'delete': '确认批量删除所选产品？'
+    };
+    if (tips[action] && !confirm(tips[action])) return;
+    $('#batch-action').val(action);
+    $('#batch-form').submit();
+  }
+  function batch_move(){
+    if (checked_ids() === 0){ alert('请先选择产品'); return; }
+    var target = $('#move-target').val();
+    if (!target){ alert('请先选择目标栏目'); return; }
+    if (!confirm('确认将所选产品移动到目标栏目？')) return;
+    var $f = $('#batch-form');
+    $f.append('<input type="hidden" name="target_column_id" value="' + target + '">');
+    $('#batch-action').val('move');
+    $f.submit();
+  }
+</script>
+{% endblock %}

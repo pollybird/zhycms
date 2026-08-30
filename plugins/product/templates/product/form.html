@@ -1,0 +1,322 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ '编辑产品' if product else '新增产品' }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ '编辑产品' if product else '新增产品' }}{% endblock %}
+{% set active_menu = 'product' %}
+
+{% block breadcrumb %}
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.product_index') }}">产品管理</a></li>
+  <li class="breadcrumb-item active">{{ '编辑' if product else '新增' }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" id="product-form">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">标题</label>
+            <input type="text" name="title" class="form-control form-control-lg" value="{{ product.title if product else '' }}" required>
+          </div>
+          <div class="form-group">
+            <label>摘要</label>
+            <textarea name="summary" rows="2" class="form-control" placeholder="列表页展示的产品简介">{{ product.summary if product else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-edit"></i> 产品详情</h3></div>
+        <div class="card-body p-0">
+          <textarea name="content" id="content" rows="12" class="form-control" style="border:0;">{{ product.content if product else '' }}</textarea>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-images"></i> 产品相册</h3>
+          <div class="card-tools">
+            <small class="text-muted mr-2">拖拽图片调整顺序；未单独上传封面时，列表取第一张为封面</small>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="gallery-box" class="d-flex flex-wrap">
+            {% if product %}
+            {% for url in product.gallery_urls() %}
+            <div class="gallery-item card mr-2 mb-2" draggable="true" style="width:132px;">
+              <img src="{{ url }}" class="card-img-top" style="height:90px;object-fit:cover;" alt="相册图">
+              <div class="card-body p-1 text-center">
+                <input type="hidden" name="gallery_keep" value="{{ url }}">
+                <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeGalleryItem(this)">
+                  <i class="fas fa-trash"></i> 移除
+                </button>
+              </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+          </div>
+          <div class="form-group mb-0">
+            <label>上传新图片（可多选）</label>
+            <input type="file" name="gallery_files" id="gallery-files" class="form-control-file" multiple accept="image/*">
+            <small class="form-text text-muted">新上传图片将排在相册末尾；保存后可再调整顺序。</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-list"></i> 规格参数</h3>
+          <div class="card-tools">
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addGroup()">
+              <i class="fas fa-plus"></i> 添加分组
+            </button>
+          </div>
+        </div>
+        <div class="card-body" id="specs-box">
+          {% if product %}
+          {% for g in product.specs_grouped() %}
+          <div class="spec-group border rounded p-2 mb-3">
+            <div class="form-group mb-2 d-flex">
+              <input type="text" class="form-control form-control-sm spec-group-name mr-2"
+                     placeholder="分组名称（如：基本参数）" value="{{ g.group }}" style="max-width:240px;">
+              <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeGroup(this)" title="删除分组">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+            <table class="table table-sm mb-2">
+              <thead><tr><th style="width:40%;">参数名</th><th>参数值</th><th width="60"></th></tr></thead>
+              <tbody>
+                {% for it in g.items %}
+                <tr class="spec-row">
+                  <td><input type="text" class="form-control form-control-sm spec-name" value="{{ it.name }}" placeholder="如：型号"></td>
+                  <td><input type="text" class="form-control form-control-sm spec-value" value="{{ it.value }}"></td>
+                  <td><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeRow(this)"><i class="fas fa-times"></i></button></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-0" onclick="addRow(this)">
+              <i class="fas fa-plus"></i> 添加参数
+            </button>
+          </div>
+          {% endfor %}
+          {% endif %}
+        </div>
+        <div class="card-footer text-muted" style="font-size:12px;">
+          参数名为空的行保存时自动忽略；前台详情页按分组渲染规格表。
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">发布设置</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">所属栏目</label>
+            <select name="column_id" class="form-control" required>
+              <option value="">请选择列表栏目</option>
+              {% for c in columns %}
+              <option value="{{ c.id }}"
+                {{ 'selected' if (product and product.column_id == c.id) or (pre_col and pre_col.id == c.id) }}>{{ c.name }}（{{ c.slug }}）</option>
+              {% endfor %}
+            </select>
+            <small class="form-text text-muted">产品归入列表栏目；栏目级内容权限与文章一致。</small>
+          </div>
+          <div class="form-group">
+            <label>排序优先级</label>
+            <input type="number" name="sort_order" class="form-control" value="{{ product.sort_order if product else 0 }}">
+          </div>
+          <div class="form-group">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" class="custom-control-input" id="is-enabled" name="is_enabled"
+                     {{ 'checked' if (product and product.is_enabled) or not product }}>
+              <label class="custom-control-label" for="is-enabled">启用（前台展示）</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>封面图</label>
+            <input type="file" name="cover" class="form-control-file" accept="image/*">
+            {% if product and product.cover %}
+            <div class="mt-2"><img src="{{ product.cover }}" style="max-height:100px;"></div>
+            <label><input type="checkbox" name="cover_remove"> 删除封面</label>
+            <small class="form-text text-muted">删除后展示取相册第一张（如有）。</small>
+            {% elif product %}
+            <small class="form-text text-muted">未设置封面时展示取相册第一张（如有）。</small>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">SEO</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>SEO 标题</label>
+            <input type="text" name="seo_title" class="form-control" value="{{ product.seo_title if product and product.seo_title else '' }}">
+          </div>
+          <div class="form-group">
+            <label>SEO 关键词</label>
+            <input type="text" name="seo_keywords" class="form-control" value="{{ product.seo_keywords if product and product.seo_keywords else '' }}">
+          </div>
+          <div class="form-group">
+            <label>SEO 描述</label>
+            <textarea name="seo_description" rows="2" class="form-control">{{ product.seo_description if product and product.seo_description else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存产品</button>
+          <a href="{{ url_for('admin.product_index') }}" class="btn btn-default btn-block">返回列表</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <input type="hidden" name="gallery_json" id="gallery-json">
+  <input type="hidden" name="specs_json" id="specs-json">
+</form>
+{% endblock %}
+
+{% block js %}
+<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
+<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
+<style>
+  .ck.ck-editor__editable_inline { min-height: 400px; }
+  .gallery-item.dragging { opacity: .5; border: 2px dashed #007bff; }
+  .gallery-item { cursor: move; }
+  #specs-box .spec-group-name { font-weight: 600; }
+</style>
+<script>
+  // ===== CKEditor5（与文章编辑器同配置） =====
+  const ckConfig = {
+    licenseKey: 'GPL',
+    language: 'zh-cn',
+    placeholder: '在此输入产品详情……',
+    toolbar: {
+      items: [
+        'undo', 'redo', '|',
+        'heading', '|',
+        'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
+        'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'code', '|',
+        'alignment', '|',
+        'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+        'link', 'imageUpload', 'insertTable', 'blockQuote', 'highlight',
+        'codeBlock', 'horizontalLine', 'specialCharacters', '|',
+        'removeFormat', 'sourceEditing'
+      ],
+      shouldNotGroupWhenFull: true
+    },
+    removePlugins: [
+      'AIAssistant', 'AITextAdapter', 'OpenAITextAdapter', 'AWSTextAdapter',
+      'CKBox', 'CKFinder', 'EasyImage', 'RealTimeCollaborativeComments',
+      'RealTimeCollaborativeTrackChanges', 'RealTimeCollaborativeRevisionHistory',
+      'PresenceList', 'Comments', 'TrackChanges', 'TrackChangesData', 'RevisionHistory',
+      'Pagination', 'WProofreader', 'MathType', 'SlashCommand', 'Template',
+      'DocumentOutline', 'FormatPainter', 'TableOfContents', 'PasteFromOfficeEnhanced',
+      'CaseChange'
+    ],
+    image: {
+      toolbar: ['imageTextAlternative', 'toggleImageCaption', '|',
+                'imageStyle:inline', 'imageStyle:block', 'imageStyle:side']
+    },
+    table: {
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties']
+    },
+    fontSize: {
+      options: [9, 10, 11, 12, 13, 'default', 15, 17, 19, 21, 24, 28, 32, 40]
+    },
+    simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=product' }
+  };
+
+  let mainEditor = null;
+  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), ckConfig)
+    .then(e => { mainEditor = e; })
+    .catch(err => console.error(err));
+
+  // ===== 相册编辑器：拖拽排序 + 移除；新上传文件由服务端追加 =====
+  function removeGalleryItem(btn){
+    btn.closest('.gallery-item').remove();
+  }
+
+  (function(){
+    const box = document.getElementById('gallery-box');
+    let dragEl = null;
+    box.addEventListener('dragstart', function(e){
+      const item = e.target.closest('.gallery-item');
+      if (!item) return;
+      dragEl = item;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    box.addEventListener('dragover', function(e){
+      e.preventDefault();
+      const target = e.target.closest('.gallery-item');
+      if (!target || target === dragEl || !dragEl) return;
+      const rect = target.getBoundingClientRect();
+      const before = (e.clientX - rect.left) < rect.width / 2;
+      box.insertBefore(dragEl, before ? target : target.nextSibling);
+    });
+    box.addEventListener('dragend', function(){
+      if (dragEl) dragEl.classList.remove('dragging');
+      dragEl = null;
+    });
+  })();
+
+  // ===== 规格参数编辑器 =====
+  function addGroup(){
+    const html =
+      '<div class="spec-group border rounded p-2 mb-3">' +
+      '  <div class="form-group mb-2 d-flex">' +
+      '    <input type="text" class="form-control form-control-sm spec-group-name mr-2" placeholder="分组名称（如：基本参数）" style="max-width:240px;">' +
+      '    <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeGroup(this)" title="删除分组"><i class="fas fa-trash"></i></button>' +
+      '  </div>' +
+      '  <table class="table table-sm mb-2"><thead><tr><th style="width:40%;">参数名</th><th>参数值</th><th width="60"></th></tr></thead><tbody></tbody></table>' +
+      '  <button type="button" class="btn btn-outline-secondary btn-sm py-0" onclick="addRow(this)"><i class="fas fa-plus"></i> 添加参数</button>' +
+      '</div>';
+    document.getElementById('specs-box').insertAdjacentHTML('beforeend', html);
+    const groups = document.querySelectorAll('#specs-box .spec-group');
+    const last = groups[groups.length - 1];
+    addRow(last.querySelector('button'));
+  }
+  function removeGroup(btn){ btn.closest('.spec-group').remove(); }
+  function addRow(btn){
+    const tbody = btn.closest('.spec-group').querySelector('tbody');
+    const tr = document.createElement('tr');
+    tr.className = 'spec-row';
+    tr.innerHTML =
+      '<td><input type="text" class="form-control form-control-sm spec-name" placeholder="如：型号"></td>' +
+      '<td><input type="text" class="form-control form-control-sm spec-value"></td>' +
+      '<td><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeRow(this)"><i class="fas fa-times"></i></button></td>';
+    tbody.appendChild(tr);
+    tr.querySelector('.spec-name').focus();
+  }
+  function removeRow(btn){ btn.closest('tr').remove(); }
+
+  // ===== 提交前组装 JSON =====
+  $('#product-form').on('submit', function(){
+    if (mainEditor) document.querySelector('#content').value = mainEditor.getData();
+
+    // 相册顺序（保留项按 DOM 顺序）
+    const kept = [];
+    document.querySelectorAll('#gallery-box .gallery-item input[name="gallery_keep"]')
+      .forEach(i => kept.push(i.value));
+    document.getElementById('gallery-json').value = JSON.stringify(kept);
+
+    // 规格参数
+    const specs = [];
+    document.querySelectorAll('#specs-box .spec-group').forEach(g => {
+      const groupName = (g.querySelector('.spec-group-name') || {value: ''}).value.trim();
+      const items = [];
+      g.querySelectorAll('.spec-row').forEach(tr => {
+        const name = tr.querySelector('.spec-name').value.trim();
+        const value = tr.querySelector('.spec-value').value.trim();
+        if (name) items.push({name: name, value: value});
+      });
+      if (groupName || items.length) specs.push({group: groupName, items: items});
+    });
+    document.getElementById('specs-json').value = JSON.stringify(specs);
+  });
+</script>
+{% endblock %}

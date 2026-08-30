@@ -86,12 +86,15 @@
   <a href="#sec-login" class="sub">登录防暴破</a>
   <a href="#sec-upload" class="sub">上传安全</a>
   <a href="#sec-audit" class="sub">审计日志</a>
+  <a href="#api" style="margin-top:8px;background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十四、REST 内容 API（v2.2）</a>
+  <a href="#plugins" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十五、插件机制（v2.2）</a>
+  <a href="#plugin-dev" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十六、插件开发指引（v2.2）</a>
 </nav>
 
 <main>
 <header class="hero">
-  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.1.1</span></h1>
-  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>v1.1&rarr;v2.0 升级迁移</b></p>
+  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.2.0</span></h1>
+  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>REST 内容 API</b> · <b>插件机制与开发指引</b> · <b>v1.1&rarr;v2.0 升级迁移</b></p>
 </header>
 
 <section id="intro">
@@ -613,6 +616,329 @@ sudo apt install -y libmagic1        # Debian/Ubuntu
   <li>上传 JPG 生成缩略图且压缩；伪静态、消息通知、备份按需配置验证</li>
 </ul>
 <p>完整内容（手工 SQL、回滚方案、变更明细附录）见 <b><code>UPGRADE.md</code></b>。</p>
+</section>
+
+<section id="api">
+<h2>十四、REST 内容 API（v2.2）</h2>
+<p>v2.2 新增只读内容 API，前缀 <code>/api/v1</code>，供小程序、App、Headless 前端（Nuxt/Next/Vue 等）直接消费。所有端点遵循统一响应包、鉴权规则、CORS、缓存策略，插件可向同一蓝本追加自己的只读端点。</p>
+
+<h3 id="api-config">1. 配置与鉴权</h3>
+<p>后台「系统设置 → 内容 API」可配置：</p>
+<ul>
+  <li><b>内容 API 总开关</b>（<code>api_enable</code>）：关闭后所有 <code>/api/v1/*</code> 返回 404，不暴露存在性。</li>
+  <li><b>访问 Token</b>（<code>api_token</code>）：非空时要求请求头 <code>X-API-Token: {token}</code>，缺失或错误返回 401。</li>
+  <li><b>CORS 允许来源</b>（<code>api_cors_origins</code>）：<code>*</code> 或逗号分隔域名；<code>*</code> 下响应头 <code>Access-Control-Allow-Origin: *</code>，适合本地调试与公共开放站；生产如需更严，请逐个列域名（如 <code>https://m.example.com,https://admin.example.com</code>）。</li>
+  <li><b>缓存 TTL</b>（<code>api_cache_ttl</code>）：默认 300 秒；使用 Flask-Caching，按「端点类型 + 路径 + 查询」维度独立键，插件启停时不会串页。</li>
+</ul>
+<p>改动以上任意一项均写入审计日志（模块=系统设置，操作=修改）。</p>
+
+<h3 id="api-format">2. 统一响应格式</h3>
+<pre><code>{
+  "code": 0,        // 0=成功，其他=业务错误码
+  "message": "ok",  // 错误时为中文说明
+  "data": ...,      // 成功时返回数据
+  "meta": {         // 列表端点附带分页信息；否则 null
+    "page": 1,
+    "per_page": 10,
+    "total": 128,
+    "pages": 13
+  }
+}</code></pre>
+<p>错误示例：<code>{"code":401,"message":"Token 无效或缺失","data":null,"meta":null}</code>。</p>
+
+<h3 id="api-endpoints">3. 核心端点</h3>
+<ul>
+  <li><code>GET /api/v1/columns</code>：栏目导航树（含 type/slug/外链 URL/list_template 等，仅启用+未删除+非外链栏目可下钻）。</li>
+  <li><code>GET /api/v1/columns/&lt;slug&gt;</code>：栏目详情（封面图、SEO 三字段、父级/子级摘要等）。</li>
+  <li><code>GET /api/v1/columns/&lt;slug&gt;/articles?page=1&amp;per_page=10&amp;keyword=</code>：栏目文章分页（仅发布+未删除），<code>per_page</code> 范围 1-50。</li>
+  <li><code>GET /api/v1/articles/&lt;id&gt;</code>：文章详情（正文 HTML、SEO、自定义字段值、<code>prev</code>/<code>next</code> 指针）。</li>
+</ul>
+
+<h3 id="api-plugins">4. 插件扩展端点（v2.2）</h3>
+<ul>
+  <li><code>GET /api/v1/banners/&lt;slug&gt;</code>：<b>轮播图插件</b>。返回分组下按 <code>sort_order</code> 排序的启用项列表（含图片 URL、标题、链接、<code>link_target</code>）；插件未启用或分组不存在返回 404。</li>
+  <li><code>GET /api/v1/columns/&lt;slug&gt;/products</code> + <code>GET /api/v1/products/&lt;id&gt;</code>：<b>产品展示插件</b>。列表支持分页+关键词；详情附带相册 URL 列表、分组规格参数、上一条/下一条产品指针；插件未启用或产品不存在/未启用返回 404。</li>
+</ul>
+<div class="tip">第三方插件开发时请一律把端点挂在核心 <code>api_bp</code>（<code>get_api_routes(api_bp)</code> 钩子），这样会自动享受总开关、鉴权、CORS、缓存装饰器与审计，不要单独注册新的顶层蓝本。</div>
+</section>
+
+<section id="plugins">
+<h2>十五、插件机制（v2.2）</h2>
+<p>v2.2 的核心底座是「插件优先架构」：所有非通用能力（轮播、产品、表单扩展、FAQ、招聘、下载中心、留言板…）都以插件形式开发，无需修改核心源码即可部署；启停只改一项 Setting 值，<b>即时生效、无需重启、禁用即隐身</b>。</p>
+
+<h3 id="pl-arch">1. 架构总览</h3>
+<ul>
+  <li><b>发现与加载</b>：应用启动时调用 <code>discover_and_load(app)</code>，扫描 <code>plugins/*/__init__.py</code> 并导入；单个插件导入失败仅记录错误并在管理页标红，不拖垮启动。</li>
+  <li><b>门控</b>：运行时以 <code>Setting('enabled_plugins') = 'banner,product,...'</code> 逗号分隔 slug 集合为唯一真值。<code>plugin_enabled(slug)</code> 请求级 memo，按次查询。</li>
+  <li><b>启用</b>：幂等写入权限点 → 给预设角色（content_editor/content_auditor/super_admin 等）补授权 → <code>db.create_all()</code> 兜底建插件表 → 写启用清单。</li>
+  <li><b>禁用</b>：仅从启用清单移除 slug，<b>不删表、不清数据、不回收权限绑定</b>（核心零迁移；下次启用直接复用历史数据）。前台/后台门控：未启用的插件→路由 404、菜单不显示、sitemap 不收录、API 返回 404、模板函数返回 fallback。</li>
+</ul>
+
+<h3 id="pl-official">2. 官方内置插件</h3>
+<table class="tbl">
+  <thead><tr><th>slug</th><th>名称</th><th>适用场景</th><th>资源路径 / 关键字</th></tr></thead>
+  <tbody>
+    <tr><td>banner</td><td>轮播图</td><td>首页幻灯片、侧边广告位、横幅分组</td><td><code>banner_items('home-hero')</code>；<code>banner/hero_carousel.html</code> partial；<code>GET /api/v1/banners/&lt;slug&gt;</code></td></tr>
+    <tr><td>product</td><td>产品展示</td><td>制造业/贸易产品库、相册 + 规格参数、区别普通文章</td><td><code>product_latest('products', 8)</code>；<code>/product-&lt;id&gt;.html</code> 伪静态；<code>list_product.html</code> 列表模板；<code>GET /api/v1/products/&lt;id&gt;</code></td></tr>
+  </tbody>
+</table>
+
+<h3 id="pl-ui">3. 后台：插件管理页</h3>
+<p>入口：后台侧边栏「系统 → 插件管理」（权限点：<code>system:plugins_manage</code>）。页面列出所有已发现插件的元数据（名称/版本/作者/说明），导入错误的插件会以红色「加载失败」徽标标注错误栈；启用插件会弹出确认说明并写入审计日志（模块=系统设置，操作=修改，<code>changed.enabled_plugins = [旧清单, 新清单]</code>）。</p>
+
+<h3 id="pl-wizard">4. 初始化向导集成</h3>
+<p>新装初始化向导在「演示数据选择」后新增<b>「功能插件」</b>勾选步骤，默认勾选 <b>轮播图 + 产品展示</b>：</p>
+<ul>
+  <li>勾选 → 核心演示数据生成后立即调用 <code>run_demo_data_hooks(industry)</code>，生成 banner 分组 3 张图 / 制造业 6 产品；同时自动给 <code>content_editor</code> / <code>content_auditor</code> 绑定插件权限点。</li>
+  <li>不勾选 → 启用清单为空、不建插件数据、栏目模板不被改动；后续需要时在「插件管理」一键启用即可。</li>
+</ul>
+</section>
+
+<section id="plugin-dev">
+<h2>十六、插件开发指引（v2.2）</h2>
+<p>本章节面向想开发自定义插件的开发者，从目录结构 → 元数据 → 钩子方法 → 测试清单，走完一个完整插件的开发流程。建议以 <code>plugins/banner</code>（最简后台+模板函数）和 <code>plugins/product</code>（完整 CRUD + 前台路由 + API）作为样板对照。</p>
+
+<h3 id="pd-layout">1. 目录结构约定</h3>
+<pre><code>plugins/
+  my_plugin/              # 插件根目录，slug 必须符合 [a-zA-Z0-9_-]{2,32}
+    manifest.json         # 纯元数据（管理页展示 + min_core_version 校验）
+    __init__.py           # 入口：定义 PluginBase 子类，末尾实例化为变量 `plugin`
+    models.py             # SQLAlchemy 模型（导入即进入 metadata，启用时 db.create_all 建表）
+    admin.py              # 后台路由（挂核心 admin_bp，endpoint 归入 admin.*）
+    frontend.py           # 前台模板函数（jinja globals）+ URL 生成
+    frontend_routes.py    # 前台蓝图路由（可选，仅当需要独立 URL）
+    api.py                # REST API 端点（挂核心 api_bp，统一响应包）
+    demo.py               # 演示数据钩子：generate(industry)，幂等
+    templates/            # Jinja 模板目录：后台页 / 前台 partial / 前台详情页
+      my_plugin/          # 建议 namespace，避免与核心模板重名
+        index.html
+        form.html
+        show_detail.html
+    static/               # 插件静态资源（可选；蓝图注册 static_url_path 暴露）
+      css/my.css
+      js/my.js</code></pre>
+
+<h3 id="pd-manifest">2. manifest.json（元数据）</h3>
+<pre><code>{
+  "slug": "my_plugin",
+  "name": "我的插件",
+  "version": "1.0.0",
+  "description": "一句话说明该插件做什么，会显示在插件管理页。",
+  "author": "你的名字或团队",
+  "min_core_version": "2.2.0"
+}</code></pre>
+<p><code>min_core_version</code> 用于未来核心 API 变更时提示升级；当前最低 <code>2.2.0</code>。</p>
+
+<h3 id="pd-base">3. 入口：PluginBase 子类 + <code>plugin = MyPlugin()</code></h3>
+<p>最简骨架（可直接复制粘贴再改类名）：</p>
+<pre><code>"""my_plugin 插件入口。"""
+from app.plugin_api import PluginBase
+
+from . import admin as _admin  # noqa: F401  导入即向 admin_bp 注册后台路由
+from . import api as _api      # noqa: F401  可选：导入即准备好 API 注册器
+
+
+class MyPlugin(PluginBase):
+    # --- 元数据（与 manifest.json 保持一致，类属性优先） ---
+    slug = 'my_plugin'
+    name = '我的插件'
+    version = '1.0.0'
+    description = '示例插件：演示全部钩子的用法'
+    author = '开发者名称'
+
+    # --- 声明式注册 ---
+    # 权限点：启用时幂等写入 permissions 表
+    permissions = [
+        ('my_plugin:manage', '我的插件管理', '增删改查管理权限'),
+    ]
+    # 启用时幂等给预设角色补授权（可留空）
+    preset_role_grants = {
+        'content_auditor': ['my_plugin:manage'],
+        'content_editor':  ['my_plugin:manage'],
+    }
+    # 审计模块：筛选下拉 + 列表徽标翻译（可留空）
+    audit_modules = [('my_plugin', '我的插件')]
+
+    # --- 代码钩子（按需求覆写） ---
+
+    def get_admin_menu(self):
+        """侧边栏菜单项：启用 + 当前用户有权限才显示。"""
+        return [{
+            'label': '我的插件',
+            'endpoint': 'admin.my_plugin_index',  # admin 蓝本 endpoint
+            'icon': 'fa-cog',                      # FontAwesome 图标
+            'permission': 'my_plugin:manage',
+            'active_prefix': 'my_plugin',          # active_menu 高亮前缀
+        }]
+
+    def get_admin_menu_icon(self):
+        """侧边栏整组图标，默认 fa-plug。"""
+        return 'fa-cube'
+
+    def get_admin_routes(self, admin_bp):
+        """如需在 __init__.py 中集中注册路由，可覆写此方法。"""
+        pass
+
+    def get_frontend_blueprint(self):
+        """返回前台蓝图；即使无前台路由也可返回仅含 template_folder 的蓝图，
+        用于把插件模板目录接入 Jinja 搜索链。"""
+        from flask import Blueprint
+        return Blueprint('my_plugin_frontend', __name__,
+                         template_folder='templates',
+                         static_folder='static',
+                         static_url_path='/plugins-static/my_plugin')
+
+    def get_jinja_globals(self):
+        """模板全局函数：核心自动包裹"插件启用"守卫；未启用时返回 fallback。"""
+        from .frontend import my_plugin_items
+        return {'my_plugin_items': my_plugin_items}
+
+    def get_jinja_fallbacks(self):
+        """同名函数禁用时的兜底返回值（避免模板 UndefinedError）。"""
+        return {'my_plugin_items': []}
+
+    def get_api_routes(self, api_bp):
+        """向核心内容 API 蓝本注册只读端点。"""
+        _api.register(api_bp)
+
+    def get_sitemap_urls(self):
+        """贡献 sitemap URL，返回 [{loc, lastmod, changefreq, priority}]；
+        loc 为完整 URL，伪静态开启时优先用伪静态 URL。"""
+        return []
+
+    def generate_demo_data(self, industry):
+        """演示数据钩子，industry='manufacturing' | 'service'。幂等！"""
+        from .demo import generate
+        generate(industry)
+
+
+plugin = MyPlugin()   # 必须！核心通过 import 后取模块级 plugin 变量识别</code></pre>
+
+<h3 id="pd-models">4. 模型开发（models.py）</h3>
+<pre><code>"""my_plugin 数据模型。
+注意：只定义 db.Model 子类即可——import models 时即进入 metadata；
+启用插件时 db.create_all() 会幂等建表；禁用插件后仍保留表与数据。
+"""
+from datetime import datetime
+import json
+from app.extensions import db
+
+class MyItem(db.Model):
+    __tablename__ = 'my_items'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    is_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False)
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now,
+                           onupdate=datetime.now, nullable=False)</code></pre>
+<div class="warn">表名建议带插件 slug 前缀（如 <code>my_items</code>），避免与核心或其他插件冲突；模型必须含 <code>is_deleted</code> 字段并在查询中<b>显式过滤</b>，遵循核心的"软删除、便于批量恢复"策略。</div>
+
+<h3 id="pd-admin">5. 后台管理路由（admin.py）</h3>
+<p>后台路由直接从核心 <code>admin_bp</code> 注册，endpoint 归入 <code>admin.*</code>，从而自动获得<b>后台地址前缀即时生效</b>机制（无需为你的插件单独处理前缀切换）。关键装饰器三件套：</p>
+<pre><code>from app.admin import admin_bp                       # 核心后台蓝本
+from app.utils.helpers import permission_required, audit_log  # 权限 + 审计
+from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE
+from .models import MyItem, AUDIT_MODULE = 'my_plugin'
+
+@admin_bp.route('/my-items')                          # URL: /{admin_prefix}/my-items
+@permission_required('my_plugin:manage',
+                     any_of=['content:edit','content:delete'])  # any_of=聚合权限点
+def my_plugin_index():
+    items = MyItem.query.filter_by(is_deleted=False).all()
+    return render_template('my_plugin/index.html', items=items)
+
+@admin_bp.route('/my-items/&lt;int:iid&gt;/delete', methods=['POST'])
+@permission_required('content:delete')
+def my_plugin_delete(iid):
+    item = MyItem.query.get_or_404(iid)
+    item.is_deleted = True
+    db.session.commit()
+    audit_log(OP_DELETE, AUDIT_MODULE, item.id, item.title,
+              detail={'remark': '软删除'})  # 改动作出审计
+    flash('已删除', 'success')
+    return redirect(url_for('admin.my_plugin_index'))</code></pre>
+<p>权限点策略参考官方插件：<code>my_plugin:manage</code> 是语义聚合权限（后台菜单用），而 CRUD 的细粒度仍沿用核心的 <code>content:create/edit/delete/batch</code>，这样「内容编辑」「内容审核」预设角色只要绑定一次 <code>my_plugin:manage</code> 就立即获得全套 CRUD 权限。</p>
+
+<h3 id="pd-frontend">6. 前台模板函数与蓝图（frontend.py + frontend_routes.py）</h3>
+<p>模板函数不要直接写在蓝图函数中；应声明为纯函数，在 <code>get_jinja_globals()</code> 注册。核心会给它自动套「启用守卫」：未启用插件时返回 <code>get_jinja_fallbacks()</code> 中声明的默认值（<code>[]</code> / <code>None</code>），避免模板抛错。</p>
+<pre><code># frontend.py（模板函数 + URL 生成）
+from flask import url_for
+from app.models.setting import Setting
+from .models import MyItem
+
+def frontend_item_url(item):
+    """伪静态优先的详情 URL。"""
+    if Setting.get('seo_rewrite_enable') == 'on':
+        return f'/my-{item.id}.html'
+    return url_for('my_plugin_frontend.item_detail', iid=item.id)
+
+def my_plugin_items(limit=6):
+    """前台调用：{{ my_plugin_items(4) }}。"""
+    rows = MyItem.query.filter_by(is_enabled=True, is_deleted=False) \
+        .order_by(MyItem.sort_order.desc(), MyItem.id.desc()).limit(limit).all()
+    return [{'id': r.id, 'title': r.title, 'url': frontend_item_url(r)}
+            for r in rows]</code></pre>
+<pre><code># frontend_routes.py（前台蓝图路由）
+from flask import Blueprint, render_template, abort
+from app.models.setting import Setting
+from app.models.column import Column  # 若栏目耦合
+from .models import MyItem
+
+my_plugin_frontend = Blueprint('my_plugin_frontend', __name__,
+                               template_folder='templates')
+
+@my_plugin_frontend.route('/my-&lt;int:iid&gt;.html')
+def item_detail_rewrite(iid):
+    """伪静态路由（只有 seo_rewrite_enable=on 时返回 200）。"""
+    if Setting.get('seo_rewrite_enable') != 'on':
+        abort(404)
+    ...
+    return render_template('my_plugin/show_detail.html', item=item)</code></pre>
+
+<h3 id="pd-api">7. REST API（api.py）</h3>
+<pre><code>"""my_plugin：只读 API 端点。"""
+from app.api.views import api_ok, api_err, api_cache
+from app.plugin_system import plugin_enabled
+
+def register(api_bp):
+    @api_bp.route('/my-items')
+    @api_cache('my_item')  # 独立缓存键维度：my_item
+    def my_items_list():
+        if not plugin_enabled('my_plugin'):
+            return api_err(404, '资源不存在')   # 未启用/不存在统一 404
+        from .models import MyItem
+        rows = MyItem.query.filter_by(
+            is_enabled=True, is_deleted=False
+        ).order_by(MyItem.sort_order.desc()).limit(50).all()
+        return api_ok([
+            {'id': r.id, 'title': r.title} for r in rows
+        ])</code></pre>
+
+<h3 id="pd-test">8. 自测清单（插件发布前必过）</h3>
+<ul class="check">
+  <li>插件目录放入后，启动应用无异常；插件管理页显示"已加载"、版本/作者/说明与 manifest.json 一致。</li>
+  <li><b>启用</b>：权限点种子成功（数据库 permissions 表新增）、预设角色授权成功、模型表 <code>SHOW TABLES / .tables</code> 存在、侧边栏菜单在有 <code>my_plugin:manage</code> 权限的角色下显示。</li>
+  <li><b>后台 CRUD</b>：创建/编辑/删除/批量 → 审计日志有记录、模块筛选下拉含「我的插件」、<code>?module=my_plugin</code> 过滤命中。</li>
+  <li><b>模板</b>：前台调用模板函数 → 渲染；禁用插件 → 同一个模板不报错、返回 fallback 空值。</li>
+  <li><b>前台路由</b>：动态详情 200；伪静态开启时 <code>/my-&lt;id&gt;.html</code> 200，关闭时 404 且核心 <code>/article-&lt;id&gt;.html</code>、<code>/{slug}-{N}.html</code> 分页不被劫持。</li>
+  <li><b>API</b>：<code>api_enable=on</code> 200，<code>off</code> 404；有 Token 时缺失/错误返回 401；CORS 头匹配配置；插件禁用后 API 返回 404。</li>
+  <li><b>sitemap</b>：有详情页的插件 → sitemap.xml 含 <code>&lt;loc&gt;</code>；禁用插件 → sitemap 中消失。</li>
+  <li><b>演示数据钩子</b>：两次调用 generate（幂等）→ 记录数不变、无 IntegrityError；服务业/制造业分支覆盖。</li>
+  <li><b>禁用</b>：插件管理页禁用 → 前台路由/API/菜单/sitemap 全部隐身；<b>重新启用</b> → 历史数据全部恢复可见，权限点/授权/建表动作不重复。</li>
+  <li><b>升级兼容</b>：在 v2.1.1 已运行实例上覆盖代码 → 无需重启即可看到插件管理页、启用后立即生效。</li>
+</ul>
+
+<h3 id="pd-common">9. 常见陷阱与最佳实践</h3>
+<ul>
+  <li>后台路由 endpoint 命名：<code>admin.my_plugin_{action}</code>。<b>不要自己注册新蓝本</b>，否则后台前缀切换时你的插件路由不会即时失效。</li>
+  <li>文件名判断上传类型时，用 <code>secure_filename 之前</code>的原始文件名取后缀（核心 <code>save_upload_file</code> 已处理，直接复用即可）。</li>
+  <li>模板中使用字典时，<code>g['items']</code> 不要写成 <code>g.items</code>——后者会命中 dict 的 <code>items()</code> 方法而非键值。</li>
+  <li>新建数据库时，模型 import 必须发生在 <code>db.create_all()</code> 之前。核心在应用工厂最后才执行 <code>create_all</code>，因此你的 <code>__init__.py</code> 必须显式 <code>from . import admin</code>（<code>admin.py</code> 再导入 <code>models.py</code>），保证模型已被注册。</li>
+  <li>插件 <code>__init__.py</code> 末尾一定要实例化为 <code>plugin = MyPlugin()</code>，否则 <code>plugin_system</code> 会判定加载失败（且没有友好提示）。</li>
+  <li>伪静态产品 URL <code>/product-{id}.html</code> 优先级<b>必须高于</b>栏目分页规则 <code>/{slug}-{N}.html</code>；核心 <code>frontend_routes.py</code> 已确保此顺序，新增插件时若声明 <code>/foo-{id}.html</code> 格式，要在 README 注明并加入回归测试。</li>
+</ul>
 </section>
 
 <footer>

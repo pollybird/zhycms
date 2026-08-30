@@ -1,0 +1,8 @@
+{
+  "slug": "banner",
+  "name": "轮播图",
+  "version": "1.0.0",
+  "description": "首页幻灯片/广告位分组管理，模板 banner_items() 一行调用，替代碎片拼轮播",
+  "author": "ZhyCMS 官方",
+  "min_core_version": "2.2.0"
+}
