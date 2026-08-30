@@ -90,7 +90,7 @@
 
 <main>
 <header class="hero">
-  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.1.0</span></h1>
+  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.1.1</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>v1.1&rarr;v2.0 升级迁移</b></p>
 </header>
 
@@ -182,20 +182,21 @@ python run.py</code></pre>
 <p>浏览器访问 <a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a>，首次访问会自动跳转到 <code>/admin/setup</code> 初始化向导。向导中需要填写：</p>
 <ul>
   <li><b>管理员账号</b>（至少 3 个字符）与<b>密码</b>（至少 6 个字符，需二次确认）</li>
-  <li><b>数据库类型</b>：SQLite / MySQL / PostgreSQL（见下）</li>
+  <li><b>数据库类型</b>：MySQL / PostgreSQL（生产推荐）/ SQLite（仅开发/测试，见下）</li>
   <li><b>演示数据</b>：不生成 / 制造业 / 服务业</li>
 </ul>
 <p>提交后系统会创建管理员、写入默认设置，并按选择生成演示数据，随后跳转登录页。</p>
 
 <h3 id="install-db">数据库选择</h3>
+<div class="warn"><b>生产环境请选择 MySQL 5.7+ 或 PostgreSQL 12+</b>：SQLite 不支持并发写入，正式站点使用容易锁表，仅适用于开发与测试。</div>
 <table>
   <tr><th>类型</th><th>说明</th><th>需要填写</th></tr>
-  <tr><td><b>SQLite</b></td><td>默认，直接生成 <code>instance/zhycms.db</code> 文件，零配置</td><td>无</td></tr>
-  <tr><td><b>MySQL</b></td><td>连接已有 MySQL 服务，默认端口 3306</td><td>主机、端口、数据库名、用户名、密码</td></tr>
-  <tr><td><b>PostgreSQL</b></td><td>连接已有 PostgreSQL 服务，默认端口 5432</td><td>主机、端口、数据库名、用户名、密码</td></tr>
+  <tr><td><b>MySQL</b> <span style="color:#155724;">（生产推荐）</span></td><td>生产首选（5.7+），连接已有 MySQL 服务，默认端口 3306</td><td>主机、端口、数据库名、用户名、密码</td></tr>
+  <tr><td><b>PostgreSQL</b> <span style="color:#155724;">（生产推荐）</span></td><td>生产可选（12+），连接已有 PostgreSQL 服务，默认端口 5432</td><td>主机、端口、数据库名、用户名、密码</td></tr>
+  <tr><td><b>SQLite</b>（仅开发/测试）</td><td>默认选项，直接生成 <code>instance/zhycms.db</code> 文件，零配置；<b>不支持并发写入，不要用于生产环境</b></td><td>无</td></tr>
 </table>
 <div class="note">选择 MySQL/PostgreSQL 时，向导会先<b>测试连接</b>，成功后才将连接信息写入 <code>instance/db_config.json</code> 并热切换数据库引擎；若切换失败会自动回滚到原库，保证应用可继续运行。</div>
-<div class="warn"><b>数据库 URI 解析优先级</b>（见 <code>app/config.py</code>）：<br>环境变量 <code>ZHOCMS_DB_URI</code> &gt; <code>instance/db_config.json</code>（初始化向导所存） &gt; 默认 SQLite。</div>
+<div class="warn"><b>数据库 URI 解析优先级</b>（见 <code>app/config.py</code>）：<br>环境变量 <code>ZHYCMS_DB_URI</code> &gt; <code>instance/db_config.json</code>（初始化向导所存） &gt; 默认 SQLite。</div>
 </section>
 
 <section id="deploy">
@@ -207,19 +208,20 @@ python run.py</code></pre>
 
 <h3 id="deploy-prod">生产部署</h3>
 <pre><code># 直接运行（关闭 DEBUG）
-ZHOCMS_ENV=production ZHOCMS_SECRET_KEY=your-secret python run.py
+ZHYCMS_ENV=production ZHYCMS_SECRET_KEY=your-secret python run.py
 
 # 或使用 gunicorn（推荐）
 gunicorn -w 4 -b 0.0.0.0:5000 "run:app"</code></pre>
-<div class="warn"><b>生产环境注意：</b>务必通过 <code>ZHOCMS_SECRET_KEY</code> 设置自定义会话密钥；建议在 gunicorn 前置 Nginx 反向代理并托管 <code>app/static/</code> 静态资源。</div>
+<div class="warn"><b>生产环境注意：</b>务必通过 <code>ZHYCMS_SECRET_KEY</code> 设置自定义会话密钥；建议在 gunicorn 前置 Nginx 反向代理并托管 <code>app/static/</code> 静态资源。</div>
 
 <h3 id="deploy-env">环境变量</h3>
 <table>
   <tr><th>变量</th><th>默认值</th><th>说明</th></tr>
-  <tr><td><code>ZHOCMS_ENV</code></td><td><code>development</code></td><td>配置模式：<code>development</code> / <code>production</code></td></tr>
-  <tr><td><code>ZHOCMS_SECRET_KEY</code></td><td>内置默认值</td><td>会话加密密钥，<b>生产环境必须修改</b></td></tr>
-  <tr><td><code>ZHOCMS_DB_URI</code></td><td><code>sqlite:///instance/zhycms.db</code></td><td>数据库 URI，可换成 MySQL/PostgreSQL；优先级最高</td></tr>
+  <tr><td><code>ZHYCMS_ENV</code></td><td><code>development</code></td><td>配置模式：<code>development</code> / <code>production</code></td></tr>
+  <tr><td><code>ZHYCMS_SECRET_KEY</code></td><td>内置默认值</td><td>会话加密密钥，<b>生产环境必须修改</b></td></tr>
+  <tr><td><code>ZHYCMS_DB_URI</code></td><td><code>sqlite:///instance/zhycms.db</code></td><td>数据库 URI，可换成 MySQL/PostgreSQL；优先级最高</td></tr>
 </table>
+<div class="note">v2.1 起环境变量前缀统一为 <code>ZHYCMS_</code>（与项目名一致）；旧前缀 <code>ZHOCMS_</code>（v2.1 前的拼写差异）仍被识别作为兼容回退，但将在未来版本移除，建议尽快改用新前缀。</div>
 </section>
 
 <section id="identity">

@@ -46,6 +46,7 @@ v1.1 文章只有 `is_enabled` 启用/停用开关；v2.0 引入 `status` 工作
 | 已有自定义字段/表单/碎片 | — | 兼容 | 无 |
 | `instance/db_config.json` | — | 兼容 | 无需改动 |
 | `instance/admin_config.json` | — | 兼容 | 无需改动（后台前缀修改 v2.0 起即时生效） |
+| 环境变量前缀 | `ZHOCMS_*` | `ZHYCMS_*`（v2.1 起统一，与项目名一致） | 旧前缀仍被识别（自动回退），**建议将部署脚本/systemd 配置中的 `ZHOCMS_ENV`、`ZHOCMS_SECRET_KEY`、`ZHOCMS_DB_URI` 改为新前缀 `ZHYCMS_*`**，未来版本将移除旧前缀支持 |
 
 **新增依赖 4 个**（`requirements.txt`）：`Flask-Caching`（页面缓存）、`APScheduler`（计划任务）、`requests`（企业微信通知）、`python-magic`（MIME 校验，Linux 需系统库 `libmagic`：Debian/Ubuntu `apt install libmagic1`，CentOS `yum install file-libs`；Windows 建议 `pip install python-magic-bin`）。
 
@@ -81,8 +82,8 @@ sudo apt install -y libmagic1
 # 使用 instance/db_config.json 中配置的数据库
 .venv/bin/python scripts/upgrade_v2.py
 
-# 或显式指定数据库 URI
-ZHOCMS_DB_URI='mysql+pymysql://user:pass@127.0.0.1:3306/zhycms?charset=utf8mb4' \
+# 或显式指定数据库 URI（v2.1 起前缀统一为 ZHYCMS_，旧前缀 ZHOCMS_ 仍兼容）
+ZHYCMS_DB_URI='mysql+pymysql://user:pass@127.0.0.1:3306/zhycms?charset=utf8mb4' \
     .venv/bin/python scripts/upgrade_v2.py
 ```
 

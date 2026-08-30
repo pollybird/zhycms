@@ -94,27 +94,27 @@
         <div class="form-group">
           <label><strong>数据库类型</strong></label>
           <small class="text-muted d-block mb-2">
-            选择 SQLite 无需任何配置，即刻生成本地数据库文件；选择 MySQL / PostgreSQL 需填写连接信息。
+            生产环境请选择 <b>MySQL 5.7+ / PostgreSQL 12+</b>（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。
           </small>
-          <div class="icheck-primary d-block mb-2">
-            <input type="radio" id="db_sqlite" name="db_type" value="sqlite" {{ 'checked' if (db_type or 'sqlite') == 'sqlite' else '' }}>
-            <label for="db_sqlite">
-              <strong>SQLite</strong>
-              <small class="text-muted d-block">默认，开箱即用，数据保存在 instance/zhycms.db</small>
-            </label>
-          </div>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_mysql" name="db_type" value="mysql" {{ 'checked' if db_type == 'mysql' else '' }}>
             <label for="db_mysql">
-              <strong>MySQL</strong>
-              <small class="text-muted d-block">适合中大型站点，需已创建目标数据库（建议字符集 utf8mb4）</small>
+              <strong>MySQL</strong> <span class="badge badge-success">生产推荐</span>
+              <small class="text-muted d-block">生产环境首选（5.7+），需已创建目标数据库（建议字符集 utf8mb4）</small>
             </label>
           </div>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_pg" name="db_type" value="postgresql" {{ 'checked' if db_type == 'postgresql' else '' }}>
             <label for="db_pg">
-              <strong>PostgreSQL</strong>
-              <small class="text-muted d-block">功能强大，需已创建目标数据库</small>
+              <strong>PostgreSQL</strong> <span class="badge badge-success">生产推荐</span>
+              <small class="text-muted d-block">生产环境可选（12+），功能强大，需已创建目标数据库</small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="db_sqlite" name="db_type" value="sqlite" {{ 'checked' if (db_type or 'sqlite') == 'sqlite' else '' }}>
+            <label for="db_sqlite">
+              <strong>SQLite</strong> <span class="badge badge-secondary">仅开发/测试</span>
+              <small class="text-muted d-block">默认，开箱即用（instance/zhycms.db）；不支持并发写入，<b>不要用于生产环境</b></small>
             </label>
           </div>
 

@@ -1,6 +1,7 @@
 """通用工具函数与模板过滤器注册 + RBAC 权限装饰器 + 审计日志快捷方法。"""
 from functools import wraps
 import json
+import re
 from datetime import datetime
 
 from flask import request, redirect, url_for, abort, flash, current_app
@@ -304,7 +305,7 @@ def register_template_filters(app):
         return text[:length] + '...' if len(text) > length else text
 
     @app.template_filter('audit_detail')
-    def audit_detail(value, maps=None):
+    def audit_detail(value, maps=None, compact=False):
         """审计日志详情人性化：JSON 转中文描述，普通字符串原样。
 
         - maps: {'roles': {id: 角色名}, 'columns': {id: 栏目名}}，用于把 ID 翻译成名称
@@ -395,6 +396,15 @@ def register_template_filters(app):
             except (ValueError, TypeError):
                 data = None
             if isinstance(data, dict):
+                if compact:
+                    # 紧凑单行摘要：最多前 3 个键，"标签：值"以 ； 分隔（用于仪表盘等窄列表格）
+                    items = []
+                    for k, v in list(data.items())[:3]:
+                        label = AUDIT_FIELD_LABELS.get(k, k)
+                        seg = re.sub(r'<[^>]+>', '', f'{label}：{fmt_value(v, k)}').strip()
+                        items.append(' '.join(seg.split()))
+                    text = '；'.join(items)
+                    return str(escape(text[:70])) + ('…' if len(text) > 70 else '')
                 parts = []
                 for k, v in data.items():
                     label = AUDIT_FIELD_LABELS.get(k, k)

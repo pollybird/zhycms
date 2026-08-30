@@ -302,7 +302,9 @@ def _setup_scheduler(app):
 
 def create_app(config_name=None):
     if config_name is None:
-        config_name = os.environ.get('ZHOCMS_ENV', 'default')
+        # ZHOCMS_ 为 v2.1 前旧前缀（历史拼写差异），保留兼容回退
+        config_name = (os.environ.get('ZHYCMS_ENV')
+                       or os.environ.get('ZHOCMS_ENV', 'default'))
 
     app = _AdminPrefixAwareFlask(__name__, instance_relative_config=False)
     app.config.from_object(config[config_name])

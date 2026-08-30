@@ -5,7 +5,7 @@
     .venv/bin/python scripts/upgrade_v2.py
 
     # 或显式指定数据库 URI
-    ZHOCMS_DB_URI='mysql+pymysql://user:pass@127.0.0.1:3306/zhycms?charset=utf8mb4' \
+    ZHYCMS_DB_URI='mysql+pymysql://user:pass@127.0.0.1:3306/zhycms?charset=utf8mb4' \
         .venv/bin/python scripts/upgrade_v2.py
 
 做了什么：

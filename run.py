@@ -4,7 +4,7 @@
     python run.py
 
 生产模式：
-    ZHOCMS_ENV=production python run.py
+    ZHYCMS_ENV=production python run.py
 """
 from app import create_app
 

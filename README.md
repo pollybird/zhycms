@@ -4,7 +4,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v2.1.0**（v2.0 八大能力之上完成一批体验与稳定性修复，详见 [v2.1.0 更新内容](#v210-更新内容)；八大模块说明见 [v2.0 更新亮点](#v20-更新亮点)）。**从 v1.1 升级请先阅读 [UPGRADE.md 升级迁移指南](UPGRADE.md) 并执行 `scripts/upgrade_v2.py`。**
+**当前版本：v2.1.1**（v2.0 八大能力之上持续打磨：环境变量前缀统一、项目治理文件补齐、SQLite 生产风险提示、仪表盘审计详情人性化，详见 [v2.1.1 更新内容](#v211-更新内容)；历史版本见 [v2.1.0 更新内容](#v210-更新内容)与 [v2.0 更新亮点](#v20-更新亮点)）。**从 v1.1 升级请先阅读 [UPGRADE.md 升级迁移指南](UPGRADE.md) 并执行 `scripts/upgrade_v2.py`。**
 
 ## 特性一览
 
@@ -16,6 +16,24 @@
 - **表单收集**：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，提交数据可导出；v2.0 支持提交后邮件/企业微信实时通知。
 - **SEO 优化**：每个栏目、文章可单独设置 SEO 标题/关键词/描述；v2.0 新增伪静态、sitemap/robots 自定义、页面缓存、图片默认 ALT。
 - **安全加固**：支持自定义后台路由前缀（如 `manage-x8y2`），v2.0 起**修改后即时生效无需重启**；登录防暴破锁定、图形验证码、异地登录提醒、RBAC 权限、审计日志、上传内容安全校验。
+
+## v2.1.1 更新内容
+
+v2.1.1（2026-08-29）为配置与治理完善版本，**无数据库结构变更，v2.1.0 直接覆盖代码即可升级**：
+
+### Changed
+
+- **环境变量前缀统一为 `ZHYCMS_`**（与项目名一致）：`ZHYCMS_ENV`、`ZHYCMS_SECRET_KEY`、`ZHYCMS_DB_URI`。旧前缀 `ZHOCMS_*`（历史拼写差异）仍被识别作为兼容回退，将在未来主版本移除；部署脚本/systemd 配置建议改用新前缀。
+- **初始化向导数据库选项重排**：MySQL/PostgreSQL（生产推荐徽标）置顶，SQLite 标注「仅开发/测试」；顶部新增 SQLite 并发写入风险提示。
+
+### Added
+
+- **项目治理文件**：`CONTRIBUTING.md`（贡献指南）、`CODE_OF_CONDUCT.md`（行为准则）、`SECURITY.md`（安全策略）、`CHANGELOG.md`（变更日志）。
+- **README 生产数据库提示**：环境要求明确标注「SQLite 仅用于开发/测试，生产环境请使用 MySQL 5.7+ 或 PostgreSQL 12+」。
+
+### Improved
+
+- **仪表盘「最近操作审计」详情人性化**：与审计日志页共用同一套中文化过滤器（`audit_detail` 紧凑模式），原始 JSON 变为「IP 地址：…；登录城市：…；异地登录：否」等单行中文摘要（最多 3 项、超长截断），ID 自动显示为角色/栏目名称。
 
 ## v2.1.0 更新内容
 
@@ -55,7 +73,9 @@ v2.0 围绕「企业级安全、可控、可运维」完成八大模块升级：
 ### 环境要求
 
 - Python 3.9+
-- SQLite（默认）或 MySQL/PostgreSQL
+- 数据库：SQLite（默认，**仅用于开发/测试**）或 **MySQL 5.7+ / PostgreSQL 12+（生产推荐）**
+
+> ⚠️ **SQLite 不支持并发写入，生产环境容易锁表**。正式站点请务必在初始化向导中选择 MySQL 或 PostgreSQL（需提前创建好目标数据库，MySQL 建议字符集 `utf8mb4`）。
 
 ### 安装与运行
 
@@ -80,7 +100,7 @@ python run.py
 ### 生产部署
 
 ```bash
-ZHOCMS_ENV=production ZHOCMS_SECRET_KEY=your-secret python run.py
+ZHYCMS_ENV=production ZHYCMS_SECRET_KEY=your-secret python run.py
 # 或使用 gunicorn
 gunicorn -w 4 -b 0.0.0.0:5000 "run:app"
 ```
@@ -267,6 +287,10 @@ v2.0 起全局注入 `frontend_pager_url(column, page)` 助手：伪静态开启
 伪静态开启时文章详情建议直接使用 `/{文章id}.html` 或保留原有 `url_for('frontend.article_detail', ...)`（前台会自动识别）。
 
 > 模板制作详情请参考 [app/utils/bootstrap.py](app/utils/bootstrap.py) 及 [app/utils/themes.py](app/utils/themes.py)。完整使用手册请浏览器打开 [wiki.html](wiki.html)。
+
+## 参与贡献
+
+欢迎报告问题与提交 PR，请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)（环境搭建/开发规范/提交规范）。变更历史见 [CHANGELOG.md](CHANGELOG.md)，社区规范见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)，漏洞报告请勿使用公开 Issue，详见 [SECURITY.md](SECURITY.md)。
 
 ## 许可证
 

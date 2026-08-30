@@ -5,7 +5,7 @@
 - 初始化向导选择数据库类型后，mysql/postgresql 的连接信息会以
   ``instance/db_config.json`` 落盘（chmod 600），SQLite 则清除该文件走默认。
 - 应用启动时的 URI 解析优先级见 ``app/config.py``：
-  环境变量 ``ZHOCMS_DB_URI`` > ``db_config.json`` > 默认 sqlite。
+  环境变量 ``ZHYCMS_DB_URI`` > ``db_config.json`` > 默认 sqlite。
 - 初始化过程中可用 ``switch_engine`` 热切换 SQLAlchemy 引擎，免重启即时生效。
 """
 import json

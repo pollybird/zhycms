@@ -44,8 +44,15 @@ def dashboard():
         'recent_logs': LoginLog.query.order_by(LoginLog.created_at.desc()).limit(8).all(),
         'recent_audits': AuditLog.query.order_by(AuditLog.created_at.desc()).limit(10).all(),
     }
+    # 仪表盘审计详情中文化的 ID→名称映射（与审计列表页同款）
+    from ..models.rbac import Role
+    dashboard_audit_maps = {
+        'roles': {r.id: r.name for r in Role.query.all()},
+        'columns': {c.id: c.name for c in Column.query.filter_by(is_deleted=False).all()},
+    }
     try:
         monitor = system_monitor_stats()
     except Exception:
         monitor = None
-    return render_template('admin/dashboard.html', stats=stats, monitor=monitor)
+    return render_template('admin/dashboard.html', stats=stats, monitor=monitor,
+                           dashboard_audit_maps=dashboard_audit_maps)
