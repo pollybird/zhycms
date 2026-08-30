@@ -5,7 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-## [2.1.1] - 2026-08-29
+## [2.1.1] - 2026-08-30
 
 配置与治理完善版本，**无数据库结构变更**，v2.1.0 直接覆盖代码即可升级。
 
