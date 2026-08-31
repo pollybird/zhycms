@@ -1,0 +1,9 @@
+{
+  "slug": "default",
+  "name": "经典默认",
+  "version": "2.2.0",
+  "description": "官方内置：经典默认主题，中性简洁风格，四套栏目/详情/单页/搜索/表单模板一应俱全，适合任何类型企业。",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

@@ -1,38 +1,60 @@
-"""友情链接管理。升级：权限 + 审计日志。"""
-from flask import (
-    render_template, redirect, url_for, request, flash
-)
+"""友情链接插件：后台管理。
 
-from ..extensions import db
-from ..models.friend_link import FriendLink
-from ..utils.helpers import permission_required, audit_log, clear_content_cache
-from ..utils.uploads import save_upload_file
-from ..models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRIEND_LINK
-from . import admin_bp
+路由挂在核心 admin_bp 上（endpoint 归入 admin.*，自动获得后台地址前缀
+即时生效机制），路径与核心版一致（/friend-links），老站书签/审计记录不受影响；
+未启用插件时所有路由 404（不暴露存在性），菜单本就隐藏。
+"""
+from functools import wraps
+
+from flask import render_template, redirect, url_for, request, flash, abort
+
+from app.extensions import db
+from app.admin import admin_bp
+from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
+from app.utils.helpers import permission_required, audit_log
+from app.utils.uploads import save_upload_file
+from app.plugin_system import plugin_enabled
+
+from .models import FriendLink
+
+AUDIT_MODULE = 'friend_link'
+
+
+def _gate(view):
+    """插件启用守卫：未启用 → 404。"""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not plugin_enabled('friend_link'):
+            abort(404)
+        return view(*args, **kwargs)
+    return wrapper
 
 
 @admin_bp.route('/friend-links')
-@permission_required('system:settings')
+@_gate
+@permission_required('friend_link:manage')
 def friend_link_index():
     links = FriendLink.query.filter_by(is_deleted=False).order_by(
         FriendLink.sort_order.desc(), FriendLink.created_at.desc()
     ).all()
-    return render_template('admin/friend_link/index.html', links=links)
+    return render_template('friend_link/index.html', links=links)
 
 
 @admin_bp.route('/friend-links/create', methods=['GET', 'POST'])
-@permission_required('system:settings')
+@_gate
+@permission_required('friend_link:manage')
 def friend_link_create():
     if request.method == 'POST':
         link = _save_link(None)
         if link is None:
             return redirect(url_for('admin.friend_link_create'))
         return redirect(url_for('admin.friend_link_index'))
-    return render_template('admin/friend_link/form.html', link=None)
+    return render_template('friend_link/form.html', link=None)
 
 
 @admin_bp.route('/friend-links/<int:lid>/edit', methods=['GET', 'POST'])
-@permission_required('system:settings')
+@_gate
+@permission_required('friend_link:manage')
 def friend_link_edit(lid):
     link = FriendLink.query.get_or_404(lid)
     if request.method == 'POST':
@@ -40,7 +62,7 @@ def friend_link_edit(lid):
         if updated is None:
             return redirect(url_for('admin.friend_link_edit', lid=lid))
         return redirect(url_for('admin.friend_link_index'))
-    return render_template('admin/friend_link/form.html', link=link)
+    return render_template('friend_link/form.html', link=link)
 
 
 def _save_link(link):
@@ -75,31 +97,39 @@ def _save_link(link):
     if is_new:
         db.session.add(link)
     db.session.commit()
+    audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE,
+              link.id, link.name, {'action': '链接', 'url': link.url})
     flash('友情链接已保存', 'success')
     return link
 
 
 @admin_bp.route('/friend-links/<int:lid>/delete', methods=['POST'])
-@permission_required('system:settings')
+@_gate
+@permission_required('friend_link:manage')
 def friend_link_delete(lid):
     link = FriendLink.query.get_or_404(lid)
     link.is_deleted = True
     db.session.commit()
+    audit_log(OP_DELETE, AUDIT_MODULE, link.id, link.name, {'action': '链接'})
     flash('已删除', 'success')
     return redirect(url_for('admin.friend_link_index'))
 
 
 @admin_bp.route('/friend-links/<int:lid>/toggle', methods=['POST'])
-@permission_required('system:settings')
+@_gate
+@permission_required('friend_link:manage')
 def friend_link_toggle(lid):
     link = FriendLink.query.get_or_404(lid)
     link.is_enabled = not link.is_enabled
     db.session.commit()
+    audit_log(OP_UPDATE, AUDIT_MODULE, link.id, link.name,
+              {'action': '启停切换', 'is_enabled': link.is_enabled})
     return redirect(url_for('admin.friend_link_index'))
 
 
 @admin_bp.route('/friend-links/batch', methods=['POST'])
-@permission_required('system:settings')
+@_gate
+@permission_required('friend_link:manage')
 def friend_link_batch():
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
@@ -109,11 +139,16 @@ def friend_link_batch():
 
     links = FriendLink.query.filter(FriendLink.id.in_(ids)).all()
     if action == 'enable':
-        for l in links: l.is_enabled = True
+        for l in links:
+            l.is_enabled = True
     elif action == 'disable':
-        for l in links: l.is_enabled = False
+        for l in links:
+            l.is_enabled = False
     elif action == 'delete':
-        for l in links: l.is_deleted = True
+        for l in links:
+            l.is_deleted = True
     db.session.commit()
+    audit_log(OP_BATCH, AUDIT_MODULE, None, None,
+              {'action': f'批量{action}', 'count': len(links)})
     flash('批量操作完成', 'success')
     return redirect(url_for('admin.friend_link_index'))

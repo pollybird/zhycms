@@ -1,0 +1,111 @@
+{% extends 'admin/base.html' %}
+{% set active_menu = 'recruit_app' %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-user-graduate"></i> 求职申请</h3>
+  </div>
+
+  <div class="card-body">
+    <form method="get" class="form-inline mb-2">
+      <select name="job_id" class="form-control form-control-sm mr-2" style="width:220px;">
+        <option value="">全部岗位</option>
+        {% for j in jobs %}
+        <option value="{{ j.id }}" {{ 'selected' if filter_job_id == j.id }}>{{ j.title }}</option>
+        {% endfor %}
+      </select>
+      <select name="status" class="form-control form-control-sm mr-2" style="width:140px;">
+        <option value="">全部状态</option>
+        {% for code, label in [('pending', '未处理'), ('viewed', '已查看'), ('pass', '录用'), ('reject', '不合适')] %}
+        <option value="{{ code }}" {{ 'selected' if status == code }}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-search"></i> 筛选</button>
+    </form>
+
+    <table class="table table-bordered table-hover">
+      <thead>
+        <tr>
+          <th width="110">姓名</th>
+          <th width="130">联系电话</th>
+          <th width="170">邮箱</th>
+          <th width="80">学历</th>
+          <th>应聘岗位</th>
+          <th width="130">简历</th>
+          <th width="90">处理状态</th>
+          <th width="150">提交时间</th>
+          <th width="200">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for a in apps %}
+        <tr>
+          <td><b>{{ a.name }}</b></td>
+          <td>{{ a.phone }}</td>
+          <td>{{ a.email or '—' }}</td>
+          <td>{{ a.education or '—' }}</td>
+          <td>{{ a.job.title if a.job else '（岗位已删除）' }}</td>
+          <td>
+            {% if a.resume_file %}
+            <a href="{{ url_for('admin.recruit_application_resume', aid=a.id) }}" class="text-primary"
+               style="font-size:12px;" title="{{ a.resume_name }}">
+              <i class="fas fa-file-download"></i> 下载简历</a>
+            {% else %}
+            <span class="text-muted" style="font-size:12px;">未上传</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.status == 'pending' %}<span class="badge badge-warning">未处理</span>
+            {% elif a.status == 'viewed' %}<span class="badge badge-info">已查看</span>
+            {% elif a.status == 'pass' %}<span class="badge badge-success">录用</span>
+            {% else %}<span class="badge badge-secondary">不合适</span>{% endif %}
+          </td>
+          <td class="text-muted" style="font-size:12px;">
+            {{ a.created_at.strftime('%Y-%m-%d %H:%M') }}<br>IP: {{ a.ip or '—' }}
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('admin.recruit_application_status', aid=a.id) }}"
+                  class="d-inline-flex align-items-center">
+              <input type="hidden" name="back_status" value="{{ status }}">
+              <input type="hidden" name="back_job_id" value="{{ filter_job_id or '' }}">
+              <select name="status" class="form-control form-control-sm" style="width:96px;">
+                <option value="pending" {{ 'selected' if a.status == 'pending' }}>未处理</option>
+                <option value="viewed" {{ 'selected' if a.status == 'viewed' }}>已查看</option>
+                <option value="pass" {{ 'selected' if a.status == 'pass' }}>录用</option>
+                <option value="reject" {{ 'selected' if a.status == 'reject' }}>不合适</option>
+              </select>
+              <button class="btn btn-outline-primary btn-sm ml-1" title="更新状态">
+                <i class="fas fa-check"></i></button>
+            </form>
+            <form method="post" action="{{ url_for('admin.recruit_application_delete', aid=a.id) }}" class="d-inline"
+                  onsubmit="return confirm('确认删除「{{ a.name }}」的申请记录？（简历文件保留在上传目录）')">
+              <button class="btn btn-outline-danger btn-sm"><i class="fas fa-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">暂无求职申请</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {% if pagination.pages > 1 %}
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="text-muted" style="font-size:13px;">共 {{ pagination.total }} 条</span>
+      <ul class="pagination pagination-sm m-0">
+        {% for p in pagination.iter_pages() %}
+          {% if p %}
+            <li class="page-item {{ 'active' if p == pagination.page }}">
+              <a class="page-link" href="{{ url_for('admin.recruit_application_index', page=p, job_id=filter_job_id or None, status=status or None) }}">{{ p }}</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

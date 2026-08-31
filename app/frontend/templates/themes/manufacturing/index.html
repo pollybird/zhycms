@@ -174,12 +174,15 @@
 </section>
 {% endif %}
 
-{# ===== 友情链接 ===== #}
+{# ===== 友情链接（friend_link 插件提供，插件未启用时自动隐藏） ===== #}
+{% set friend_links = friend_links() %}
 {% if friend_links %}
 <section class="py-3 border-top">
   <span class="text-muted mr-3"><i class="fas fa-link"></i> 友情链接：</span>
   {% for l in friend_links %}
-  <a href="{{ l.url }}" target="{{ l.target }}" class="mr-3">{{ l.name }}</a>
+  <a href="{{ l.url }}" target="{{ l.target }}" class="mr-3" title="{{ l.name }}">
+    {% if l.logo %}<img src="{{ l.logo }}" alt="{{ l.name }}" style="height:26px;vertical-align:middle;">{% else %}{{ l.name }}{% endif %}
+  </a>
   {% endfor %}
 </section>
 {% endif %}

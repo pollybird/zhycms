@@ -12,7 +12,6 @@ from . import dashboard  # noqa: E402,F401
 from . import column  # noqa: E402,F401
 from . import article  # noqa: E402,F401
 from . import fragment  # noqa: E402,F401
-from . import friend_link  # noqa: E402,F401
 from . import form  # noqa: E402,F401
 from . import setting  # noqa: E402,F401
 from . import upload  # noqa: E402,F401
@@ -24,3 +23,7 @@ from . import audit  # noqa: E402,F401
 from . import backup  # noqa: E402,F401
 # v2.2.0 插件管理
 from . import plugins  # noqa: E402,F401
+# v2.2.0 主题管理
+from . import themes   # noqa: E402,F401
+# v2.2.0 危险操作二次确认验证码（卸载插件/删除主题共用）
+from . import confirm  # noqa: E402,F401

@@ -1,0 +1,139 @@
+{% extends theme_base %}
+{% block title %}{{ job.title }} - 招贤纳士{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('recruit_frontend.job_list') }}">招贤纳士</a></li>
+    <li class="breadcrumb-item active">{{ job.title }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  <div class="col-md-8">
+    <h1>{{ job.title }}</h1>
+    <div class="text-muted mb-3">
+      {% if job.department %}<span class="mr-3"><i class="fas fa-sitemap"></i> {{ job.department }}</span>{% endif %}
+      {% if job.location %}<span class="mr-3"><i class="fas fa-map-marker-alt"></i> {{ job.location }}</span>{% endif %}
+      {% if job.headcount %}<span class="mr-3"><i class="fas fa-users"></i> 招聘 {{ job.headcount }} 人</span>{% endif %}
+      {% if job.salary %}<span class="mr-3"><i class="fas fa-yen-sign"></i> {{ job.salary }}</span>{% endif %}
+      <span>
+        {% if job.deadline %}
+        <i class="fas fa-hourglass-half"></i>
+        截止时间：<b class="{{ 'text-danger' if is_open else '' }}">{{ job.deadline.strftime('%Y-%m-%d %H:%M') }}</b>
+        {% else %}
+        <i class="fas fa-infinity"></i> 长期有效
+        {% endif %}
+      </span>
+    </div>
+
+    {% if job.description %}
+    <div class="article-content">
+      {{ job.description|safe }}
+    </div>
+    {% endif %}
+  </div>
+
+  {# ===== 申请表单（右侧栏） ===== #}
+  <div class="col-md-4">
+    {% if submitted %}
+    <div class="alert alert-success">
+      <h5 class="alert-heading"><i class="fas fa-check-circle"></i> 提交成功！</h5>
+      <p class="mb-0">您的求职申请已提交，我们会尽快与您联系。</p>
+    </div>
+    {% endif %}
+
+    {% if is_open %}
+    <div class="card">
+      <div class="card-header"><b><i class="fas fa-paper-plane"></i> 在线申请该职位</b></div>
+      <div class="card-body">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for cat, msg in messages %}
+          <div class="alert alert-{{ 'danger' if cat == 'danger' else ('warning' if cat == 'warning' else 'info') }} py-2">
+            {{ msg }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <form method="post" enctype="multipart/form-data"
+              action="{{ url_for('recruit_frontend.job_apply', jid=job.id) }}" autocomplete="off">
+          <div class="form-group">
+            <label>姓名 <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control form-control-sm" required maxlength="64">
+          </div>
+          <div class="form-group">
+            <label>联系电话 <span class="text-danger">*</span></label>
+            <input type="tel" name="phone" class="form-control form-control-sm" required maxlength="32">
+          </div>
+          <div class="form-group">
+            <label>邮箱</label>
+            <input type="email" name="email" class="form-control form-control-sm" maxlength="128">
+          </div>
+          <div class="form-group">
+            <label>最高学历</label>
+            <select name="education" class="form-control form-control-sm">
+              <option value="">请选择</option>
+              <option>初中及以下</option><option>高中/中专</option>
+              <option>大专</option><option>本科</option>
+              <option>硕士</option><option>博士</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>自我介绍 / 工作经历</label>
+            <textarea name="intro" rows="3" class="form-control form-control-sm" maxlength="2000"></textarea>
+          </div>
+          <div class="form-group">
+            <label>上传简历 <span class="text-danger">*</span></label>
+            <div class="custom-file">
+              <input type="file" name="resume" class="custom-file-input" id="resumeFile" required
+                     accept=".doc,.docx,.xls,.xlsx,.pdf">
+              <label class="custom-file-label" for="resumeFile" id="resumeFileLabel">选择文件</label>
+            </div>
+            <small class="text-muted d-block mt-1">支持 {{ resume_exts }} 格式，最大 10MB</small>
+          </div>
+          <div class="form-group">
+            <label>验证码 <span class="text-danger">*</span></label>
+            <div class="input-group input-group-sm">
+              <input type="text" name="captcha" class="form-control" placeholder="输入右侧验证码" required
+                     autocomplete="off" maxlength="6">
+              <div class="input-group-append">
+                <img src="{{ url_for('frontend.captcha') }}" alt="验证码" title="看不清？点击刷新"
+                     id="captcha-img" data-src="{{ url_for('frontend.captcha') }}"
+                     style="height:38px;cursor:pointer;border:1px solid #dee2e6;border-left:0;">
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">
+            <i class="fas fa-paper-plane"></i> 提交申请
+          </button>
+        </form>
+      </div>
+    </div>
+    <script>
+      // 简历文件名显示 + 验证码点击刷新
+      document.getElementById('resumeFile').addEventListener('change', function(){
+        document.getElementById('resumeFileLabel').textContent =
+          this.files.length ? this.files[0].name : '选择文件';
+      });
+      var capImg = document.getElementById('captcha-img');
+      capImg.addEventListener('click', function(){
+        this.src = this.getAttribute('data-src') + '?r=' + Date.now();
+      });
+    </script>
+    {% else %}
+    <div class="card bg-light">
+      <div class="card-body text-center">
+        <i class="fas fa-hourglass-end fa-2x text-muted mb-2"></i>
+        <h6 class="mb-1">招聘已截止</h6>
+        <p class="text-muted mb-0" style="font-size:13px;">
+          该岗位已于 {{ job.deadline.strftime('%Y-%m-%d %H:%M') if job.deadline else '' }}
+          停止接收申请，感谢您的关注。<br>
+          可返回<a href="{{ url_for('recruit_frontend.job_list') }}">岗位列表</a>
+          查看其他招聘中岗位。
+        </p>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

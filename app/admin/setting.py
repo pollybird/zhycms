@@ -18,7 +18,7 @@ from ..models.user import User, LoginLog
 from ..models.setting import Setting
 from ..utils.helpers import admin_required, permission_required, audit_log, clear_content_cache
 from ..utils.uploads import save_upload_file
-from ..utils.themes import list_themes
+from ..utils.themes import list_theme_templates
 from ..utils.admin_prefix import load_admin_prefix, validate_prefix, save_admin_prefix
 from ..models.audit import (
     OP_CONFIG_CHANGE, OP_UPDATE, MODULE_SETTING,
@@ -58,12 +58,10 @@ def setting_site():
     if request.method == 'POST':
         changed = {}
         for key in ('site_name', 'site_subtitle', 'site_close_reason',
-                    'footer_copyright', 'site_theme', 'site_status'):
+                    'footer_copyright', 'site_status'):
             val = (request.form.get(key) or '').strip()
             if key == 'site_status':
                 val = val or 'open'
-            if key == 'site_theme':
-                val = val or 'default'
             old = Setting.get(key)
             if old != val:
                 Setting.set(key, val)
@@ -92,7 +90,7 @@ def setting_site():
         return redirect(url_for('admin.setting_site'))
 
     return render_template('admin/setting/site.html',
-                           settings=Setting.get_dict(), themes=list_themes())
+                           settings=Setting.get_dict())
 
 
 # ============ SEO 默认 + SEO 高级（伪静态/sitemap/robots/缓存/图片ALT）============

@@ -1,0 +1,23 @@
+/* ZhyCMS 科技蓝主题样式（base.html 外置） */
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #333; background:#f5f8fc; }
+.navbar-brand img { max-height: 40px; }
+.navbar { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.footer { background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%); color: #e3f2fd; padding: 36px 0; margin-top: 50px; }
+.footer a { color: #bbdefb; }
+.footer a:hover { color: #fff; }
+.nav-item.dropdown:hover > .dropdown-menu { display: block; }
+.dropdown-menu { border-radius: 6px; border:none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.dropdown-item:hover { background:#e3f2fd; color:#1565c0; }
+.breadcrumb { background: transparent; padding: 0; }
+.article-content img { max-width: 100%; height: auto; }
+.article-content p { line-height: 1.8; margin-bottom: 1em; }
+.list-article { transition: all 0.2s; border-left: 3px solid transparent; }
+.list-article:hover { background: #e3f2fd; border-left-color: #1565c0; }
+.friend-link img { max-height: 50px; }
+.card { border: none; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card-header { background: #1565c0; color: #fff; border-radius: 8px 8px 0 0 !important; font-weight: 500; }
+.btn-primary { background:#1565c0; border-color:#1565c0; }
+.btn-primary:hover { background:#0d47a1; border-color:#0d47a1; }
+a { color:#1565c0; }
+a:hover { color:#0d47a1; }
+h1,h2,h3,h4,h5 { color:#0d47a1; }

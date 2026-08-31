@@ -74,6 +74,15 @@ class PluginBase:
         """
         return []
 
+    def get_frontend_menu(self):
+        """返回前台导航菜单项列表（v2.2.0）：
+        [{'label', 'url', 'target'}, ...]
+        - 仅启用插件的菜单项会出现在前台导航栏（追加在栏目之后）
+        - url 建议返回插件固定路由（如 '/jobs'）；target 为链接打开方式（'' 当前页）
+        - 归属栏目的插件（如产品）栏目本身已进导航，无需实现本钩子
+        """
+        return []
+
     def get_sitemap_urls(self):
         """yield {'loc', 'lastmod', 'changefreq', 'priority'}（loc 为完整 URL）。"""
         return []

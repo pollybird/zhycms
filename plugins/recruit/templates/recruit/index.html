@@ -1,0 +1,111 @@
+{% extends 'admin/base.html' %}
+{% set active_menu = 'recruit_job' %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-briefcase"></i> 招聘岗位</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.recruit_job_create') }}" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> 发布岗位</a>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <form method="get" class="form-inline mb-2">
+      <input type="text" name="keyword" value="{{ keyword }}" class="form-control form-control-sm mr-2"
+             placeholder="岗位名称关键词" style="width:200px;">
+      <select name="status" class="form-control form-control-sm mr-2" style="width:140px;">
+        <option value="">全部状态</option>
+        <option value="open" {{ 'selected' if status == 'open' }}>招聘中</option>
+        <option value="expired" {{ 'selected' if status == 'expired' }}>已截止</option>
+        <option value="disabled" {{ 'selected' if status == 'disabled' }}>已停用</option>
+      </select>
+      <button class="btn btn-sm btn-outline-secondary"><i class="fas fa-search"></i> 筛选</button>
+    </form>
+
+    <form method="post" action="{{ url_for('admin.recruit_job_batch') }}" id="jobBatchForm">
+      <table class="table table-bordered table-hover">
+        <thead>
+          <tr>
+            <th width="36"><input type="checkbox" onclick="document.querySelectorAll('input[name=\'ids[]\']').forEach(c => c.checked = this.checked)"></th>
+            <th>岗位名称</th>
+            <th width="90">招聘人数</th>
+            <th width="190">招聘截止时间</th>
+            <th width="90">申请数</th>
+            <th width="90">状态</th>
+            <th width="170">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for j in jobs %}
+          {% set expired = j.is_expired() %}
+          <tr>
+            <td><input type="checkbox" name="ids[]" value="{{ j.id }}"></td>
+            <td>
+              <b>{{ j.title }}</b>
+              <div class="text-muted" style="font-size:12px;">
+                {% if j.department %}<span class="mr-2"><i class="fas fa-sitemap"></i> {{ j.department }}</span>{% endif %}
+                {% if j.location %}<span class="mr-2"><i class="fas fa-map-marker-alt"></i> {{ j.location }}</span>{% endif %}
+                {% if j.salary %}<span><i class="fas fa-yen-sign"></i> {{ j.salary }}</span>{% endif %}
+              </div>
+            </td>
+            <td>{{ j.headcount or '若干' }}</td>
+            <td>
+              {% if j.deadline %}
+                {{ j.deadline.strftime('%Y-%m-%d %H:%M') }}
+                {% if expired %}
+                  <span class="badge badge-secondary">已截止</span>
+                {% else %}
+                  <span class="text-muted" style="font-size:12px;">招聘中</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">长期有效</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('admin.recruit_application_index', job_id=j.id) }}"
+                 class="badge badge-info" title="查看该岗位申请">{{ j.applications_count() }}</a>
+            </td>
+            <td>
+              {% if j.is_enabled %}
+              <span class="badge badge-success">启用</span>
+              {% else %}
+              <span class="badge badge-secondary">停用</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('admin.recruit_job_edit', jid=j.id) }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-edit"></i> 编辑</a>
+              <form method="post" action="{{ url_for('admin.recruit_job_delete', jid=j.id) }}" class="d-inline"
+                    onsubmit="return confirm('确认删除岗位「{{ j.title }}」？删除后前台不再展示（申请记录保留）。')">
+                <button class="btn btn-outline-danger btn-sm"><i class="fas fa-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">暂无岗位，点击右上角「发布岗位」开始招聘</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </form>
+
+    {% if pagination.pages > 1 %}
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="text-muted" style="font-size:13px;">共 {{ pagination.total }} 条</span>
+      <ul class="pagination pagination-sm m-0">
+        {% for p in pagination.iter_pages() %}
+          {% if p %}
+            <li class="page-item {{ 'active' if p == pagination.page }}">
+              <a class="page-link" href="{{ url_for('admin.recruit_job_index', page=p, keyword=keyword, status=status) }}">{{ p }}</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

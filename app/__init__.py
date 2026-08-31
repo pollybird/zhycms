@@ -428,6 +428,21 @@ def create_app(config_name=None):
         except Exception:
             pass
 
+        # ===== v2.2 升级兼容：老站点一次性自动启用内置友情链接插件 =====
+        # 新装站点在初始化向导中写入 friend_link_plugin_migrated 标记，
+        # 只有缺失该标记的已初始化站点（v2.1 及以前升级）才自动启用一次；
+        # 表名/审计模块代码与核心版一致，老数据与历史审计无缝保留。
+        try:
+            from .models.setting import Setting
+            from .plugin_system import enable_plugin
+            if (User.query.filter_by(is_deleted=False).first() is not None
+                    and not Setting.get('friend_link_plugin_migrated')):
+                enable_plugin('friend_link')
+                Setting.set('friend_link_plugin_migrated', '1')
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     # 未初始化拦截：后台与前台除初始化页外，都跳转
     @app.before_request
     def _check_initialized():

@@ -1,0 +1,71 @@
+{% extends theme_base %}
+{% block title %}{{ seo.title }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
+    <li class="breadcrumb-item active">招贤纳士</li>
+  </ol>
+</nav>
+
+<h1 class="mb-4"><i class="fas fa-briefcase"></i> 招贤纳士</h1>
+
+{# ===== 招聘中 ===== #}
+<h4 class="mb-3"><span class="badge badge-success">招聘中</span></h4>
+{% if open_jobs %}
+<div class="row">
+  {% for j in open_jobs %}
+  <div class="col-md-6 mb-3">
+    <div class="card h-100">
+      <div class="card-body d-flex flex-column">
+        <h5 class="card-title mb-2">
+          {{ j.title }}
+          {% if j.headcount %}<span class="badge badge-light border">招{{ j.headcount }}人</span>{% endif %}
+        </h5>
+        <div class="text-muted mb-2" style="font-size:13px;">
+          {% if j.department %}<span class="mr-2"><i class="fas fa-sitemap"></i> {{ j.department }}</span>{% endif %}
+          {% if j.location %}<span class="mr-2"><i class="fas fa-map-marker-alt"></i> {{ j.location }}</span>{% endif %}
+          {% if j.salary %}<span><i class="fas fa-yen-sign"></i> {{ j.salary }}</span>{% endif %}
+        </div>
+        <div class="mt-auto d-flex justify-content-between align-items-center">
+          <span class="text-muted" style="font-size:12px;">
+            {% if j.deadline %}<i class="fas fa-hourglass-half"></i> 截止：{{ j.deadline }}
+            {% else %}<i class="fas fa-infinity"></i> 长期有效{% endif %}
+          </span>
+          <a href="{{ recruit_job_url(j) }}" class="btn btn-primary btn-sm">查看详情 / 投递简历</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">当前暂无招聘中的岗位，感谢您的关注！</div>
+{% endif %}
+
+{# ===== 已截止 ===== #}
+{% if closed_jobs %}
+<hr class="my-4">
+<h4 class="mb-3"><span class="badge badge-secondary">已截止</span></h4>
+<div class="row">
+  {% for j in closed_jobs %}
+  <div class="col-md-6 mb-3">
+    <div class="card h-100 bg-light">
+      <div class="card-body text-muted">
+        <h5 class="card-title mb-2" style="font-size:1.05rem;">{{ j.title }}</h5>
+        <div class="mb-2" style="font-size:13px;">
+          {% if j.department %}<span class="mr-2">{{ j.department }}</span>{% endif %}
+          {% if j.location %}<span class="mr-2">{{ j.location }}</span>{% endif %}
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <span style="font-size:12px;"><i class="fas fa-hourglass-end"></i> 已于 {{ j.deadline }} 截止</span>
+          <a href="{{ recruit_job_url(j) }}" class="btn btn-outline-secondary btn-sm">查看详情</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

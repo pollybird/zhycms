@@ -1,0 +1,125 @@
+{% extends 'admin/base.html' %}
+{% set active_menu = 'recruit_job' %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-briefcase"></i> {{ '编辑岗位' if job else '发布岗位' }}</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.recruit_job_index') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="fas fa-arrow-left"></i> 返回列表</a>
+    </div>
+  </div>
+  <form method="post" id="job-form" autocomplete="off">
+    <div class="card-body">
+      <div class="form-group">
+        <label>岗位名称 <span class="text-danger">*</span></label>
+        <input type="text" name="title" class="form-control" required maxlength="200"
+               value="{{ job.title if job else '' }}" placeholder="如：机械设计工程师">
+      </div>
+      <div class="row">
+        <div class="col-md-3 form-group">
+          <label>所属部门</label>
+          <input type="text" name="department" class="form-control" maxlength="100"
+                 value="{{ job.department if job and job.department else '' }}" placeholder="如：技术部">
+        </div>
+        <div class="col-md-3 form-group">
+          <label>工作地点</label>
+          <input type="text" name="location" class="form-control" maxlength="200"
+                 value="{{ job.location if job and job.location else '' }}" placeholder="如：江苏泰州">
+        </div>
+        <div class="col-md-3 form-group">
+          <label>招聘人数</label>
+          <input type="number" name="headcount" min="0" class="form-control"
+                 value="{{ job.headcount if job and job.headcount else 1 }}" placeholder="0 表示若干">
+        </div>
+        <div class="col-md-3 form-group">
+          <label>薪资待遇</label>
+          <input type="text" name="salary" class="form-control" maxlength="100"
+                 value="{{ job.salary if job and job.salary else '' }}" placeholder="如：6000-9000 元/月">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>招聘截止时间
+          <span class="text-muted" style="font-size:12px;">
+            （留空表示长期有效；超过该时间后前台关闭投递入口，仅展示「已截止」提示）
+          </span>
+        </label>
+        <input type="datetime-local" name="deadline" class="form-control" style="max-width:280px;"
+               value="{{ job.deadline.strftime('%Y-%m-%dT%H:%M') if job and job.deadline else '' }}">
+      </div>
+      <div class="form-group">
+        <label>岗位介绍（岗位职责、任职要求等）</label>
+        <textarea name="description" id="content" rows="4">{{ job.description if job and job.description else '' }}</textarea>
+      </div>
+      <div class="row">
+        <div class="col-md-3 form-group">
+          <label>排序（大值靠前）</label>
+          <input type="number" name="sort_order" class="form-control"
+                 value="{{ job.sort_order if job and job.sort_order else 0 }}">
+        </div>
+        <div class="col-md-9 form-group">
+          <label class="d-block">&nbsp;</label>
+          <div class="custom-control custom-switch">
+            <input type="checkbox" class="custom-control-input" id="is_enabled" name="is_enabled"
+                   {{ 'checked' if not job or job.is_enabled }}>
+            <label class="custom-control-label" for="is_enabled">启用（前台展示该岗位）</label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer">
+      <button class="btn btn-primary"><i class="fas fa-save"></i> 保存</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
+<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
+<style>
+  .ck.ck-editor__editable_inline { min-height: 320px; }
+</style>
+<script>
+  // 提交前把编辑器内容写回 textarea
+  let recruitEditor = null;
+  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), {
+    licenseKey: 'GPL',
+    language: 'zh-cn',
+    placeholder: '在此输入岗位职责、任职要求……',
+    toolbar: {
+      items: [
+        'undo', 'redo', '|',
+        'heading', '|',
+        'bold', 'italic', 'underline', '|',
+        'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+        'link', 'imageUpload', 'insertTable', 'blockQuote', '|',
+        'removeFormat', 'sourceEditing'
+      ],
+      shouldNotGroupWhenFull: true
+    },
+    removePlugins: [
+      'AIAssistant', 'AITextAdapter', 'OpenAITextAdapter', 'AWSTextAdapter',
+      'CKBox', 'CKFinder', 'EasyImage', 'RealTimeCollaborativeComments',
+      'RealTimeCollaborativeTrackChanges', 'RealTimeCollaborativeRevisionHistory',
+      'PresenceList', 'Comments', 'TrackChanges', 'TrackChangesData', 'RevisionHistory',
+      'Pagination', 'WProofreader', 'MathType', 'SlashCommand', 'Template',
+      'DocumentOutline', 'FormatPainter', 'TableOfContents', 'PasteFromOfficeEnhanced',
+      'CaseChange'
+    ],
+    image: {
+      toolbar: ['imageTextAlternative', 'toggleImageCaption', '|',
+                'imageStyle:inline', 'imageStyle:block', 'imageStyle:side']
+    },
+    table: {
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+    },
+    simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=recruit' }
+  }).then(e => { recruitEditor = e; }).catch(err => console.error(err));
+
+  document.getElementById('job-form').addEventListener('submit', function(){
+    if (recruitEditor) document.querySelector('#content').value = recruitEditor.getData();
+  });
+</script>
+{% endblock %}

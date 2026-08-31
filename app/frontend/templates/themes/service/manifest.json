@@ -1,0 +1,9 @@
+{
+  "slug": "service",
+  "name": "服务业",
+  "version": "2.2.0",
+  "description": "官方内置：服务业主题，柔和色块+服务项目卡片，适合咨询、培训、服务外包等轻资产行业。",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

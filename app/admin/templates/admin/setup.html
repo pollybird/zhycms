@@ -185,14 +185,15 @@
         <div class="form-group">
           <label><strong>功能插件</strong></label>
           <small class="text-muted d-block mb-2">
-            勾选要启用的官方插件，初始化后可在「后台 → 插件管理」随时启用/停用。
+            勾选要启用的官方插件，初始化后可在「后台 → 插件管理」随时启用/停用。<br>
+            选择行业演示数据时，<b>轮播图、友情链接</b>（选制造业另含<b>产品展示</b>）会自动启用，无需勾选。
           </small>
           <div class="icheck-primary d-block mb-2">
             <input type="checkbox" id="plug_banner" name="plugins" value="banner" {{ 'checked' if 'banner' in (plugins or []) else '' }}>
             <label for="plug_banner">
               <strong>轮播图</strong>
               <small class="text-muted d-block">
-                首页幻灯片/广告位分组管理，模板 banner_items() 一行调用，替代碎片拼轮播
+                首页幻灯片/广告位分组管理，模板 banner_items() 一行调用；初始化轮播数据由本插件生成（不再使用碎片）
               </small>
             </label>
           </div>
@@ -202,6 +203,15 @@
               <strong>产品展示</strong>
               <small class="text-muted d-block">
                 产品多图相册与规格参数表，区别普通文章，适合制造业企业；演示数据含产品示例（仅制造业）
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block">
+            <input type="checkbox" id="plug_friend_link" name="plugins" value="friend_link" {{ 'checked' if 'friend_link' in (plugins or []) else '' }}>
+            <label for="plug_friend_link">
+              <strong>友情链接</strong>
+              <small class="text-muted d-block">
+                站点友情链接管理，前台模板 friend_links() 一行调用；演示数据含 3 条示例链接
               </small>
             </label>
           </div>

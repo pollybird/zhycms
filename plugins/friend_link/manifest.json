@@ -1,0 +1,9 @@
+{
+  "slug": "friend_link",
+  "name": "友情链接",
+  "version": "1.0.0",
+  "description": "站点友情链接管理：名称/LOGO/排序/启停，首页主题模板自动展示，v2.2.0 起由核心功能转为插件",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "min_core_version": "2.2.0"
+}

@@ -1,0 +1,9 @@
+{
+  "slug": "manufacturing",
+  "name": "制造业",
+  "version": "2.2.0",
+  "description": "官方内置：制造业主题，首页大图Banner+产品橱窗布局，适合工厂、机械设备、制造业企业；启用产品插件自动展示产品卡片。",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

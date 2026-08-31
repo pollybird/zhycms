@@ -74,7 +74,8 @@
     </div>
     {% endif %}
 
-    {# 友情链接 #}
+    {# 友情链接（friend_link 插件提供，插件未启用时自动隐藏） #}
+    {% set friend_links = friend_links() %}
     {% if friend_links %}
     <div class="card">
       <div class="card-header"><i class="fas fa-link"></i> 友情链接</div>

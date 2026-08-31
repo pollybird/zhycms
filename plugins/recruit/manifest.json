@@ -1,0 +1,9 @@
+{
+  "slug": "recruit",
+  "name": "招聘管理",
+  "version": "1.0.0",
+  "description": "招聘岗位发布与在线求职申请：岗位介绍、招聘截止时间、简历上传（word/excel/pdf），截止后自动关闭提交，适合企业招贤纳士",
+  "author": "ZhyCMS 社区示例",
+  "builtin": false,
+  "min_core_version": "2.2.0"
+}

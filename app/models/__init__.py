@@ -2,7 +2,6 @@ from .user import User, LoginLog
 from .column import Column, ColumnField, ColumnFieldValue
 from .article import Article, ArticleFieldValue
 from .fragment import Fragment, FragmentGroup
-from .friend_link import FriendLink
 from .form import Form, FormField, FormSubmission, FormSubmissionValue
 from .setting import Setting
 from .rbac import (
@@ -12,7 +11,7 @@ from .rbac import (
 )
 from .audit import (
     AuditLog, OP_TYPE_CHOICES, MODULE_USER, MODULE_ROLE, MODULE_COLUMN, MODULE_ARTICLE,
-    MODULE_FRAGMENT, MODULE_FRIEND_LINK, MODULE_FORM, MODULE_FORM_SUBMISSION, MODULE_SETTING,
+    MODULE_FRAGMENT, MODULE_FORM, MODULE_FORM_SUBMISSION, MODULE_SETTING,
     MODULE_AUDIT, MODULE_BACKUP, MODULE_UPLOAD, MODULE_OTHER,
     OP_LOGIN, OP_LOGOUT, OP_CREATE, OP_UPDATE, OP_DELETE, OP_PUBLISH, OP_ARCHIVE,
     OP_REVIEW_PASS, OP_REVIEW_REJECT, OP_BATCH, OP_ROLLBACK, OP_CONFIG_CHANGE,
@@ -30,7 +29,6 @@ __all__ = [
     'Column', 'ColumnField', 'ColumnFieldValue',
     'Article', 'ArticleFieldValue',
     'Fragment', 'FragmentGroup',
-    'FriendLink',
     'Form', 'FormField', 'FormSubmission', 'FormSubmissionValue',
     'Setting',
     # RBAC
@@ -40,7 +38,7 @@ __all__ = [
     # Audit
     'AuditLog', 'OP_TYPE_CHOICES',
     'MODULE_USER', 'MODULE_ROLE', 'MODULE_COLUMN', 'MODULE_ARTICLE',
-    'MODULE_FRAGMENT', 'MODULE_FRIEND_LINK', 'MODULE_FORM', 'MODULE_FORM_SUBMISSION',
+    'MODULE_FRAGMENT', 'MODULE_FORM', 'MODULE_FORM_SUBMISSION',
     'MODULE_SETTING', 'MODULE_AUDIT', 'MODULE_BACKUP', 'MODULE_UPLOAD', 'MODULE_OTHER',
     'OP_LOGIN', 'OP_LOGOUT', 'OP_CREATE', 'OP_UPDATE', 'OP_DELETE',
     'OP_PUBLISH', 'OP_ARCHIVE', 'OP_REVIEW_PASS', 'OP_REVIEW_REJECT',

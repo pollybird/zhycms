@@ -47,7 +47,7 @@ def _is_initialized():
 
 
 # 向导可勾选的官方插件（与 plugins/ 目录一一对应；第三方插件请在插件管理页启用）
-SETUP_PLUGINS = ('banner', 'product')
+SETUP_PLUGINS = ('banner', 'product', 'friend_link')
 
 
 def _form_ctx(request):
@@ -145,10 +145,18 @@ def setup():
             return redirect(url_for('admin_auth.login'))
 
         if demo_type in ('manufacturing', 'service'):
-            # v2.2.0：先启用向导勾选的插件（种子权限/建表/写启用清单），
-            # 再生成核心演示数据，最后调用插件演示数据钩子（轮播图/产品）
+            # v2.2.0：行业演示数据与官方插件联动 —— 轮播图、友情链接在两个
+            # 行业模板下均强制启用；制造业演示数据的产品页依赖 product 插件
+            # （多图相册/规格参数/伪静态详情，演示钩子会把产品子栏目切换为
+            # list_product 模板），同样强制启用。
+            # 不生成演示数据时，仍按向导勾选启用。
             from ..plugin_system import enable_plugin, run_demo_data_hooks
-            for slug in ctx['plugins']:
+            auto_plugins = {'banner', 'friend_link'}
+            if demo_type == 'manufacturing':
+                auto_plugins.add('product')
+            for slug in dict.fromkeys(list(ctx['plugins']) + sorted(auto_plugins)):
+                if slug not in SETUP_PLUGINS:
+                    continue
                 err = enable_plugin(slug)
                 if err:
                     flash(f'插件启用失败：{err}', 'warning')
@@ -172,7 +180,7 @@ def setup():
 
         return redirect(url_for('admin_auth.login'))
 
-    # 默认勾选官方轮播图 + 产品插件（可取消）
+    # 默认勾选官方轮播图 + 产品插件（可取消；选择行业演示数据时会自动补齐联动插件）
     return render_template('admin/setup.html', plugins=list(SETUP_PLUGINS))
 
 

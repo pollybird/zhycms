@@ -1,6 +1,11 @@
+"""友情链接插件：数据模型。
+
+FriendLink  友情链接（名称/URL/LOGO/排序/启停/软删除）
+表结构沿用核心迁移前定义（friend_links），旧站点升级后数据无缝保留。
+"""
 from datetime import datetime
 
-from ..extensions import db
+from app.extensions import db
 
 
 class FriendLink(db.Model):
@@ -16,4 +21,5 @@ class FriendLink(db.Model):
     target = db.Column(db.String(16), default='_blank')  # _self / _blank
     remark = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now,
+                           onupdate=datetime.now, nullable=False)

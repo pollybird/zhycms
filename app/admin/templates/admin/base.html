@@ -96,14 +96,6 @@
           </li>
           {% endif %}
 
-          {% if current_user.has_permission('system:settings') %}
-          <li class="nav-item">
-            <a href="{{ url_for('admin.friend_link_index') }}" class="nav-link {{ 'active' if active_menu == 'friend_link' }}">
-              <i class="nav-icon fas fa-link"></i><p>友情链接</p>
-            </a>
-          </li>
-          {% endif %}
-
           {% if current_user.has_permission('form:view') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('form') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('form') }}">
@@ -261,6 +253,11 @@
               <li class="nav-item">
                 <a href="{{ url_for('admin.plugin_index') }}" class="nav-link {{ 'active' if active_menu == 'plugin' }}">
                   <i class="far fa-circle nav-icon"></i><p>插件管理</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.theme_index') }}" class="nav-link {{ 'active' if active_menu == 'theme' }}">
+                  <i class="far fa-circle nav-icon"></i><p>主题管理</p>
                 </a>
               </li>
               <li class="nav-item">

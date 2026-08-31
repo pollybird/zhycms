@@ -36,14 +36,12 @@
             <label>关闭原因（站点关闭时显示）</label>
             <textarea name="site_close_reason" rows="2" class="form-control">{{ settings.site_close_reason }}</textarea>
           </div>
-          <div class="form-group">
-            <label>前台主题</label>
-            <select name="site_theme" class="form-control">
-              {% for name, label in themes %}
-              <option value="{{ name }}" {{ 'selected' if settings.site_theme == name }}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <small class="form-text text-muted">切换前台站点使用的模板主题，主题目录位于 app/frontend/templates/themes/</small>
+          <div class="callout callout-info py-2 px-3" style="font-size:14px;">
+            <b>前台主题</b>的切换入口已迁移到：
+            <a href="{{ url_for('admin.theme_index') }}">
+              <i class="fas fa-palette mr-1"></i>系统设置 → 主题管理
+            </a>。
+            当前启用主题：<b>{{ settings.site_theme or 'default' }}</b>
           </div>
         </div>
       </div>

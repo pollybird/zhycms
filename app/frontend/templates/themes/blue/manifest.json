@@ -1,0 +1,9 @@
+{
+  "slug": "blue",
+  "name": "科技蓝",
+  "version": "2.2.0",
+  "description": "官方内置：科技蓝主题，蓝色系渐变+卡片风格，适合科技、软件、互联网企业。",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

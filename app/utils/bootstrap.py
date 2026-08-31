@@ -14,7 +14,6 @@ from ..models.setting import Setting
 from ..models.column import Column, ColumnField, ColumnFieldValue
 from ..models.article import Article, ArticleFieldValue
 from ..models.fragment import Fragment, FragmentGroup
-from ..models.friend_link import FriendLink
 from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
 
 
@@ -27,6 +26,9 @@ def init_default_settings():
     for key, value in Setting.DEFAULTS.items():
         if not Setting.query.filter_by(key=key).first():
             db.session.add(Setting(key=key, value=str(value), description=key))
+    # 标记为新装站点：v2.2 升级兼容逻辑（create_app 中老站自动启用
+    # 友情链接插件）仅对没有本标记的已初始化站点生效
+    Setting.set('friend_link_plugin_migrated', '1')
     db.session.commit()
 
 
@@ -82,7 +84,10 @@ def generate_demo_data(industry='manufacturing'):
 
 
 def _clean_demo_data():
-    """清理旧的演示数据（栏目/文章/碎片/友情链接/表单），保留用户与站点设置。"""
+    """清理旧的演示数据（栏目/文章/碎片/表单），保留用户与站点设置。
+
+    友情链接改由 friend_link 插件演示数据钩子负责清理与重建。
+    """
     # 按外键依赖顺序删除
     FormSubmissionValue.query.delete()
     FormSubmission.query.delete()
@@ -95,7 +100,6 @@ def _clean_demo_data():
     Column.query.delete()
     Fragment.query.delete()
     FragmentGroup.query.delete()
-    FriendLink.query.delete()
     db.session.commit()
 
 
@@ -224,9 +228,6 @@ def _generate_manufacturing_demo():
 
     # ============ 碎片 ============
     _mfg_init_fragments(company, brand)
-
-    # ============ 友情链接 ============
-    _init_friend_links(industry='manufacturing')
 
     # ============ 表单 ============
     _init_forms()
@@ -403,15 +404,8 @@ def _mfg_init_fragments(company, brand):
                  field_type='richtext',
                  value=f'<p>欢迎访问{company}官方网站！专注精密机械制造二十余年。</p>',
                  sort_order=100, is_enabled=True),
-        Fragment(name='首页轮播图1', slug='home_banner_1', group_id=grp_home.id,
-                 field_type='image', value=f'{_DEMO_IMG}/mfg_factory.jpg',
-                 sort_order=90, is_enabled=True),
-        Fragment(name='首页轮播图2', slug='home_banner_2', group_id=grp_home.id,
-                 field_type='image', value=f'{_DEMO_IMG}/mfg_workshop.jpg',
-                 sort_order=80, is_enabled=True),
-        Fragment(name='首页轮播图3', slug='home_banner_3', group_id=grp_home.id,
-                 field_type='image', value=f'{_DEMO_IMG}/mfg_team.jpg',
-                 sort_order=70, is_enabled=True),
+        # 首页轮播图 v2.2.0 起由 banner 插件演示钩子生成（home-hero 分组），
+        # 不再写入 home_banner_* 碎片
     ]
     db.session.add_all(fragments)
 
@@ -561,9 +555,6 @@ def _generate_service_demo():
 
     # ============ 碎片 ============
     _svc_init_fragments(company, brand)
-
-    # ============ 友情链接 ============
-    _init_friend_links(industry='service')
 
     # ============ 表单 ============
     _init_forms()
@@ -766,15 +757,8 @@ def _svc_init_fragments(company, brand):
                  field_type='richtext',
                  value=f'<p>欢迎访问{company}官方网站！专业企业管理咨询服务商。</p>',
                  sort_order=100, is_enabled=True),
-        Fragment(name='首页轮播图1', slug='home_banner_1', group_id=grp_home.id,
-                 field_type='image', value=f'{_DEMO_IMG}/svc_office.jpg',
-                 sort_order=90, is_enabled=True),
-        Fragment(name='首页轮播图2', slug='home_banner_2', group_id=grp_home.id,
-                 field_type='image', value=f'{_DEMO_IMG}/svc_meeting.jpg',
-                 sort_order=80, is_enabled=True),
-        Fragment(name='首页轮播图3', slug='home_banner_3', group_id=grp_home.id,
-                 field_type='image', value=f'{_DEMO_IMG}/svc_team.jpg',
-                 sort_order=70, is_enabled=True),
+        # 首页轮播图 v2.2.0 起由 banner 插件演示钩子生成（home-hero 分组），
+        # 不再写入 home_banner_* 碎片
     ]
     db.session.add_all(fragments)
 
@@ -798,29 +782,6 @@ def _add_article(column, title, summary, content, published_at, sort_order=50, c
         cover=cover,
     )
     db.session.add(article)
-
-
-def _init_friend_links(industry='manufacturing'):
-    """初始化友情链接。"""
-    if industry == 'service':
-        links = [
-            FriendLink(name='中国管理咨询网', url='https://www.mckinsey.com.cn/',
-                       target='_blank', sort_order=100, is_enabled=True),
-            FriendLink(name='中国企业联合会', url='https://www.cec-ceda.org.cn/',
-                       target='_blank', sort_order=90, is_enabled=True),
-            FriendLink(name='人力资源市场', url='https://www.zhaopin.com/',
-                       target='_blank', sort_order=80, is_enabled=True),
-        ]
-    else:
-        links = [
-            FriendLink(name='工业和信息化部', url='https://www.miit.gov.cn/',
-                       target='_blank', sort_order=100, is_enabled=True),
-            FriendLink(name='国家市场监督管理总局', url='https://www.samr.gov.cn/',
-                       target='_blank', sort_order=90, is_enabled=True),
-            FriendLink(name='中国机械工业联合会', url='https://www.cmif.org.cn/',
-                       target='_blank', sort_order=80, is_enabled=True),
-        ]
-    db.session.add_all(links)
 
 
 def _init_forms():

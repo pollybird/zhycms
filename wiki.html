@@ -88,13 +88,24 @@
   <a href="#sec-audit" class="sub">审计日志</a>
   <a href="#api" style="margin-top:8px;background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十四、REST 内容 API（v2.2）</a>
   <a href="#plugins" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十五、插件机制（v2.2）</a>
-  <a href="#plugin-dev" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十六、插件开发指引（v2.2）</a>
+  <a href="#plugin-dev" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十六、插件开发指南（招聘样板）</a>
+  <a href="#pd-req" class="sub">需求拆解</a>
+  <a href="#pd-layout" class="sub">目录结构与 manifest</a>
+  <a href="#pd-manifest" class="sub">插件入口</a>
+  <a href="#pd-models" class="sub">数据模型</a>
+  <a href="#pd-admin" class="sub">后台管理路由</a>
+  <a href="#pd-frontend" class="sub">前台蓝图与模板函数</a>
+  <a href="#pd-upload" class="sub">表单与文件上传</a>
+  <a href="#pd-nav" class="sub">前台导航贡献</a>
+  <a href="#pd-lifecycle" class="sub">上传/下载/卸载</a>
+  <a href="#pd-test" class="sub">自测清单</a>
+  <a href="#theme-mgr" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十七、主题管理（v2.2）</a>
 </nav>
 
 <main>
 <header class="hero">
   <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.2.0</span></h1>
-  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>REST 内容 API</b> · <b>插件机制与开发指引</b> · <b>v1.1&rarr;v2.0 升级迁移</b></p>
+  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>REST 内容 API</b> · <b>插件机制与开发指引</b> · <b>主题管理</b> · <b>v1.1&rarr;v2.0 升级迁移</b></p>
 </header>
 
 <section id="intro">
@@ -108,13 +119,14 @@
 <h2>特性一览</h2>
 <ul>
   <li><b>多主题模板系统</b>：前台模板按主题组织，后台一键切换。内置 <code>default</code>、<code>blue</code> 两套通用聚合主题，以及 <code>manufacturing</code>（制造业）、<code>service</code>（服务业）两套行业专用主题。</li>
-  <li><b>演示数据一键生成</b>：初始化时可选「制造业」或「服务业」示例，自动生成栏目、文章、碎片、友情链接与演示图片并切换主题。</li>
+  <li><b>演示数据一键生成</b>：初始化时可选「制造业」或「服务业」示例，自动生成栏目、文章、碎片与演示图片并切换主题；勾选的官方插件还会通过演示数据钩子生成轮播图、产品、友情链接示例数据。</li>
   <li><b>CMS 标识与企业标识分离</b>：后台 CMS 名称/版权固定不可改，前台网站名称/版权可独立配置。</li>
   <li><b>栏目级模板选择</b>：每个栏目可指定独立的列表页/内容页/单页模板，未指定自动回退默认。</li>
   <li><b>自定义字段</b>：栏目和文章支持自定义字段（文本/富文本/图片/文件/URL/数字等）。</li>
   <li><b>表单收集</b>：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，带图形验证码防刷，提交数据可导出；<span class="tag">v2.0</span> 支持提交后邮件/企业微信实时通知。</li>
-  <li><b>SEO 优化 / 碎片管理 / 友情链接 / 图片上传 / 验证码登录 / 首次初始化引导</b>。</li>
+  <li><b>SEO 优化 / 碎片管理 / 图片上传 / 验证码登录 / 首次初始化引导</b>。</li>
   <li><span class="tag">v2.0</span> <b>企业级能力</b>：RBAC 角色权限、审计日志、内容工作流与版本还原、数据库备份恢复、登录防暴破、上传内容安全校验、伪静态与页面缓存。</li>
+  <li><span class="tag">v2.2</span> <b>插件优先架构</b>：轮播图、产品展示、友情链接均以官方内置插件提供，可随时启停；<code>friend_links()</code> 模板函数一行调用。</li>
 </ul>
 </section>
 
@@ -146,6 +158,7 @@
 &#9474;   &#9500;&#9472;&#9472; __init__.py         # 应用工厂 create_app
 &#9474;   &#9500;&#9472;&#9472; config.py           # 配置（含数据库 URI 解析）
 &#9474;   &#9492;&#9472;&#9472; extensions.py       # 扩展初始化
+&#9500;&#9472;&#9472; plugins/                # &#9733; 插件目录（v2.2）：官方内置 banner / product / friend_link + 自定义插件
 &#9500;&#9472;&#9472; instance/               # 实例数据（数据库、db_config.json、admin_config.json、backups/）
 &#9500;&#9472;&#9472; requirements.txt        # 依赖清单（含 MySQL/PostgreSQL 驱动）
 &#9500;&#9472;&#9472; run.py                  # 启动入口
@@ -250,7 +263,7 @@ gunicorn -w 4 -b 0.0.0.0:5000 "run:app"</code></pre>
 </table>
 <ul>
   <li>演示数据由 <code>app/utils/bootstrap.py</code> 的 <code>generate_demo_data(industry)</code> 生成。</li>
-  <li>每次生成会先调用 <code>_clean_demo_data()</code> 按外键依赖顺序清理旧数据（表单 &rarr; 文章 &rarr; 栏目 &rarr; 碎片 &rarr; 友情链接），因此可在两个行业间反复切换而不会触发 <code>slug</code> 唯一约束冲突。</li>
+  <li>每次生成会先调用 <code>_clean_demo_data()</code> 按外键依赖顺序清理旧数据（表单 &rarr; 文章 &rarr; 栏目 &rarr; 碎片；友情链接等插件数据由各自插件的演示数据钩子自行清理重建），因此可在两个行业间反复切换而不会触发 <code>slug</code> 唯一约束冲突。</li>
   <li>演示图片位于 <code>app/static/uploads/demo/</code>（制造业 <code>mfg_*</code>、服务业 <code>svc_*</code>），无需联网即可展示。</li>
   <li>演示数据只写入<b>前台企业信息</b>，不会改动后台 CMS 名称与版权。</li>
 </ul>
@@ -261,21 +274,36 @@ gunicorn -w 4 -b 0.0.0.0:5000 "run:app"</code></pre>
 <p>zhycms 前台采用 <b>多主题 + 栏目级模板</b> 的双层机制，主题可在网站设置一键切换，栏目可单独指定列表/内容/单页模板。模板基于 <b>Jinja2 + Bootstrap 4</b>。</p>
 
 <h3 id="tpl-theme">1. 主题目录结构</h3>
-<p>所有主题存放在 <code>app/frontend/templates/themes/</code> 下，每个主题是一个独立目录，目录名即主题名：</p>
+<p>所有主题存放在 <code>app/frontend/templates/themes/</code> 下，每个主题是一个独立目录，目录名即主题 slug：</p>
 <pre><code>themes/default/
+&#9500;&#9472;&#9472; manifest.json      # 主题元数据（v2.2）：name/slug/version/description/author，
+&#9472;                       #   builtin:true 标记官方内置，template_required 声明额外必备模板
 &#9500;&#9472;&#9472; base.html            # 基础布局（必须）
 &#9500;&#9472;&#9472; index.html           # 首页（必须）
 &#9500;&#9472;&#9472; list.html            # 列表页默认模板（必须）
 &#9500;&#9472;&#9472; article.html         # 文章详情默认模板（必须）
 &#9500;&#9472;&#9472; page.html            # 单页默认模板（必须）
 &#9500;&#9472;&#9472; list_card.html       # 卡片式列表（可选，栏目备选模板）
+&#9500;&#9472;&#9472; list_product.html    # 产品列表（可选，产品插件启用时可选用）
 &#9500;&#9472;&#9472; column_children.html # 父栏目展示子栏目列表
 &#9500;&#9472;&#9472; search.html          # 搜索结果页
 &#9500;&#9472;&#9472; form.html            # 表单提交页（含验证码）
 &#9500;&#9472;&#9472; form_closed.html     # 表单关闭提示页
 &#9500;&#9472;&#9472; closed.html          # 站点关闭提示页
 &#9500;&#9472;&#9472; 404.html
-&#9492;&#9472;&#9472; 500.html</code></pre>
+&#9500;&#9472;&#9472; 500.html
+&#9500;&#9472;&#9472; css/                 # 主题样式目录（v2.2 起样式外置于此）
+&#9472;   &#9492;&#9472;&#9472; style.css       #   base.html 通过 theme_asset 引用
+&#9500;&#9472;&#9472; js/                  # 主题脚本目录（可选）
+&#9500;&#9472;&#9472; images/              # 主题静态图片目录（可选：背景图、图标、示例图等）
+&#9492;&#9472;&#9472; fonts/                # 主题字体文件目录（可选：woff/woff2/ttf 等）</code></pre>
+
+<h4>主题静态资源引用（v2.2）</h4>
+<p>主题内 <code>css/</code>、<code>js/</code>、<code>images/</code>、<code>fonts/</code> 四个目录下的文件通过前台资源路由自动对外服务，模板中用全局变量 <code>current_theme</code> 引用（跟随启用主题自动变化）：</p>
+<pre><code>&lt;link rel="stylesheet" href="{{ url_for('frontend.theme_asset', slug=current_theme, filename='css/style.css') }}"&gt;
+&lt;script src="{{ url_for('frontend.theme_asset', slug=current_theme, filename='js/main.js') }}"&gt;&lt;/script&gt;
+&lt;img src="{{ url_for('frontend.theme_asset', slug=current_theme, filename='images/hero.png') }}" alt=""&gt;</code></pre>
+<div class="note">资源路由仅放行 <code>css/</code>、<code>js/</code>、<code>images/</code>、<code>fonts/</code> 四个子目录并拦截路径穿越；<code>manifest.json</code> 与模板文件不对外暴露。全部资源随主题目录分发，主题打包下载时一并带走。</div>
 
 <h4>必备模板</h4>
 <table>
@@ -288,6 +316,7 @@ gunicorn -w 4 -b 0.0.0.0:5000 "run:app"</code></pre>
   <tr><td><code>404.html</code> / <code>500.html</code></td><td>错误页</td></tr>
   <tr><td><code>closed.html</code></td><td>站点关闭时展示</td></tr>
 </table>
+<div class="note">v2.2 起主题<b>上传与启用前</b>强制检查 7 个必备模板（<code>index/list/article/page/base/404/500.html</code>），任一缺失将拒绝启用并给出补齐指引；manifest 的 <code>template_required</code> 可追加额外必备模板声明。</div>
 
 <h4>可选模板（栏目级备选）</h4>
 <p>凡以 <code>list</code>、<code>article</code>、<code>page</code> 开头的 <code>.html</code> 文件，会<b>自动</b>出现在后台栏目编辑页的下拉选项中：</p>
@@ -302,16 +331,18 @@ gunicorn -w 4 -b 0.0.0.0:5000 "run:app"</code></pre>
 <p>以创建名为 <code>green</code> 的绿色风格主题为例：</p>
 <h4>步骤 1：复制默认主题作为起点</h4>
 <pre><code>cp -r app/frontend/templates/themes/default app/frontend/templates/themes/green</code></pre>
-<h4>步骤 2：修改 base.html 中的样式</h4>
+<h4>步骤 2：修改主题样式</h4>
+<p>v2.2 起主题样式外置在 <code>css/style.css</code> 中（不再写进 base.html 的 <code>&lt;style&gt;</code> 标签），直接修改即可：</p>
 <pre><code>/* 主题色：绿色 */
 .navbar { background: linear-gradient(135deg,#2e7d32 0%,#1b5e20 100%) !important; }
 .footer { background: linear-gradient(135deg,#2e7d32 0%,#1b5e20 100%); color:#e8f5e9; }
 .card-header { background:#2e7d32; color:#fff; }
 .btn-primary { background-color:#2e7d32; border-color:#2e7d32; }
 a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
+<p>同时修改 <code>manifest.json</code> 中的 <code>name</code> / <code>slug</code>（slug 需符合 <code>[a-zA-Z0-9_-]{2,32}</code> 且与目录名一致）/ <code>version</code> / <code>description</code>。</p>
 <h4>步骤 3：在后台启用</h4>
-<p>进入 <b>后台 &rarr; 网站设置 &rarr; 前台主题</b>，下拉框会自动出现 <code>green</code> 选项，选中保存即可。</p>
-<div class="note">主题的发现是<b>自动</b>的：扫描 <code>themes/</code> 下所有子目录，无需在代码中注册。</div>
+<p>进入 <b>后台 &rarr; 系统设置 &rarr; 主题管理</b>（v2.2 起主题启用入口已从「网站设置」迁移至此），列表中出现 <code>green</code> 后点击「启用」即可，前台即时生效。</p>
+<div class="note">主题的发现是<b>自动</b>的：扫描 <code>themes/</code> 下所有子目录，无需在代码中注册。也可以把主题目录打包为 zip 后通过「主题管理」上传安装。</div>
 
 <h3 id="tpl-base">3. 模板继承与 theme_base</h3>
 <p>所有页面模板通过 <code>{% extends theme_base %}</code> 继承当前主题的 <code>base.html</code>，而不是写死路径：</p>
@@ -343,7 +374,7 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
 </table>
 <h4>视图函数传入的常用变量</h4>
 <ul>
-  <li><b>首页</b> <code>index.html</code>：<code>nav</code>、<code>first_page</code>、<code>latest_articles</code>、<code>friend_links</code>、<code>seo</code>；行业主题另有 <code>about_col</code>、<code>products_col/products</code>、<code>services_col/services</code>、<code>news_col/news</code>、<code>cases_col/cases</code>（按 slug 约定收集，通用主题忽略）</li>
+  <li><b>首页</b> <code>index.html</code>：<code>nav</code>、<code>first_page</code>、<code>latest_articles</code>、<code>seo</code>，友情链接改用插件全局函数 <code>friend_links()</code>（friend_link 插件提供，未启用时返回 <code>[]</code> 自动隐藏区块）；行业主题另有 <code>about_col</code>、<code>products_col/products</code>、<code>services_col/services</code>、<code>news_col/news</code>、<code>cases_col/cases</code>（按 slug 约定收集，通用主题忽略）</li>
   <li><b>列表页</b> <code>list.html</code>：<code>column</code>、<code>articles</code>、<code>pagination</code>、<code>nav</code>、<code>seo</code></li>
   <li><b>文章详情</b> <code>article.html</code>：<code>column</code>、<code>article</code>、<code>fields</code>、<code>latest_articles</code>、<code>prev_article</code>、<code>next_article</code>、<code>nav</code>、<code>seo</code></li>
   <li><b>单页</b> <code>page.html</code>：<code>column</code>、<code>nav</code>、<code>seo</code></li>
@@ -433,7 +464,7 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
   <li><code>base.html</code> 提供 <code>title / css / content / js</code> 四个 block</li>
   <li>富文本内容使用 <code>|safe</code> 过滤器</li>
   <li>列表页、文章页的分页链接正确使用 <code>pagination</code> 对象；分页链接统一使用 <code>frontend_pager_url(column, page)</code> 助手以兼容伪静态开关</li>
-  <li>后台「网站设置 &rarr; 前台主题」下拉框能看到新主题</li>
+  <li>后台「系统设置 &rarr; 主题管理」列表中出现新主题，点击「启用」前台即时生效</li>
   <li>切换到新主题后，首页、栏目页、文章页、单页、404 均能正常访问</li>
   <li>自定义字段按 <code>field_type</code> 区分图片/文件/URL/富文本正确渲染</li>
 </ul>
@@ -680,265 +711,613 @@ sudo apt install -y libmagic1        # Debian/Ubuntu
   <tbody>
     <tr><td>banner</td><td>轮播图</td><td>首页幻灯片、侧边广告位、横幅分组</td><td><code>banner_items('home-hero')</code>；<code>banner/hero_carousel.html</code> partial；<code>GET /api/v1/banners/&lt;slug&gt;</code></td></tr>
     <tr><td>product</td><td>产品展示</td><td>制造业/贸易产品库、相册 + 规格参数、区别普通文章</td><td><code>product_latest('products', 8)</code>；<code>/product-&lt;id&gt;.html</code> 伪静态；<code>list_product.html</code> 列表模板；<code>GET /api/v1/products/&lt;id&gt;</code></td></tr>
+    <tr><td>friend_link</td><td>友情链接</td><td>站点友链管理（v2.2.0 起由核心功能转为内置插件，老站数据无缝保留）</td><td><code>friend_links()</code> 模板函数；后台 <code>/&lt;admin&gt;/friend-links</code>（路径与核心版一致）</td></tr>
   </tbody>
 </table>
+<div class="note">社区示例插件 <b>recruit（招聘管理）</b>（<code>builtin: false</code>）作为插件开发的完整实战样板：岗位 CRUD、招聘截止时间门控、简历上传（word/excel/pdf）、前台导航贡献与伪静态详情页——完整开发教程见<b>第十六章</b>，也可在插件管理页下载其源码包对照学习。</div>
 
 <h3 id="pl-ui">3. 后台：插件管理页</h3>
 <p>入口：后台侧边栏「系统 → 插件管理」（权限点：<code>system:plugins_manage</code>）。页面列出所有已发现插件的元数据（名称/版本/作者/说明），导入错误的插件会以红色「加载失败」徽标标注错误栈；启用插件会弹出确认说明并写入审计日志（模块=系统设置，操作=修改，<code>changed.enabled_plugins = [旧清单, 新清单]</code>）。</p>
 
-<h3 id="pl-wizard">4. 初始化向导集成</h3>
-<p>新装初始化向导在「演示数据选择」后新增<b>「功能插件」</b>勾选步骤，默认勾选 <b>轮播图 + 产品展示</b>：</p>
+<h3 id="pl-pkg">4. 插件上传 / 卸载 / 打包下载（v2.2）</h3>
 <ul>
-  <li>勾选 → 核心演示数据生成后立即调用 <code>run_demo_data_hooks(industry)</code>，生成 banner 分组 3 张图 / 制造业 6 产品；同时自动给 <code>content_editor</code> / <code>content_auditor</code> 绑定插件权限点。</li>
-  <li>不勾选 → 启用清单为空、不建插件数据、栏目模板不被改动；后续需要时在「插件管理」一键启用即可。</li>
+  <li><b>上传安装</b>：插件管理页上传 <code>.zip / .tar.gz / .tgz</code> 压缩包，通过 8 层校验后自动解压至 <code>plugins/</code>——扩展名白名单 → 压缩包完整性 → 路径穿越拦截 → 符号链接处理 → 插件根识别 → 必备文件（<code>manifest.json</code> + <code>__init__.py</code>）→ manifest 合法性（JSON 对象、slug 符合 <code>^[a-zA-Z0-9_-]{2,32}$</code>）→ 目标目录检查（禁止覆盖已有插件）。任何一层失败整体拒绝，全程临时目录、失败零写入；成功后写入上传审计。</li>
+  <li><b>打包下载</b>：列表「下载」按钮将插件目录打包为 zip（单目录形态，与上传校验完全兼容），可在其他站点直接上传复用；下载写入导出审计。内置、启用中、加载失败的插件均可下载。</li>
+  <li><b>卸载删除</b>：点击「卸载」弹出红色警告模态框，需输入图形验证码确认（一次性消费防重放，独立于登录验证码）后才会物理删除 <code>plugins/&lt;slug&gt;/</code> 目录。<b>官方内置插件（manifest <code>builtin:true</code>）不可卸载</b>；启用中的插件须先禁用。卸载后运行期注册表同步移除（菜单/列表/sitemap/审计聚合立即消失），<b>数据表与数据保留</b>，重新上传同名包即可恢复使用。操作写入删除审计。</li>
+</ul>
+
+<h3 id="pl-wizard">5. 初始化向导集成</h3>
+<p>新装初始化向导在「演示数据选择」后新增<b>「功能插件」</b>勾选步骤，默认勾选 <b>轮播图 + 产品展示 + 友情链接</b>：</p>
+<ul>
+  <li><b>行业联动</b>：选择任一行业演示数据时，<b>轮播图、友情链接</b>自动启用（无需勾选）；选<b>制造业</b>时<b>产品展示</b>也自动启用——制造业演示数据的产品页（多图相册/规格参数/伪静态详情）依赖 product 插件，演示钩子会把「精密零部件 / 自动化设备」子栏目切换为 <code>list_product</code> 模板。</li>
+  <li>勾选 → 核心演示数据生成后立即调用 <code>run_demo_data_hooks(industry)</code>：banner 生成 <code>home-hero</code> 分组 3 张图（<b>初始化轮播数据由插件生成，不再写入 <code>home_banner_*</code> 碎片</b>）/ 制造业 6 产品 / 友情链接 3 条；同时自动绑定插件权限点（友情链接沿用核心时代策略，仅超级管理员可管理，可按需自行授权）。</li>
+  <li>不勾选且不选演示数据 → 启用清单为空、不建插件数据、栏目模板不被改动；后续需要时在「插件管理」一键启用即可。</li>
+  <li><b>老站升级</b>：v2.1 及以前的站点升级后首次启动会自动启用友情链接插件一次（旧 <code>friend_links</code> 表数据与历史审计日志无缝保留），之后可随时在插件管理中禁用。行业主题中的碎片轮播兜底逻辑保留，老站升级后行为不变。</li>
 </ul>
 </section>
 
 <section id="plugin-dev">
-<h2>十六、插件开发指引（v2.2）</h2>
-<p>本章节面向想开发自定义插件的开发者，从目录结构 → 元数据 → 钩子方法 → 测试清单，走完一个完整插件的开发流程。建议以 <code>plugins/banner</code>（最简后台+模板函数）和 <code>plugins/product</code>（完整 CRUD + 前台路由 + API）作为样板对照。</p>
+<h2>十六、插件开发指南（v2.2）——以「招聘管理」插件为样板</h2>
+<p>本章以 <code>plugins/recruit</code>（招聘管理插件）为<b>完整实战样板</b>，从需求拆解 → 模型 → 后台 → 前台 → 文件上传 → 导航贡献 → 生命周期，走完一个插件从零到发布的全部环节。该插件 <code>builtin: false</code>（非官方内置），你可以在后台「插件管理」中<b>下载它的源码 zip 包</b>对照学习，也可以上传/卸载它反复实验。</p>
+<div class="note">对照样板：<code>plugins/banner</code>（最简：模板函数型）、<code>plugins/product</code>（完整：栏目归属 + API）、<code>plugins/recruit</code>（本章主线：独立路由 + 表单 + 文件上传 + 截止时间门控）。</div>
 
-<h3 id="pd-layout">1. 目录结构约定</h3>
-<pre><code>plugins/
-  my_plugin/              # 插件根目录，slug 必须符合 [a-zA-Z0-9_-]{2,32}
-    manifest.json         # 纯元数据（管理页展示 + min_core_version 校验）
-    __init__.py           # 入口：定义 PluginBase 子类，末尾实例化为变量 `plugin`
-    models.py             # SQLAlchemy 模型（导入即进入 metadata，启用时 db.create_all 建表）
-    admin.py              # 后台路由（挂核心 admin_bp，endpoint 归入 admin.*）
-    frontend.py           # 前台模板函数（jinja globals）+ URL 生成
-    frontend_routes.py    # 前台蓝图路由（可选，仅当需要独立 URL）
-    api.py                # REST API 端点（挂核心 api_bp，统一响应包）
-    demo.py               # 演示数据钩子：generate(industry)，幂等
-    templates/            # Jinja 模板目录：后台页 / 前台 partial / 前台详情页
-      my_plugin/          # 建议 namespace，避免与核心模板重名
-        index.html
-        form.html
-        show_detail.html
-    static/               # 插件静态资源（可选；蓝图注册 static_url_path 暴露）
-      css/my.css
-      js/my.js</code></pre>
+<h3 id="pd-req">1. 需求拆解：一个插件要动哪些层</h3>
+<p>以招聘插件的需求为例——「发布招聘岗位与岗位介绍，可设置招聘截止时间；截止前浏览者可填写基本信息并上传简历（word/excel/pdf），截止后关闭投递」——拆解到插件机制的各个层：</p>
+<table class="tbl">
+  <thead><tr><th>需求点</th><th>涉及的层</th><th>recruit 中的实现</th></tr></thead>
+  <tbody>
+    <tr><td>岗位数据（标题/部门/地点/人数/薪资/介绍/截止时间）</td><td>数据模型</td><td><code>models.py</code> → <code>RecruitJob</code>，启用时自动建表 <code>recruit_jobs</code></td></tr>
+    <tr><td>求职申请（基本信息 + 简历 + 处理状态）</td><td>数据模型</td><td><code>RecruitApplication</code>（外键关联岗位）</td></tr>
+    <tr><td>后台岗位管理 / 申请处理</td><td>后台路由 + 后台模板</td><td><code>admin.py</code>（挂核心 admin_bp）+ <code>templates/recruit/*.html</code></td></tr>
+    <tr><td>截止时间门控（截止后不可投递）</td><td>模型方法 + 前后台双重校验</td><td><code>is_open()</code> / <code>is_expired()</code>，前台不渲染表单、后端提交再拒一次</td></tr>
+    <tr><td>简历上传（word/excel/pdf）</td><td>复用核心上传中心</td><td><code>save_upload_file()</code> + 后缀白名单 + MIME 校验 + 大小上限</td></tr>
+    <tr><td>前台岗位列表 / 详情 / 投递表单</td><td>前台蓝图 + 模板解析链</td><td><code>frontend_routes.py</code>：<code>/jobs</code>、<code>/jobs/&lt;id&gt;</code>、伪静态 <code>/job-&lt;id&gt;.html</code></td></tr>
+    <tr><td>前台导航出现「招贤纳士」入口</td><td>前台菜单钩子</td><td><code>get_frontend_menu()</code> → 导航树追加虚拟外链节点</td></tr>
+    <tr><td>权限 / 侧边栏菜单 / 审计</td><td>声明式注册</td><td><code>permissions</code> / <code>preset_role_grants</code> / <code>audit_modules</code> / <code>get_admin_menu()</code></td></tr>
+    <tr><td>搜索引擎收录岗位页</td><td>sitemap 钩子</td><td><code>get_sitemap_urls()</code></td></tr>
+  </tbody>
+</table>
 
-<h3 id="pd-manifest">2. manifest.json（元数据）</h3>
+<h3 id="pd-layout">2. 目录结构与 manifest.json</h3>
+<p>招聘插件的实际文件树——<b>没有 api.py 和 demo.py</b>：API 端点与演示数据都是可选件，按需增删：</p>
+<pre><code>plugins/recruit/
+&#9500;&#9472;&#9472; manifest.json          # 元数据（builtin=false：可下载/可卸载）
+&#9500;&#9472;&#9472; __init__.py            # 入口：RecruitPlugin 类 + 模块级 plugin 实例
+&#9500;&#9472;&#9472; models.py              # RecruitJob / RecruitApplication 模型
+&#9500;&#9472;&#9472; admin.py               # 后台路由（挂核心 admin_bp）
+&#9500;&#9472;&#9472; frontend.py            # 模板函数 recruit_jobs() / recruit_job_url()
+&#9500;&#9472;&#9472; frontend_routes.py     # 前台蓝图（列表/详情/投递/伪静态/简历下载换算）
+&#9492;&#9472;&#9472; templates/recruit/
+    &#9500;&#9472;&#9472; index.html          # 后台岗位列表
+    &#9500;&#9472;&#9472; form.html          # 后台岗位表单（含 CKEditor 富文本）
+    &#9500;&#9472;&#9472; applications.html  # 后台申请列表
+    &#9500;&#9472;&#9472; jobs.html          # 前台岗位列表（主题可用 recruit_jobs.html 覆盖）
+    &#9492;&#9472;&#9472; job_detail.html    # 前台详情 + 申请表单（主题可用 recruit_job_detail.html 覆盖）</code></pre>
+
+<p>manifest.json（真实文件）：</p>
 <pre><code>{
-  "slug": "my_plugin",
-  "name": "我的插件",
+  "slug": "recruit",
+  "name": "招聘管理",
   "version": "1.0.0",
-  "description": "一句话说明该插件做什么，会显示在插件管理页。",
-  "author": "你的名字或团队",
+  "description": "招聘岗位发布与在线求职申请：岗位介绍、招聘截止时间、简历上传（word/excel/pdf），截止后自动关闭提交，适合企业招贤纳士",
+  "author": "ZhyCMS 社区示例",
+  "builtin": false,
   "min_core_version": "2.2.0"
 }</code></pre>
-<p><code>min_core_version</code> 用于未来核心 API 变更时提示升级；当前最低 <code>2.2.0</code>。</p>
+<ul>
+  <li><code>slug</code> 必须符合 <code>^[a-zA-Z0-9_-]{2,32}$</code>，同时是插件目录名与启用清单里的键。</li>
+  <li><code>builtin: false</code>：插件管理页出现<b>卸载/下载</b>按钮；官方内置插件标 <code>true</code>（禁止卸载，防止误删后功能缺失）。</li>
+  <li><code>min_core_version</code>：核心能力不足时管理页给出升级提示。</li>
+  <li>上传插件包要求：zip/tar.gz 压缩包内含 <code>manifest.json</code> 与 <code>__init__.py</code> 必备文件，单目录形态（<code>recruit/...</code>）或平铺形态均可，详见十五章「插件上传」。</li>
+</ul>
 
-<h3 id="pd-base">3. 入口：PluginBase 子类 + <code>plugin = MyPlugin()</code></h3>
-<p>最简骨架（可直接复制粘贴再改类名）：</p>
-<pre><code>"""my_plugin 插件入口。"""
+<h3 id="pd-manifest">3. 插件入口：PluginBase 子类（__init__.py 全解）</h3>
+<p>入口文件做两件事：<b>定义 PluginBase 子类</b>（声明式注册 + 代码钩子）、<b>末尾实例化为 <code>plugin</code></b>（核心识别插件的标志）。招聘插件的完整入口：</p>
+<pre><code>"""招聘插件（社区示例插件，非官方内置）。"""
 from app.plugin_api import PluginBase
 
-from . import admin as _admin  # noqa: F401  导入即向 admin_bp 注册后台路由
-from . import api as _api      # noqa: F401  可选：导入即准备好 API 注册器
+from . import admin as _admin       # noqa: F401  导入即注册后台路由（并引入 models）
+from .frontend import recruit_job_url, recruit_jobs
 
 
-class MyPlugin(PluginBase):
-    # --- 元数据（与 manifest.json 保持一致，类属性优先） ---
-    slug = 'my_plugin'
-    name = '我的插件'
+class RecruitPlugin(PluginBase):
+    # ---- 元数据（与 manifest.json 保持一致，类属性优先） ----
+    slug = 'recruit'
+    name = '招聘管理'
     version = '1.0.0'
-    description = '示例插件：演示全部钩子的用法'
-    author = '开发者名称'
+    description = '招聘岗位发布与在线求职申请：……'
+    author = 'ZhyCMS 社区示例'
 
-    # --- 声明式注册 ---
-    # 权限点：启用时幂等写入 permissions 表
-    permissions = [
-        ('my_plugin:manage', '我的插件管理', '增删改查管理权限'),
-    ]
-    # 启用时幂等给预设角色补授权（可留空）
+    # ---- 声明式注册（启用动作自动完成，幂等） ----
+    permissions = [('recruit:manage', '招聘管理',
+                    '招聘岗位维护与求职申请处理')]
     preset_role_grants = {
-        'content_auditor': ['my_plugin:manage'],
-        'content_editor':  ['my_plugin:manage'],
+        'content_editor': ['recruit:manage'],
+        'content_auditor': ['recruit:manage'],
     }
-    # 审计模块：筛选下拉 + 列表徽标翻译（可留空）
-    audit_modules = [('my_plugin', '我的插件')]
+    audit_modules = [('recruit', '招聘管理')]
 
-    # --- 代码钩子（按需求覆写） ---
+    # ---- 代码钩子 ----
 
     def get_admin_menu(self):
-        """侧边栏菜单项：启用 + 当前用户有权限才显示。"""
-        return [{
-            'label': '我的插件',
-            'endpoint': 'admin.my_plugin_index',  # admin 蓝本 endpoint
-            'icon': 'fa-cog',                      # FontAwesome 图标
-            'permission': 'my_plugin:manage',
-            'active_prefix': 'my_plugin',          # active_menu 高亮前缀
-        }]
+        """后台侧边栏：启用 + 有权限才显示。可返回多项。"""
+        return [
+            {'label': '招聘岗位', 'endpoint': 'admin.recruit_job_index',
+             'icon': 'fa-briefcase', 'permission': 'recruit:manage',
+             'active_prefix': 'recruit_job'},
+            {'label': '求职申请', 'endpoint': 'admin.recruit_application_index',
+             'icon': 'fa-user-graduate', 'permission': 'recruit:manage',
+             'active_prefix': 'recruit_app'},
+        ]
 
     def get_admin_menu_icon(self):
-        """侧边栏整组图标，默认 fa-plug。"""
-        return 'fa-cube'
-
-    def get_admin_routes(self, admin_bp):
-        """如需在 __init__.py 中集中注册路由，可覆写此方法。"""
-        pass
+        return 'fa-briefcase'
 
     def get_frontend_blueprint(self):
-        """返回前台蓝图；即使无前台路由也可返回仅含 template_folder 的蓝图，
-        用于把插件模板目录接入 Jinja 搜索链。"""
-        from flask import Blueprint
-        return Blueprint('my_plugin_frontend', __name__,
-                         template_folder='templates',
-                         static_folder='static',
-                         static_url_path='/plugins-static/my_plugin')
+        from .frontend_routes import recruit_frontend
+        return recruit_frontend
 
     def get_jinja_globals(self):
-        """模板全局函数：核心自动包裹"插件启用"守卫；未启用时返回 fallback。"""
-        from .frontend import my_plugin_items
-        return {'my_plugin_items': my_plugin_items}
+        return {'recruit_job_url': recruit_job_url,
+                'recruit_jobs': recruit_jobs}
 
     def get_jinja_fallbacks(self):
-        """同名函数禁用时的兜底返回值（避免模板 UndefinedError）。"""
-        return {'my_plugin_items': []}
+        """插件禁用时同名全局的兜底值（模板不报 UndefinedError）。"""
+        return {'recruit_job_url': '#', 'recruit_jobs': []}
 
-    def get_api_routes(self, api_bp):
-        """向核心内容 API 蓝本注册只读端点。"""
-        _api.register(api_bp)
+    def get_frontend_menu(self):
+        """前台导航贡献（v2.2）：返回 [{'label', 'url', 'target'}]。"""
+        try:
+            from flask import url_for
+            url = url_for('recruit_frontend.job_list')
+        except Exception:
+            url = '/jobs'
+        return [{'label': '招贤纳士', 'url': url, 'target': ''}]
 
     def get_sitemap_urls(self):
-        """贡献 sitemap URL，返回 [{loc, lastmod, changefreq, priority}]；
-        loc 为完整 URL，伪静态开启时优先用伪静态 URL。"""
-        return []
-
-    def generate_demo_data(self, industry):
-        """演示数据钩子，industry='manufacturing' | 'service'。幂等！"""
-        from .demo import generate
-        generate(industry)
+        """开放申请的岗位详情页收录（loc 为完整 URL）。"""
+        ...
 
 
-plugin = MyPlugin()   # 必须！核心通过 import 后取模块级 plugin 变量识别</code></pre>
+plugin = RecruitPlugin()   # 必须！核心 import 后取模块级 plugin 变量识别插件</code></pre>
+<div class="note">钩子速查：<code>get_admin_menu</code>（侧边栏，可多项）、<code>get_frontend_blueprint</code>（前台路由蓝图，必返回）、<code>get_jinja_globals</code> / <code>get_jinja_fallbacks</code>（模板全局 + 禁用兜底，核心自动包裹启停守卫）、<code>get_frontend_menu</code>（前台导航，v2.2 新增）、<code>get_api_routes</code>（REST 端点，可选）、<code>get_sitemap_urls</code>（收录，可选）、<code>generate_demo_data</code>（演示数据，可选）。</div>
+<p><b>导入顺序陷阱</b>：<code>from . import admin</code> 必须在 <code>__init__.py</code> 顶部完成——<code>admin.py</code> 会再导入 <code>models.py</code>，保证模型在核心 <code>db.create_all()</code> 之前注册进 metadata，否则新装站点建表会漏掉插件表。</p>
 
-<h3 id="pd-models">4. 模型开发（models.py）</h3>
-<pre><code>"""my_plugin 数据模型。
-注意：只定义 db.Model 子类即可——import models 时即进入 metadata；
-启用插件时 db.create_all() 会幂等建表；禁用插件后仍保留表与数据。
-"""
-from datetime import datetime
-import json
+<h3 id="pd-models">4. 数据模型（models.py）：两张表与截止时间语义</h3>
+<p>招聘插件有两个模型：<code>RecruitJob</code>（岗位，主数据）与 <code>RecruitApplication</code>（求职申请，流水数据，外键关联岗位）。核心片段：</p>
+<pre><code>from datetime import datetime
 from app.extensions import db
 
-class MyItem(db.Model):
-    __tablename__ = 'my_items'
+
+class RecruitJob(db.Model):
+    """招聘岗位。"""
+    __tablename__ = 'recruit_jobs'
+
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
+    department = db.Column(db.String(100))            # 所属部门（可选）
+    location = db.Column(db.String(200))              # 工作地点（可选）
+    headcount = db.Column(db.Integer, default=1)      # 招聘人数（可选）
+    salary = db.Column(db.String(100))                # 薪资待遇（可选）
+    description = db.Column(db.Text)                  # 岗位介绍（富文本）
+    deadline = db.Column(db.DateTime, index=True)     # 招聘截止时间（空=长期有效）
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
     sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.now,
-                           onupdate=datetime.now, nullable=False)</code></pre>
-<div class="warn">表名建议带插件 slug 前缀（如 <code>my_items</code>），避免与核心或其他插件冲突；模型必须含 <code>is_deleted</code> 字段并在查询中<b>显式过滤</b>，遵循核心的"软删除、便于批量恢复"策略。</div>
+                           onupdate=datetime.now, nullable=False)
 
-<h3 id="pd-admin">5. 后台管理路由（admin.py）</h3>
-<p>后台路由直接从核心 <code>admin_bp</code> 注册，endpoint 归入 <code>admin.*</code>，从而自动获得<b>后台地址前缀即时生效</b>机制（无需为你的插件单独处理前缀切换）。关键装饰器三件套：</p>
-<pre><code>from app.admin import admin_bp                       # 核心后台蓝本
-from app.utils.helpers import permission_required, audit_log  # 权限 + 审计
-from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE
-from .models import MyItem, AUDIT_MODULE = 'my_plugin'
+    # ---- 截止状态（业务语义收口在模型层，前后台共用） ----
 
-@admin_bp.route('/my-items')                          # URL: /{admin_prefix}/my-items
-@permission_required('my_plugin:manage',
-                     any_of=['content:edit','content:delete'])  # any_of=聚合权限点
-def my_plugin_index():
-    items = MyItem.query.filter_by(is_deleted=False).all()
-    return render_template('my_plugin/index.html', items=items)
+    def is_expired(self):
+        """是否已过招聘截止时间（未设截止时间视为长期有效）。"""
+        if self.deadline is None:
+            return False
+        return datetime.now() &gt; self.deadline
 
-@admin_bp.route('/my-items/&lt;int:iid&gt;/delete', methods=['POST'])
-@permission_required('content:delete')
-def my_plugin_delete(iid):
-    item = MyItem.query.get_or_404(iid)
-    item.is_deleted = True
+    def is_open(self):
+        """是否开放申请：启用 + 未删除 + 未截止。"""
+        return self.is_enabled and not self.is_deleted and not self.is_expired()
+
+    def applications_count(self):
+        return RecruitApplication.query.filter_by(job_id=self.id).count()
+
+
+class RecruitApplication(db.Model):
+    """求职申请。"""
+    __tablename__ = 'recruit_applications'
+
+    STATUS_PENDING = 'pending'    # 未处理
+    STATUS_VIEWED = 'viewed'      # 已查看
+    STATUS_PASS = 'pass'          # 录用
+    STATUS_REJECT = 'reject'      # 不合适
+    STATUS_LABELS = {STATUS_PENDING: '未处理', STATUS_VIEWED: '已查看',
+                     STATUS_PASS: '录用', STATUS_REJECT: '不合适'}
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('recruit_jobs.id'),
+                       nullable=False, index=True)
+    name = db.Column(db.String(64), nullable=False)     # 姓名
+    phone = db.Column(db.String(32), nullable=False)    # 联系电话
+    email = db.Column(db.String(128))
+    education = db.Column(db.String(64))
+    intro = db.Column(db.Text)
+    resume_file = db.Column(db.String(500))             # 简历存储相对路径（uploads/...）
+    resume_name = db.Column(db.String(255))             # 简历原始文件名
+    ip = db.Column(db.String(64))
+    status = db.Column(db.String(16), default=STATUS_PENDING, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now,
+                           nullable=False, index=True)
+
+    job = db.relationship('RecruitJob', backref=db.backref(
+        'applications', lazy='dynamic'))
+
+    def status_label(self):
+        return self.STATUS_LABELS.get(self.status, self.status)</code></pre>
+<p><b>模型设计要点</b>：</p>
+<ul>
+  <li><b>表名带插件前缀</b>（<code>recruit_jobs</code> / <code>recruit_applications</code>），避免与核心或其他插件冲突。</li>
+  <li><b>软删除</b>：主数据模型带 <code>is_deleted</code> 并在所有查询中显式过滤；流水数据（申请）直接硬删。</li>
+  <li><b>业务语义收口在模型</b>：<code>is_open()</code> / <code>is_expired()</code> 把"截止时间"规则写一次、前后台共用，避免视图里散落时间比较。</li>
+  <li><b>可空字段表达可选语义</b>：<code>deadline</code> 为空 = 长期有效，用 <code>None</code> 而非魔法值。</li>
+  <li>只定义 <code>db.Model</code> 子类即可——import 时进入 metadata，<b>启用插件时核心 <code>db.create_all()</code> 幂等建表</b>；禁用不删表、不丢数据。</li>
+</ul>
+
+<h3 id="pd-admin">5. 后台管理路由（admin.py）：守卫三件套与 CRUD</h3>
+<p>后台路由从核心 <code>admin_bp</code> 注册（endpoint 归入 <code>admin.*</code>，自动获得后台地址前缀即时生效能力）。每个视图套三层守卫：<b>插件启用守卫 → 权限点 → 业务校验</b>：</p>
+<pre><code>from flask import render_template, redirect, url_for, request, flash, abort
+from app.extensions import db
+from app.admin import admin_bp                              # 核心后台蓝本
+from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
+from app.utils.helpers import permission_required, audit_log
+from .models import RecruitJob, RecruitApplication
+
+AUDIT_MODULE = 'recruit'
+
+
+def _gate(view):
+    """插件启用守卫：未启用 → 404（不暴露存在性）。"""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        from app.plugin_system import plugin_enabled
+        if not plugin_enabled('recruit'):
+            abort(404)
+        return view(*args, **kwargs)
+    return wrapper
+
+
+@admin_bp.route('/recruit/jobs')
+@_gate
+@permission_required('recruit:manage')
+def recruit_job_index():
+    page = max(_to_int(request.args.get('page'), 1), 1)
+    keyword = (request.args.get('keyword') or '').strip()
+    query = RecruitJob.query.filter_by(is_deleted=False)
+    if keyword:
+        query = query.filter(RecruitJob.title.like(f'%{keyword}%'))
+    pagination = query.order_by(
+        RecruitJob.sort_order.desc(), RecruitJob.id.desc()
+    ).paginate(page=page, per_page=15, error_out=False)
+    return render_template('recruit/index.html',
+                           jobs=pagination.items, pagination=pagination, ...)</code></pre>
+<p><b>表单保存与截止时间解析</b>——前台表单传 <code>datetime-local</code> 值（<code>2026-09-30T18:00</code>），解析要容错多格式，非法值必须拒绝而不是静默忽略：</p>
+<pre><code>def _parse_deadline(raw):
+    """解析 datetime-local 输入；空返回 None（长期有效），非法抛 ValueError。"""
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    for fmt in ('%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'):
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+    raise ValueError(raw)
+
+
+def _save_job(job):
+    """岗位表单保存（新增/编辑共用）。失败 flash 并返回 None。"""
+    title = (request.form.get('title') or '').strip()
+    if not title:
+        flash('岗位名称必填', 'danger')
+        return None
+    try:
+        deadline = _parse_deadline(request.form.get('deadline'))
+    except ValueError:
+        flash('招聘截止时间格式不正确', 'danger')
+        return None
+    job.title = title
+    ...
+    job.is_enabled = (request.form.get('is_enabled') == 'on')
     db.session.commit()
-    audit_log(OP_DELETE, AUDIT_MODULE, item.id, item.title,
-              detail={'remark': '软删除'})  # 改动作出审计
-    flash('已删除', 'success')
-    return redirect(url_for('admin.my_plugin_index'))</code></pre>
-<p>权限点策略参考官方插件：<code>my_plugin:manage</code> 是语义聚合权限（后台菜单用），而 CRUD 的细粒度仍沿用核心的 <code>content:create/edit/delete/batch</code>，这样「内容编辑」「内容审核」预设角色只要绑定一次 <code>my_plugin:manage</code> 就立即获得全套 CRUD 权限。</p>
+    audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE, job.id, job.title,
+              {'action': '岗位',
+               'deadline': job.deadline.strftime('%Y-%m-%d %H:%M')
+               if job.deadline else '长期有效'})
+    return job</code></pre>
+<p><b>求职申请管理</b>：列表（按岗位/状态筛选 + 分页）、状态标记、删除。简历下载是安全敏感点——存储路径换算必须过 <code>safe_join</code> 且仅放行简历后缀白名单（见第 8 节）。所有写操作均写审计日志（<code>OP_UPDATE</code> 状态流转记 <code>from → to</code>）。</p>
 
 <h3 id="pd-frontend">6. 前台模板函数与蓝图（frontend.py + frontend_routes.py）</h3>
-<p>模板函数不要直接写在蓝图函数中；应声明为纯函数，在 <code>get_jinja_globals()</code> 注册。核心会给它自动套「启用守卫」：未启用插件时返回 <code>get_jinja_fallbacks()</code> 中声明的默认值（<code>[]</code> / <code>None</code>），避免模板抛错。</p>
-<pre><code># frontend.py（模板函数 + URL 生成）
+<p><b>frontend.py</b>——模板函数声明为纯函数，在 <code>get_jinja_globals()</code> 注册。核心会自动套「启用守卫」：插件禁用时返回 <code>get_jinja_fallbacks()</code> 中的默认值（<code>[]</code> / <code>'#'</code>），主题模板不报错。招聘插件提供两个全局：岗位卡片数据 <code>recruit_jobs()</code> 与详情 URL 生成 <code>recruit_job_url()</code>：</p>
+<pre><code>from datetime import datetime
 from flask import url_for
 from app.models.setting import Setting
-from .models import MyItem
 
-def frontend_item_url(item):
-    """伪静态优先的详情 URL。"""
+
+def recruit_job_url(job):
+    """岗位详情 URL：伪静态开启用 /job-{id}.html，否则动态 URL。"""
     if Setting.get('seo_rewrite_enable') == 'on':
-        return f'/my-{item.id}.html'
-    return url_for('my_plugin_frontend.item_detail', iid=item.id)
+        return f'/job-{job.id}.html'
+    try:
+        return url_for('recruit_frontend.job_detail', jid=job.id)
+    except Exception:
+        return f'/jobs/{job.id}'
 
-def my_plugin_items(limit=6):
-    """前台调用：{{ my_plugin_items(4) }}。"""
-    rows = MyItem.query.filter_by(is_enabled=True, is_deleted=False) \
-        .order_by(MyItem.sort_order.desc(), MyItem.id.desc()).limit(limit).all()
-    return [{'id': r.id, 'title': r.title, 'url': frontend_item_url(r)}
-            for r in rows]</code></pre>
-<pre><code># frontend_routes.py（前台蓝图路由）
-from flask import Blueprint, render_template, abort
-from app.models.setting import Setting
-from app.models.column import Column  # 若栏目耦合
-from .models import MyItem
 
-my_plugin_frontend = Blueprint('my_plugin_frontend', __name__,
-                               template_folder='templates')
+def recruit_jobs(limit=10, only_open=False):
+    """前台调用：{{ recruit_jobs(4) }} → 岗位卡片数据（dict 列表）。"""
+    from .models import RecruitJob
+    q = RecruitJob.query.filter(RecruitJob.is_deleted == False,   # noqa: E712
+                                RecruitJob.is_enabled == True)    # noqa: E712
+    if only_open:
+        q = q.filter((RecruitJob.deadline.is_(None))
+                     | (RecruitJob.deadline &gt; datetime.now()))
+    jobs = q.order_by(RecruitJob.sort_order.desc(),
+                      RecruitJob.id.desc()).limit(limit).all()
+    return [{'id': j.id, 'title': j.title, ...,
+             'url': recruit_job_url(j)} for j in jobs]</code></pre>
+<div class="warn"><b>实战教训</b>：模板中生成插件对象链接时，一律走注册的 URL 全局函数（如 <code>recruit_job_url(j)</code>），不要在模板里写 <code>{{ j.url }}</code>——模型对象并没有 <code>url</code> 属性，Jinja 会静默渲染成 <code>href=""</code>，点击「查看详情」等于刷新当前页，且不易被发现。</div>
 
-@my_plugin_frontend.route('/my-&lt;int:iid&gt;.html')
-def item_detail_rewrite(iid):
-    """伪静态路由（只有 seo_rewrite_enable=on 时返回 200）。"""
+<p><b>frontend_routes.py</b>——前台蓝图承载列表/详情/投递三类页面，三个关键机制：</p>
+<pre><code>recruit_frontend = Blueprint('recruit_frontend', __name__,
+                             template_folder='templates')
+
+# ---- 机制 1：启用守卫（未启用 → 404，不暴露存在性） ----
+def _gate(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not plugin_enabled('recruit'):
+            abort(404)
+        return view(*args, **kwargs)
+    return wrapper
+
+# ---- 机制 2：模板解析链（主题覆盖 → 插件自带兜底） ----
+def _resolve_template(name):
+    """主题有 recruit_jobs.html / recruit_job_detail.html 则用主题版，
+    否则用插件自带模板。"""
+    theme = get_active_theme()
+    if os.path.isfile(os.path.join(THEMES_DIR, theme, name)):
+        return theme_template(name)
+    return f'recruit/{name.replace("recruit_", "")}'
+
+# ---- 机制 3：伪静态路由（与 /product-{id}.html 同级，seo 关闭时 404） ----
+@recruit_frontend.route('/job-&lt;int:jid&gt;.html')
+@_gate
+def job_detail_rewrite(jid):
     if Setting.get('seo_rewrite_enable') != 'on':
         abort(404)
-    ...
-    return render_template('my_plugin/show_detail.html', item=item)</code></pre>
+    return job_detail(jid)          # 复用动态详情视图</code></pre>
+<p>列表视图把岗位分为「招聘中 / 已截止」两组传给模板；详情视图根据 <code>job.is_open()</code> 决定渲染申请表单还是「招聘已截止」提示卡片——<b>前台不渲染表单是第一道门</b>。</p>
 
-<h3 id="pd-api">7. REST API（api.py）</h3>
-<pre><code>"""my_plugin：只读 API 端点。"""
-from app.api.views import api_ok, api_err, api_cache
-from app.plugin_system import plugin_enabled
+<h3 id="pd-upload">7. 前台表单与文件上传：投递申请（重点）</h3>
+<p><code>POST /jobs/&lt;id&gt;/apply</code> 是整个插件的交互核心，六步校验链：</p>
+<pre><code>@recruit_frontend.route('/jobs/&lt;int:jid&gt;/apply', methods=['POST'])
+@_gate
+def job_apply(jid):
+    job = _get_open_job(jid)
+    # 1. 截止时间后端复检（前台不渲染表单只是第一道门）
+    if not job.is_open():
+        flash('该岗位招聘已截止，无法继续投递', 'warning')
+        return redirect(recruit_job_url(job))
 
-def register(api_bp):
+    # 2. 图形验证码（沿用站点表单习惯：核心 /captcha 端点 + form_captcha 会话键）
+    given = (request.form.get('captcha') or '').strip().lower()
+    expected = (session.get('form_captcha') or '').lower()
+    session.pop('form_captcha', None)          # 一次性消费，防重放
+    if not expected or given != expected:
+        flash('验证码错误，请重试', 'danger')
+        return redirect(recruit_job_url(job))
+
+    # 3. 必填项与长度校验（系统边界处才做严格校验）
+    name = (request.form.get('name') or '').strip()
+    phone = (request.form.get('phone') or '').strip()
+    if not name or not phone:
+        flash('请填写姓名和联系电话', 'danger')
+        return redirect(recruit_job_url(job))
+
+    # 4. 简历上传（复用核心上传中心：后缀白名单 + MIME + 大小 + 去重）
+    RESUME_EXTS = ['doc', 'docx', 'xls', 'xlsx', 'pdf']   # word/excel/pdf
+    f = request.files.get('resume')
+    if f is not None and f.filename:
+        rel, url, err = save_upload_file(f, sub_dir='recruit',
+                                         allowed_exts=RESUME_EXTS,
+                                         max_size=10 * 1024 * 1024)
+        if err:
+            flash(f'简历上传失败：{err}', 'danger')
+            return redirect(recruit_job_url(job))
+
+    # 5. 入库（记录来源 IP）
+    db.session.add(RecruitApplication(job_id=job.id, name=name, ...,
+                                      resume_file=rel, resume_name=f.filename,
+                                      ip=request.remote_addr or ''))
+    db.session.commit()
+
+    # 6. 重定向回详情页并带 submitted 标记（PRG 模式，防重复提交）
+    return redirect(url_for('recruit_frontend.job_detail', jid=job.id,
+                            submitted=1))</code></pre>
+<p><b>简历安全下载</b>：后台「求职申请」页按原始文件名回传附件，存储路径换算做三重防护——剥前缀后缀白名单、<code>safe_join</code> 防穿越、存在性检查：</p>
+<pre><code>def resume_abs_path(app_row):
+    """resume_file 形如 'uploads/recruit/20260830/uuid.pdf'（相对 static），
+    剥去前缀后即 UPLOAD_FOLDER 下的相对路径。"""
+    rel = (app_row.resume_file or '').replace('\\', '/')
+    if not rel.startswith('uploads/'):
+        return None
+    rel = rel[len('uploads') + 1:]
+    ext = rel.rsplit('.', 1)[1].lower() if '.' in rel else ''
+    if ext not in RESUME_EXTS:          # 仅放行简历白名单后缀
+        return None
+    joined = safe_join(current_app.config['UPLOAD_FOLDER'], rel)
+    if joined and os.path.isfile(joined):
+        return joined
+    return None
+
+# 后台下载视图
+return send_file(path, as_attachment=True,
+                 download_name=app_row.resume_name or 'resume')</code></pre>
+<div class="note"><b>前台表单页不要接页面缓存</b>：投递页含验证码会话交互与 flash 消息，接入 Flask-Caching 会把验证码/提示串到其他访客。核心只对首页/栏目页/文章页做缓存，插件交互页保持无缓存即可。</div>
+
+<h3 id="pd-nav">8. 前台导航贡献（get_frontend_menu，v2.2）</h3>
+<p>启用插件后希望前台导航栏自动出现入口，实现 <code>get_frontend_menu()</code> 钩子即可（招聘插件返回「招贤纳士」→ <code>/jobs</code>）。核心聚合原理：把每个菜单项构造为 <code>type='link'</code> 的<b>虚拟外链栏目节点</b>追加到导航树尾，主题导航宏的外链分支（<code>col.name</code> / <code>col.link_url</code>）直接渲染，<b>各主题无需任何改造</b>：</p>
+<ul>
+  <li>仅<b>启用中</b>插件的菜单项参与聚合（与后台菜单同一门控），禁用即时消失。</li>
+  <li>归属栏目的插件（如产品）栏目本身已进导航，<b>无需</b>实现本钩子。</li>
+  <li>单个插件钩子抛异常时静默跳过，不影响整站导航。</li>
+</ul>
+
+<h3 id="pd-sitemap">9. sitemap 与 SEO 贡献</h3>
+<p>实现 <code>get_sitemap_urls()</code> 让岗位页被 <code>/sitemap.xml</code> 收录（伪静态开启时输出 <code>/job-&lt;id&gt;.html</code> 地址）：</p>
+<pre><code>def get_sitemap_urls(self):
+    from flask import has_request_context, request
+    from app.models.setting import Setting
+    from .models import RecruitJob
+    from .frontend import recruit_job_url
+
+    base = request.url_root.rstrip('/') if has_request_context() else ''
+    if not base:
+        base = (Setting.get('site_url') or '').strip().rstrip('/')
+    freq = Setting.get('seo_sitemap_changefreq_article') or 'monthly'
+    prio = Setting.get('seo_sitemap_priority_article') or '0.6'
+    urls = []
+    for j in (RecruitJob.query.filter_by(is_enabled=True, is_deleted=False)
+              .order_by(RecruitJob.updated_at.desc()).limit(2000)):
+        urls.append({'loc': base + recruit_job_url(j),
+                     'lastmod': j.updated_at.strftime('%Y-%m-%d'),
+                     'changefreq': freq, 'priority': prio})
+    return urls</code></pre>
+<div class="note">注意 <code>loc</code> 必须是完整 URL：有请求上下文时取 <code>request.url_root</code>，无上下文（命令行/定时任务生成 sitemap）时回退 <code>site_url</code> 设置。</div>
+
+<h3 id="pd-api">10. REST API（可选，api.py）</h3>
+<p>需要对外输出数据时，定义 <code>register(api_bp)</code> 并在 <code>__init__.py</code> 覆写 <code>get_api_routes(api_bp)</code> 调用它。招聘插件未提供 API（岗位数据面向表单交互，无只读输出需求）；需要参照时看 <code>plugins/product/api.py</code>：</p>
+<pre><code>def register(api_bp):
     @api_bp.route('/my-items')
-    @api_cache('my_item')  # 独立缓存键维度：my_item
+    @api_cache('my_item')                    # 独立缓存键维度
     def my_items_list():
         if not plugin_enabled('my_plugin'):
-            return api_err(404, '资源不存在')   # 未启用/不存在统一 404
-        from .models import MyItem
+            return api_err(404, '资源不存在')  # 未启用统一 404
         rows = MyItem.query.filter_by(
-            is_enabled=True, is_deleted=False
-        ).order_by(MyItem.sort_order.desc()).limit(50).all()
-        return api_ok([
-            {'id': r.id, 'title': r.title} for r in rows
-        ])</code></pre>
+            is_enabled=True, is_deleted=False).limit(50).all()
+        return api_ok([{'id': r.id, 'title': r.title} for r in rows])</code></pre>
+<p>端点自动获得核心的 Token 鉴权、CORS、缓存与统一响应包（<code>/api/v1/...</code>）；API 缓存在内容变更时随核心清理逻辑失效。</p>
 
-<h3 id="pd-test">8. 自测清单（插件发布前必过）</h3>
-<ul class="check">
-  <li>插件目录放入后，启动应用无异常；插件管理页显示"已加载"、版本/作者/说明与 manifest.json 一致。</li>
-  <li><b>启用</b>：权限点种子成功（数据库 permissions 表新增）、预设角色授权成功、模型表 <code>SHOW TABLES / .tables</code> 存在、侧边栏菜单在有 <code>my_plugin:manage</code> 权限的角色下显示。</li>
-  <li><b>后台 CRUD</b>：创建/编辑/删除/批量 → 审计日志有记录、模块筛选下拉含「我的插件」、<code>?module=my_plugin</code> 过滤命中。</li>
-  <li><b>模板</b>：前台调用模板函数 → 渲染；禁用插件 → 同一个模板不报错、返回 fallback 空值。</li>
-  <li><b>前台路由</b>：动态详情 200；伪静态开启时 <code>/my-&lt;id&gt;.html</code> 200，关闭时 404 且核心 <code>/article-&lt;id&gt;.html</code>、<code>/{slug}-{N}.html</code> 分页不被劫持。</li>
-  <li><b>API</b>：<code>api_enable=on</code> 200，<code>off</code> 404；有 Token 时缺失/错误返回 401；CORS 头匹配配置；插件禁用后 API 返回 404。</li>
-  <li><b>sitemap</b>：有详情页的插件 → sitemap.xml 含 <code>&lt;loc&gt;</code>；禁用插件 → sitemap 中消失。</li>
-  <li><b>演示数据钩子</b>：两次调用 generate（幂等）→ 记录数不变、无 IntegrityError；服务业/制造业分支覆盖。</li>
-  <li><b>禁用</b>：插件管理页禁用 → 前台路由/API/菜单/sitemap 全部隐身；<b>重新启用</b> → 历史数据全部恢复可见，权限点/授权/建表动作不重复。</li>
-  <li><b>升级兼容</b>：在 v2.1.1 已运行实例上覆盖代码 → 无需重启即可看到插件管理页、启用后立即生效。</li>
-</ul>
-
-<h3 id="pd-common">9. 常见陷阱与最佳实践</h3>
+<h3 id="pd-admin-tpl">11. 后台页面模板要点</h3>
+<p>后台模板继承 <code>admin/base.html</code>，注意三点：</p>
 <ul>
-  <li>后台路由 endpoint 命名：<code>admin.my_plugin_{action}</code>。<b>不要自己注册新蓝本</b>，否则后台前缀切换时你的插件路由不会即时失效。</li>
-  <li>文件名判断上传类型时，用 <code>secure_filename 之前</code>的原始文件名取后缀（核心 <code>save_upload_file</code> 已处理，直接复用即可）。</li>
-  <li>模板中使用字典时，<code>g['items']</code> 不要写成 <code>g.items</code>——后者会命中 dict 的 <code>items()</code> 方法而非键值。</li>
-  <li>新建数据库时，模型 import 必须发生在 <code>db.create_all()</code> 之前。核心在应用工厂最后才执行 <code>create_all</code>，因此你的 <code>__init__.py</code> 必须显式 <code>from . import admin</code>（<code>admin.py</code> 再导入 <code>models.py</code>），保证模型已被注册。</li>
-  <li>插件 <code>__init__.py</code> 末尾一定要实例化为 <code>plugin = MyPlugin()</code>，否则 <code>plugin_system</code> 会判定加载失败（且没有友好提示）。</li>
-  <li>伪静态产品 URL <code>/product-{id}.html</code> 优先级<b>必须高于</b>栏目分页规则 <code>/{slug}-{N}.html</code>；核心 <code>frontend_routes.py</code> 已确保此顺序，新增插件时若声明 <code>/foo-{id}.html</code> 格式，要在 README 注明并加入回归测试。</li>
+  <li><b>菜单高亮对齐</b>：模板内 <code>{% set active_menu = 'recruit_job' %}</code>，与 <code>get_admin_menu()</code> 里对应项的 <code>active_prefix</code> 一致；父组展开判断用 startswith，因此 <code>recruit_job</code> / <code>recruit_app</code> 都能点亮 <code>recruit</code> 组。</li>
+  <li><b>脚本块名是 <code>{% block js %}</code></b>（不是 scripts）——父模板不存在的块会静默丢弃，导致你写的弹窗/初始化 JS 整段消失且无报错。</li>
+  <li><b>富文本编辑器</b>：岗位介绍直接复用核心自托管 CKEditor5（GPL license、zh-cn 语言包）：</li>
 </ul>
+<pre><code>{% block js %}
+&lt;script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"&gt;&lt;/script&gt;
+&lt;script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"&gt;&lt;/script&gt;
+&lt;script&gt;
+  let editor = null;
+  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), {
+    licenseKey: 'GPL', language: 'zh-cn',
+    removePlugins: ['AIAssistant', ...],
+  }).then(e =&gt; { editor = e; });
+  // 提交前把编辑器内容写回 textarea（ClassicEditor 不进 CKEDITOR.instances）
+  document.getElementById('job-form').addEventListener('submit', function(){
+    if (editor) document.querySelector('#content').value = editor.getData();
+  });
+&lt;/script&gt;
+{% endblock %}</code></pre>
+<div class="warn"><b>实战教训</b>：创建编辑器只调用一次并保存实例引用（<code>.then(e =&gt; editor = e)</code>）。若既 <code>.catch()</code> 兜底又重复 <code>create()</code>，页面会出现两个编辑器实例、数据丢失。</div>
+<p>列表页通用结构：筛选表单（keyword/status）+ 复选框批量表单 + 分页（<code>pagination.iter_pages()</code>）+ 状态徽标。岗位列表用 <code>j.is_expired()</code> 在截止时间列内联输出「招聘中 / 已截止」徽标，申请数列直接链接到筛选后的申请页。</p>
+
+<h3 id="pd-front-tpl">12. 前台页面模板要点</h3>
+<p>前台模板继承 <code>theme_base</code>（跟随当前主题的 base），渲染上下文需提供 <code>nav</code>（<code>_build_nav()</code>）与 <code>seo</code> 字典。招聘详情页把「申请表单」放右侧栏：</p>
+<ul>
+  <li><b>状态分支</b>：<code>{% if is_open %}</code> 渲染表单，<code>{% else %}</code> 渲染「招聘已截止」提示卡（含截止时间与返回列表链接）。</li>
+  <li><b>flash 消息</b>：表单上方 <code>get_flashed_messages(with_categories=true)</code> 展示校验错误与成功提示。</li>
+  <li><b>验证码</b>：<code>&lt;img src="{{ url_for('frontend.captcha') }}"&gt;</code>，点击刷新加时间戳 query；<code>name="captcha"</code> 与后端取值对应。</li>
+  <li><b>文件选择美化</b>：bootstrap custom-file + JS 把选中文件名写入 label（显示中文原始文件名）。</li>
+  <li><b>成功反馈</b>：提交后重定向 <code>?submitted=1</code>，详情页据此渲染成功提示（PRG 模式）。</li>
+</ul>
+
+<h3 id="pd-debug">13. 开发与调试流程</h3>
+<ol>
+  <li>在 <code>plugins/</code> 下按第二章结构创建目录与文件（slug 即目录名）。</li>
+  <li>启动应用（开发模式 <code>python run.py</code>，debug 自动重载）——启动时全量导入所有插件，导入失败会在管理页标红并显示原因，不拖垮站点。</li>
+  <li>后台「插件管理」→ <b>启用</b>：自动种子权限点、给预设角色补授权、<code>db.create_all()</code> 建表——全程幂等，可反复启停。</li>
+  <li>侧边栏出现插件菜单 → 开始 CRUD 迭代；前台验证 <code>/jobs</code>、详情、伪静态开关两种模式、禁用后 404。</li>
+  <li>改完代码重启生效（启停动作本身无需重启；插件代码变更需要重启进程重新导入）。</li>
+  <li>发布：把插件目录打包为 zip（含 <code>manifest.json</code> + <code>__init__.py</code>）→ 其他站点「插件管理 → 上传插件」直接可用；也可在本站「下载」按钮导出当前源码包。</li>
+</ol>
+
+<h3 id="pd-lifecycle">14. 生命周期：上传 / 下载 / 卸载（builtin: false 的意义）</h3>
+<ul>
+  <li><b>上传</b>：8 层校验（格式/完整性/路径穿越/符号链接/manifest/必备文件/根识别/目标检查），全程临时目录，失败不落盘。</li>
+  <li><b>下载</b>：一键打包 zip（单目录形态），含全部源码与模板，可在其他站点直接上传复用；写入导出审计。</li>
+  <li><b>卸载</b>：红色警告模态框 + 图形验证码二次确认后物理删除 <code>plugins/recruit/</code>；<b>内置（builtin:true）或启用中禁止卸载</b>；卸载后运行期注册表同步移除（菜单/导航/聚合立即消失），<b>数据表与数据保留</b>——重新上传同名插件包即恢复。</li>
+  <li>发布到社区时建议 <code>builtin: false</code>（用户可自主卸载）；官方随核心分发的插件才标 <code>true</code>。</li>
+</ul>
+
+<h3 id="pd-test">15. 自测清单（插件发布前必过）</h3>
+<ul class="check">
+  <li>插件目录放入后，启动应用无异常；插件管理页显示"已加载"、版本/作者/说明与 manifest.json 一致，<b>非内置插件显示卸载/下载按钮</b>。</li>
+  <li><b>启用</b>：权限点种子成功、预设角色授权成功、插件表存在（<code>recruit_jobs</code> / <code>recruit_applications</code>）、侧边栏菜单按权限显示。</li>
+  <li><b>后台 CRUD</b>：创建/编辑/删除/批量 → 审计日志有记录、模块筛选下拉含「招聘管理」；非法输入（空标题/坏日期）被拒绝且有提示。</li>
+  <li><b>前台路由</b>：动态 200；伪静态开 <code>/job-&lt;id&gt;.html</code> 200、关 404；核心 <code>/article-&lt;id&gt;.html</code>、分页 <code>/{slug}-{N}.html</code> 不被劫持。</li>
+  <li><b>表单与上传</b>：验证码错误拒绝且一次性消费；截止前后台双重拒绝；docx/xlsx/pdf 成功入库落盘，exe 等非法类型拒绝；简历下载原始文件名正确。</li>
+  <li><b>前台导航</b>：启用后各主题导航出现插件入口；禁用后消失；与栏目导航并存不重复。</li>
+  <li><b>模板函数</b>：主题中调用 → 渲染；禁用插件 → 同一模板不报错、返回 fallback 空值。</li>
+  <li><b>API（如有）</b>：<code>api_enable=on</code> 200 / off 404；Token 缺失 401；插件禁用后 404。</li>
+  <li><b>sitemap</b>：<code>/sitemap.xml</code> 含插件 URL；禁用后消失。</li>
+  <li><b>禁用/重启用</b>：禁用 → 路由/菜单/导航/API/sitemap 全部隐身；重新启用 → 历史数据恢复，权限/建表不重复。</li>
+  <li><b>卸载</b>：验证码确认后目录删除、列表消失；数据表保留；重新上传同名包恢复。</li>
+</ul>
+
+<h3 id="pd-common">16. 常见陷阱与最佳实践</h3>
+<ul>
+  <li>后台路由 endpoint 命名：<code>admin.recruit_*</code>。<b>不要为后台自注册新蓝本</b>，否则后台前缀切换时你的路由不会即时失效；前台才用独立蓝图。</li>
+  <li>前台模板生成插件对象链接时用注册的 URL 全局函数（<code>recruit_job_url(j)</code>），<b>不要写 <code>{{ j.url }}</code></b>——模型没有该属性时 Jinja 静默输出空 href。</li>
+  <li>文件名判断上传类型时，用 <code>secure_filename</code> 之前的<b>原始文件名</b>取后缀（中文文件名经 secure_filename 处理后缀会丢；核心 <code>save_upload_file</code> 已处理，直接复用）。</li>
+  <li>新建数据库时，模型 import 必须发生在 <code>db.create_all()</code> 之前——<code>__init__.py</code> 顶部显式 <code>from . import admin</code>（admin.py 再导入 models.py）。</li>
+  <li><code>__init__.py</code> 末尾必须 <code>plugin = RecruitPlugin()</code>，否则核心判定插件加载失败。</li>
+  <li>声明伪静态路由（如 <code>/job-&lt;id&gt;.html</code>）后，把它加入回归测试：确保核心 <code>/article-&lt;id&gt;.html</code> 与栏目分页 <code>/{slug}-{N}.html</code> 不被劫持。</li>
+  <li>验证码校验后立即 <code>session.pop</code>（一次性消费，防重放）；前台交互页不要接页面缓存。</li>
+  <li>模板中使用字典时写 <code>g['items']</code> 而非 <code>g.items</code>——后者命中 dict 的 <code>items()</code> 方法。</li>
+  <li>后台模板脚本块是 <code>{% block js %}</code>；子模板定义父模板不存在的块名会被静默丢弃（无报错）。</li>
+  <li>业务规则（如截止时间判断）收口在模型方法，前后台共用，避免散落的时间比较。</li>
+</ul>
+</section>
+
+<section id="theme-mgr">
+<h2>十七、主题管理（v2.2）</h2>
+<p>入口：后台侧边栏「系统设置 → 主题管理」（权限点：<code>system:settings</code>）。v2.2 起前台主题的<b>切换、上传、删除、下载</b>统一在本页完成，「网站设置」中的原主题下拉框已移除并替换为引导卡片。</p>
+
+<h3 id="tm-list">1. 主题列表</h3>
+<p>列出 <code>themes/</code> 目录下全部主题的名称、版本、作者、说明、模板数与状态：</p>
+<ul>
+  <li><b>使用中</b>（绿色高亮）：当前启用主题，行内提示「已是当前使用中」。</li>
+  <li><b>未启用</b>：可一键启用。</li>
+  <li><b>模板不完整</b>（标红）：缺失必备模板，操作按钮灰显，悬停提示缺失明细与补齐指引。</li>
+  <li>官方内置主题带「官方内置」徽标（manifest <code>builtin:true</code>，共 default/blue/manufacturing/service 四套）。</li>
+</ul>
+
+<h3 id="tm-upload">2. 上传主题</h3>
+<p>支持 <code>.zip / .tar.gz / .tgz</code> 压缩包，单目录形态（<code>&lt;slug&gt;/manifest.json ...</code>）或平铺形态（manifest 在包根）均可，自动归一化。上传需通过 8 步校验：</p>
+<table class="tbl">
+  <thead><tr><th>#</th><th>校验项</th><th>失败处理</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>扩展名白名单（.zip/.tar.gz/.tgz）</td><td>拒绝</td></tr>
+    <tr><td>2</td><td>压缩包完整性（损坏包）</td><td>拒绝</td></tr>
+    <tr><td>3</td><td>路径穿越（预检 + <code>_safe_join</code> 双重拦截）</td><td>拒绝</td></tr>
+    <tr><td>4</td><td>符号链接 / 特殊文件</td><td>静默跳过</td></tr>
+    <tr><td>5</td><td>manifest 合法 JSON + slug 符合 <code>^[a-zA-Z0-9_-]{2,32}$</code></td><td>拒绝</td></tr>
+    <tr><td>6</td><td>必备模板 7 个全量存在（<code>index/list/article/page/base/404/500.html</code>，<code>template_required</code> 可追加）</td><td>拒绝并列出缺失项</td></tr>
+    <tr><td>7</td><td>形态 A / B 自动归一化</td><td>—</td></tr>
+    <tr><td>8</td><td>内置主题禁止覆盖；同名自定义主题需先删除旧目录再上传</td><td>拒绝 / 先删后传</td></tr>
+  </tbody>
+</table>
+<div class="note">上传全程使用临时目录，任何校验失败<b>不写入 <code>themes/</code></b>，finally 彻底清理临时文件；成功后写入上传审计（含 action/version/author/file_count/size_kb）。</div>
+
+<h3 id="tm-activate">3. 启用主题</h3>
+<p>启用前再次强检必备模板，缺失直接拒绝；通过后写入 Setting <code>site_theme</code> 并记录 <code>OP_CONFIG_CHANGE</code> 审计（含旧主题 → 新主题）。前台<b>即时生效、无需重启</b>；模板解析链保持「主题覆盖 → 插件自带 → default 兜底」。</p>
+
+<h3 id="tm-delete">4. 删除主题</h3>
+<ul>
+  <li>点击「删除」弹出红色警告模态框，需输入<b>图形验证码</b>确认（一次性消费防重放，独立于登录验证码）后才会物理删除 <code>themes/&lt;slug&gt;/</code> 目录。</li>
+  <li><b>官方内置主题不可删除</b>（会导致系统模板缺失）；<b>启用中的主题不可删除</b>（须先切换到其他主题，含目录名与 manifest slug 双重判断）。</li>
+  <li>删除动作写入 <code>OP_DELETE</code> 审计。</li>
+</ul>
+
+<h3 id="tm-download">5. 打包下载主题</h3>
+<p>列表「下载」按钮把主题目录打包为 zip（单目录形态，与上传校验完全兼容），含 <code>css/</code>、<code>js/</code>、<code>images/</code>、<code>fonts/</code> 全部静态资源，可在其他站点直接上传复用；下载写入导出审计（含版本/文件数/大小）。</p>
+
+<h3 id="tm-fallback">6. 安全兜底</h3>
+<p><code>get_active_theme()</code> 在当前启用主题目录不存在或模板不全时自动回退 <code>default</code> 主题，即使主题目录被误删，前台也不会白屏。</p>
 </section>
 
 <footer>

@@ -23,12 +23,13 @@ from ..extensions import db
 from ..models.column import Column, ColumnField
 from ..models.article import Article, ArticleFieldValue
 from ..models.fragment import Fragment
-from ..models.friend_link import FriendLink
 from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
 from ..models.setting import Setting
 from ..models.workflow import STATUS_PUBLISHED
 from ..utils.uploads import save_upload_file
-from ..utils.themes import theme_template, get_column_template
+from ..utils.themes import (
+    theme_template, get_column_template, THEMES_DIR, THEME_SLUG_RE,
+)
 from ..utils.captcha import generate_captcha
 from . import frontend_bp
 
@@ -124,9 +125,26 @@ def _inject_default_alt(html):
 # ============================================================
 
 def _build_nav():
-    """构建导航树。"""
+    """构建导航树：启用栏目 + 启用插件贡献的菜单项（追加在树尾）。
+
+    插件菜单项构造为 type='link' 的虚拟外链栏目节点，主题导航宏的
+    外链分支（col.name / col.link_url / col.link_target）可直接渲染，
+    各主题无需为插件单独改造。
+    """
     columns = Column.get_tree(enabled_only=True)
-    return Column.build_nested(columns)
+    tree = Column.build_nested(columns)
+    try:
+        from ..plugin_system import plugin_frontend_menus
+        from types import SimpleNamespace
+        for m in plugin_frontend_menus():
+            fake_col = SimpleNamespace(
+                type='link', name=m['label'],
+                link_url=m['url'], link_target=m['target'],
+            )
+            tree.append({'node': fake_col, 'children': []})
+    except Exception:
+        pass
+    return tree
 
 
 def _seo(column=None, article=None):
@@ -201,9 +219,7 @@ def index():
         parent_id=None, type='page', is_enabled=True, is_deleted=False
     ).order_by(Column.sort_order.desc()).first()
 
-    friend_links = FriendLink.query.filter_by(
-        is_enabled=True, is_deleted=False
-    ).order_by(FriendLink.sort_order.desc()).all()
+    # 友情链接改由 friend_link 插件提供（模板全局函数 friend_links()，禁用时返回 []）
 
     list_columns = Column.query.filter_by(
         type='list', is_enabled=True, is_deleted=False
@@ -227,7 +243,7 @@ def index():
     # 图片默认 ALT 注入（对内容型单页的 page_content，留空由单页渲染处处理）
     return render_template(
         theme_template('index'),
-        nav=nav, friend_links=friend_links,
+        nav=nav,
         first_page=top_pages, latest_articles=latest_articles,
         about_col=about_col,
         products_col=products_col, products=products,
@@ -537,7 +553,7 @@ def form_submit(slug):
 
 
 # ============================================================
-# 验证码 / 搜索 / 根文件
+# 验证码 / 主题静态资源 / 搜索 / 根文件
 # ============================================================
 
 @frontend_bp.route('/captcha')
@@ -547,6 +563,30 @@ def captcha():
     resp = current_app.response_class(image_data, mimetype='image/png')
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
+    return resp
+
+
+@frontend_bp.route('/themes/<slug>/<path:filename>')
+def theme_asset(slug, filename):
+    """主题静态资源：/themes/<主题>/css、js、images、fonts 下的文件。
+
+    主题静态资源随主题目录分发（base.html 通过 current_theme 引用）。
+    安全：slug 正则校验 + 仅允许四个资源子目录 + 拒绝 .. 与反斜杠，
+    send_from_directory 本身再做一层路径穿越防护。
+    """
+    if not THEME_SLUG_RE.match(slug or ''):
+        abort(404)
+    fn = (filename or '').replace('\\', '/')
+    if not fn.startswith(('css/', 'js/', 'images/', 'fonts/')):
+        abort(404)
+    parts = [p for p in fn.split('/') if p not in ('', '.')]
+    if not parts or any(p == '..' for p in parts):
+        abort(404)
+    theme_dir = os.path.join(THEMES_DIR, slug)
+    if not os.path.isdir(theme_dir):
+        abort(404)
+    resp = send_from_directory(theme_dir, '/'.join(parts))
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
     return resp
 
 

@@ -6,7 +6,58 @@
 {% block breadcrumb %}<li class="breadcrumb-item active">插件管理</li>{% endblock %}
 
 {% block content %}
-<div class="card">
+
+{# ------- 上传插件压缩包卡片 ------- #}
+<div class="card card-outline card-primary">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fas fa-cloud-upload-alt mr-1"></i>上传插件压缩包
+    </h3>
+    <div class="card-tools">
+      <span class="badge badge-warning mr-1">支持格式：{{ allowed_exts }}</span>
+      <span class="badge badge-info">启用仍需手动，即时生效</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <form id="plug_upload_form" method="post" action="{{ url_for('admin.plugin_upload') }}"
+          enctype="multipart/form-data"
+          onsubmit="var btn=this.querySelector('button[type=submit]'); if(btn){btn.disabled=true;btn.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> 上传中…';}return true;">
+      <div class="row align-items-end">
+        <div class="col-12 col-md-8">
+          <div class="form-group mb-md-0">
+            <label>选择压缩包 <span class="text-danger">*</span></label>
+            <div class="custom-file">
+              <input type="file" id="plug_archive" name="archive"
+                     accept=".zip,.tar.gz,.tgz,application/zip,application/x-tar"
+                     class="custom-file-input" required>
+              <label class="custom-file-label" for="plug_archive">选择压缩包文件…</label>
+            </div>
+            <small class="text-muted d-block mt-1">
+              必备文件：<b>{{ required_files }}</b>（api.py 等为可选）。压缩包结构支持：
+              <code>my_plugin.zip → my_plugin/...</code>（推荐） 或
+              <code>my_plugin.zip → ...平铺文件</code>（自动识别并放入同名目录）。
+            </small>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <button type="submit" class="btn btn-primary btn-block btn-flat">
+            <i class="fas fa-upload"></i> 上传并解压
+          </button>
+        </div>
+      </div>
+      <div class="alert alert-warning mt-2 mb-0 py-2 px-3" style="font-size:13px;">
+        <b>安全与校验说明：</b>
+        压缩包会进行 8 项校验（扩展名白名单 / 路径穿越拦截 / 绝对路径拦截 / 符号链接跳过 /
+        manifest.json 合法性 / slug 格式 / 必备文件存在 / 已存在目录禁止覆盖）；
+        任一失败立即回滚，不写入 <code>plugins/</code>。
+        上传成功后应用仍处于旧状态：<b>如未发现新插件请重启应用重新加载</b>。
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ------- 已发现插件列表 ------- #}
+<div class="card mt-3">
   <div class="card-header">
     <h3 class="card-title">已发现插件</h3>
     <div class="card-tools">
@@ -22,7 +73,7 @@
           <th>功能说明</th>
           <th width="140">权限点</th>
           <th width="110">状态</th>
-          <th width="120">操作</th>
+          <th width="245">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -70,13 +121,33 @@
               {% endif %}
             </form>
             {% else %}
-            <span class="text-muted" style="font-size:12px;" title="{{ p.error }}">查看错误</span>
+            <span class="text-muted" style="font-size:12px;" data-toggle="tooltip" title="{{ p.error }}">查看错误</span>
             {% endif %}
+            {% if p.builtin %}
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled data-toggle="tooltip"
+                    title="官方内置插件不支持卸载；如不需要可禁用">
+              <i class="fas fa-trash"></i> 卸载</button>
+            {% elif p.enabled %}
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled data-toggle="tooltip"
+                    title="插件启用中，请先禁用再卸载">
+              <i class="fas fa-trash"></i> 卸载</button>
+            {% else %}
+            <button type="button" class="btn btn-outline-danger btn-sm" data-toggle="tooltip"
+                    title="卸载并删除插件目录（不可恢复）"
+                    onclick="askDeletePlugin(this)"
+                    data-slug="{{ p.slug }}" data-name="{{ p.name }}">
+              <i class="fas fa-trash"></i> 卸载</button>
+            {% endif %}
+            <a class="btn btn-outline-info btn-sm" data-toggle="tooltip"
+               title="打包下载为 zip（可在其他站点上传复用）"
+               href="{{ url_for('admin.plugin_download', slug=p.slug) }}">
+              <i class="fas fa-download"></i> 下载</a>
           </td>
         </tr>
         {% else %}
         <tr><td colspan="6" class="text-center text-muted py-4">
-          未发现任何插件（请将插件放入项目根 plugins/ 目录并重启服务）
+          未发现任何插件：请使用上方「上传插件压缩包」或手动放入项目根
+          <code>plugins/</code> 目录后<b>重启应用</b>重新加载。
         </td></tr>
         {% endfor %}
       </tbody>
@@ -86,4 +157,82 @@
     提示：启用插件将自动创建其权限点并授权给预设角色；禁用不删除数据，重新启用后原样恢复。
   </div>
 </div>
+
+{# ------- 卸载确认模态框 ------- #}
+<div class="modal fade" id="delPluginModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-danger">
+        <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> 危险操作：确认卸载插件</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <form id="delPluginForm" method="post" action="" autocomplete="off">
+        <div class="modal-body">
+          <p>即将卸载插件：<b id="delPluginName"></b></p>
+          <div class="callout callout-danger py-2 px-3" style="font-size:13px;">
+            <p class="mb-1"><b>此操作不可恢复！</b>将从服务器 <code>plugins/</code>
+              目录中永久删除该插件的全部代码文件。</p>
+            <p class="mb-0">插件的数据表与数据将保留；重新上传同名插件包可恢复使用。官方内置插件不支持卸载。</p>
+          </div>
+          <div class="form-group">
+            <label>请输入右侧图形验证码以确认卸载 <span class="text-danger">*</span></label>
+            <div class="input-group" style="max-width:330px;">
+              <input type="text" name="captcha" class="form-control" placeholder="验证码（不区分大小写）" required autocomplete="off">
+              <div class="input-group-append">
+                <img id="delPluginCaptchaImg" src="{{ url_for('admin.delete_captcha_image') }}"
+                     alt="验证码" title="看不清？点击刷新"
+                     style="height:40px;cursor:pointer;border:1px solid #dee2e6;border-left:0;border-radius:0 .25rem .25rem 0;">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between">
+          <span class="text-muted" style="font-size:12px;"><i class="fas fa-info-circle"></i> 看不清可点击验证码图片刷新</span>
+          <div>
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+            <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> 确认卸载</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+  // Custom file label 显示文件名（支持中文）
+  document.getElementById('plug_archive').addEventListener('change', function () {
+    var label = this.nextElementSibling;
+    label.textContent = this.files.length ? this.files[0].name : '选择压缩包文件…';
+  });
+  // 上传按钮防重复 + 为空时阻止提交
+  document.getElementById('plug_upload_form').addEventListener('submit', function (e) {
+      var inp = this.querySelector('input[name=archive]');
+      if (!inp || !inp.files || !inp.files.length) {
+        e.preventDefault();
+        alert('请选择插件压缩包');
+      }
+    });
+  // 卸载确认弹窗
+  var DEL_CAPTCHA_URL = "{{ url_for('admin.delete_captcha_image') }}";
+  function refreshPluginDelCaptcha() {
+    document.getElementById('delPluginCaptchaImg').src =
+      DEL_CAPTCHA_URL + '?t=' + Date.now();
+  }
+  function askDeletePlugin(btn) {
+    var slug = btn.getAttribute('data-slug');
+    var name = btn.getAttribute('data-name');
+    document.getElementById('delPluginName').textContent =
+      name + '（' + slug + '）';
+    var tpl = "{{ url_for('admin.plugin_delete', slug='__SLUG__') }}";
+    document.getElementById('delPluginForm').action =
+      tpl.replace('__SLUG__', encodeURIComponent(slug));
+    document.querySelector('#delPluginForm input[name=captcha]').value = '';
+    refreshPluginDelCaptcha();
+    $('#delPluginModal').modal('show');
+  }
+  document.getElementById('delPluginCaptchaImg')
+    .addEventListener('click', refreshPluginDelCaptcha);
+</script>
 {% endblock %}

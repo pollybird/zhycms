@@ -222,6 +222,7 @@ def get_plugin_records():
             'enabled': rec.slug in current,
             'error': rec.error,
             'loaded': rec.loaded,
+            'builtin': bool(rec.manifest.get('builtin')),
             'menu': menu,
             'permissions': getattr(rec.instance, 'permissions', []) if rec.instance else [],
         })
@@ -280,6 +281,23 @@ def disable_plugin(slug):
     set_enabled_slugs(slugs)
 
 
+def remove_record(slug):
+    """卸载插件后从运行期注册表移除记录（列表/菜单/聚合钩子立即消失），
+    并清理 sys.modules 缓存，便于同进程内重新上传同名插件。"""
+    import sys
+    rec = _by_slug.pop(slug, None)
+    if rec is not None:
+        try:
+            _registry.remove(rec)
+        except ValueError:
+            pass
+    prefix = f'plugins.{slug}'
+    for key in [k for k in sys.modules
+                if k == prefix or k.startswith(prefix + '.')]:
+        sys.modules.pop(key, None)
+    return rec is not None
+
+
 # ============================================================
 # 聚合钩子（菜单 / 审计模块 / sitemap / 演示数据）
 # ============================================================
@@ -328,6 +346,31 @@ def plugin_audit_modules():
         except Exception:
             pass
     return mods
+
+
+def plugin_frontend_menus():
+    """前台导航聚合（v2.2.0）：启用插件贡献的菜单项。
+    返回 [{'label', 'url', 'target'}, ...]，单个插件异常静默跳过。
+    """
+    current = enabled_slugs()
+    items = []
+    for rec in _registry:
+        if rec.slug not in current or rec.instance is None:
+            continue
+        try:
+            for m in (rec.instance.get_frontend_menu() or []):
+                if not isinstance(m, dict):
+                    continue
+                label = (m.get('label') or '').strip()
+                url = (m.get('url') or '').strip()
+                if label and url:
+                    items.append({
+                        'label': label, 'url': url,
+                        'target': (m.get('target') or '').strip(),
+                    })
+        except Exception:
+            pass
+    return items
 
 
 def collect_sitemap_urls():
