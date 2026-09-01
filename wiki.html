@@ -100,12 +100,15 @@
   <a href="#pd-lifecycle" class="sub">上传/下载/卸载</a>
   <a href="#pd-test" class="sub">自测清单</a>
   <a href="#theme-mgr" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十七、主题管理（v2.2）</a>
+  <a href="#i18n" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十八、国际化（v2.3）</a>
+  <a href="#i18n-config" class="sub">后台配置与语言切换</a>
+  <a href="#i18n-dev" class="sub">模板标记与翻译工作流</a>
 </nav>
 
 <main>
 <header class="hero">
-  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.2.0</span></h1>
-  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>REST 内容 API</b> · <b>插件机制与开发指引</b> · <b>主题管理</b> · <b>v1.1&rarr;v2.0 升级迁移</b></p>
+  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.3.0</span></h1>
+  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>REST 内容 API</b> · <b>插件机制与开发指引</b> · <b>主题管理</b> · <b>国际化</b> · <b>v1.1&rarr;v2.0 升级迁移</b></p>
 </header>
 
 <section id="intro">
@@ -119,14 +122,15 @@
 <h2>特性一览</h2>
 <ul>
   <li><b>多主题模板系统</b>：前台模板按主题组织，后台一键切换。内置 <code>default</code>、<code>blue</code> 两套通用聚合主题，以及 <code>manufacturing</code>（制造业）、<code>service</code>（服务业）两套行业专用主题。</li>
-  <li><b>演示数据一键生成</b>：初始化时可选「制造业」或「服务业」示例，自动生成栏目、文章、碎片与演示图片并切换主题；勾选的官方插件还会通过演示数据钩子生成轮播图、产品、友情链接示例数据。</li>
+  <li><b>演示数据一键生成</b>：初始化时可选「制造业」或「服务业」示例，自动生成栏目、文章、碎片与演示图片并切换主题；勾选的官方插件还会通过演示数据钩子生成轮播图、产品、友情链接、表单示例数据。</li>
   <li><b>CMS 标识与企业标识分离</b>：后台 CMS 名称/版权固定不可改，前台网站名称/版权可独立配置。</li>
   <li><b>栏目级模板选择</b>：每个栏目可指定独立的列表页/内容页/单页模板，未指定自动回退默认。</li>
   <li><b>自定义字段</b>：栏目和文章支持自定义字段（文本/富文本/图片/文件/URL/数字等）。</li>
-  <li><b>表单收集</b>：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，带图形验证码防刷，提交数据可导出；<span class="tag">v2.0</span> 支持提交后邮件/企业微信实时通知。</li>
+  <li><b>表单收集</b>：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，带图形验证码防刷，提交数据可导出；<span class="tag">v2.0</span> 支持提交后邮件/企业微信实时通知；<span class="tag">v2.3</span> 起由核心功能转为官方内置插件（表名/路由/设置键不变，老站数据无缝保留）。</li>
   <li><b>SEO 优化 / 碎片管理 / 图片上传 / 验证码登录 / 首次初始化引导</b>。</li>
   <li><span class="tag">v2.0</span> <b>企业级能力</b>：RBAC 角色权限、审计日志、内容工作流与版本还原、数据库备份恢复、登录防暴破、上传内容安全校验、伪静态与页面缓存。</li>
   <li><span class="tag">v2.2</span> <b>插件优先架构</b>：轮播图、产品展示、友情链接均以官方内置插件提供，可随时启停；<code>friend_links()</code> 模板函数一行调用。</li>
+  <li><span class="tag">v2.3</span> <b>国际化与统计插件</b>：Flask-Babel 中英文自由切换（默认关闭）；官方内置统计代码插件（百度统计/GA4/站长工具/自定义代码，<code>analytics_head()</code>/<code>analytics_body()</code> 自动注入）；自定义表单转为官方内置插件。</li>
 </ul>
 </section>
 
@@ -134,7 +138,7 @@
 <h2>一、目录结构</h2>
 <pre><code>zhycms/
 &#9500;&#9472;&#9472; app/
-&#9474;   &#9500;&#9472;&#9472; admin/              # 后台模块（栏目、文章、表单、设置、用户、角色、审计、备份等）
+&#9474;   &#9500;&#9472;&#9472; admin/              # 后台模块（栏目、文章、设置、用户、角色、审计、备份、国际化等；表单已迁至插件）
 &#9474;   &#9500;&#9472;&#9472; frontend/           # 前台模块（路由与视图）
 &#9474;   &#9474;   &#9492;&#9472;&#9472; templates/
 &#9474;   &#9474;       &#9492;&#9472;&#9472; themes/     # &#9733; 前台主题模板目录
@@ -147,18 +151,23 @@
 &#9474;   &#9474;   &#9500;&#9472;&#9472; audit.py              # 审计日志（v2.0）
 &#9474;   &#9474;   &#9500;&#9472;&#9472; workflow.py           # 内容工作流与版本（v2.0）
 &#9474;   &#9474;   &#9500;&#9472;&#9472; backup.py / upload.py # 备份记录 / 上传文件索引（v2.0）
-&#9474;   &#9474;   &#9492;&#9472;&#9472; article.py / column.py / form.py / setting.py ...
+&#9474;   &#9474;   &#9492;&#9472;&#9472; article.py / column.py / setting.py ...  # 表单模型已迁至插件（v2.3）
+&#9474;   &#9500;&#9472;&#9472; translations/       # 国际化翻译文件（v2.3）：en/LC_MESSAGES/messages.po
+&#9474;   &#9500;&#9472;&#9472; i18n.py             # 国际化 locale 选择器与切换辅助（v2.3）
 &#9474;   &#9500;&#9472;&#9472; utils/              # 工具模块
 &#9474;   &#9474;   &#9500;&#9472;&#9472; uploads.py            # 上传安全：MIME 校验、SHA-256 去重、压缩缩略图（v2.0）
-&#9474;   &#9474;   &#9500;&#9472;&#9472; notify_utils.py       # 表单消息通知：邮件 + 企业微信（v2.0）
+&#9474;   &#9474;   &#9500;&#9472;&#9472; notify_utils.py       # 消息通知通用传输层：邮件 + 企业微信（v2.0；v2.3 起业务触发移至插件）
 &#9474;   &#9474;   &#9500;&#9472;&#9472; backup_utils.py       # 备份恢复引擎（v2.0）
 &#9474;   &#9474;   &#9500;&#9472;&#9472; admin_prefix.py       # 后台动态路由前缀（v2.0 即时生效）
 &#9474;   &#9474;   &#9492;&#9472;&#9472; themes.py / captcha.py / bootstrap.py / ip_locator.py ...
 &#9474;   &#9500;&#9472;&#9472; static/             # 静态资源（uploads/ 上传文件、admin/ 后台资源）
 &#9474;   &#9500;&#9472;&#9472; __init__.py         # 应用工厂 create_app
 &#9474;   &#9500;&#9472;&#9472; config.py           # 配置（含数据库 URI 解析）
-&#9474;   &#9492;&#9472;&#9472; extensions.py       # 扩展初始化
-&#9500;&#9472;&#9472; plugins/                # &#9733; 插件目录（v2.2）：官方内置 banner / product / friend_link + 自定义插件
+&#9474;   &#9500;&#9472;&#9472; plugin_system.py    # 插件运行时（v2.2）
+&#9474;   &#9500;&#9472;&#9472; plugin_api.py       # PluginBase 插件基类（v2.2）
+&#9474;   &#9492;&#9472;&#9472; extensions.py       # 扩展初始化（含 Flask-Babel，v2.3）
+&#9500;&#9472;&#9472; plugins/                # &#9733; 插件目录（v2.2）：官方内置 banner / product / friend_link / form / analytics + 自定义插件
+&#9500;&#9472;&#9472; babel.cfg               # pybabel 翻译提取配置（v2.3）
 &#9500;&#9472;&#9472; instance/               # 实例数据（数据库、db_config.json、admin_config.json、backups/）
 &#9500;&#9472;&#9472; requirements.txt        # 依赖清单（含 MySQL/PostgreSQL 驱动）
 &#9500;&#9472;&#9472; run.py                  # 启动入口
@@ -415,7 +424,7 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
 {{ url_for('frontend.column_detail', slug=column.slug) }}         {# 栏目页 #}
 {{ url_for('frontend.column_detail', slug=column.slug, page=2) }} {# 带分页 #}
 {{ url_for('frontend.article_detail', slug=column.slug, aid=article.id) }} {# 文章 #}
-{{ url_for('frontend.form_submit', slug=form.slug) }}             {# 表单 #}
+{{ url_for('form_frontend.form_submit', slug=form.slug) }}        {# 表单（v2.3 起由表单插件提供） #}
 {{ url_for('frontend.search') }}                                  {# 搜索 #}</code></pre>
 <h4>伪静态分页助手（v2.0）</h4>
 <p>v2.0 起全局注入 <code>frontend_pager_url(column, page)</code>：<b>SEO 高级中开启伪静态</b>时自动输出 <code>/{slug}-{N}.html</code>（第 1 页为 <code>/{slug}.html</code>），关闭时输出 <code>/column/{slug}?page=N</code>。<b>自定义列表模板的分页链接请统一使用该助手</b>，不要写死动态 URL：</p>
@@ -532,7 +541,7 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
 
 <section id="notify">
 <h2>十、表单消息通知</h2>
-<p>后台菜单 <b>系统设置 &rarr; 消息通知</b>（v2.0 新增）。配置后，前台表单每收到一条提交都会实时推送到指定渠道。</p>
+<p>后台菜单 <b>系统设置 &rarr; 消息通知</b>（v2.0 新增）。配置后，前台表单每收到一条提交都会实时推送到指定渠道。<b>v2.3 起自定义表单已转为官方内置插件</b>（<code>plugins/form</code>），本章配置页与设置键保持不变，通知由插件复用核心通用传输层发送；老站升级后首次启动自动启用表单插件，配置无缝保留。</p>
 <h3 id="notify-email">邮件通知</h3>
 <table>
   <tr><th>配置项</th><th>说明</th></tr>
@@ -610,6 +619,7 @@ a { color:#2e7d32; } a:hover { color:#1b5e20; }</code></pre>
 <section id="upgrade">
 <h2>十三、v1.1 &rarr; v2.0 升级迁移</h2>
 <p>正在运行 v1.1 及更早 1.x 版本的站点升级到 v2.0 前，请务必完整阅读项目根目录的 <b><code>UPGRADE.md</code></b>（升级迁移指南）。本章为速览。</p>
+<div class="note"><b>v2.2.x &rarr; v2.3.0 升级</b>：无数据库结构变更，覆盖代码 + <code>pip install -r requirements.txt</code>（新增 Flask-Babel）+ <code>pybabel compile -d app/translations</code>（可选，英文界面需要）即可；首次启动自动启用表单插件一次，详见 <code>UPGRADE.md</code> 对应章节。</div>
 
 <h3 id="upgrade-key">升级前必读：四个关键变化</h3>
 <table>
@@ -694,7 +704,7 @@ sudo apt install -y libmagic1        # Debian/Ubuntu
 </section>
 
 <section id="plugins">
-<h2>十五、插件机制（v2.2）</h2>
+<h2>十五、插件机制（v2.2 / v2.3）</h2>
 <p>v2.2 的核心底座是「插件优先架构」：所有非通用能力（轮播、产品、表单扩展、FAQ、招聘、下载中心、留言板…）都以插件形式开发，无需修改核心源码即可部署；启停只改一项 Setting 值，<b>即时生效、无需重启、禁用即隐身</b>。</p>
 
 <h3 id="pl-arch">1. 架构总览</h3>
@@ -712,6 +722,8 @@ sudo apt install -y libmagic1        # Debian/Ubuntu
     <tr><td>banner</td><td>轮播图</td><td>首页幻灯片、侧边广告位、横幅分组</td><td><code>banner_items('home-hero')</code>；<code>banner/hero_carousel.html</code> partial；<code>GET /api/v1/banners/&lt;slug&gt;</code></td></tr>
     <tr><td>product</td><td>产品展示</td><td>制造业/贸易产品库、相册 + 规格参数、区别普通文章</td><td><code>product_latest('products', 8)</code>；<code>/product-&lt;id&gt;.html</code> 伪静态；<code>list_product.html</code> 列表模板；<code>GET /api/v1/products/&lt;id&gt;</code></td></tr>
     <tr><td>friend_link</td><td>友情链接</td><td>站点友链管理（v2.2.0 起由核心功能转为内置插件，老站数据无缝保留）</td><td><code>friend_links()</code> 模板函数；后台 <code>/&lt;admin&gt;/friend-links</code>（路径与核心版一致）</td></tr>
+    <tr><td>form</td><td>自定义表单</td><td>可视化表单设计与提交收集（v2.3.0 起由核心功能转为内置插件，表名/路由/设置键/审计模块代码不变，老站数据无缝保留）</td><td>后台 <code>/&lt;admin&gt;/forms</code>；前台提交 <code>/form/&lt;slug&gt;</code>；权限 <code>form:view</code> / <code>form:manage</code>；老站升级自动启用一次</td></tr>
+    <tr><td>analytics</td><td>统计代码</td><td>百度统计 / Google Analytics 4 / 站长工具 / 自定义代码嵌入（v2.3 新增）</td><td>后台 <code>/&lt;admin&gt;/analytics</code> 配置页；前台模板 <code>&#123;&#123; analytics_head()|safe &#125;&#125;</code> / <code>&#123;&#123; analytics_body()|safe &#125;&#125;</code>（4 套内置主题已接入）；仅注入前台页面</td></tr>
   </tbody>
 </table>
 <div class="note">社区示例插件 <b>recruit（招聘管理）</b>（<code>builtin: false</code>）作为插件开发的完整实战样板：岗位 CRUD、招聘截止时间门控、简历上传（word/excel/pdf）、前台导航贡献与伪静态详情页——完整开发教程见<b>第十六章</b>，也可在插件管理页下载其源码包对照学习。</div>
@@ -732,7 +744,7 @@ sudo apt install -y libmagic1        # Debian/Ubuntu
   <li><b>行业联动</b>：选择任一行业演示数据时，<b>轮播图、友情链接</b>自动启用（无需勾选）；选<b>制造业</b>时<b>产品展示</b>也自动启用——制造业演示数据的产品页（多图相册/规格参数/伪静态详情）依赖 product 插件，演示钩子会把「精密零部件 / 自动化设备」子栏目切换为 <code>list_product</code> 模板。</li>
   <li>勾选 → 核心演示数据生成后立即调用 <code>run_demo_data_hooks(industry)</code>：banner 生成 <code>home-hero</code> 分组 3 张图（<b>初始化轮播数据由插件生成，不再写入 <code>home_banner_*</code> 碎片</b>）/ 制造业 6 产品 / 友情链接 3 条；同时自动绑定插件权限点（友情链接沿用核心时代策略，仅超级管理员可管理，可按需自行授权）。</li>
   <li>不勾选且不选演示数据 → 启用清单为空、不建插件数据、栏目模板不被改动；后续需要时在「插件管理」一键启用即可。</li>
-  <li><b>老站升级</b>：v2.1 及以前的站点升级后首次启动会自动启用友情链接插件一次（旧 <code>friend_links</code> 表数据与历史审计日志无缝保留），之后可随时在插件管理中禁用。行业主题中的碎片轮播兜底逻辑保留，老站升级后行为不变。</li>
+  <li><b>老站升级</b>：v2.1 及以前的站点升级后首次启动会自动启用友情链接插件一次（旧 <code>friend_links</code> 表数据与历史审计日志无缝保留），v2.2.x 升级到 v2.3.0 后首次启动会自动启用表单插件一次（旧 <code>forms</code>/<code>form_submissions</code> 等表数据、提交记录与通知配置无缝保留），之后均可随时在插件管理中禁用。行业主题中的碎片轮播兜底逻辑保留，老站升级后行为不变。</li>
 </ul>
 </section>
 
@@ -1318,6 +1330,53 @@ return send_file(path, as_attachment=True,
 
 <h3 id="tm-fallback">6. 安全兜底</h3>
 <p><code>get_active_theme()</code> 在当前启用主题目录不存在或模板不全时自动回退 <code>default</code> 主题，即使主题目录被误删，前台也不会白屏。</p>
+</section>
+
+<section id="i18n">
+<h2>十八、国际化（v2.3）</h2>
+<p>v2.3 基于 <b>Flask-Babel</b> 实现界面文案的中英文自由切换，前台 + 后台全站生效。<b>默认关闭</b>（<code>i18n_enable=0</code>）：关闭时全站按默认中文渲染，与 v2.2.0 行为完全一致，不影响现有中文站点；仅界面文案（菜单、按钮、提示等静态字符串）参与翻译，栏目名/文章标题等<b>内容数据不翻译</b>。</p>
+
+<h3 id="i18n-config">1. 后台配置与语言切换</h3>
+<p>入口：后台侧边栏「系统设置 → 国际化」（权限点：<code>system:settings</code>），可视化配置三项并写入审计日志：</p>
+<table class="tbl">
+  <thead><tr><th>设置项</th><th>默认值</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>国际化总开关 <code>i18n_enable</code></td><td>关闭</td><td>关闭时不读取翻译文件，全站中文渲染</td></tr>
+    <tr><td>默认语种 <code>i18n_default_locale</code></td><td><code>zh</code></td><td>所有自动检测失败后的兜底语种</td></tr>
+    <tr><td>可用语种清单 <code>i18n_available_locales</code></td><td><code>zh</code></td><td>逗号分隔，如 <code>zh,en</code>；决定语言切换器显示哪些语种</td></tr>
+  </tbody>
+</table>
+<p><b>语言切换器</b>：后台顶栏与前台主题 <code>base.html</code> 导航栏均会渲染语种下拉（全局函数 <code>available_locales()</code> / <code>current_locale()</code>）；未启用 i18n 或可用语种只有一个时自动隐藏。后台切换路由为 <code>/admin/set-locale?lang=xx&amp;next=...</code>，写入会话后跳回原页面。</p>
+<p><b>当前语种判定优先级</b>（[app/i18n.py](app/i18n.py)）：</p>
+<ol>
+  <li>URL 参数 <code>?lang=en</code>（一次性生效并写回 session）；</li>
+  <li>session 中记录的语种；</li>
+  <li>cookie 中的语种；</li>
+  <li>浏览器 <code>Accept-Language</code> 头自动匹配可用语种；</li>
+  <li>默认语种 <code>zh</code> 兜底。</li>
+</ol>
+
+<h3 id="i18n-dev">2. 模板标记与翻译工作流</h3>
+<p>核心模板中的可翻译字符串用 <code>_()</code> 标记：</p>
+<pre><code>&lt;!-- 后台/主题模板 --&gt;
+&lt;p&gt;&#123;&#123; _('仪表盘') &#125;&#125;&lt;/p&gt;
+&lt;input placeholder="&#123;&#123; _('搜索文章') &#125;&#125;"&gt;</code></pre>
+<p>翻译文件位于 <code>app/translations/&lt;语种&gt;/LC_MESSAGES/messages.po</code>（当前提供 <code>en</code> 英文）。<code>.po</code> 源文件入库，<code>.mo</code> 编译产物不入库（已在 <code>.gitignore</code> 排除），<b>部署时需编译一次</b>：</p>
+<pre><code># 安装提取工具（Babel 已随 Flask-Babel 安装）
+pip install Babel
+
+# 1. 修改模板后重新提取字符串
+pybabel extract -F babel.cfg -o app/translations/messages.pot app/
+
+# 2. 更新各语种 .po（新增字符串追加、删除字符串标记过期）
+pybabel update -i app/translations/messages.pot -d app/translations
+
+# 3. 手工补全/校对 .po 中的 msgstr 后编译
+pybabel compile -d app/translations
+
+# 新增语种（如日语）示例
+pybabel init -i app/translations/messages.pot -d app/translations -l ja</code></pre>
+<div class="note"><b>注意：</b>① <code>pybabel update</code> 可能把相近字符串模糊匹配为旧翻译，编译前请检查 <code>#, fuzzy</code> 标记行并修正；② 插件自带模板的字符串不在核心提取范围，插件国际化约定在 <code>plugins/&lt;slug&gt;/translations/</code> 自带翻译目录（首版未强制）；③ 中文（<code>zh</code>）为源语言，无需翻译文件。</div>
 </section>
 
 <footer>

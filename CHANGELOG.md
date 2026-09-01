@@ -5,6 +5,40 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.3.0] - 2026-09-01
+
+**国际化 + 统计插件 + 表单插件化**版本。**无数据库结构变更，v2.2.x 直接覆盖代码即可升级**；自定义表单由核心转为内置插件（表名/路由/设置键/审计模块代码不变，老站数据无缝保留），国际化默认关闭、不改变现有站点行为。
+
+### Added
+
+- **国际化（i18n，Flask-Babel）**：
+  - 中英文自由切换，前台 + 后台全站生效；新增语种仅需追加翻译目录并编译（`pybabel init/update/compile`），无需改代码。
+  - Locale 选择优先级：URL `?lang=xx`（一次性，写回 session）→ session → cookie → `Accept-Language` 自动匹配 → 默认语种 `zh` 兜底。
+  - 后台「系统设置 → 国际化」可视化配置页（权限 `system:settings`）：总开关、默认语种、可用语种清单，改动写入审计。
+  - 后台顶栏与前台主题 `base.html` 语言切换器（`available_locales()` / `current_locale()` 全局函数）；未启用时切换器自动隐藏。
+  - 切换路由 `/admin/set-locale`（归属核心）；核心模板（后台 base 与全部主题 base 等界面文案）已标记 `_()` 并提供英文翻译（`app/translations/en/LC_MESSAGES/messages.po`）。
+  - 默认关闭（`i18n_enable=0`）：关闭时全站按中文渲染，与 v2.2.0 行为完全一致；内容数据（栏目名/文章标题等动态数据）不在翻译范围，仅界面文案国际化。
+- **统计代码插件 `analytics`（官方内置）**：
+  - 后台「插件管理」独立配置页（权限 `analytics:manage`）：百度统计 / Google Analytics 4 / 站长工具（cnzz、51la 等）/ 自定义 head 与 body 代码，均为直接粘贴官方代码片段，保存即生效、无需重启。
+  - 前台注入采用「插件 Jinja 全局函数 + 主题注入点」模式：主题 `base.html` 的 `</head>` 前调用 `{{ analytics_head()|safe }}`、`</body>` 前调用 `{{ analytics_body()|safe }}`，4 套内置主题均已接入；禁用插件时函数返回空串、模板零报错。
+  - 仅注入前台页面，不注入后台管理页（避免后台流量污染统计）；设置存 Setting 键值（`analytics_*`），不建表、零迁移；操作写入审计（module=`analytics`）。
+
+### Changed
+
+- **自定义表单插件化（`form`，官方内置，v2.3.0 起由核心功能转为插件）**：
+  - 新增 `plugins/form/`（manifest / 模型 / 后台路由 / 前台提交路由 / 通知 / 演示数据钩子 / 管理页模板），后台路由挂核心 `admin_bp`，路径与端点名与核心版完全一致（`/<admin>/forms`）；前台提交地址 `/form/<slug>` 不变。
+  - **迁移四原则**（沿用 v2.2.0 友情链接迁移）：表名不变（`forms`/`form_fields`/`form_submissions`/`form_submission_values`）、审计模块代码不变（`form`/`form_submission`）、后台路由路径不变、通知设置键不变——旧表单数据、提交记录、历史审计日志、邮件/企业微信通知配置全部无缝保留。
+  - 权限点改为插件自有 `form:view`/`form:manage`（沿用核心时代策略）；提交通知由插件复用核心通用传输层 `app/utils/notify_utils.py`（邮件/企业微信发送实现保留在核心）。
+  - 核心移除：`app/models/form.py`、`app/admin/form.py`、`app/frontend/views.py` 表单提交视图、后台侧边栏固定「自定义表单」菜单项、演示数据内置表单生成（改由插件 `generate_demo_data` 钩子生成）。
+  - **老站升级自动迁移**：v2.2.x 升级后首次启动自动启用表单插件一次（`form_plugin_migrated` Setting 标记，新装站点初始化时写入、不触发），无需手工操作。
+- `notify_utils.py` 解耦为通用传输层：发送实现（SMTP 邮件/企业微信 Webhook）保留核心，业务触发移至插件，供各插件复用。
+- 仪表盘「自定义表单统计」卡片随插件门控懒加载，禁用插件后自动隐藏。
+
+### Fixed
+
+- 统计插件管理页模板路径：插件注册前台蓝图（即使无前台路由）将自身 `templates/` 目录加入 Jinja 搜索路径，杜绝 `TemplateNotFound`。
+- 表单插件后台菜单图标改用 Font Awesome 5 solid 图标（`fas` 前缀），并移除核心模板中硬编码的重复菜单。
+
 ## [2.2.0] - 2026-08-31
 
 **插件优先架构**大版本。**无数据库结构变更，v2.1.x 直接覆盖代码即可升级**；插件模型表随 `db.create_all()` 自动补齐，插件启停仅改 Setting 值、无需重启。
@@ -130,7 +164,8 @@ v2.0 的体验优化与缺陷修复版本，**无数据库结构变更**，v2.0 
 - 修复带路径参数路由（如文章列表）分页链接 BuildError。
 - 修复单页栏目自定义字段内容录入问题。
 
-[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.2.0...HEAD
+[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.3.0...HEAD
+[2.3.0]: https://gitee.com/pollybird/zhycms/compare/v2.2.0...v2.3.0
 [2.2.0]: https://gitee.com/pollybird/zhycms/compare/v2.1.1...v2.2.0
 [2.1.1]: https://gitee.com/pollybird/zhycms/compare/v2.1.0...v2.1.1
 [2.1.0]: https://gitee.com/pollybird/zhycms/compare/v2.0...v2.1.0
