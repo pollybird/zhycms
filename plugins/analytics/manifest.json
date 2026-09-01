@@ -1,0 +1,9 @@
+{
+  "slug": "analytics",
+  "name": "统计代码",
+  "version": "1.0.0",
+  "description": "第三方统计代码嵌入：百度统计/Google Analytics/站长工具/自定义 head/body 代码，后台配置即时生效，前台自动注入；v2.3.0 起作为内置插件",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "min_core_version": "2.3.0"
+}

@@ -1,6 +1,5 @@
-"""前台路由：首页、栏目、文章、表单提交、根文件（favicon/robots/sitemap）。
+"""前台路由：首页、栏目、文章、根文件（favicon/robots/sitemap）。
 升级点：
-  - 模块7：表单提交成功后触发 notify_utils.notify_form_submission（邮件+企业微信）
   - 模块8：缓存装饰器（基于 Flask-Caching）作用在首页/栏目/文章页面，Setting TTL 控制
   - 模块8：伪静态 URL（seo_rewrite_enable=on 时生效 /<slug>.html /article-<aid>.html）
   - 模块8：sitemap.xml 读取 Setting 的 changefreq/priority 配置（栏目/文章分别）
@@ -23,10 +22,9 @@ from ..extensions import db
 from ..models.column import Column, ColumnField
 from ..models.article import Article, ArticleFieldValue
 from ..models.fragment import Fragment
-from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
+# 自定义表单 v2.3.0 起转为内置插件 plugins/form，前台 /form/<slug> 路由由插件蓝本提供
 from ..models.setting import Setting
 from ..models.workflow import STATUS_PUBLISHED
-from ..utils.uploads import save_upload_file
 from ..utils.themes import (
     theme_template, get_column_template, THEMES_DIR, THEME_SLUG_RE,
 )
@@ -438,118 +436,6 @@ def article_short(aid):
         abort(404)
     return redirect(url_for('frontend.article_detail',
                             slug=article.column.slug, aid=article.id))
-
-
-# ============================================================
-# 表单提交（模块7：提交成功后触发消息通知）
-# ============================================================
-
-@frontend_bp.route('/form/<slug>', methods=['GET', 'POST'])
-def form_submit(slug):
-    form = Form.query.filter_by(slug=slug, is_deleted=False).first_or_404()
-    if not form.is_open:
-        return render_template(theme_template('form_closed'), form=form,
-                               nav=_build_nav(), seo=_seo()), 403
-
-    nav = _build_nav()
-    fields = form.fields.filter_by(is_deleted=False).order_by(FormField.sort_order.asc()).all()
-
-    if request.method == 'POST':
-        if form.submit_interval > 0:
-            cache_key = f'form_submit_{form.id}_{request.remote_addr}'
-            last = session.get(cache_key, 0)
-            now = int(time.time())
-            if now - last < form.submit_interval:
-                flash(f'提交过于频繁，请 {form.submit_interval - (now - last)} 秒后再试', 'danger')
-                return redirect(url_for('frontend.form_submit', slug=slug))
-
-        # 图形验证码
-        captcha = (request.form.get('captcha') or '').strip().lower()
-        session_captcha = (session.get('form_captcha') or '').lower()
-        session.pop('form_captcha', None)
-        if not session_captcha or captcha != session_captcha:
-            flash('验证码错误，请重新输入', 'danger')
-            return redirect(url_for('frontend.form_submit', slug=slug))
-
-        # 校验必填
-        errors = []
-        for f in fields:
-            val = request.form.get(f'field_{f.id}') or ''
-            file_obj = request.files.get(f'field_{f.id}')
-            if f.is_required and not val and not (file_obj and file_obj.filename):
-                errors.append(f'{f.label} 为必填项')
-
-        for f in fields:
-            val = (request.form.get(f'field_{f.id}') or '').strip()
-            if not val:
-                continue
-            if f.field_type == 'email' and '@' not in val:
-                errors.append(f'{f.label} 格式不正确')
-            elif f.field_type == 'phone' and not val.isdigit():
-                errors.append(f'{f.label} 必须为数字')
-
-        if errors:
-            for e in errors:
-                flash(e, 'danger')
-            return redirect(url_for('frontend.form_submit', slug=slug))
-
-        # 保存提交
-        sub = FormSubmission(
-            form_id=form.id,
-            ip=request.remote_addr or '',
-            user_agent=request.user_agent.string[:255] if request.user_agent else '',
-        )
-        db.session.add(sub)
-        db.session.flush()
-
-        fields_list = []  # 用于通知模块7：(label, value)
-        for f in fields:
-            value = None
-            if f.field_type == 'file':
-                file_obj = request.files.get(f'field_{f.id}')
-                if file_obj and file_obj.filename:
-                    allowed = f.allowed_exts.split(',') if f.allowed_exts else None
-                    rel, url, err = save_upload_file(
-                        file_obj, sub_dir=f'form/{form.slug}',
-                        allowed_exts=allowed, max_size=f.max_size
-                    )
-                    if err:
-                        flash(f'字段 {f.label} 上传失败：{err}', 'danger')
-                        db.session.rollback()
-                        return redirect(url_for('frontend.form_submit', slug=slug))
-                    value = url
-            elif f.field_type == 'checkbox':
-                values = request.form.getlist(f'field_{f.id}')
-                value = '|||'.join(values)
-            else:
-                value = request.form.get(f'field_{f.id}') or ''
-
-            if value is not None:
-                v = FormSubmissionValue(submission_id=sub.id, field_id=f.id, value=value)
-                db.session.add(v)
-                fields_list.append((f.label, value))
-
-        db.session.commit()
-        if form.submit_interval > 0:
-            session[cache_key] = int(time.time())
-
-        # 模块7：消息通知推送（异常不影响用户提交成功提示）
-        if Setting.get('form_notify_enable') == 'on':
-            try:
-                from ..utils.notify_utils import notify_form_submission
-                submit_page = request.referrer or url_for('frontend.form_submit',
-                                                          slug=slug, _external=True)
-                notify_form_submission(form, sub, fields_list, submit_page=submit_page)
-            except Exception:
-                current_app.logger.exception('notify form submission failed')
-
-        flash(form.success_message, 'success')
-        return redirect(url_for('frontend.form_submit', slug=slug))
-
-    return render_template(
-        theme_template('form'), form=form, fields=fields,
-        nav=nav, seo=_seo()
-    )
 
 
 # ============================================================

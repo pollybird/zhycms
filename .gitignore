@@ -32,6 +32,9 @@ app/static/uploads/
 *.bak
 *.tmp
 
+# ===== 国际化编译产物（部署时由 pybabel compile 生成，不入库）=====
+*.mo
+
 # ===== 环境变量（可能含密钥、数据库密码）=====
 .env
 .env.*

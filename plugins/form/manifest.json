@@ -1,0 +1,9 @@
+{
+  "slug": "form",
+  "name": "自定义表单",
+  "version": "1.0.0",
+  "description": "可视化表单设计与提交收集：字段类型/验证/文件上传/提交记录导出/邮件·企业微信通知；v2.3.0 起由核心功能转为内置插件，老站数据无缝保留",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "min_core_version": "2.3.0"
+}

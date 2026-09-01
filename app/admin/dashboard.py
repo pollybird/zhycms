@@ -11,12 +11,27 @@ from ..extensions import db
 from ..models.user import LoginLog, User
 from ..models.column import Column
 from ..models.article import Article
-from ..models.form import FormSubmission
 from ..models.workflow import STATUS_REVIEW
 from ..models.audit import AuditLog
 from ..utils.helpers import admin_required
 from ..utils.backup_utils import system_monitor_stats
+from ..plugin_system import plugin_enabled
 from . import admin_bp
+
+
+def _pending_form_submissions():
+    """待处理表单提交数（表单插件禁用时返回 0）。
+
+    自定义表单 v2.3.0 起转为内置插件 plugins/form，表单模型不再属于核心，
+    故此处按插件启用状态懒加载，禁用时仪表盘不展示该计数。
+    """
+    if not plugin_enabled('form'):
+        return 0
+    try:
+        from plugins.form.models import FormSubmission
+        return FormSubmission.query.filter_by(is_deleted=False, is_read=False).count()
+    except Exception:
+        return 0
 
 
 @admin_bp.route('/')
@@ -38,9 +53,7 @@ def dashboard():
         'articles_pending_review': Article.query.filter_by(
             is_deleted=False, status=STATUS_REVIEW
         ).count(),
-        'pending_submissions': FormSubmission.query.filter_by(
-            is_deleted=False, is_read=False
-        ).count(),
+        'pending_submissions': _pending_form_submissions(),
         'recent_logs': LoginLog.query.order_by(LoginLog.created_at.desc()).limit(8).all(),
         'recent_audits': AuditLog.query.order_by(AuditLog.created_at.desc()).limit(10).all(),
     }

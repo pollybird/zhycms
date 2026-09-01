@@ -1,0 +1,219 @@
+# English translations for ZhyCMS.
+# Copyright (C) 2026 ZhyCMS
+# This file is distributed under the same license as the ZhyCMS project.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: ZhyCMS 2.3.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-01 17:43+0800\n"
+"PO-Revision-Date: 2026-09-01 17:50+0800\n"
+"Last-Translator: ZhyCMS <dev@tzzhy.cn>\n"
+"Language: en\n"
+"Language-Team: en <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: app/admin/templates/admin/base.html:30
+msgid "查看前台"
+msgstr "View site"
+
+#: app/admin/templates/admin/base.html:53
+#: app/admin/templates/admin/base.html:231
+msgid "个人资料"
+msgstr "Profile"
+
+#: app/admin/templates/admin/base.html:54
+#: app/admin/templates/admin/base.html:236
+msgid "修改密码"
+msgstr "Change password"
+
+#: app/admin/templates/admin/base.html:56
+msgid "退出登录"
+msgstr "Sign out"
+
+#: app/admin/templates/admin/base.html:73
+msgid "仪表盘"
+msgstr "Dashboard"
+
+#: app/admin/templates/admin/base.html:80
+msgid "内容管理"
+msgstr "Content"
+
+#: app/admin/templates/admin/base.html:85
+msgid "栏目管理"
+msgstr "Columns"
+
+#: app/admin/templates/admin/base.html:95
+msgid "碎片管理"
+msgstr "Fragments"
+
+#: app/admin/templates/admin/base.html:100
+msgid "碎片分组"
+msgstr "Fragment groups"
+
+#: app/admin/templates/admin/base.html:105
+msgid "碎片字段"
+msgstr "Fragment fields"
+
+#: app/admin/templates/admin/base.html:134
+msgid "用户权限"
+msgstr "Users & permissions"
+
+#: app/admin/templates/admin/base.html:139
+msgid "用户列表"
+msgstr "Users"
+
+#: app/admin/templates/admin/base.html:144
+msgid "角色与权限"
+msgstr "Roles & permissions"
+
+#: app/admin/templates/admin/base.html:154
+msgid "审计日志"
+msgstr "Audit log"
+
+#: app/admin/templates/admin/base.html:162
+msgid "备份运维"
+msgstr "Backup & ops"
+
+#: app/admin/templates/admin/base.html:167
+msgid "备份列表"
+msgstr "Backups"
+
+#: app/admin/templates/admin/base.html:172
+msgid "系统监控"
+msgstr "System monitor"
+
+#: app/admin/templates/admin/base.html:181
+msgid "系统设置"
+msgstr "Settings"
+
+#: app/admin/templates/admin/base.html:187
+msgid "网站设置"
+msgstr "Site"
+
+#: app/admin/templates/admin/base.html:192
+msgid "SEO 默认配置"
+msgstr "SEO defaults"
+
+#: app/admin/templates/admin/base.html:199
+msgid "SEO 高级"
+msgstr "SEO advanced"
+
+#: app/admin/templates/admin/base.html:206
+msgid "上传配置"
+msgstr "Upload"
+
+#: app/admin/templates/admin/base.html:213
+msgid "上传安全"
+msgstr "Upload security"
+
+#: app/admin/templates/admin/base.html:218
+msgid "消息通知"
+msgstr "Notifications"
+
+#: app/admin/templates/admin/base.html:225
+msgid "后台安全"
+msgstr "Admin security"
+
+#: app/admin/templates/admin/base.html:242
+msgid "登录日志"
+msgstr "Login log"
+
+#: app/admin/templates/admin/base.html:249
+msgid "图片ALT批量管理"
+msgstr "Image ALT batch"
+
+#: app/admin/templates/admin/base.html:254
+msgid "插件管理"
+msgstr "Plugins"
+
+#: app/admin/templates/admin/base.html:259
+msgid "主题管理"
+msgstr "Themes"
+
+#: app/admin/templates/admin/base.html:264
+msgid "内容 API"
+msgstr "Content API"
+
+#: app/admin/templates/admin/base.html:269
+msgid "国际化"
+msgstr "Internationalization"
+
+#: app/admin/templates/admin/base.html:290
+#: app/frontend/templates/themes/blue/base.html:31
+#: app/frontend/templates/themes/default/base.html:31
+#: app/frontend/templates/themes/manufacturing/base.html:42
+#: app/frontend/templates/themes/service/base.html:42
+msgid "首页"
+msgstr "Home"
+
+#: app/admin/templates/admin/base.html:318
+msgid "官网"
+msgstr "Official site"
+
+#: app/admin/templates/admin/base.html:319
+msgid "Version"
+msgstr "Version"
+
+#: app/admin/templates/admin/login.html:6
+#: app/admin/templates/admin/login.html:52
+msgid "登录"
+msgstr "Sign in"
+
+#: app/admin/templates/admin/login.html:6
+msgid "管理后台"
+msgstr "Admin Panel"
+
+#: app/admin/templates/admin/login.html:24
+msgid "请登录管理后台"
+msgstr "Please sign in to the admin panel"
+
+#: app/admin/templates/admin/login.html:39
+msgid "账号"
+msgstr "Username"
+
+#: app/admin/templates/admin/login.html:43
+msgid "密码"
+msgstr "Password"
+
+#: app/admin/templates/admin/login.html:47
+msgid "验证码（不区分大小写）"
+msgstr "Captcha (case-insensitive)"
+
+#: app/admin/templates/admin/login.html:48
+msgid "验证码"
+msgstr "Captcha"
+
+#: app/admin/templates/admin/login.html:48
+msgid "点击刷新"
+msgstr "Click to refresh"
+
+#: app/frontend/templates/themes/blue/base.html:80
+#: app/frontend/templates/themes/default/base.html:80
+msgid "搜索文章"
+msgstr "Search articles"
+
+#: app/frontend/templates/themes/manufacturing/base.html:23
+msgid "服务热线"
+msgstr "Service hotline"
+
+#: app/frontend/templates/themes/manufacturing/base.html:91
+msgid "搜索产品/资讯"
+msgstr "Search products/news"
+
+#: app/frontend/templates/themes/manufacturing/base.html:123
+#: app/frontend/templates/themes/service/base.html:123
+msgid "联系我们"
+msgstr "Contact us"
+
+#: app/frontend/templates/themes/service/base.html:23
+msgid "咨询热线"
+msgstr "Consultation hotline"
+
+#: app/frontend/templates/themes/service/base.html:91
+msgid "搜索服务/资讯"
+msgstr "Search services/news"

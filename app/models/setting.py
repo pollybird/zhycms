@@ -104,6 +104,19 @@ class Setting(db.Model):
         'api_token': '',                     # 非空时要求请求头 X-API-Token
         'api_cache_ttl': '60',               # 接口缓存秒数（0=不缓存）
         'api_cors_origins': '',              # 跨域白名单，逗号分隔，* 全部
+
+        # ===== v2.3.0：第三方统计代码（plugins/analytics，键值存储零迁移）=====
+        'analytics_enable': '0',             # 1=启用前台注入 / 0=关闭
+        'analytics_google': '',              # Google Analytics 代码（注入 head）
+        'analytics_baidu': '',               # 百度统计代码（注入 head）
+        'analytics_webmaster': '',            # 站长工具代码 cnzz/51la（注入 head）
+        'analytics_custom_head': '',          # 自定义 </head> 前注入代码
+        'analytics_custom_body': '',          # 自定义 </body> 前注入代码
+
+        # ===== v2.3.0：国际化（Flask-Babel，核心能力非插件）=====
+        'i18n_enable': '0',                  # 1=启用 / 0=关闭（默认关闭，全站中文）
+        'i18n_default_locale': 'zh',         # 默认语种（zh 中文 / en 英文）
+        'i18n_available_locales': 'zh',      # 可用语种清单，逗号分隔，如 zh,en
     }
 
     @classmethod

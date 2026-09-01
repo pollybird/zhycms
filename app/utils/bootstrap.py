@@ -14,7 +14,7 @@ from ..models.setting import Setting
 from ..models.column import Column, ColumnField, ColumnFieldValue
 from ..models.article import Article, ArticleFieldValue
 from ..models.fragment import Fragment, FragmentGroup
-from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
+# 自定义表单 v2.3.0 起转为内置插件 plugins/form，演示数据由插件 demo.py 钩子生成
 
 
 # 演示图片根路径（/static/uploads/demo/ 下的文件）
@@ -26,9 +26,10 @@ def init_default_settings():
     for key, value in Setting.DEFAULTS.items():
         if not Setting.query.filter_by(key=key).first():
             db.session.add(Setting(key=key, value=str(value), description=key))
-    # 标记为新装站点：v2.2 升级兼容逻辑（create_app 中老站自动启用
-    # 友情链接插件）仅对没有本标记的已初始化站点生效
+    # 标记为新装站点：v2.2/v2.3 升级兼容逻辑（create_app 中老站自动启用
+    # 友情链接/自定义表单插件）仅对没有本标记的已初始化站点生效
     Setting.set('friend_link_plugin_migrated', '1')
+    Setting.set('form_plugin_migrated', '1')
     db.session.commit()
 
 
@@ -84,15 +85,11 @@ def generate_demo_data(industry='manufacturing'):
 
 
 def _clean_demo_data():
-    """清理旧的演示数据（栏目/文章/碎片/表单），保留用户与站点设置。
+    """清理旧的演示数据（栏目/文章/碎片），保留用户与站点设置。
 
-    友情链接改由 friend_link 插件演示数据钩子负责清理与重建。
+    友情链接/自定义表单改由对应插件演示数据钩子负责清理与重建。
     """
     # 按外键依赖顺序删除
-    FormSubmissionValue.query.delete()
-    FormSubmission.query.delete()
-    FormField.query.delete()
-    Form.query.delete()
     ArticleFieldValue.query.delete()
     Article.query.delete()
     ColumnFieldValue.query.delete()
@@ -228,9 +225,6 @@ def _generate_manufacturing_demo():
 
     # ============ 碎片 ============
     _mfg_init_fragments(company, brand)
-
-    # ============ 表单 ============
-    _init_forms()
 
     db.session.commit()
 
@@ -556,9 +550,6 @@ def _generate_service_demo():
     # ============ 碎片 ============
     _svc_init_fragments(company, brand)
 
-    # ============ 表单 ============
-    _init_forms()
-
     db.session.commit()
 
 
@@ -782,35 +773,3 @@ def _add_article(column, title, summary, content, published_at, sort_order=50, c
         cover=cover,
     )
     db.session.add(article)
-
-
-def _init_forms():
-    """初始化自定义表单。"""
-    # 在线留言表单
-    form = Form(
-        name='在线留言',
-        slug='message',
-        description='欢迎您留下宝贵的意见和建议，我们会尽快与您联系。',
-        success_message='感谢您的留言，我们会尽快与您联系！',
-        submit_interval=60,
-        is_open=True,
-    )
-    db.session.add(form)
-    db.session.flush()
-
-    fields = [
-        FormField(label='姓名', field_key='name', field_type='text',
-                  is_required=True, placeholder='请输入您的姓名',
-                  sort_order=100, form_id=form.id),
-        FormField(label='手机号', field_key='phone', field_type='phone',
-                  is_required=True, placeholder='请输入手机号',
-                  help_text='我们会对您的信息严格保密',
-                  sort_order=90, form_id=form.id),
-        FormField(label='邮箱', field_key='email', field_type='email',
-                  is_required=False, placeholder='请输入邮箱',
-                  sort_order=80, form_id=form.id),
-        FormField(label='留言内容', field_key='content', field_type='textarea',
-                  is_required=True, placeholder='请输入留言内容',
-                  sort_order=70, form_id=form.id),
-    ]
-    db.session.add_all(fields)

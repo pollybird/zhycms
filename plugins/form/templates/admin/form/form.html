@@ -122,7 +122,7 @@
           <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存表单</button>
           {% if form %}
           <a href="{{ url_for('admin.form_submissions', fid=form.id) }}" class="btn btn-info btn-block"><i class="fas fa-inbox"></i> 查看提交数据</a>
-          <a href="{{ url_for('frontend.form_submit', slug=form.slug) }}" target="_blank" class="btn btn-default btn-block"><i class="fas fa-eye"></i> 前台预览</a>
+          <a href="{{ url_for('form_frontend.form_submit', slug=form.slug) }}" target="_blank" class="btn btn-default btn-block"><i class="fas fa-eye"></i> 前台预览</a>
           {% endif %}
           <a href="{{ url_for('admin.form_index') }}" class="btn btn-default btn-block">返回列表</a>
         </div>

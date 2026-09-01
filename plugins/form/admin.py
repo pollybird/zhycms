@@ -1,28 +1,38 @@
-"""自定义表单管理 + 前台提交处理。
-升级：权限（form:manage 表单配置 / form:view 查看导出）+ 审计日志 + 表单导出记录。
+"""自定义表单插件：后台管理。
+
+路由挂在核心 admin_bp 上（endpoint 归入 admin.*，自动获得后台地址前缀
+即时生效机制），路径与核心版一致（/forms、/forms/<id>/edit、
+/forms/<id>/submissions 等），老站书签/审计记录不受影响；
+未启用插件时所有路由 404（不暴露存在性），菜单本就隐藏。
+
+审计模块代码沿用核心版（'form' / 'form_submission'），历史审计日志在
+插件启用后自动正常翻译显示。
 """
 import io
 import json
-import time
 from datetime import datetime
+from functools import wraps
 
 from flask import (
     render_template, redirect, url_for, request,
-    flash, abort, jsonify, send_file, session, current_app
+    flash, abort, send_file
 )
 from openpyxl import Workbook
 
-from ..extensions import db
-from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
-from ..models.setting import Setting
-from ..utils.helpers import permission_required, audit_log
-from ..utils.uploads import save_upload_file
-from ..models.audit import (
+from app.extensions import db
+from app.admin import admin_bp
+from app.models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_EXPORT, OP_BATCH,
-    MODULE_FORM, MODULE_FORM_SUBMISSION,
 )
-from . import admin_bp
+from app.utils.helpers import permission_required, audit_log
+from app.utils.uploads import save_upload_file
+from app.plugin_system import plugin_enabled
 
+from .models import Form, FormField, FormSubmission, FormSubmissionValue
+
+# 审计模块代码（与核心版 app.models.audit 常量值一致，历史日志无缝翻译）
+MODULE_FORM = 'form'
+MODULE_FORM_SUBMISSION = 'form_submission'
 
 FIELD_TYPES = [
     ('text', '单行文本'),
@@ -36,9 +46,20 @@ FIELD_TYPES = [
 ]
 
 
+def _gate(view):
+    """插件启用守卫：未启用 → 404。"""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not plugin_enabled('form'):
+            abort(404)
+        return view(*args, **kwargs)
+    return wrapper
+
+
 # ============ 表单管理 ============
 
 @admin_bp.route('/forms')
+@_gate
 @permission_required('form:view')
 def form_index():
     forms = Form.query.filter_by(is_deleted=False).order_by(Form.created_at.desc()).all()
@@ -46,6 +67,7 @@ def form_index():
 
 
 @admin_bp.route('/forms/create', methods=['GET', 'POST'])
+@_gate
 @permission_required('form:manage')
 def form_create():
     if request.method == 'POST':
@@ -57,6 +79,7 @@ def form_create():
 
 
 @admin_bp.route('/forms/<int:fid>/edit', methods=['GET', 'POST'])
+@_gate
 @permission_required('form:manage')
 def form_edit(fid):
     form = Form.query.get_or_404(fid)
@@ -189,6 +212,7 @@ def _save_form_fields(form):
 
 
 @admin_bp.route('/forms/<int:fid>/delete', methods=['POST'])
+@_gate
 @permission_required('form:manage')
 def form_delete(fid):
     form = Form.query.get_or_404(fid)
@@ -202,6 +226,7 @@ def form_delete(fid):
 # ============ 表单数据管理 ============
 
 @admin_bp.route('/forms/<int:fid>/submissions')
+@_gate
 @permission_required('form:view')
 def form_submissions(fid):
     form = Form.query.get_or_404(fid)
@@ -226,6 +251,7 @@ def form_submissions(fid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/<int:sid>')
+@_gate
 @permission_required('form:view')
 def form_submission_detail(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
@@ -239,6 +265,7 @@ def form_submission_detail(fid, sid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/<int:sid>/toggle-read', methods=['POST'])
+@_gate
 @permission_required('form:view')
 def form_submission_toggle_read(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
@@ -250,6 +277,7 @@ def form_submission_toggle_read(fid, sid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/<int:sid>/delete', methods=['POST'])
+@_gate
 @permission_required('form:manage')
 def form_submission_delete(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
@@ -260,6 +288,7 @@ def form_submission_delete(fid, sid):
 
 
 @admin_bp.route('/forms/<int:fid>/submissions/batch', methods=['POST'])
+@_gate
 @permission_required('form:manage')
 def form_submission_batch(fid):
     action = request.form.get('action')
@@ -281,6 +310,7 @@ def form_submission_batch(fid):
 
 
 @admin_bp.route('/forms/<int:fid>/export')
+@_gate
 @permission_required('form:view')
 def form_export(fid):
     """导出表单数据为 Excel。"""

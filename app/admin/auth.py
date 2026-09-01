@@ -47,7 +47,7 @@ def _is_initialized():
 
 
 # 向导可勾选的官方插件（与 plugins/ 目录一一对应；第三方插件请在插件管理页启用）
-SETUP_PLUGINS = ('banner', 'product', 'friend_link')
+SETUP_PLUGINS = ('banner', 'product', 'friend_link', 'form')
 
 
 def _form_ctx(request):
@@ -151,7 +151,7 @@ def setup():
             # list_product 模板），同样强制启用。
             # 不生成演示数据时，仍按向导勾选启用。
             from ..plugin_system import enable_plugin, run_demo_data_hooks
-            auto_plugins = {'banner', 'friend_link'}
+            auto_plugins = {'banner', 'friend_link', 'form'}
             if demo_type == 'manufacturing':
                 auto_plugins.add('product')
             for slug in dict.fromkeys(list(ctx['plugins']) + sorted(auto_plugins)):

@@ -9,7 +9,8 @@
 from datetime import datetime
 
 from flask import (
-    render_template, redirect, url_for, request, flash, abort, current_app
+    render_template, redirect, url_for, request, flash, abort, current_app,
+    session,
 )
 from flask_login import current_user
 
@@ -424,6 +425,66 @@ def setting_api():
     except (TypeError, ValueError):
         settings['api_cache_ttl'] = 60
     return render_template('admin/setting/api.html', settings=settings)
+
+
+# ============ 国际化（v2.3.0 Flask-Babel）============
+
+# 后台切换器可选项（首版仅 zh/en，扩展仅需追加映射）
+_LOCALE_OPTIONS = [('zh', '中文'), ('en', 'English')]
+
+
+@admin_bp.route('/set-locale')
+@admin_required
+def set_locale():
+    """切换后台语种：写 session['locale'] 后重定向回 next。
+
+    任何已登录后台用户均可切换自己的语种（非 system:settings 权限）。
+    """
+    lang = request.args.get('lang')
+    next_url = request.args.get('next') or request.referrer or '/'
+    available = [c.strip() for c in
+                 (Setting.get('i18n_available_locales') or 'zh').split(',')
+                 if c.strip()]
+    if lang and lang in available:
+        session['locale'] = lang
+    return redirect(next_url)
+
+
+@admin_bp.route('/settings/i18n', methods=['GET', 'POST'])
+@permission_required('system:settings')
+def setting_i18n():
+    """国际化：总开关、默认语种、可用语种清单。"""
+    if request.method == 'POST':
+        changed = {}
+        val = '1' if request.form.get('i18n_enable') == 'on' else '0'
+        if Setting.get('i18n_enable') != val:
+            Setting.set('i18n_enable', val)
+            changed['i18n_enable'] = val
+        val = (request.form.get('i18n_default_locale') or 'zh').strip()
+        if val not in dict(_LOCALE_OPTIONS):
+            val = 'zh'
+        if Setting.get('i18n_default_locale') != val:
+            Setting.set('i18n_default_locale', val)
+            changed['i18n_default_locale'] = val
+        codes = request.form.getlist('i18n_available_locales')
+        val = ','.join(c.strip() for c in codes if c.strip()) or 'zh'
+        if Setting.get('i18n_available_locales') != val:
+            Setting.set('i18n_available_locales', val)
+            changed['i18n_available_locales'] = val
+        db.session.commit()
+        flash('国际化配置已保存', 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'i18n', 'changed': changed})
+        return redirect(url_for('admin.setting_i18n'))
+
+    settings = Setting.get_dict()
+    available = [c.strip() for c in
+                 (settings.get('i18n_available_locales') or 'zh').split(',')
+                 if c.strip()]
+    return render_template('admin/setting/i18n.html', settings=settings,
+                           locale_options=_LOCALE_OPTIONS,
+                           available=available)
 
 
 # ============ 个人资料 / 密码 ============
