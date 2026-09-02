@@ -1,11 +1,11 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ '编辑碎片' if fragment else '新增碎片' }} - {{ cms_name }}{% endblock %}
-{% block page_header %}{{ '编辑碎片' if fragment else '新增碎片' }}{% endblock %}
+{% block title %}{{ _('编辑碎片') if fragment else _('新增碎片') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('编辑碎片') if fragment else _('新增碎片') }}{% endblock %}
 {% set active_menu = 'fragment' %}
 
 {% block breadcrumb %}
-  <li class="breadcrumb-item"><a href="{{ url_for('admin.fragment_index') }}">碎片字段</a></li>
-  <li class="breadcrumb-item active">{{ '编辑' if fragment else '新增' }}</li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.fragment_index') }}">{{ _('碎片字段') }}</a></li>
+  <li class="breadcrumb-item active">{{ _('编辑') if fragment else _('新增') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -15,25 +15,25 @@
       <div class="card">
         <div class="card-body">
           <div class="form-group">
-            <label class="required-mark">名称</label>
+            <label class="required-mark">{{ _('名称') }}</label>
             <input type="text" name="name" class="form-control" value="{{ fragment.name if fragment else '' }}" required>
           </div>
           <div class="form-group">
-            <label class="required-mark">调用标识（英文，创建后不可修改）</label>
+            <label class="required-mark">{{ _('调用标识（英文，创建后不可修改）') }}</label>
             <input type="text" name="slug" class="form-control" pattern="[a-zA-Z][a-zA-Z0-9_]*" value="{{ fragment.slug if fragment else '' }}" {{ 'readonly' if fragment else 'required' }}>
-            <small class="form-text text-muted">模板中通过 <code>{{ '{{ site_fragments.slug.value }}' }}</code> 调用</small>
+            <small class="form-text text-muted">{{ _('模板中通过 %(code)s 调用', code='{{ site_fragments.slug.value }}') }}</small>
           </div>
           <div class="form-group">
-            <label>所属分组</label>
+            <label>{{ _('所属分组') }}</label>
             <select name="group_id" class="form-control">
-              <option value="">— 无分组 —</option>
+              <option value="">— {{ _('无分组') }} —</option>
               {% for g in groups %}
               <option value="{{ g.id }}" {{ 'selected' if fragment and fragment.group_id == g.id }}>{{ g.name }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="form-group">
-            <label>字段类型</label>
+            <label>{{ _('字段类型') }}</label>
             <select name="field_type" id="field_type" class="form-control" {{ 'disabled' if fragment }}>
               {% for v, label in field_types %}
               <option value="{{ v }}" {{ 'selected' if fragment and fragment.field_type == v }}>{{ label }}</option>
@@ -43,7 +43,7 @@
           </div>
 
           <div class="form-group" id="value-text-block">
-            <label>字段值</label>
+            <label>{{ _('字段值') }}</label>
             {% if fragment and fragment.field_type == 'textarea' %}
             <textarea name="value" rows="4" class="form-control">{{ fragment.value or '' }}</textarea>
             {% elif fragment and fragment.field_type == 'richtext' %}
@@ -54,16 +54,16 @@
           </div>
 
           <div class="form-group" id="value-file-block" style="display:none;">
-            <label>上传文件</label>
+            <label>{{ _('上传文件') }}</label>
             <input type="file" name="value_file" class="form-control-file">
             {% if fragment and fragment.value %}
             <div class="mt-2">
               {% if fragment.field_type == 'image' %}
               <img src="{{ fragment.value }}" style="max-height:120px;">
               {% else %}
-              <a href="{{ fragment.value }}" target="_blank">查看已上传文件</a>
+              <a href="{{ fragment.value }}" target="_blank">{{ _('查看已上传文件') }}</a>
               {% endif %}
-              <br><label><input type="checkbox" name="value_remove"> 删除文件</label>
+              <br><label><input type="checkbox" name="value_remove"> {{ _('删除文件') }}</label>
             </div>
             {% endif %}
           </div>
@@ -75,17 +75,17 @@
       <div class="card">
         <div class="card-body">
           <div class="form-group">
-            <label>排序优先级</label>
+            <label>{{ _('排序优先级') }}</label>
             <input type="number" name="sort_order" class="form-control" value="{{ fragment.sort_order if fragment else 0 }}">
           </div>
           <div class="form-group">
             <div class="custom-control custom-switch">
               <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled" {{ 'checked' if fragment is none or fragment.is_enabled }}>
-              <label class="custom-control-label" for="is_enabled">启用</label>
+              <label class="custom-control-label" for="is_enabled">{{ _('启用') }}</label>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存</button>
-          <a href="{{ url_for('admin.fragment_index') }}" class="btn btn-default btn-block">返回</a>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存') }}</button>
+          <a href="{{ url_for('admin.fragment_index') }}" class="btn btn-default btn-block">{{ _('返回') }}</a>
         </div>
       </div>
     </div>
@@ -104,7 +104,7 @@
   CKEDITOR.ClassicEditor.create(document.querySelector('#value_richtext'), {
     licenseKey: 'GPL',
     language: 'zh-cn',
-    placeholder: '在此输入内容……',
+    placeholder: '{{ _('在此输入内容……') }}',
     toolbar: {
       items: [
         'undo', 'redo', '|',

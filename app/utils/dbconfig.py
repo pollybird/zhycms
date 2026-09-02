@@ -14,6 +14,7 @@ import os
 from sqlalchemy import engine_from_config
 from sqlalchemy.engine import URL
 
+from flask_babel import gettext as _gettext
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 CONFIG_PATH = os.path.join(BASE_DIR, 'instance', 'db_config.json')
 
@@ -35,14 +36,14 @@ def build_uri(db_type, host, port, database, user, password):
     """
     db_type = (db_type or '').strip().lower()
     if db_type not in _DRIVERS:
-        raise ValueError(f'不支持的数据库类型：{db_type}')
+        raise ValueError(_gettext('不支持的数据库类型：{0}').format(db_type))
 
     if not port:
         port = DEFAULT_PORTS[db_type]
     try:
         port = int(port)
     except (TypeError, ValueError):
-        raise ValueError('端口必须为数字')
+        raise ValueError(_gettext('端口必须为数字'))
 
     query = {'charset': 'utf8mb4'} if db_type == 'mysql' else {}
     url = URL.create(

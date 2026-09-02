@@ -31,11 +31,7 @@ from .frontend import analytics_head, analytics_body
 
 class AnalyticsPlugin(PluginBase):
     slug = 'analytics'
-    name = '统计代码'
     version = '1.0.0'
-    description = ('第三方统计代码嵌入：百度统计/Google Analytics/站长工具/'
-                   '自定义 head/body 代码，后台配置即时生效，前台自动注入；'
-                   'v2.3.0 起作为内置插件')
     author = 'ZhyCMS 官方'
 
     # 仅系统设置类角色可管（沿用核心时代策略：不向内容角色默认授权）
@@ -43,13 +39,28 @@ class AnalyticsPlugin(PluginBase):
         ('analytics:manage', '统计代码管理', '配置第三方统计代码与自定义注入代码'),
     ]
     preset_role_grants = {}
-    audit_modules = [('analytics', '统计代码')]
 
     # ---- 代码钩子 ----
 
+    @property
+    def name(self):
+        return self._('统计代码')
+
+    @property
+    def description(self):
+        return self._(
+            '第三方统计代码嵌入：百度统计/Google Analytics/站长工具/'
+            '自定义 head/body 代码，后台配置即时生效，前台自动注入；'
+            'v2.3.0 起作为内置插件'
+        )
+
+    @property
+    def audit_modules(self):
+        return [('analytics', self._('统计代码'))]
+
     def get_admin_menu(self):
         return [{
-            'label': '统计代码',
+            'label': self._('统计代码'),
             'endpoint': 'admin.analytics_index',
             'icon': 'fa-chart-bar',
             'permission': 'analytics:manage',

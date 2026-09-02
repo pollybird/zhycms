@@ -1,29 +1,29 @@
 {% extends 'admin/base.html' %}
-{% block title %}提交详情 - {{ cms_name }}{% endblock %}
-{% block page_header %}提交详情 #{{ sub.id }}{% endblock %}
+{% block title %}{{ _p('form', '提交详情') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('form', '提交详情') }} #{{ sub.id }}{% endblock %}
 {% set active_menu = 'form' %}
 
 {% block breadcrumb %}
-  <li class="breadcrumb-item"><a href="{{ url_for('admin.form_index') }}">自定义表单</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.form_index') }}">{{ _p('form', '自定义表单') }}</a></li>
   <li class="breadcrumb-item"><a href="{{ url_for('admin.form_submissions', fid=sub.form_id) }}">{{ sub.form.name }}</a></li>
-  <li class="breadcrumb-item active">详情</li>
+  <li class="breadcrumb-item active">{{ _p('form', '详情') }}</li>
 {% endblock %}
 
 {% block content %}
 <div class="card">
-  <div class="card-header"><h3 class="card-title">基础信息</h3></div>
+  <div class="card-header"><h3 class="card-title">{{ _p('form', '基础信息') }}</h3></div>
   <div class="card-body">
     <table class="table table-sm">
-      <tr><th width="120">提交时间</th><td>{{ sub.created_at|datetime }}</td></tr>
-      <tr><th>IP 地址</th><td>{{ sub.ip }}</td></tr>
+      <tr><th width="120">{{ _p('form', '提交时间') }}</th><td>{{ sub.created_at|datetime }}</td></tr>
+      <tr><th>{{ _p('form', 'IP 地址') }}</th><td>{{ sub.ip }}</td></tr>
       <tr><th>User-Agent</th><td>{{ sub.user_agent }}</td></tr>
-      <tr><th>已读状态</th><td>{{ '已读' if sub.is_read else '未读' }}</td></tr>
+      <tr><th>{{ _p('form', '已读状态') }}</th><td>{{ _p('form', '已读') if sub.is_read else _p('form', '未读') }}</td></tr>
     </table>
   </div>
 </div>
 
 <div class="card">
-  <div class="card-header"><h3 class="card-title">字段内容</h3></div>
+  <div class="card-header"><h3 class="card-title">{{ _p('form', '字段内容') }}</h3></div>
   <div class="card-body">
     <table class="table table-sm">
       {% for f in fields %}
@@ -32,7 +32,7 @@
         <td>
           {% set val = sub.get_value(f.id) %}
           {% if f.field_type == 'file' and val %}
-            <a href="{{ val }}" target="_blank" class="btn btn-sm btn-success"><i class="fas fa-download"></i> 下载附件</a>
+            <a href="{{ val }}" target="_blank" class="btn btn-sm btn-success"><i class="fas fa-download"></i> {{ _p('form', '下载附件') }}</a>
             <a href="{{ val }}" target="_blank">{{ val }}</a>
           {% elif f.field_type == 'checkbox' %}
             {% if val %}{% set arr = val.split('|||') %}<span class="badge badge-info">{{ arr|join('</span> <span class="badge badge-info">') }}</span>{% endif %}
@@ -46,7 +46,7 @@
     </table>
   </div>
   <div class="card-footer">
-    <a href="{{ url_for('admin.form_submissions', fid=sub.form_id) }}" class="btn btn-default">返回列表</a>
+    <a href="{{ url_for('admin.form_submissions', fid=sub.form_id) }}" class="btn btn-default">{{ _p('form', '返回列表') }}</a>
   </div>
 </div>
 {% endblock %}

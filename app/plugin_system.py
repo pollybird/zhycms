@@ -149,6 +149,15 @@ def _register_instance(app, rec):
 
     inst = rec.instance
 
+    # 0) v2.3.0 插件国际化：如插件提供 translations/ 目录，则登记 slug 的翻译域
+    try:
+        i18n_dir = inst.get_i18n_dir() if hasattr(inst, 'get_i18n_dir') else None
+        if i18n_dir and os.path.isdir(i18n_dir):
+            from .i18n import register_plugin_i18n
+            register_plugin_i18n(rec.slug, i18n_dir, domain='messages')
+    except Exception:
+        pass  # 单个插件 i18n 注册失败不拖垮整体
+
     # 1) 后台路由（挂在核心 admin_bp 上，endpoint 自动获得前缀即时生效机制）
     inst.get_admin_routes(admin_bp)
 
@@ -324,12 +333,50 @@ def plugin_admin_menus():
                              or (current_user.is_authenticated
                                  and current_user.has_permission(perm))):
                 continue
+            _label = item.get('label') or ''
+            if isinstance(_label, str) and _label:
+                # v2.3.0：插件菜单 label 走插件翻译域（插件没 translations/ 时 fallback 原文）
+                try:
+                    from .i18n import plugin_gettext
+                    _label = plugin_gettext(rec.slug, _label)
+                except Exception:
+                    pass
+                try:
+                    from flask_babel import gettext as _g
+                    # 再查一次核心域（避免中文 label 实际来自 plugins/admin.py 视图变量）
+                    # 只有插件翻译不命中（=原文）时再看核心，不重复翻译英文串
+                    import re as _re
+                    if _label and _re.search(r'[\u3400-\u9fff]', _label):
+                        _core = _g(_label)
+                        if _core and _core != _label:
+                            _label = _core
+                except Exception:
+                    pass
+            item = dict(item)
+            item['label'] = _label
             visible.append(item)
         if visible:
             icon = (rec.instance.get_admin_menu_icon()
                     if hasattr(rec.instance, 'get_admin_menu_icon') else None) \
                 or 'fa-plug'
-            result.append({'slug': rec.slug, 'name': rec.name,
+            # v2.3.0：插件分组名（name）也翻译：先查插件翻译域，再回退核心域
+            _name = rec.name
+            if isinstance(_name, str) and _name:
+                import re as _re2
+                try:
+                    from .i18n import plugin_gettext as _pg2
+                    _name = _pg2(rec.slug, _name)
+                except Exception:
+                    pass
+                try:
+                    from flask_babel import gettext as _g2
+                    if _re2.search(r'[\u3400-\u9fff]', _name):
+                        _c2 = _g2(_name)
+                        if _c2 and _c2 != _name:
+                            _name = _c2
+                except Exception:
+                    pass
+            result.append({'slug': rec.slug, 'name': _name,
                            'icon': icon, 'items': visible})
     return result
 

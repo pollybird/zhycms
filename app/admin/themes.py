@@ -16,6 +16,7 @@ import zipfile
 from flask import (render_template, redirect, url_for, request, flash,
                    send_file)
 
+from flask_babel import gettext as _gettext
 from ..extensions import db
 from ..models.audit import (OP_UPDATE, OP_UPLOAD, OP_DELETE, OP_EXPORT,
                             MODULE_SETTING)
@@ -37,14 +38,14 @@ from .confirm import verify_delete_captcha
 
 def _safe_join(base, member_path):
     if os.path.isabs(member_path):
-        raise ValueError(f'文件包含绝对路径：{member_path}')
+        raise ValueError(_gettext('文件包含绝对路径：{0}').format(member_path))
     normalized = member_path.replace('\\', '/').lstrip('/')
     target = os.path.normpath(os.path.join(base, normalized))
     base_abs = os.path.normpath(os.path.abspath(base))
     target_abs = os.path.normpath(os.path.abspath(target))
     if not (target_abs == base_abs
             or target_abs.startswith(base_abs + os.sep)):
-        raise ValueError(f'文件包含路径穿越：{member_path}')
+        raise ValueError(_gettext('文件包含路径穿越：{0}').format(member_path))
     return target
 
 
@@ -130,7 +131,7 @@ def _validate_theme_package(unpacked, themes_dir):
     """返回 (root, slug, manifest, meta)。不合法抛 ValueError(str)。"""
     root = _find_root(unpacked)
     if root is None:
-        raise ValueError('未找到 manifest.json，主题包结构不符合规范')
+        raise ValueError(_gettext('未找到 manifest.json，主题包结构不符合规范'))
 
     # 1) manifest
     mf = os.path.join(root, 'manifest.json')
@@ -138,17 +139,16 @@ def _validate_theme_package(unpacked, themes_dir):
         with open(mf, 'r', encoding='utf-8') as f:
             manifest = json.load(f)
     except (ValueError, OSError) as e:
-        raise ValueError(f'manifest.json 解析失败：{e}')
+        raise ValueError(_gettext('manifest.json 解析失败：{0}').format(e))
     if not isinstance(manifest, dict):
-        raise ValueError('manifest.json 必须是 JSON 对象')
+        raise ValueError(_gettext('manifest.json 必须是 JSON 对象'))
 
     slug = (manifest.get('slug') or '').strip()
     if not slug:
-        raise ValueError('manifest.json 缺少必填字段 slug')
+        raise ValueError(_gettext('manifest.json 缺少必填字段 slug'))
     if not THEME_SLUG_RE.match(slug):
         raise ValueError(
-            f'manifest.json 的 slug 格式不合法，只能包含字母/数字/连字符/下划线，'
-            f'长度 2-32 位（当前：{slug}）')
+            _gettext('manifest.json 的 slug 格式不合法，只能包含字母/数字/连字符/下划线，长度 2-32 位（当前：{0}）').format(slug))
 
     # 2) 必备模板：THEME_REQUIRED_FILES ∪ manifest.template_required
     extra = manifest.get('template_required') or []
@@ -160,8 +160,8 @@ def _validate_theme_package(unpacked, themes_dir):
             required.append(x)
     missing = [f for f in required if not os.path.isfile(os.path.join(root, f))]
     if missing:
-        raise ValueError('缺少必备模板文件：' + '、'.join(missing)
-                         + '（主题需包含 index/list/article/page/base/404/500 等基础模板）')
+        raise ValueError(_gettext('缺少必备模板文件：') + '、'.join(missing)
+                         + _gettext('（主题需包含 index/list/article/page/base/404/500 等基础模板）'))
 
     # 3) 形态 B（平铺）→ 包一层
     if root == unpacked:
@@ -186,11 +186,9 @@ def _validate_theme_package(unpacked, themes_dir):
         builtin = bool(existing_mf.get('builtin')) if isinstance(existing_mf, dict) else False
         if builtin:
             raise ValueError(
-                f'目标目录 themes/{slug}/ 为<b>官方内置主题</b>，禁止覆盖；'
-                f'如想自定义请以其它 slug 命名后上传。')
+                _gettext('目标目录 themes/{0}/ 为<b>官方内置主题</b>，禁止覆盖；如想自定义请以其它 slug 命名后上传。').format(slug))
         raise ValueError(
-            f'主题目录已存在：themes/{slug}/，请先备份并删除该目录后再上传，'
-            f'避免误覆盖正在使用的自定义主题。')
+            _gettext('主题目录已存在：themes/{0}/，请先备份并删除该目录后再上传，避免误覆盖正在使用的自定义主题。').format(slug))
 
     # 5) 汇总元数据
     file_count = 0
@@ -241,7 +239,7 @@ def theme_activate(slug):
     """
     target_dir = os.path.join(THEMES_DIR, slug)
     if not os.path.isdir(target_dir):
-        flash(f'主题目录不存在：themes/{slug}/', 'danger')
+        flash(_gettext('主题目录不存在：themes/{0}/').format(slug), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     # 读取 manifest（若有）+ 检查必备模板
@@ -265,13 +263,13 @@ def theme_activate(slug):
     missing = [f for f in required
                if not os.path.isfile(os.path.join(target_dir, f))]
     if missing:
-        flash(f'主题 {slug} 缺少必备模板：{"、".join(missing)}，无法启用',
+        flash(_gettext('主题 {0} 缺少必备模板：{1}，无法启用').format(slug, "、".join(missing)),
               'danger')
         return redirect(url_for('admin.theme_index'))
 
     old_theme = Setting.get('site_theme') or 'default'
     if old_theme == slug:
-        flash(f'「{mf.get("name") or slug}」已是当前启用主题', 'info')
+        flash(_gettext('「{0}」已是当前启用主题').format(mf.get("name") or slug), 'info')
         return redirect(url_for('admin.theme_index'))
 
     Setting.set('site_theme', slug)
@@ -284,7 +282,7 @@ def theme_activate(slug):
                       'version': (mf.get('version') or '').strip(),
                       'author': (mf.get('author') or '').strip(),
                       })
-    flash(f'主题「{name}」启用成功，前台立即生效', 'success')
+    flash(_gettext('主题「{0}」启用成功，前台立即生效').format(name), 'success')
     return redirect(url_for('admin.theme_index'))
 
 
@@ -303,12 +301,12 @@ def theme_delete(slug):
 
     # slug 来自 URL，严格校验防路径穿越
     if not THEME_SLUG_RE.match(slug or ''):
-        flash('非法的主题标识', 'danger')
+        flash(_gettext('非法的主题标识'), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     target_dir = os.path.join(THEMES_DIR, slug)
     if not os.path.isdir(target_dir):
-        flash(f'主题目录不存在：themes/{slug}/', 'danger')
+        flash(_gettext('主题目录不存在：themes/{0}/').format(slug), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     # manifest（可能缺失，缺失时按非内置处理）
@@ -325,14 +323,14 @@ def theme_delete(slug):
 
     if mf.get('builtin'):
         name = (mf.get('name') or '').strip() or slug
-        flash(f'「{name}」为官方内置主题，不支持删除（删除会导致系统模板缺失）',
+        flash(_gettext('「{0}」为官方内置主题，不支持删除（删除会导致系统模板缺失）').format(name),
               'danger')
         return redirect(url_for('admin.theme_index'))
 
     # 当前启用中的主题禁止删除（含目录名与 manifest.slug 双重判断）
     active = get_active_theme()
     if active == slug or (mf.get('slug') or '').strip() == active:
-        flash('该主题正在启用中，请先切换到其他主题再删除', 'danger')
+        flash(_gettext('该主题正在启用中，请先切换到其他主题再删除'), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     name = (mf.get('name') or '').strip() or slug
@@ -341,12 +339,12 @@ def theme_delete(slug):
     try:
         shutil.rmtree(target_dir)
     except OSError as e:
-        flash(f'删除主题目录失败：{e}（请检查目录写权限）', 'danger')
+        flash(_gettext('删除主题目录失败：{0}（请检查目录写权限）').format(e), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     audit_log(OP_DELETE, MODULE_SETTING, target_id=slug, target_name=name,
               detail={'action': '删除主题', 'version': version})
-    flash(f'主题「{name}」已删除，目录 themes/{slug}/ 已移除', 'success')
+    flash(_gettext('主题「{0}」已删除，目录 themes/{1}/ 已移除').format(name, slug), 'success')
     return redirect(url_for('admin.theme_index'))
 
 
@@ -355,12 +353,12 @@ def theme_delete(slug):
 def theme_download(slug):
     """打包下载主题目录为 zip（单目录形态，可在其他站点直接上传复用）。"""
     if not THEME_SLUG_RE.match(slug or ''):
-        flash('非法的主题标识', 'danger')
+        flash(_gettext('非法的主题标识'), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     target_dir = os.path.join(THEMES_DIR, slug)
     if not os.path.isdir(target_dir):
-        flash(f'主题目录不存在：themes/{slug}/', 'danger')
+        flash(_gettext('主题目录不存在：themes/{0}/').format(slug), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     # manifest 可能有缺失（缺失时按目录名处理）
@@ -392,7 +390,7 @@ def theme_download(slug):
 def theme_upload():
     f = request.files.get('archive')
     if f is None or not f.filename:
-        flash('请选择主题压缩包', 'danger')
+        flash(_gettext('请选择主题压缩包'), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     raw_name = f.filename or ''
@@ -402,7 +400,7 @@ def theme_upload():
     else:
         ext = lower.rsplit('.', 1)[-1] if '.' in lower else ''
     if ext not in THEME_ALLOWED_EXTS:
-        flash(f'非法文件类型：仅允许 {" / ".join(THEME_ALLOWED_EXTS)}',
+        flash(_gettext('非法文件类型：仅允许 {0}').format(" / ".join(THEME_ALLOWED_EXTS)),
               'danger')
         return redirect(url_for('admin.theme_index'))
 
@@ -413,25 +411,24 @@ def theme_upload():
         os.makedirs(unpacked, exist_ok=True)
         err = _extract_archive(f.stream, ext, unpacked)
         if err:
-            flash(f'解压失败：{err}', 'danger')
+            flash(_gettext('解压失败：{0}').format(err), 'danger')
             return redirect(url_for('admin.theme_index'))
         try:
             root, slug, manifest, meta = _validate_theme_package(
                 unpacked, THEMES_DIR)
         except ValueError as e:
-            flash(f'主题包不合法：{e}', 'danger')
+            flash(_gettext('主题包不合法：{0}').format(e), 'danger')
             return redirect(url_for('admin.theme_index'))
         target = os.path.join(THEMES_DIR, slug)
         try:
             shutil.move(root, target)
         except OSError as e:
-            flash(f'写入 themes 目录失败：{e}', 'danger')
+            flash(_gettext('写入 themes 目录失败：{0}').format(e), 'danger')
             return redirect(url_for('admin.theme_index'))
 
         name = (manifest.get('name') or '').strip() or slug
         ver = (manifest.get('version') or '').strip()
-        flash(f'主题「{name}」（{slug} v{ver or "-"}）上传成功，'
-              f'可在下方列表中点击「启用」应用到前台；未生效可刷新页面或重启。',
+        flash(_gettext('主题「{0}」（{1} v{2}）上传成功，可在下方列表中点击「启用」应用到前台；未生效可刷新页面或重启。').format(name, slug, ver or "-"),
               'success')
         audit_log(OP_UPLOAD, MODULE_SETTING,
                   target_id=slug, target_name=name,

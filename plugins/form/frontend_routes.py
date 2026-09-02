@@ -17,6 +17,7 @@ from flask import (
     flash, abort, session, current_app,
 )
 
+from flask_babel import gettext as _gettext
 from app.extensions import db
 from app.models.setting import Setting
 from app.plugin_system import plugin_enabled
@@ -56,7 +57,7 @@ def form_submit(slug):
             last = session.get(cache_key, 0)
             now = int(time.time())
             if now - last < form.submit_interval:
-                flash(f'提交过于频繁，请 {form.submit_interval - (now - last)} 秒后再试', 'danger')
+                flash(_gettext('提交过于频繁，请 {0} 秒后再试').format(form.submit_interval - (now - last)), 'danger')
                 return redirect(url_for('.form_submit', slug=slug))
 
         # 图形验证码
@@ -64,7 +65,7 @@ def form_submit(slug):
         session_captcha = (session.get('form_captcha') or '').lower()
         session.pop('form_captcha', None)
         if not session_captcha or captcha != session_captcha:
-            flash('验证码错误，请重新输入', 'danger')
+            flash(_gettext('验证码错误，请重新输入'), 'danger')
             return redirect(url_for('.form_submit', slug=slug))
 
         # 校验必填
@@ -110,7 +111,7 @@ def form_submit(slug):
                         allowed_exts=allowed, max_size=f.max_size
                     )
                     if err:
-                        flash(f'字段 {f.label} 上传失败：{err}', 'danger')
+                        flash(_gettext('字段 {0} 上传失败：{1}').format(f.label, err), 'danger')
                         db.session.rollback()
                         return redirect(url_for('.form_submit', slug=slug))
                     value = url

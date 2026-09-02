@@ -127,8 +127,19 @@ class Role(db.Model):
     )
 
     @property
-    def permission_codes(self):
-        return {p.permission_code for p in self.permission_assignments}
+    def users(self):
+        """返回本角色下**未删除**的用户集合 Query（兼容模板：r.users.filter_by(...).count() 等）。
+
+        注意：返回的 Query 是 FROM users，已 JOIN user_roles 限定到本角色，
+        因此 filter_by/order_by 等针对 User 属性字段均可正常使用。
+        """
+        from .user import User
+        return User.query.join(
+            UserRole, UserRole.user_id == User.id
+        ).filter(
+            UserRole.role_id == self.id,
+            User.is_deleted.is_(False)
+        )
 
     @classmethod
     def ensure_presets(cls):

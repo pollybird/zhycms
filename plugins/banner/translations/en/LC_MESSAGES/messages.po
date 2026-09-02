@@ -1,0 +1,424 @@
+# English translations for PROJECT.
+# Copyright (C) 2026 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+msgid "编辑分组"
+msgstr "Edit Group"
+msgid "新增分组"
+msgstr "Add Group"
+msgid "轮播图"
+msgstr "Banner"
+msgid "分组名称"
+msgstr "Group Name"
+msgid "如：首页大图"
+msgstr "如：首页大图"
+
+msgid "调用标识（创建后建议不再修改）"
+msgstr "调用标识（创建后建议不再修改）"
+
+# | msgid "å¦ï¼home-hero"
+#, fuzzy
+msgid "如：home-hero"
+msgstr "e.g. home-hero"
+
+msgid "模板中通过"
+msgstr "模板中通过"
+
+msgid "调用标识"
+msgstr "调用标识"
+
+msgid "调用"
+msgstr "调用"
+
+msgid "说明"
+msgstr "说明"
+
+msgid "选填，便于后台识别"
+msgstr "选填，便于后台识别"
+
+msgid "启用"
+msgstr "Enabled"
+msgid "停用后前台该轮播位自动隐藏（数据保留）。"
+msgstr "停用后前台该轮播位自动隐藏（数据保留）。"
+
+msgid "保存"
+msgstr "Save"
+msgid "返回"
+msgstr "返回"
+
+msgid "轮播图管理"
+msgstr "Banner Management"
+msgid "轮播分组"
+msgstr "Banner Groups"
+msgid "名称"
+msgstr "Name"
+msgid "图片数"
+msgstr "图片数"
+
+msgid "状态"
+msgstr "Status"
+msgid "操作"
+msgstr "Actions"
+msgid "停用"
+msgstr "Disabled"
+msgid "管理图片"
+msgstr "管理图片"
+
+msgid "编辑"
+msgstr "Edit"
+msgid "删除分组将同时删除组内图片记录（不可恢复），确认删除？"
+msgstr "删除分组将同时删除组内图片记录（不可恢复），确认删除？"
+
+msgid "删除"
+msgstr "Delete"
+msgid "暂无分组，请先新增（如「首页大图」，调用标识 home-hero）"
+msgstr "暂无分组，请先新增（如「首页大图」，调用标识 home-hero）"
+
+msgid "前台调用："
+msgstr "前台调用："
+
+msgid "分组调用标识"
+msgstr "分组调用标识"
+
+msgid "四套主题首页已内置首页轮播位（调用标识"
+msgstr "四套主题首页已内置首页轮播位（调用标识"
+
+msgid "），分组停用或无图片时该区域自动隐藏。"
+msgstr "），分组停用或无图片时该区域自动隐藏。"
+
+msgid "图片管理"
+msgstr "图片管理"
+
+msgid "图片列表"
+msgstr "图片列表"
+
+msgid "张"
+msgstr "张"
+
+msgid "新增图片"
+msgstr "新增图片"
+
+msgid "返回分组"
+msgstr "返回分组"
+
+msgid "缩略图"
+msgstr "缩略图"
+
+msgid "标题（alt）"
+msgstr "标题（alt）"
+
+msgid "链接"
+msgstr "Link"
+msgid "排序"
+msgstr "Order"
+msgid "定时上下线"
+msgstr "定时上下线"
+
+msgid "纯展示"
+msgstr "纯展示"
+
+msgid "起"
+msgstr "起"
+
+msgid "止"
+msgstr "止"
+
+msgid "长期有效"
+msgstr "长期有效"
+
+msgid "确认删除该图片？"
+msgstr "确认删除该图片？"
+
+msgid "暂无图片，点击右上角「新增图片」上传第一张轮播图"
+msgstr "暂无图片，点击右上角「新增图片」上传第一张轮播图"
+
+msgid "批量启用"
+msgstr "批量启用"
+
+msgid "批量停用"
+msgstr "批量停用"
+
+msgid "批量删除"
+msgstr "批量删除"
+
+msgid "确认批量删除选中图片？"
+msgstr "确认批量删除选中图片？"
+
+msgid "请先勾选图片"
+msgstr "请先勾选图片"
+
+msgid "编辑图片"
+msgstr "编辑图片"
+
+msgid "标题（alt 文案）"
+msgstr "标题（alt 文案）"
+
+msgid "如：现代化生产车间"
+msgstr "如：现代化生产车间"
+
+msgid "上传图片"
+msgstr "上传图片"
+
+msgid "支持 jpg/jpeg/png/gif/webp；走上传中心（自动压缩/去重）。重新上传将替换当前图片。"
+msgstr "支持 jpg/jpeg/png/gif/webp；走上传中心（自动压缩/去重）。重新上传将替换当前图片。"
+
+msgid "或外链图片 URL"
+msgstr "或外链图片 URL"
+
+msgid "如 https://cdn.example.com/banner.jpg（填写后不适用于上传）"
+msgstr "如 https://cdn.example.com/banner.jpg（填写后不适用于上传）"
+
+msgid "当前图片"
+msgstr "当前图片"
+
+msgid "跳转链接（留空纯展示）"
+msgstr "跳转链接（留空纯展示）"
+
+# | msgid "å¦ /column/about æ https://example.com"
+#, fuzzy
+msgid "如 /column/about 或 https://example.com"
+msgstr "e.g. /column/about or https://example.com"
+
+msgid "打开方式"
+msgstr "Open In"
+msgid "当前窗口"
+msgstr "Current Window"
+msgid "新窗口"
+msgstr "New Window"
+msgid "排序优先级（大在前）"
+msgstr "排序优先级（大在前）"
+
+msgid "定时上线（可选）"
+msgstr "定时上线（可选）"
+
+msgid "定时下线（可选）"
+msgstr "定时下线（可选）"
+
+#~ msgid "ä¸ä¼ å¾ç"
+#~ msgstr "Upload image"
+
+#~ msgid "ä¿å­"
+#~ msgstr "Save"
+
+#~ msgid "åç¨"
+#~ msgstr "Disable"
+
+#~ msgid "åç¨ååå°è¯¥è½®æ­ä½èªå¨éèï¼æ°æ®ä¿çï¼ã"
+#~ msgstr ""
+#~ "When disabled, the carousel position is"
+#~ " automatically hidden on the frontend "
+#~ "(data preserved)."
+
+#~ msgid "åç»åç§°"
+#~ msgstr "Group name"
+
+#~ msgid "åç»è°ç¨æ è¯"
+#~ msgstr "Group slug"
+
+#~ msgid "å é¤"
+#~ msgstr "Delete"
+
+#~ msgid ""
+#~ "å é¤åç»å°åæ¶å "
+#~ "é¤ç»åå¾çè®°å½ï¼ä¸å¯æ¢å¤ï¼ï¼ç¡®è®¤å é¤ï¼"
+#~ msgstr ""
+
+#~ msgid "åå°è°ç¨ï¼"
+#~ msgstr "Frontend usage:"
+
+#~ msgid "åç§°"
+#~ msgstr "Name"
+
+#~ msgid "å¯ç¨"
+#~ msgstr "Enable"
+
+#~ msgid "åå¥ä¸»é¢é¦é¡µå·²åç½®é¦é¡µè½®æ­ä½ï¼è°ç¨æ è¯"
+#~ msgstr ""
+
+#~ msgid "å¾çåè¡¨"
+#~ msgstr "Image list"
+
+#~ msgid "å¾çæ°"
+#~ msgstr "Image count"
+
+#~ msgid "å¾çç®¡ç"
+#~ msgstr "Carousel items"
+
+#~ msgid "å¦ https://cdn.example.com/banner.jpgï¼å¡«ååä¸éç¨äºä¸ä¼ ï¼"
+#~ msgstr ""
+#~ "e.g. https://cdn.example.com/banner.jpg (upload is"
+#~ " ignored when this is filled)"
+
+#~ msgid "å¦ï¼ç°ä»£åçäº§è½¦é´"
+#~ msgstr "e.g. Modern production workshop"
+
+#~ msgid "å¦ï¼é¦é¡µå¤§å¾"
+#~ msgstr "e.g. Homepage hero"
+
+#~ msgid "å®æ¶ä¸ä¸çº¿"
+#~ msgstr "Schedule"
+
+#~ msgid "å®æ¶ä¸çº¿ï¼å¯éï¼"
+#~ msgstr "Publish time (optional)"
+
+#~ msgid "å®æ¶ä¸çº¿ï¼å¯éï¼"
+#~ msgstr "Expiry time (optional)"
+
+#~ msgid "å¼ "
+#~ msgstr "items"
+
+#~ msgid "å½åå¾ç"
+#~ msgstr "Current image"
+
+#~ msgid "å½åçªå£"
+#~ msgstr "Same tab"
+
+#~ msgid "æå¤é¾å¾ç URL"
+#~ msgstr "Or external image URL"
+
+#~ msgid "æå¼æ¹å¼"
+#~ msgstr "Target"
+
+#~ msgid "æ¹éåç¨"
+#~ msgstr "Bulk disable"
+
+#~ msgid "æ¹éå é¤"
+#~ msgstr "Bulk delete"
+
+#~ msgid "æ¹éå¯ç¨"
+#~ msgstr "Bulk enable"
+
+#~ msgid "æåº"
+#~ msgstr "Sort"
+
+#~ msgid "æåºä¼çº§ï¼å¤§å¨åï¼"
+#~ msgstr ""
+
+#~ msgid "æä½"
+#~ msgstr "Actions"
+
+#~ msgid ""
+#~ "æ¯æ jpg/jpeg/png/gif/webpï¼èµ°ä¸ä¼ "
+#~ "ä¸­å¿ï¼èªå¨åç¼©/å»éï¼ãéæ°ä¸ä¼ "
+#~ "å°æ¿æ¢å½åå¾çã"
+#~ msgstr ""
+#~ "Supports jpg/jpeg/png/gif/webp; uploaded via "
+#~ "upload center (auto-compressed/deduplicated). "
+#~ "Re-uploading replaces the current image."
+
+#~ msgid "æ°å¢åç»"
+#~ msgstr "Add group"
+
+#~ msgid "æ°å¢å¾ç"
+#~ msgstr "New image"
+
+#~ msgid "æ°çªå£"
+#~ msgstr "New tab"
+
+#~ msgid ""
+#~ "ææ åç»ï¼è¯·æ°å¢ï¼å¦ãé¦é¡µå¤§å¾ãï¼è°ç¨æ "
+#~ "è¯ home-heroï¼"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "ææ å¾çï¼ç¹å»å³ä¸è§ãæ°å¢å¾çãä¸ä¼ "
+#~ "ç¬¬ä¸å¼ è½®æ­å¾"
+#~ msgstr ""
+#~ "No images yet. Click \"New image\" "
+#~ "at the top right to upload the "
+#~ "first carousel image."
+
+#~ msgid "æ é¢ï¼alt ææ¡ï¼"
+#~ msgstr "Title (alt text)"
+
+#~ msgid "æ é¢ï¼altï¼"
+#~ msgstr "Title (alt)"
+
+#~ msgid "æ¨¡æ¿ä¸­éè¿"
+#~ msgstr "Use in templates via"
+
+#~ msgid "æ­¢"
+#~ msgstr "to"
+
+#~ msgid "ç¶æ"
+#~ msgstr "Status"
+
+#~ msgid "ç¡®è®¤å é¤è¯¥å¾çï¼"
+#~ msgstr "Confirm delete this image?"
+
+#~ msgid "ç¡®è®¤æ¹éå é¤éä¸­å¾çï¼"
+#~ msgstr "Confirm bulk delete the selected images?"
+
+#~ msgid "ç®¡çå¾ç"
+#~ msgstr "Manage items"
+
+#~ msgid "çº¯å±ç¤º"
+#~ msgstr "Display only"
+
+#~ msgid "ç¼è¾"
+#~ msgstr "Edit"
+
+#~ msgid "ç¼è¾åç»"
+#~ msgstr "Edit group"
+
+#~ msgid "ç¼è¾å¾ç"
+#~ msgstr "Edit image"
+
+#~ msgid "ç¼©ç¥å¾"
+#~ msgstr "Thumbnail"
+
+#~ msgid "è¯´æ"
+#~ msgstr "Notes"
+
+#~ msgid "è¯·å¾éå¾ç"
+#~ msgstr ""
+
+#~ msgid "è°ç¨"
+#~ msgstr "call"
+
+#~ msgid "è°ç¨æ è¯"
+#~ msgstr "Slug"
+
+#~ msgid "è°ç¨æ è¯ï¼åå»ºåå»ºè®®ä¸åä¿®æ¹ï¼"
+#~ msgstr "Slug (not recommended to change after creation)"
+
+#~ msgid "èµ·"
+#~ msgstr "from"
+
+#~ msgid "è·³è½¬é¾æ¥ï¼çç©ºçº¯å±ç¤ºï¼"
+#~ msgstr "Link (leave blank for display only)"
+
+#~ msgid "è½®æ­åç»"
+#~ msgstr "Carousel groups"
+
+#~ msgid "è½®æ­å¾"
+#~ msgstr "Carousel"
+
+#~ msgid "è½®æ­å¾ç®¡ç"
+#~ msgstr "Carousel management"
+
+#~ msgid "è¿å"
+#~ msgstr "Back"
+
+#~ msgid "è¿ååç»"
+#~ msgstr "Back to groups"
+
+#~ msgid "éå¡«ï¼ä¾¿äºåå°è¯å«"
+#~ msgstr "Optional, for backend identification only"
+
+#~ msgid "é¾æ¥"
+#~ msgstr "Link"
+
+#~ msgid "é¿æææ"
+#~ msgstr "Always active"
+
+#~ msgid "ï¼ï¼åç»åç¨ææ å¾çæ¶è¯¥åºåèªå¨éèã"
+#~ msgstr ""
+#~ "). This slot is automatically hidden "
+#~ "when the group is disabled or "
+#~ "empty."
+

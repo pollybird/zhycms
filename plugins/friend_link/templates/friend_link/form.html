@@ -1,11 +1,11 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ '编辑友情链接' if link else '新增友情链接' }} - {{ cms_name }}{% endblock %}
-{% block page_header %}{{ '编辑友情链接' if link else '新增友情链接' }}{% endblock %}
+{% block title %}{{ _p('friend_link', '编辑友情链接') if link else _p('friend_link', '新增友情链接') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('friend_link', '编辑友情链接') if link else _p('friend_link', '新增友情链接') }}{% endblock %}
 {% set active_menu = 'friend_link' %}
 
 {% block breadcrumb %}
-  <li class="breadcrumb-item"><a href="{{ url_for('admin.friend_link_index') }}">友情链接</a></li>
-  <li class="breadcrumb-item active">{{ '编辑' if link else '新增' }}</li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.friend_link_index') }}">{{ _p('friend_link', '友情链接') }}</a></li>
+  <li class="breadcrumb-item active">{{ _p('friend_link', '编辑') if link else _p('friend_link', '新增') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -15,23 +15,23 @@
       <div class="card">
         <div class="card-body">
           <div class="form-group">
-            <label class="required-mark">链接名称</label>
+            <label class="required-mark">{{ _p('friend_link', '链接名称') }}</label>
             <input type="text" name="name" class="form-control" value="{{ link.name if link else '' }}" required>
           </div>
           <div class="form-group">
-            <label class="required-mark">链接 URL</label>
+            <label class="required-mark">{{ _p('friend_link', '链接 URL') }}</label>
             <input type="url" name="url" class="form-control" value="{{ link.url if link else '' }}" required>
           </div>
           <div class="form-group">
-            <label>LOGO 图片</label>
+            <label>{{ _p('friend_link', 'LOGO 图片') }}</label>
             <input type="file" name="logo" class="form-control-file" accept="image/*">
             {% if link and link.logo %}
             <div class="mt-2"><img src="{{ link.logo }}" style="max-height:80px;"></div>
-            <label><input type="checkbox" name="logo_remove"> 删除 LOGO</label>
+            <label><input type="checkbox" name="logo_remove"> {{ _p('friend_link', '删除 LOGO') }}</label>
             {% endif %}
           </div>
           <div class="form-group">
-            <label>备注</label>
+            <label>{{ _p('friend_link', '备注') }}</label>
             <textarea name="remark" rows="2" class="form-control">{{ link.remark if link else '' }}</textarea>
           </div>
         </div>
@@ -41,24 +41,24 @@
       <div class="card">
         <div class="card-body">
           <div class="form-group">
-            <label>排序优先级</label>
+            <label>{{ _p('friend_link', '排序优先级') }}</label>
             <input type="number" name="sort_order" class="form-control" value="{{ link.sort_order if link else 0 }}">
           </div>
           <div class="form-group">
-            <label>打开方式</label>
+            <label>{{ _p('friend_link', '打开方式') }}</label>
             <select name="target" class="form-control">
-              <option value="_blank" {{ 'selected' if link is none or link.target == '_blank' }}>新窗口</option>
-              <option value="_self" {{ 'selected' if link and link.target == '_self' }}>当前窗口</option>
+              <option value="_blank" {{ 'selected' if link is none or link.target == '_blank' }}>{{ _p('friend_link', '新窗口') }}</option>
+              <option value="_self" {{ 'selected' if link and link.target == '_self' }}>{{ _p('friend_link', '当前窗口') }}</option>
             </select>
           </div>
           <div class="form-group">
             <div class="custom-control custom-switch">
               <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled" {{ 'checked' if link is none or link.is_enabled }}>
-              <label class="custom-control-label" for="is_enabled">启用</label>
+              <label class="custom-control-label" for="is_enabled">{{ _p('friend_link', '启用') }}</label>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存</button>
-          <a href="{{ url_for('admin.friend_link_index') }}" class="btn btn-default btn-block">返回</a>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _p('friend_link', '保存') }}</button>
+          <a href="{{ url_for('admin.friend_link_index') }}" class="btn btn-default btn-block">{{ _p('friend_link', '返回') }}</a>
         </div>
       </div>
     </div>

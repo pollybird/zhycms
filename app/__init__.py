@@ -7,7 +7,7 @@ from flask_login import current_user
 
 from .config import config
 from .extensions import db, login_manager, cache, set_scheduler, babel
-from .i18n import select_locale, available_locales, current_locale
+from .i18n import select_locale, available_locales, current_locale, _p
 
 
 # ============================================================
@@ -337,7 +337,8 @@ def create_app(config_name=None):
 
     # 登录视图名：需要兼容自定义前缀，login_manager.login_view 使用 endpoint，故保持默认即可
     login_manager.login_view = 'admin_auth.login'
-    login_manager.login_message = '请先登录后再访问该页面'
+    from flask_babel import lazy_gettext
+    login_manager.login_message = lazy_gettext('请先登录后再访问该页面')
     login_manager.login_message_category = 'warning'
 
     # 注入全局模板变量
@@ -412,9 +413,10 @@ def create_app(config_name=None):
     from .frontend.views import frontend_pager_url
     app.jinja_env.globals['frontend_pager_url'] = frontend_pager_url
 
-    # v2.3.0 国际化：注入切换器渲染函数（_ 由 Flask-Babel 自动注入）
+    # v2.3.0 国际化：注入切换器渲染函数与插件翻译 _p（_ 由 Flask-Babel 自动注入）
     app.jinja_env.globals['available_locales'] = available_locales
     app.jinja_env.globals['current_locale'] = current_locale
+    app.jinja_env.globals['_p'] = _p
 
     # 初始化数据库表结构
     with app.app_context():

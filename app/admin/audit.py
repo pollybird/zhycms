@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from flask import (
     render_template, redirect, url_for, request, flash, abort, send_file, current_app
 )
+from flask_babel import gettext as _gettext
 from flask_login import current_user
 
 from ..extensions import db
@@ -198,7 +199,7 @@ def audit_clean():
         except ValueError:
             keep_days = 90
     if keep_days <= 0:
-        flash('保留天数必须为正整数', 'danger')
+        flash(_gettext('保留天数必须为正整数'), 'danger')
         return redirect(url_for('admin.audit_index'))
     count = AuditLog.clean_expired(keep_days=keep_days)
     try:
@@ -206,7 +207,7 @@ def audit_clean():
     except Exception:
         db.session.rollback()
         count = 0
-    flash(f'已清理 {keep_days} 天前的审计日志，共删除 {count} 条记录', 'success')
+    flash(_gettext('已清理 {0} 天前的审计日志，共删除 {1} 条记录').format(keep_days, count), 'success')
     audit_log(OP_BATCH, MODULE_AUDIT, None, None,
               {'action': 'clean_expired', 'keep_days': keep_days, 'deleted_count': count})
     return redirect(url_for('admin.audit_index'))

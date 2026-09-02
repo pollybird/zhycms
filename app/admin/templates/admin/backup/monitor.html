@@ -1,95 +1,76 @@
 {% extends 'admin/base.html' %}
-{% block title %}系统监控 - {{ cms_name }}{% endblock %}
-{% block page_header %}系统监控{% endblock %}
-{% set active_menu = 'monitor' %}
+{% block title %}{{ _('系统监控') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('系统监控') }}{% endblock %}
+{% set active_menu = 'backup' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">备份运维</li>
-<li class="breadcrumb-item active">系统监控</li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.backup_index') }}">{{ _('备份与恢复') }}</a></li>
+  <li class="breadcrumb-item active">{{ _('系统监控') }}</li>
 {% endblock %}
 
 {% block content %}
 <div class="row">
-  <div class="col-md-3 col-sm-6">
-    <div class="info-box">
-      <span class="info-box-icon bg-{{ 'success' if stats.get('db_alive') else 'danger' }}"><i class="fas fa-database"></i></span>
-      <div class="info-box-content">
-        <span class="info-box-text">数据库状态</span>
-        <span class="info-box-number">{{ '运行正常' if stats.get('db_alive') else '连接异常' }}</span>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3 col-sm-6">
-    <div class="info-box">
-      <span class="info-box-icon bg-info"><i class="fas fa-hdd"></i></span>
-      <div class="info-box-content">
-        <span class="info-box-text">数据库大小</span>
-        <span class="info-box-number">{{ stats.get('db_size_mb', '-') }} <small>MB</small></span>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3 col-sm-6">
-    <div class="info-box">
-      <span class="info-box-icon bg-{{ 'warning' if (stats.get('disk_used_pct', 0) or 0) > 85 else 'success' }}"><i class="fas fa-chart-pie"></i></span>
-      <div class="info-box-content">
-        <span class="info-box-text">磁盘使用率</span>
-        <span class="info-box-number">{{ stats.get('disk_used_pct', '-') }}<small>%</small></span>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3 col-sm-6">
-    <div class="info-box">
-      <span class="info-box-icon bg-primary"><i class="fas fa-hourglass-half"></i></span>
-      <div class="info-box-content">
-        <span class="info-box-text">站点运行时长</span>
-        <span class="info-box-number text-lg">
-          {% set up = stats.get('uptime_seconds', 0) or 0 %}
-          {% if up >= 86400 %}{{ (up // 86400)|int }}天{{ ((up % 86400) // 3600)|int }}时
-          {% elif up >= 3600 %}{{ (up // 3600)|int }}时{{ ((up % 3600) // 60)|int }}分
-          {% else %}{{ (up // 60)|int }}分{% endif %}
-        </span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="row">
   <div class="col-md-6">
-    <div class="card card-outline card-primary">
-      <div class="card-header"><h3 class="card-title"><i class="fas fa-chart-pie"></i> 磁盘占用详情</h3></div>
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">{{ _('服务器状态') }}</h3></div>
       <div class="card-body">
-        <div class="progress mb-2" style="height:22px;">
-          {% set pct = stats.get('disk_used_pct', 0) or 0 %}
-          <div class="progress-bar bg-{{ 'danger' if pct > 90 else 'warning' if pct > 80 else 'success' }}" style="width: {{ pct }}%;">
-            {{ pct }}%
-          </div>
-        </div>
         <table class="table table-sm mb-0">
-          <tr><th width="130">总容量</th><td>{{ stats.get('disk_total_gb', '-') }} GB</td></tr>
-          <tr><th>已使用</th><td>{{ stats.get('disk_used_gb', '-') }} GB</td></tr>
-          <tr><th>剩余可用</th><td>{{ stats.get('disk_free_gb', '-') }} GB</td></tr>
+          <tr><th width="40%">{{ _('操作系统') }}</th><td>{{ sys_info.os or '-' }}</td></tr>
+          <tr><th>{{ _('Python 版本') }}</th><td>{{ sys_info.python or '-' }}</td></tr>
+          <tr><th>{{ _('CMS 版本') }}</th><td>{{ cms_version }}</td></tr>
+          <tr><th>{{ _('时区') }}</th><td>{{ sys_info.timezone or '-' }}</td></tr>
+          <tr><th>{{ _('运行时长') }}</th><td>{{ runtime.days }}{{ _('天') }} {{ runtime.hours }}{{ _('时') }} {{ runtime.minutes }}{{ _('分') }}</td></tr>
+          <tr><th>{{ _('请求数') }}</th><td>{{ sys_info.requests or 0 }}</td></tr>
         </table>
       </div>
     </div>
   </div>
+
   <div class="col-md-6">
-    <div class="card card-outline card-success">
-      <div class="card-header"><h3 class="card-title"><i class="fas fa-archive"></i> 备份概况</h3></div>
-      <div class="card-body p-0">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">{{ _('磁盘空间') }}</h3></div>
+      <div class="card-body">
         <table class="table table-sm mb-0">
-          <tr><th width="130">备份文件总数</th><td>{{ stats.get('backup_count', 0) }} 个</td></tr>
-          <tr><th>备份总大小</th><td>{{ stats.get('backup_total_mb', 0) }} MB</td></tr>
-          <tr><th>备份目录</th><td><code>instance/backups/</code></td></tr>
-          <tr><th>定时备份</th><td>
-            {% if site_settings.get('backup_enable_scheduled') == 'on' %}
-            <span class="badge badge-success">已开启</span>
-            {{ '每周一 ' if site_settings.get('backup_schedule_mode') == 'weekly' else '每日 ' }}{{ site_settings.get('backup_schedule_time', '03:00') }}
-            {% else %}<span class="badge badge-secondary">未开启</span>{% endif %}
+          <tr><th>{{ _('项目目录') }}</th><td>{{ disk_info.project_path }}</td></tr>
+          <tr><th>{{ _('总容量') }}</th><td>{{ disk_info.total }}</td></tr>
+          <tr><th>{{ _('已用') }}</th><td>{{ disk_info.used }} ({{ disk_info.percent }}%)</td></tr>
+          <tr><th>{{ _('剩余') }}</th><td>{{ disk_info.free }}</td></tr>
+        </table>
+        <div class="progress mt-2">
+          <div class="progress-bar {{ 'bg-danger' if disk_info.percent >= 90 else ('bg-warning' if disk_info.percent >= 75 else 'bg-success') }}"
+               style="width:{{ disk_info.percent }}%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">{{ _('数据库') }}</h3></div>
+      <div class="card-body">
+        <table class="table table-sm mb-0">
+          <tr><th>{{ _('类型') }}</th><td>{{ db_info.driver }}</td></tr>
+          <tr><th>{{ _('数据库名') }}</th><td>{{ db_info.name }}</td></tr>
+          <tr><th>{{ _('大小') }}</th><td>{{ db_info.size }}</td></tr>
+          <tr><th>{{ _('连接状态') }}</th><td>
+            {% if db_info.ok %}<span class="badge badge-success">{{ _('正常') }}</span>
+            {% else %}<span class="badge badge-danger">{{ _('异常') }}</span>{% endif %}
           </td></tr>
         </table>
       </div>
-      <div class="card-footer">
-        <a href="{{ url_for('admin.backup_index') }}" class="btn btn-primary btn-sm"><i class="fas fa-arrow-left"></i> 返回备份列表</a>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">{{ _('PHP/站点环境？') }}</h3></div>
+      <div class="card-body">
+        <p class="text-muted">{{ _('本系统基于 Python + Flask 构建，无需 PHP 环境。') }}</p>
+        <dl class="row mb-0">
+          <dt class="col-4">{{ _('服务器软件') }}</dt><dd class="col-8">{{ sys_info.server_software or _('未知') }}</dd>
+          <dt class="col-4">WSGI</dt><dd class="col-8">{{ sys_info.wsgi or '-' }}</dd>
+          <dt class="col-4">{{ _('进程 ID') }}</dt><dd class="col-8">{{ sys_info.pid or '-' }}</dd>
+        </dl>
       </div>
     </div>
   </div>

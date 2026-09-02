@@ -103,6 +103,12 @@
   <a href="#i18n" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十八、国际化（v2.3）</a>
   <a href="#i18n-config" class="sub">后台配置与语言切换</a>
   <a href="#i18n-dev" class="sub">模板标记与翻译工作流</a>
+  <a href="#i18n-plugin" class="sub">&#9733; 插件国际化实现方式</a>
+  <a href="#i18n-plugin-1" class="sub2">1. 目录结构与 get_i18n_dir()</a>
+  <a href="#i18n-plugin-2" class="sub2">2. 模板 {{ _p('slug','原文') }}</a>
+  <a href="#i18n-plugin-3" class="sub2">3. Python 层 plugin._('原文')</a>
+  <a href="#i18n-plugin-4" class="sub2">4. 提取 / 更新 / 编译命令</a>
+  <a href="#i18n-plugin-5" class="sub2">5. 运行时懒加载与 zh 回退</a>
 </nav>
 
 <main>
@@ -1376,7 +1382,119 @@ pybabel compile -d app/translations
 
 # 新增语种（如日语）示例
 pybabel init -i app/translations/messages.pot -d app/translations -l ja</code></pre>
-<div class="note"><b>注意：</b>① <code>pybabel update</code> 可能把相近字符串模糊匹配为旧翻译，编译前请检查 <code>#, fuzzy</code> 标记行并修正；② 插件自带模板的字符串不在核心提取范围，插件国际化约定在 <code>plugins/&lt;slug&gt;/translations/</code> 自带翻译目录（首版未强制）；③ 中文（<code>zh</code>）为源语言，无需翻译文件。</div>
+<div class="note"><b>注意：</b>① <code>pybabel update</code> 可能把相近字符串模糊匹配为旧翻译，编译前请检查 <code>#, fuzzy</code> 标记行并修正；② 中文（<code>zh</code>）为源语言，无需翻译文件。</div>
+
+<h3 id="i18n-plugin">&#9733; 插件国际化实现方式（v2.3 新增独立翻译域）</h3>
+<p>每个插件拥有<b>独立翻译域</b>（domain 均为 <code>messages</code>，但各自存放于自己的 translations 目录），插件下载/上传打包时其译文随目录携带，与核心翻译互不干扰。</p>
+
+<h4 id="i18n-plugin-1">1. 目录结构与 <code>get_i18n_dir()</code> 钩子</h4>
+<p>在插件目录下新建标准 translations 目录（与核心同结构）即可启用独立翻译域，无需额外注册：</p>
+<pre><code>plugins/
+  my_plugin/
+    __init__.py            # 继承 PluginBase
+    admin.py / frontend.py # Python 层视图/路由
+    templates/
+      my_plugin/
+        index.html         # 后台/前台模板（用 {{ _p('my_plugin','原文') }}）
+    translations/          # &#9733; 独立翻译域（核心启动时自动发现）
+      messages.pot         # 本插件待翻译 msgid 模板（提取生成）
+      en/LC_MESSAGES/
+        messages.po        # 英文翻译源（入库）
+        messages.mo        # 编译产物（不入库，部署时 pybabel compile -f）
+      ja/LC_MESSAGES/      # 其他语种按需新增
+        messages.po / .mo</code></pre>
+<p>核心 <a href="app/plugin_api.py">PluginBase</a> 默认实现：<code>get_i18n_dir() → 插件目录/translations</code>；如需自定义（例如多插件共用同一翻译）可覆写该方法，返回绝对路径即可。启动时 <code>plugin_system._register_instance()</code> 会校验目录存在并调用 <code>app.i18n.register_plugin_i18n(slug, 目录, domain='messages')</code> 登记元数据。</p>
+
+<h4 id="i18n-plugin-2">2. 模板标记 <code>{{ _p('&lt;slug&gt;', '原文') }}</code></h4>
+<p>v2.3 核心在 Jinja 全局注入了 <code>_p(slug, msg)</code>，所有插件模板必须使用<b>显式 slug 版</b>，禁止混用核心域的 <code>_()</code>（否则插件独立发布后译文缺失）：</p>
+<pre><code>&lt;!-- plugins/my_plugin/templates/my_plugin/index.html --&gt;
+&lt;h3&gt;&#123;&#123; _p('my_plugin', '我的插件列表') &#125;&#125;&lt;/h3&gt;
+&lt;input placeholder="&#123;&#123; _p('my_plugin', '请输入关键词') &#125;&#125;"&gt;
+&lt;form onsubmit="return confirm('&#123;&#123; _p('my_plugin', '确认删除该项？') &#125;&#125;');"&gt;</code></pre>
+<p>包含变量的文案使用标准 Python 占位符（<code>{0}</code>、<code>{name}</code>），保持原样即可（<code>.format()</code> 插值）。</p>
+
+<h4 id="i18n-plugin-3">3. Python 层 <code>plugin._('原文')</code> / <code>self.ngettext(s, p, n)</code></h4>
+<p>插件 Python 代码中使用 <code>PluginBase</code> 便捷方法（内部委托 <code>app.i18n.plugin_gettext()</code>，线程安全缓存）：</p>
+<pre><code>from app.plugin_api import PluginBase
+from flask_babel import gettext as _gettext  # 仅当复用核心 msgid 时用
+
+class MyPlugin(PluginBase):
+    slug = 'my_plugin'
+
+    @property
+    def name(self):
+        # &#9733; 插件菜单显示名：用 self._()，保证切换语言时翻译
+        return self._('我的插件')
+
+    @property
+    def audit_modules(self):
+        return [('my_plugin', self._('我的模块'))]
+
+    def get_admin_menu(self):
+        return [{
+            'label': self._('菜单项A'),
+            'endpoint': 'admin.my_plugin_index',
+            'icon': 'fa-cube',
+            'permission': 'my_plugin:manage',
+            'active_prefix': 'my_plugin',
+        }]
+
+    def some_view(self):
+        # flash 提示 / 异常消息：用 self._()（或需走核心通用文案时再 _gettext）
+        flash(self._('保存成功'), 'success')</code></pre>
+<div class="note"><b>核心 vs 插件域选择：</b>
+  <ul style="margin:6px 0 0 0;">
+    <li>UI 文案属于该插件独有 → <b>插件域</b>：模板用 <code>_p()</code>，Python 用 <code>self._()</code>；</li>
+    <li>复用核心已有的通用文案（如「确认删除」「保存成功」「非法请求」）→ 可用 <code>from flask_babel import gettext as _gettext</code>；</li>
+    <li>最保险做法：所有插件页面/插件菜单一律先走<b>插件域</b>，通过 <code>plugin_system.plugin_admin_menus()</code> 再做核心域兜底。</li>
+  </ul>
+</div>
+
+<h4 id="i18n-plugin-4">4. 提取 / 更新 / 编译命令</h4>
+<p>由于 Babel 自带 Jinja 提取器<b>仅识别</b> <code>_ / gettext / ngettext</code>，无法识别插件模板自定义的 <code>_p(slug, msg)</code>，因此需要「自定义扫描 + Babel Python 提取」<b>合并</b>生成 pot：</p>
+<pre><code># ---- 推荐做法：在项目根运行，使用根目录自带的提取脚本（开源版参考）----
+#
+# 原理：
+#   A. 正则扫描 templates/**.html：匹配 _p('<slug_literal>', '<msg_literal>') 取 msgid
+#   B. pybabel 扫 <plugin>/**.py：识别 self._(...) / gettext(...) / lazy_gettext(...)
+#   C. 两者去重合并 → plugins/<slug>/translations/messages.pot
+#
+# ---- 或手动执行以下 Babel 命令（仅 Python 层部分，模板 _p 需自己补写进 pot）----
+#
+# 1) 为插件单独写一份临时 babel.cfg（放在项目根），例如 _babel_plugin_my.cfg：
+[python: plugins/my_plugin/**.py]
+encoding = utf-8
+[jinja2: plugins/my_plugin/templates/**.html]
+encoding = utf-8
+
+# 2) Python 层 + 模板 _p 合并生成 pot
+pybabel extract -F _babel_plugin_my.cfg \
+  -k _ -k gettext -k ngettext:1,2 -k lazy_gettext \
+  -o plugins/my_plugin/translations/_babel_raw.pot plugins/my_plugin
+# 然后用正则脚本把 _p(...) 扫出来的 msgid 追加到 messages.pot 并去重
+
+# 3) 新增语种（首次）/ 更新已有语种（迭代）
+pybabel init   -i plugins/my_plugin/translations/messages.pot \
+  -d plugins/my_plugin/translations -l en
+pybabel update -i plugins/my_plugin/translations/messages.pot \
+  -d plugins/my_plugin/translations -l en --previous
+
+# 4) 手工补全 plugins/my_plugin/translations/en/LC_MESSAGES/messages.po 中
+#    的空 msgstr，然后编译（部署前必做）
+pybabel compile -f -d plugins/my_plugin/translations -l en
+
+# 5) 重复 1~4 步，为每种目标语种生成 messages.po / messages.mo</code></pre>
+<p>根目录 <code>babel.cfg</code> 仅扫 <code>app/</code> 核心。5 个官方内置插件 + recruit 的提取脚本参考随仓库 <code>_extract_plugin_i18n.py</code> / <code>_fill_tr.py</code> 提供（运行后自行删除）。</p>
+
+<h4 id="i18n-plugin-5">5. 运行时懒加载与中文回退策略</h4>
+<ul>
+  <li><b>懒加载 + 线程安全缓存</b>：<code>_get_plugin_t(slug, locale)</code> 首次访问才读取 <code>.mo/.po</code>，以 <code>(locale, slug)</code> 为键线程安全地写入 <code>_t_cache</code>（<code>_PLUGIN_I18N_LOCK</code> 防并发重建），后续请求直接复用。</li>
+  <li><b>zh 直接回退</b>：当 <code>current_locale()</code> 以 <code>zh</code> 开头时，<code>plugin_gettext()</code> 立即返回 <code>message</code> 原文，不读翻译文件，兼容中文默认站点零性能损耗。</li>
+  <li><b>插件未提供翻译目录</b>：<code>register_plugin_i18n()</code> 未登记，调用 <code>_p()</code> 时 fallback 返回原文（不报错）。</li>
+  <li><b>.mo 未找到或损坏</b>：fallback 到原文；开发环境下如果只写了 <code>.po</code> 未 compile，<code>_load_plugin_translations()</code> 会临时 shell 调用 <code>pybabel compile</code> 生成一次性 mo（正式部署前请务必显式 <code>pybabel compile -f</code>）。</li>
+  <li><b>locale 大小写/区域</b>：<code>en_US</code> 先查 <code>en_US/</code> 再退 <code>en/</code>；<code>en</code> 再退 <code>en_*</code> 目录。</li>
+</ul>
+<div class="warn"><b>部署提醒：</b>由于 <code>.gitignore</code> 排除了所有 <code>*.mo</code>（方便开发），<b>部署/打包 zip 上传插件前，必须对每个插件 translations 目录执行一次 <code>pybabel compile -f -d plugins/&lt;slug&gt;/translations -l &lt;lang&gt;</code></b>；否则站点后台英文下插件页仍然显示中文。</div>
 </section>
 
 <footer>

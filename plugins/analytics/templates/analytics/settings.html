@@ -1,25 +1,25 @@
 {% extends 'admin/base.html' %}
-{% block title %}统计代码配置 - {{ cms_name }}{% endblock %}
-{% block page_header %}统计代码配置{% endblock %}
+{% block title %}{{ _p('analytics', '统计代码配置') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('analytics', '统计代码配置') }}{% endblock %}
 {% set active_menu = 'analytics' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">插件</li>
-<li class="breadcrumb-item active">统计代码</li>
+<li class="breadcrumb-item">{{ _p('analytics', '插件') }}</li>
+<li class="breadcrumb-item active">{{ _p('analytics', '统计代码') }}</li>
 {% endblock %}
 
 {% block content %}
 <form method="post">
   <div class="card card-outline card-primary">
-    <div class="card-header"><h3 class="card-title"><i class="fas fa-toggle-on"></i> 总开关</h3></div>
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-toggle-on"></i> {{ _p('analytics', '总开关') }}</h3></div>
     <div class="card-body">
       <div class="form-group">
         <div class="icheck-primary">
           <input type="checkbox" name="analytics_enable" value="on" id="ae" {{ 'checked' if settings.analytics_enable == '1' }}>
-          <label for="ae">启用前台统计代码注入（关闭后所有页面不再注入任何统计代码）</label>
+          <label for="ae">{{ _p('analytics', '启用前台统计代码注入（关闭后所有页面不再注入任何统计代码）') }}</label>
         </div>
         <div class="alert alert-info mb-0">
-          <small>启用后，下列已填写的代码将自动注入到前台所有主题页面（不影响后台管理页）。保存即生效，无需重启。</small>
+          <small>{{ _p('analytics', '启用后，下列已填写的代码将自动注入到前台所有主题页面（不影响后台管理页）。保存即生效，无需重启。') }}</small>
         </div>
       </div>
     </div>
@@ -31,20 +31,20 @@
         <div class="card-header"><h3 class="card-title"><i class="fab fa-google"></i> Google Analytics</h3></div>
         <div class="card-body">
           <div class="form-group">
-            <label>GA4 代码（含 &lt;script&gt; 标签，注入到 &lt;/head&gt; 前）</label>
-            <textarea name="analytics_google" class="form-control" rows="7" style="font-family:monospace;font-size:13px;" placeholder="粘贴 GA4 代码片段，含 script 标签">{{ settings.analytics_google or '' }}</textarea>
-            <small class="form-text text-muted">官方建议放 head，账号 ID 内嵌（如 G-XXXXXXXX）。</small>
+            <label>{{ _p('analytics', 'GA4 代码（含 <script> 标签，注入到 </head> 前）') }}</label>
+            <textarea name="analytics_google" class="form-control" rows="7" style="font-family:monospace;font-size:13px;" placeholder="{{ _p('analytics', '粘贴 GA4 代码片段，含 script 标签') }}">{{ settings.analytics_google or '' }}</textarea>
+            <small class="form-text text-muted">{{ _p('analytics', '官方建议放 head，账号 ID 内嵌（如 G-XXXXXXXX）。') }}</small>
           </div>
         </div>
       </div>
 
       <div class="card card-outline card-danger">
-        <div class="card-header"><h3 class="card-title"><i class="fas fa-chart-bar"></i> 百度统计</h3></div>
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-chart-bar"></i> {{ _p('analytics', '百度统计') }}</h3></div>
         <div class="card-body">
           <div class="form-group">
-            <label>百度统计代码（含 &lt;script&gt; 标签，注入到 &lt;/head&gt; 前）</label>
-            <textarea name="analytics_baidu" class="form-control" rows="6" style="font-family:monospace;font-size:13px;" placeholder="粘贴百度统计代码片段，含 script 标签">{{ settings.analytics_baidu or '' }}</textarea>
-            <small class="form-text text-muted">在百度统计后台获取 hm.js 代码。</small>
+            <label>{{ _p('analytics', '百度统计代码（含 <script> 标签，注入到 </head> 前）') }}</label>
+            <textarea name="analytics_baidu" class="form-control" rows="6" style="font-family:monospace;font-size:13px;" placeholder="{{ _p('analytics', '粘贴百度统计代码片段，含 script 标签') }}">{{ settings.analytics_baidu or '' }}</textarea>
+            <small class="form-text text-muted">{{ _p('analytics', '在百度统计后台获取 hm.js 代码。') }}</small>
           </div>
         </div>
       </div>
@@ -52,30 +52,30 @@
 
     <div class="col-md-6">
       <div class="card card-outline card-success">
-        <div class="card-header"><h3 class="card-title"><i class="fas fa-flag"></i> 站长工具</h3></div>
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-flag"></i> {{ _p('analytics', '站长工具') }}</h3></div>
         <div class="card-body">
           <div class="form-group">
-            <label>cnzz / 51la 等站长统计代码（注入到 &lt;/head&gt; 前）</label>
-            <textarea name="analytics_webmaster" class="form-control" rows="7" style="font-family:monospace;font-size:13px;" placeholder="粘贴 cnzz / 51la 等站长工具代码片段">{{ settings.analytics_webmaster or '' }}</textarea>
-            <small class="form-text text-muted">直接粘贴官方提供的统计代码即可。</small>
+            <label>{{ _p('analytics', 'cnzz / 51la 等站长统计代码（注入到 </head> 前）') }}</label>
+            <textarea name="analytics_webmaster" class="form-control" rows="7" style="font-family:monospace;font-size:13px;" placeholder="{{ _p('analytics', '粘贴 cnzz / 51la 等站长工具代码片段') }}">{{ settings.analytics_webmaster or '' }}</textarea>
+            <small class="form-text text-muted">{{ _p('analytics', '直接粘贴官方提供的统计代码即可。') }}</small>
           </div>
         </div>
       </div>
 
       <div class="card card-outline card-warning">
-        <div class="card-header"><h3 class="card-title"><i class="fas fa-code"></i> 自定义代码</h3></div>
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-code"></i> {{ _p('analytics', '自定义代码') }}</h3></div>
         <div class="card-body">
           <div class="form-group">
-            <label>自定义 &lt;/head&gt; 前注入（任意第三方 / 埋点 / 像素代码）</label>
-            <textarea name="analytics_custom_head" class="form-control" rows="4" style="font-family:monospace;font-size:13px;" placeholder="任意注入到 head 末尾的代码">{{ settings.analytics_custom_head or '' }}</textarea>
+            <label>{{ _p('analytics', '自定义 </head> 前注入（任意第三方 / 埋点 / 像素代码）') }}</label>
+            <textarea name="analytics_custom_head" class="form-control" rows="4" style="font-family:monospace;font-size:13px;" placeholder="{{ _p('analytics', '任意注入到 head 末尾的代码') }}">{{ settings.analytics_custom_head or '' }}</textarea>
           </div>
           <div class="form-group">
-            <label>自定义 &lt;/body&gt; 前注入</label>
-            <textarea name="analytics_custom_body" class="form-control" rows="4" style="font-family:monospace;font-size:13px;" placeholder="任意注入到 body 末尾的代码">{{ settings.analytics_custom_body or '' }}</textarea>
+            <label>{{ _p('analytics', '自定义 </body> 前注入') }}</label>
+            <textarea name="analytics_custom_body" class="form-control" rows="4" style="font-family:monospace;font-size:13px;" placeholder="{{ _p('analytics', '任意注入到 body 末尾的代码') }}">{{ settings.analytics_custom_body or '' }}</textarea>
           </div>
         </div>
         <div class="card-footer">
-          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存统计代码配置</button>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _p('analytics', '保存统计代码配置') }}</button>
         </div>
       </div>
     </div>

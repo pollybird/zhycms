@@ -19,6 +19,7 @@ from ..plugin_system import plugin_enabled
 from . import admin_bp
 
 
+from flask_babel import gettext as _gettext
 def _pending_form_submissions():
     """待处理表单提交数（表单插件禁用时返回 0）。
 
@@ -43,8 +44,7 @@ def dashboard():
         city = abnormal.get('city') or '未知地区'
         ip = abnormal.get('ip') or '未知IP'
         tm = abnormal.get('time') or ''
-        flash(f'检测到本次登录可能为异地登录（城市：{city}，IP：{ip}，时间：{tm}）。'
-              f'若不是本人操作请立即修改密码并联系超级管理员。', 'warning')
+        flash(_gettext('检测到本次登录可能为异地登录（城市：{0}，IP：{1}，时间：{2}）。若不是本人操作请立即修改密码并联系超级管理员。').format(city, ip, tm), 'warning')
 
     stats = {
         'users': User.query.filter_by(is_deleted=False).count(),

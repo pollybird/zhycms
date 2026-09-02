@@ -1,12 +1,12 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ '编辑图片' if item else '新增图片' }} · {{ group.name }} - {{ cms_name }}{% endblock %}
-{% block page_header %}{{ '编辑图片' if item else '新增图片' }} · {{ group.name }}{% endblock %}
+{% block title %}{{ _p('banner', '编辑图片') if item else _p('banner', '新增图片') }} · {{ group.name }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('banner', '编辑图片') if item else _p('banner', '新增图片') }} · {{ group.name }}{% endblock %}
 {% set active_menu = 'banner' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item"><a href="{{ url_for('admin.banner_group_index') }}">轮播图</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.banner_group_index') }}">{{ _p('banner', '轮播图') }}</a></li>
 <li class="breadcrumb-item"><a href="{{ url_for('admin.banner_group_items', gid=group.id) }}">{{ group.name }}</a></li>
-<li class="breadcrumb-item active">{{ '编辑图片' if item else '新增图片' }}</li>
+<li class="breadcrumb-item active">{{ _p('banner', '编辑图片') if item else _p('banner', '新增图片') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -16,38 +16,38 @@
       <div class="card">
         <div class="card-body">
           <div class="form-group">
-            <label>标题（alt 文案）</label>
+            <label>{{ _p('banner', '标题（alt 文案）') }}</label>
             <input type="text" name="title" class="form-control" value="{{ item.title if item else '' }}"
-                   placeholder="如：现代化生产车间">
+                   placeholder="{{ _p('banner', '如：现代化生产车间') }}">
           </div>
           <div class="form-group">
-            <label>上传图片</label>
+            <label>{{ _p('banner', '上传图片') }}</label>
             <input type="file" name="image" class="form-control-file" accept="image/*">
-            <small class="form-text text-muted">支持 jpg/jpeg/png/gif/webp；走上传中心（自动压缩/去重）。重新上传将替换当前图片。</small>
+            <small class="form-text text-muted">{{ _p('banner', '支持 jpg/jpeg/png/gif/webp；走上传中心（自动压缩/去重）。重新上传将替换当前图片。') }}</small>
           </div>
           <div class="form-group">
-            <label>或外链图片 URL</label>
+            <label>{{ _p('banner', '或外链图片 URL') }}</label>
             <input type="text" name="external_url" class="form-control"
                    value="{{ item.external_url if item and item.external_url else '' }}"
-                   placeholder="如 https://cdn.example.com/banner.jpg（填写后不适用于上传）">
+                   placeholder="{{ _p('banner', '如 https://cdn.example.com/banner.jpg（填写后不适用于上传）') }}">
           </div>
           {% if item and item.image_url() %}
           <div class="form-group">
-            <label>当前图片</label>
+            <label>{{ _p('banner', '当前图片') }}</label>
             <div><img src="{{ item.image_url() }}" alt="{{ item.title }}" style="max-height:120px;"></div>
           </div>
           {% endif %}
           <div class="form-row">
             <div class="form-group col-md-8">
-              <label>跳转链接（留空纯展示）</label>
+              <label>{{ _p('banner', '跳转链接（留空纯展示）') }}</label>
               <input type="text" name="link_url" class="form-control" value="{{ item.link_url if item else '' }}"
-                     placeholder="如 /column/about 或 https://example.com">
+                     placeholder="{{ _p('banner', '如 /column/about 或 https://example.com') }}">
             </div>
             <div class="form-group col-md-4">
-              <label>打开方式</label>
+              <label>{{ _p('banner', '打开方式') }}</label>
               <select name="link_target" class="form-control">
-                <option value="_self" {{ 'selected' if item and item.link_target == '_self' }}>当前窗口</option>
-                <option value="_blank" {{ 'selected' if item and item.link_target == '_blank' }}>新窗口</option>
+                <option value="_self" {{ 'selected' if item and item.link_target == '_self' }}>{{ _p('banner', '当前窗口') }}</option>
+                <option value="_blank" {{ 'selected' if item and item.link_target == '_blank' }}>{{ _p('banner', '新窗口') }}</option>
               </select>
             </div>
           </div>
@@ -58,28 +58,28 @@
       <div class="card">
         <div class="card-body">
           <div class="form-group">
-            <label>排序优先级（大在前）</label>
+            <label>{{ _p('banner', '排序优先级（大在前）') }}</label>
             <input type="number" name="sort_order" class="form-control" value="{{ item.sort_order if item else 0 }}">
           </div>
           <div class="form-group">
             <div class="custom-control custom-switch">
               <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled"
                      {{ 'checked' if item is none or item.is_enabled }}>
-              <label class="custom-control-label" for="is_enabled">启用</label>
+              <label class="custom-control-label" for="is_enabled">{{ _p('banner', '启用') }}</label>
             </div>
           </div>
           <div class="form-group">
-            <label>定时上线（可选）</label>
+            <label>{{ _p('banner', '定时上线（可选）') }}</label>
             <input type="datetime-local" name="start_at" class="form-control"
                    value="{{ item.start_at.strftime('%Y-%m-%dT%H:%M') if item and item.start_at else '' }}">
           </div>
           <div class="form-group">
-            <label>定时下线（可选）</label>
+            <label>{{ _p('banner', '定时下线（可选）') }}</label>
             <input type="datetime-local" name="end_at" class="form-control"
                    value="{{ item.end_at.strftime('%Y-%m-%dT%H:%M') if item and item.end_at else '' }}">
           </div>
-          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存</button>
-          <a href="{{ url_for('admin.banner_group_items', gid=group.id) }}" class="btn btn-default btn-block">返回</a>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _p('banner', '保存') }}</button>
+          <a href="{{ url_for('admin.banner_group_items', gid=group.id) }}" class="btn btn-default btn-block">{{ _p('banner', '返回') }}</a>
         </div>
       </div>
     </div>

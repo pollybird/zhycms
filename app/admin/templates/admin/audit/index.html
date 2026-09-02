@@ -1,133 +1,118 @@
 {% extends 'admin/base.html' %}
-{% block title %}审计日志 - {{ cms_name }}{% endblock %}
-{% block page_header %}审计日志{% endblock %}
+{% block title %}{{ _('审计记录') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('审计记录') }}{% endblock %}
 {% set active_menu = 'audit' %}
 
-{% block breadcrumb %}<li class="breadcrumb-item active">审计日志</li>{% endblock %}
-
-{% set module_labels = {} %}
-{% for v, label in module_choices %}{% set _ = module_labels.update({v: label}) %}{% endfor %}
-{% set op_labels = {} %}
-{% for v, label in op_type_choices %}{% set _ = op_labels.update({v: label}) %}{% endfor %}
+{% block breadcrumb %}<li class="breadcrumb-item active">{{ _('审计记录') }}</li>{% endblock %}
 
 {% block content %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">操作审计记录 <span class="badge badge-info ml-1">共 {{ total_count }} 条</span></h3>
-    <div class="card-tools">
-      <button type="button" class="btn btn-sm btn-outline-danger" data-toggle="modal" data-target="#cleanModal">
-        <i class="fas fa-broom"></i> 清理过期日志
-      </button>
-      <a href="{{ url_for('admin.audit_export') }}?{{ request.query_string.decode() }}" class="btn btn-sm btn-outline-success ml-1">
-        <i class="fas fa-file-export"></i> 导出 CSV
-      </a>
-    </div>
+    <h3 class="card-title">{{ _('筛选') }}</h3>
   </div>
-  <div class="card-body border-bottom">
-    <form method="get" class="form-inline">
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">关键词</span></div>
-        <input type="text" name="keyword" class="form-control" value="{{ keyword }}" placeholder="详情/目标/账号/IP">
-      </div>
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">模块</span></div>
-        <select name="module" class="form-control">
-          <option value="">全部</option>
-          {% for v, label in module_choices %}
-          <option value="{{ v }}" {{ 'selected' if module == v }}>{{ label }}</option>
+  <div class="card-body">
+    <form method="get" class="form-row">
+      <div class="col-md-3">
+        <label class="small">{{ _('操作人') }}</label>
+        <select name="uid" class="form-control form-control-sm" onchange="this.form.submit()">
+          <option value="">{{ _('全部') }}</option>
+          {% for u in user_options %}
+          <option value="{{ u.id }}" {{ 'selected' if filter.uid == u.id }}>{{ u.username }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">操作</span></div>
-        <select name="op_type" class="form-control">
-          <option value="">全部</option>
-          {% for v, label in op_type_choices %}
-          <option value="{{ v }}" {{ 'selected' if op_type == v }}>{{ label }}</option>
+      <div class="col-md-3">
+        <label class="small">{{ _('操作类型') }}</label>
+        <select name="action" class="form-control form-control-sm" onchange="this.form.submit()">
+          <option value="">{{ _('全部') }}</option>
+          {% for v, label in action_options %}
+          <option value="{{ v }}" {{ 'selected' if filter.action == v }}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">开始</span></div>
-        <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+      <div class="col-md-3">
+        <label class="small">{{ _('模块') }}</label>
+        <select name="module" class="form-control form-control-sm" onchange="this.form.submit()">
+          <option value="">{{ _('全部') }}</option>
+          {% for v, label in module_options %}
+          <option value="{{ v }}" {{ 'selected' if filter.module == v }}>{{ label }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">结束</span></div>
-        <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+      <div class="col-md-3 pt-4">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> {{ _('筛选') }}</button>
+        <a href="{{ url_for('admin.audit_index') }}" class="btn btn-default btn-sm">{{ _('重置') }}</a>
+        <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#clean-modal"><i class="fas fa-broom"></i> {{ _('清理') }}</button>
       </div>
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">账号</span></div>
-        <input type="text" name="username" class="form-control" value="{{ username }}">
-      </div>
-      <button type="submit" class="btn btn-sm btn-default mb-2"><i class="fas fa-search"></i> 筛选</button>
-      <a href="{{ url_for('admin.audit_index') }}" class="btn btn-sm btn-link mb-2">重置</a>
     </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{{ _('审计记录列表') }} <small class="text-muted">{{ _('共 %(total)s 条', total=pagination.total) }}</small></h3>
   </div>
   <div class="card-body p-0">
     <table class="table table-hover table-sm mb-0">
       <thead>
         <tr>
-          <th width="70">ID</th>
-          <th width="140">时间</th>
-          <th width="100">账号</th>
-          <th width="110">IP</th>
-          <th width="100">模块</th>
-          <th width="110">操作</th>
-          <th>详情</th>
+          <th width="60">ID</th>
+          <th width="140">{{ _('操作人') }}</th>
+          <th width="100">{{ _('类型') }}</th>
+          <th width="100">{{ _('模块') }}</th>
+          <th width="80">{{ _('目标ID') }}</th>
+          <th>{{ _('详情') }}</th>
+          <th width="110">{{ _('IP') }}</th>
+          <th width="160">{{ _('时间') }}</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
         <tr>
           <td>{{ log.id }}</td>
-          <td style="white-space:nowrap;">{{ log.created_at.strftime('%m-%d %H:%M:%S') if log.created_at else '-' }}</td>
-          <td>{{ log.username or '-' }}</td>
-          <td>{{ log.ip or '-' }}</td>
-          <td><span class="badge badge-info">{{ module_labels.get(log.module, log.module) }}</span></td>
           <td>
-            <span class="badge badge-{{ 'success' if log.op_type in ['login','create','export','upload'] else 'primary' if log.op_type in ['review_pass','publish','rollback'] else 'warning' if log.op_type in ['update','config_change','user_manage','backup_create','backup_restore','batch'] else 'danger' if log.op_type in ['delete','review_reject','logout'] else 'secondary' }}">
-              {{ op_labels.get(log.op_type, log.op_type) }}
-            </span>
+            {% if log.user %}<span>{{ log.user.username }}</span>
+            {% if log.user.is_superadmin %}<span class="badge badge-danger ml-1" style="font-size:10px;">{{ _('超管') }}</span>{% endif %}
+            {% else %}<span class="text-muted">{{ _('系统') }}</span>{% endif %}
           </td>
-          <td style="max-width:480px;">
-            <small>
-              {% if log.target_name %}<strong>{{ log.target_name }}</strong> {% endif %}
-              {{ log.detail|audit_detail(audit_maps)|safe }}
-            </small>
-          </td>
+          <td><span class="badge badge-info">{{ log.action_label }}</span></td>
+          <td>{{ log.module_label }}</td>
+          <td>{{ log.target_id or '-' }}</td>
+          <td>{{ log.detail or '-' }}</td>
+          <td><code>{{ log.ip }}</code></td>
+          <td>{{ log.created_at|datetime_format }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">暂无符合条件的审计记录</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">{{ _('暂无审计记录') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% if pagination.pages > 1 %}
   <div class="card-footer">
-    {% include 'admin/_pagination.html' %}
+    {% with pagination=pagination, base_kwargs=request_args %}{% include 'admin/_pagination.html' %}{% endwith %}
   </div>
   {% endif %}
 </div>
 
-<div class="modal fade" id="cleanModal" tabindex="-1" role="dialog">
-  <div class="modal-dialog modal-sm">
-    <form method="post" action="{{ url_for('admin.audit_clean') }}" class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">清理审计日志</h5>
-        <button type="button" class="close" data-dismiss="modal">&times;</button>
-      </div>
+<div class="modal fade" id="clean-modal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <form method="post" action="{{ url_for('admin.audit_clean') }}">
+      <div class="modal-header bg-danger text-white"><h5 class="modal-title">{{ _('清理审计记录') }}</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
       <div class="modal-body">
-        <div class="form-group">
-          <label>保留最近天数</label>
-          <input type="number" name="keep_days" class="form-control" value="90" min="1" max="3650" required>
-          <small class="form-text text-muted">将删除指定天数之前的所有审计记录，且不可恢复。系统每日 02:30 也会按「系统设置」中的保留天数自动清理。</small>
-        </div>
+        <label>{{ _('清理范围') }}</label>
+        <select name="days" class="form-control">
+          <option value="30">{{ _('保留最近 30 天') }}</option>
+          <option value="90" selected>{{ _('保留最近 90 天') }}</option>
+          <option value="180">{{ _('保留最近 180 天') }}</option>
+          <option value="0">{{ _('清空全部（不可恢复）') }}</option>
+        </select>
       </div>
-      <div class="modal-footer justify-content-between">
-        <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-        <button type="submit" class="btn btn-danger" onclick="return confirm('确认清理？此操作不可撤销。');">确认清理</button>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('取消') }}</button>
+        <button type="submit" class="btn btn-danger"><i class="fas fa-broom"></i> {{ _('确认清理') }}</button>
       </div>
     </form>
-  </div>
+  </div></div>
 </div>
 {% endblock %}

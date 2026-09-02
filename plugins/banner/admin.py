@@ -19,6 +19,7 @@ from app.plugin_system import plugin_enabled
 
 from .models import BannerGroup, Banner
 
+from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'banner'
 
 
@@ -110,17 +111,17 @@ def _save_group(group):
     name = (request.form.get('name') or '').strip()
     slug = (request.form.get('slug') or '').strip()
     if not name or not slug:
-        flash('名称与调用标识必填', 'danger')
+        flash(_gettext('名称与调用标识必填'), 'danger')
         return None
     if not re.match(r'^[a-zA-Z][a-zA-Z0-9_-]*$', slug):
-        flash('调用标识须以字母开头，仅含字母、数字、中划线或下划线', 'danger')
+        flash(_gettext('调用标识须以字母开头，仅含字母、数字、中划线或下划线'), 'danger')
         return None
     exists = BannerGroup.query.filter(
         BannerGroup.slug == slug,
         BannerGroup.id != (group.id if group else 0),
     ).first()
     if exists is not None:
-        flash(f'调用标识「{slug}」已存在', 'danger')
+        flash(_gettext('调用标识「{0}」已存在').format(slug), 'danger')
         return None
 
     is_new = group is None
@@ -135,7 +136,7 @@ def _save_group(group):
     db.session.commit()
     audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE,
               group.id, group.name, {'action': '分组', 'slug': slug})
-    flash('轮播分组已保存', 'success')
+    flash(_gettext('轮播分组已保存'), 'success')
     return group
 
 
@@ -150,7 +151,7 @@ def banner_group_delete(gid):
     db.session.delete(group)   # 级联删除组内图片记录
     db.session.commit()
     audit_log(OP_DELETE, AUDIT_MODULE, gid, name, {'action': '分组'})
-    flash('分组已删除，组内图片引用已释放', 'success')
+    flash(_gettext('分组已删除，组内图片引用已释放'), 'success')
     return redirect(url_for('admin.banner_group_index'))
 
 
@@ -217,11 +218,11 @@ def _save_item(group, item):
             upload, sub_dir='banner',
             allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp'])
         if err:
-            flash(f'图片上传失败：{err}', 'danger')
+            flash(_gettext('图片上传失败：{0}').format(err), 'danger')
             return None
         rec = UploadedFile.find_by_url(file_url)
         if rec is None:
-            flash('图片记录写入异常，请重试', 'danger')
+            flash(_gettext('图片记录写入异常，请重试'), 'danger')
             return None
         _release_image(item)
         item.image_id = rec.id
@@ -230,7 +231,7 @@ def _save_item(group, item):
         _release_image(item)
         item.external_url = external
     elif is_new and not item.image_id:
-        flash('请上传图片或填写图片 URL', 'danger')
+        flash(_gettext('请上传图片或填写图片 URL'), 'danger')
         return None
 
     if is_new:
@@ -240,7 +241,7 @@ def _save_item(group, item):
     audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE,
               item.id, item.title or f'轮播图#{item.id}',
               {'action': '图片', 'group_id': group.id})
-    flash('轮播图已保存', 'success')
+    flash(_gettext('轮播图已保存'), 'success')
     return item
 
 
@@ -259,7 +260,7 @@ def banner_item_delete(gid, bid):
     db.session.commit()
     audit_log(OP_DELETE, AUDIT_MODULE, bid, title,
               {'action': '图片', 'group_id': gid})
-    flash('已删除', 'success')
+    flash(_gettext('已删除'), 'success')
     return redirect(url_for('admin.banner_group_items', gid=gid))
 
 
@@ -285,7 +286,7 @@ def banner_item_batch(gid):
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
     if not ids:
-        flash('未选择', 'warning')
+        flash(_gettext('未选择'), 'warning')
         return redirect(url_for('admin.banner_group_items', gid=gid))
 
     items = Banner.query.filter(Banner.id.in_(ids),
@@ -305,5 +306,5 @@ def banner_item_batch(gid):
     audit_log(OP_UPDATE if action in ('enable', 'disable') else OP_DELETE,
               AUDIT_MODULE, None, group.name,
               {'action': f'批量{action}', 'count': len(items)})
-    flash('批量操作完成', 'success')
+    flash(_gettext('批量操作完成'), 'success')
     return redirect(url_for('admin.banner_group_items', gid=gid))

@@ -13,6 +13,7 @@ from flask import (
     render_template, redirect, url_for, request,
     flash, abort, jsonify, current_app
 )
+from flask_babel import gettext as _gettext
 from flask_login import current_user
 
 from ..extensions import db
@@ -42,7 +43,7 @@ from . import admin_bp
 def _col_or_404(cid):
     col = Column.query.get_or_404(cid)
     if col.type != 'list':
-        flash('该栏目不是列表栏目，无法管理文章', 'warning')
+        flash(_gettext('该栏目不是列表栏目，无法管理文章'), 'warning')
         abort(400) if False else None
     return col
 
@@ -66,7 +67,7 @@ def _build_tree_with_depth(columns, parent_id=None, depth=0):
 def article_index(cid):
     col = Column.query.get_or_404(cid)
     if col.type != 'list':
-        flash('该栏目不是列表栏目，无法管理文章', 'warning')
+        flash(_gettext('该栏目不是列表栏目，无法管理文章'), 'warning')
         return redirect(url_for('admin.column_index'))
 
     page = max(int(request.args.get('page', 1)), 1)
@@ -113,10 +114,10 @@ def article_index(cid):
 def article_create(cid):
     col = Column.query.get_or_404(cid)
     if col.type != 'list':
-        flash('该栏目不是列表栏目', 'warning')
+        flash(_gettext('该栏目不是列表栏目'), 'warning')
         return redirect(url_for('admin.column_index'))
     if col.is_parent:
-        flash('父栏目不能添加文章，请先选择或创建子栏目', 'warning')
+        flash(_gettext('父栏目不能添加文章，请先选择或创建子栏目'), 'warning')
         return redirect(url_for('admin.column_index'))
 
     fields = col.fields.filter_by(is_deleted=False).order_by(ColumnField.sort_order.desc()).all()
@@ -167,7 +168,7 @@ def _save_article(article, column, fields):
     """创建或更新文章，自动同步 enabled ↔ status，创建版本快照。"""
     title = (request.form.get('title') or '').strip()
     if not title:
-        flash('文章标题必填', 'danger')
+        flash(_gettext('文章标题必填'), 'danger')
         return None
 
     is_new = article is None
@@ -191,7 +192,7 @@ def _save_article(article, column, fields):
         if status == STATUS_PUBLISHED and not (
             current_user.is_super or current_user.has_permission('content:publish')):
             status = STATUS_REVIEW
-            flash('您无「发布」权限，状态已自动改为「待审核」', 'warning')
+            flash(_gettext('您无「发布」权限，状态已自动改为「待审核」'), 'warning')
         article.status = status
     elif not is_new:
         # 编辑时保持原状态
@@ -224,7 +225,7 @@ def _save_article(article, column, fields):
                                          allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp'],
                                          max_size=10 * 1024 * 1024)
         if err:
-            flash(f'封面图上传失败：{err}', 'danger')
+            flash(_gettext('封面图上传失败：{0}').format(err), 'danger')
             return None
         article.cover = url
     elif request.form.get('cover_remove') == 'on':
@@ -260,7 +261,7 @@ def _save_article(article, column, fields):
                 rel, url, err = save_upload_file(file_obj, sub_dir='article',
                                                  allowed_exts=allowed, max_size=maxsize)
                 if err:
-                    flash(f'字段 {f.label} 上传失败：{err}', 'danger')
+                    flash(_gettext('字段 {0} 上传失败：{1}').format(f.label, err), 'danger')
                     return None
                 value = url
             elif request.form.get(f'field_{f.id}_remove') == 'on':
@@ -271,7 +272,7 @@ def _save_article(article, column, fields):
             value = request.form.get(f'field_{f.id}') or ''
 
         if f.is_required and not value:
-            flash(f'字段 {f.label} 为必填', 'danger')
+            flash(_gettext('字段 {0} 为必填').format(f.label), 'danger')
             return None
 
         if value is not None:
@@ -282,7 +283,7 @@ def _save_article(article, column, fields):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('文章保存失败（数据库错误）', 'danger')
+        flash(_gettext('文章保存失败（数据库错误）'), 'danger')
         current_app.logger.exception('article save DB error')
         return None
 
@@ -303,11 +304,11 @@ def _save_article(article, column, fields):
     # 清缓存 + 审计日志
     clear_content_cache(column_id=column.id, article_id=article.id)
     if is_new:
-        flash('文章创建成功', 'success')
+        flash(_gettext('文章创建成功'), 'success')
         audit_log(OP_CREATE, MODULE_ARTICLE, article.id, article.title,
                   {'column_id': column.id, 'status': article.status})
     else:
-        flash('文章保存成功', 'success')
+        flash(_gettext('文章保存成功'), 'success')
         audit_log(OP_UPDATE, MODULE_ARTICLE, article.id, article.title,
                   {'column_id': column.id, 'status': article.status})
     return article
@@ -325,7 +326,7 @@ def article_submit_review(cid, aid):
     if article.column_id != col.id or article.is_deleted:
         abort(404)
     if article.status not in (STATUS_DRAFT, STATUS_ARCHIVED):
-        flash('只有草稿或已归档的内容可以提交审核', 'warning')
+        flash(_gettext('只有草稿或已归档的内容可以提交审核'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
     article.status = STATUS_REVIEW
     article.reject_reason = None
@@ -334,7 +335,7 @@ def article_submit_review(cid, aid):
     try:
         db.session.commit()
         clear_content_cache(column_id=cid, article_id=aid)
-        flash('已提交待审核，请等待审核员处理', 'success')
+        flash(_gettext('已提交待审核，请等待审核员处理'), 'success')
         audit_log(OP_UPDATE, MODULE_ARTICLE, article.id, article.title,
                   {'action': 'submit_review', 'from_status': 'draft/archived'})
         ArticleVersion.snapshot(article, article.status, note='提交审核',
@@ -342,7 +343,7 @@ def article_submit_review(cid, aid):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('提交失败', 'danger')
+        flash(_gettext('提交失败'), 'danger')
     return redirect(url_for('admin.article_index', cid=cid))
 
 
@@ -354,10 +355,10 @@ def article_review_pass(cid, aid):
     if article.column_id != col.id or article.is_deleted:
         abort(404)
     if not current_user.column_flag('can_review', cid):
-        flash('您在该栏目没有「审核」权限', 'warning')
+        flash(_gettext('您在该栏目没有「审核」权限'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
     if article.status != STATUS_REVIEW:
-        flash('只有「待审核」状态才能审核通过', 'warning')
+        flash(_gettext('只有「待审核」状态才能审核通过'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
     article.status = STATUS_PUBLISHED
     article.reject_reason = None
@@ -368,7 +369,7 @@ def article_review_pass(cid, aid):
     try:
         db.session.commit()
         clear_content_cache(column_id=cid, article_id=aid)
-        flash('审核通过，内容已正式发布', 'success')
+        flash(_gettext('审核通过，内容已正式发布'), 'success')
         audit_log(OP_REVIEW_PASS, MODULE_ARTICLE, article.id, article.title,
                   {'column_id': cid})
         ArticleVersion.snapshot(article, article.status, note='审核通过',
@@ -376,7 +377,7 @@ def article_review_pass(cid, aid):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('审核失败', 'danger')
+        flash(_gettext('审核失败'), 'danger')
     return redirect(url_for('admin.article_index', cid=cid))
 
 
@@ -388,14 +389,14 @@ def article_review_reject(cid, aid):
     if article.column_id != col.id or article.is_deleted:
         abort(404)
     if not current_user.column_flag('can_review', cid):
-        flash('您在该栏目没有「审核」权限', 'warning')
+        flash(_gettext('您在该栏目没有「审核」权限'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
     if article.status != STATUS_REVIEW:
-        flash('只有「待审核」状态才能驳回', 'warning')
+        flash(_gettext('只有「待审核」状态才能驳回'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
     reason = (request.form.get('reject_reason') or '').strip()[:500]
     if not reason:
-        flash('驳回原因必填', 'danger')
+        flash(_gettext('驳回原因必填'), 'danger')
         return redirect(url_for('admin.article_edit', cid=cid, aid=aid))
     article.status = STATUS_DRAFT
     article.reject_reason = reason
@@ -406,7 +407,7 @@ def article_review_reject(cid, aid):
     try:
         db.session.commit()
         clear_content_cache(column_id=cid, article_id=aid)
-        flash(f'已驳回，原因已写入供编辑修改（{reason[:30]}…）', 'success')
+        flash(_gettext('已驳回，原因已写入供编辑修改（{0}…）').format(reason[:30]), 'success')
         audit_log(OP_REVIEW_REJECT, MODULE_ARTICLE, article.id, article.title,
                   {'column_id': cid, 'reason': reason})
         ArticleVersion.snapshot(article, article.status,
@@ -415,7 +416,7 @@ def article_review_reject(cid, aid):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('驳回失败', 'danger')
+        flash(_gettext('驳回失败'), 'danger')
     return redirect(url_for('admin.article_index', cid=cid))
 
 
@@ -427,7 +428,7 @@ def article_publish(cid, aid):
     if article.column_id != col.id or article.is_deleted:
         abort(404)
     if not current_user.column_flag('can_publish', cid):
-        flash('您在该栏目没有「发布」权限', 'warning')
+        flash(_gettext('您在该栏目没有「发布」权限'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
     article.status = STATUS_PUBLISHED
     article.reject_reason = None
@@ -436,7 +437,7 @@ def article_publish(cid, aid):
     try:
         db.session.commit()
         clear_content_cache(column_id=cid, article_id=aid)
-        flash('已直接发布', 'success')
+        flash(_gettext('已直接发布'), 'success')
         audit_log(OP_PUBLISH, MODULE_ARTICLE, article.id, article.title,
                   {'column_id': cid, 'from': 'direct_publish'})
         ArticleVersion.snapshot(article, article.status, note='直接发布',
@@ -444,7 +445,7 @@ def article_publish(cid, aid):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('发布失败', 'danger')
+        flash(_gettext('发布失败'), 'danger')
     return redirect(url_for('admin.article_index', cid=cid))
 
 
@@ -461,7 +462,7 @@ def article_archive(cid, aid):
     try:
         db.session.commit()
         clear_content_cache(column_id=cid, article_id=aid)
-        flash('已归档（前台不再展示）', 'success')
+        flash(_gettext('已归档（前台不再展示）'), 'success')
         audit_log(OP_ARCHIVE, MODULE_ARTICLE, article.id, article.title,
                   {'column_id': cid})
         ArticleVersion.snapshot(article, article.status, note='归档',
@@ -469,7 +470,7 @@ def article_archive(cid, aid):
         db.session.commit()
     except Exception:
         db.session.rollback()
-        flash('归档失败', 'danger')
+        flash(_gettext('归档失败'), 'danger')
     return redirect(url_for('admin.article_index', cid=cid))
 
 
@@ -516,13 +517,13 @@ def article_rollback(cid, aid, vid):
                                 note=f'回滚到版本 v{v.version_no}',
                                 created_by=getattr(current_user, 'id', None))
         db.session.commit()
-        flash(f'已回滚到版本 v{v.version_no}，当前状态为草稿，请检查后重新提交', 'success')
+        flash(_gettext('已回滚到版本 v{0}，当前状态为草稿，请检查后重新提交').format(v.version_no), 'success')
         audit_log(OP_ROLLBACK, MODULE_ARTICLE, article.id, article.title,
                   {'to_version_no': v.version_no, 'title_snapshot': v.title})
     except Exception:
         db.session.rollback()
         current_app.logger.exception('rollback failed')
-        flash('回滚失败，请查看日志', 'danger')
+        flash(_gettext('回滚失败，请查看日志'), 'danger')
     return redirect(url_for('admin.article_edit', cid=cid, aid=aid))
 
 
@@ -538,7 +539,7 @@ def article_delete(cid, aid):
     article.updated_by = getattr(current_user, 'id', None)
     db.session.commit()
     clear_content_cache(column_id=cid, article_id=aid)
-    flash('文章已删除', 'success')
+    flash(_gettext('文章已删除'), 'success')
     audit_log(OP_DELETE, MODULE_ARTICLE, article.id, article.title, {'column_id': cid})
     return redirect(url_for('admin.article_index', cid=cid))
 
@@ -567,7 +568,7 @@ def article_batch(cid):
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
     if not ids:
-        flash('未选择文章', 'warning')
+        flash(_gettext('未选择文章'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
 
     articles = Article.query.filter(Article.id.in_(ids), Article.column_id == cid).all()
@@ -577,7 +578,7 @@ def article_batch(cid):
     uid = getattr(current_user, 'id', None)
     # 发布类批量动作受栏目级「可发布」标志约束
     if action in ('publish', 'enable') and not current_user.column_flag('can_publish', cid):
-        flash('您在该栏目没有「发布」权限', 'warning')
+        flash(_gettext('您在该栏目没有「发布」权限'), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
 
     if action == 'enable':
@@ -629,17 +630,17 @@ def article_batch(cid):
         try:
             target_cid = int(target_cid)
         except (TypeError, ValueError):
-            flash('目标栏目无效', 'danger')
+            flash(_gettext('目标栏目无效'), 'danger')
             return redirect(url_for('admin.article_index', cid=cid))
         # 目标栏目必须是 list 类型且操作者有权限
         target_col = Column.query.filter_by(id=target_cid, is_deleted=False).first()
         if target_col is None or target_col.type != 'list':
-            flash('目标栏目不存在或不是列表栏目', 'danger')
+            flash(_gettext('目标栏目不存在或不是列表栏目'), 'danger')
             return redirect(url_for('admin.article_index', cid=cid))
         # RBAC 目标栏目权限检查
         if not (getattr(current_user, 'is_super', False) or
                 current_user.can_access_column(target_cid)):
-            flash('您对目标栏目没有操作权限', 'danger')
+            flash(_gettext('您对目标栏目没有操作权限'), 'danger')
             return redirect(url_for('admin.article_index', cid=cid))
         for a in articles:
             a.column_id = target_cid
@@ -647,7 +648,7 @@ def article_batch(cid):
         msg = f'已移动 {count} 篇到栏目「{target_col.name}」'
         audit_op = OP_BATCH
     else:
-        flash(f'未知动作 {action}', 'warning')
+        flash(_gettext('未知动作 {0}').format(action), 'warning')
         return redirect(url_for('admin.article_index', cid=cid))
 
     db.session.commit()

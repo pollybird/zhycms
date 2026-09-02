@@ -35,6 +35,7 @@ v2.3.0（2026-09-01）围绕「国际化 + 统计插件 + 表单插件化」迭�
   - 后台顶栏与前台主题 `base.html` 语言切换器（`available_locales()` / `current_locale()` 全局函数）；未启用时切换器自动隐藏。
   - 核心界面文案（后台基础模板 + 4 套主题 `base.html`）已标记 `_()`，英文翻译见 `app/translations/en/LC_MESSAGES/messages.po`（`.mo` 编译产物不入库，部署前执行 `pybabel compile -d app/translations`）。
   - 默认关闭（`i18n_enable=0`）：关闭时全站按中文渲染，与 v2.2.0 行为完全一致；内容数据（栏目名/文章标题等动态数据）不在翻译范围，仅界面文案国际化。
+  - **插件独立翻译域**（v2.3 完整支持）：每个插件可在 `plugins/<slug>/translations/<lang>/LC_MESSAGES/messages.po` 自带译文；模板使用 `{{ _p('<slug>', '原文') }}`，Python 层使用 `self._('原文')` / `self.ngettext(s, p, n)`（`PluginBase` 便捷方法）；启停不影响核心译文，独立打包上传插件时译文随目录携带。完整实现与命令见 [wiki.html → 十八、国际化 → 插件国际化实现方式](wiki.html#i18n-plugin) 章节。
 - **统计代码插件 `analytics`（官方内置）**：
   - 后台「插件管理」独立配置页（权限 `analytics:manage`）：百度统计 / Google Analytics 4 / 站长工具（cnzz、51la 等）/ 自定义 head 与 body 代码，直接粘贴官方代码片段，保存即生效、无需重启。
   - 前台注入采用「插件 Jinja 全局函数 + 主题注入点」模式：主题 `base.html` 的 `</head>` 前调用 `{{ analytics_head()|safe }}`、`</body>` 前调用 `{{ analytics_body()|safe }}`，4 套内置主题均已接入；禁用插件时函数返回空串、模板零报错。

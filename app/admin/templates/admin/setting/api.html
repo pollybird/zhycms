@@ -1,11 +1,11 @@
 {% extends 'admin/base.html' %}
-{% block title %}内容 API - {{ cms_name }}{% endblock %}
-{% block page_header %}内容 API{% endblock %}
+{% block title %}{{ _('内容 API') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('内容 API') }}{% endblock %}
 {% set active_menu = 'setting_api' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">系统设置</li>
-<li class="breadcrumb-item active">内容 API</li>
+<li class="breadcrumb-item">{{ _('系统设置') }}</li>
+<li class="breadcrumb-item active">{{ _('内容 API') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -13,25 +13,25 @@
 <div class="row">
   <div class="col-md-6">
     <div class="card card-outline card-primary">
-      <div class="card-header"><h3 class="card-title">访问控制</h3></div>
+      <div class="card-header"><h3 class="card-title">{{ _('访问控制') }}</h3></div>
       <div class="card-body">
         <div class="form-group">
           <div class="icheck-primary">
             <input type="checkbox" name="api_enable" value="on" id="api_enable" {{ 'checked' if settings.api_enable != 'off' }}>
-            <label for="api_enable">启用内容 API（关闭后 /api/v1/* 全部返回 404）</label>
+            <label for="api_enable">{{ _('启用内容 API（关闭后 /api/v1/* 全部返回 404）') }}</label>
           </div>
         </div>
         <div class="form-group">
-          <label>API Token（留空 = 公开只读）</label>
+          <label>{{ _('API Token（留空 = 公开只读）') }}</label>
           <input type="text" name="api_token" class="form-control" value="{{ settings.api_token or '' }}"
-                 placeholder="留空则任何人都可只读访问" autocomplete="new-password">
-          <small class="form-text text-muted">设置后，第三方请求须携带请求头 <code>X-API-Token: 你的Token</code>。仅只读接口，不提供写操作。</small>
+                 placeholder="{{ _('留空则任何人都可只读访问') }}" autocomplete="new-password">
+          <small class="form-text text-muted">{{ _('设置后，第三方请求须携带请求头 X-API-Token: 你的Token。仅只读接口，不提供写操作。') }}</small>
         </div>
         <div class="form-group">
-          <label>跨域白名单（CORS）</label>
+          <label>{{ _('跨域白名单（CORS）') }}</label>
           <input type="text" name="api_cors_origins" class="form-control" value="{{ settings.api_cors_origins or '' }}"
-                 placeholder="如 https://mini.example.com,https://m.example.com（* 表示允许全部）">
-          <small class="form-text text-muted">供小程序/H5 前端跨域调用，多个域名用英文逗号分隔，留空不允许跨域。</small>
+                 placeholder="{{ _('如 https://mini.example.com,https://m.example.com（* 表示允许全部）') }}">
+          <small class="form-text text-muted">{{ _('供小程序/H5 前端跨域调用，多个域名用英文逗号分隔，留空不允许跨域。') }}</small>
         </div>
       </div>
     </div>
@@ -39,37 +39,37 @@
 
   <div class="col-md-6">
     <div class="card card-outline card-info">
-      <div class="card-header"><h3 class="card-title">缓存</h3></div>
+      <div class="card-header"><h3 class="card-title">{{ _('缓存') }}</h3></div>
       <div class="card-body">
         <div class="form-group">
-          <label>接口缓存 TTL（秒）</label>
+          <label>{{ _('接口缓存 TTL（秒）') }}</label>
           <input type="number" name="api_cache_ttl" class="form-control" min="0" value="{{ settings.api_cache_ttl }}">
-          <small class="form-text text-muted">接口响应缓存时长，0 = 不缓存。内容更新后最长延迟该时长同步。</small>
+          <small class="form-text text-muted">{{ _('接口响应缓存时长，0 = 不缓存。内容更新后最长延迟该时长同步。') }}</small>
         </div>
       </div>
     </div>
 
     <div class="card card-outline card-secondary">
-      <div class="card-header"><h3 class="card-title">端点一览</h3></div>
+      <div class="card-header"><h3 class="card-title">{{ _('端点一览') }}</h3></div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
-          <thead><tr><th>端点</th><th>说明</th></tr></thead>
+          <thead><tr><th>{{ _('端点') }}</th><th>{{ _('说明') }}</th></tr></thead>
           <tbody>
-            <tr><td><code>GET /api/v1/site</code></td><td>站点信息与导航</td></tr>
-            <tr><td><code>GET /api/v1/columns</code></td><td>栏目列表 / 树</td></tr>
-            <tr><td><code>GET /api/v1/columns/&lt;slug&gt;</code></td><td>栏目详情</td></tr>
-            <tr><td><code>GET /api/v1/columns/&lt;slug&gt;/articles</code></td><td>文章分页列表</td></tr>
-            <tr><td><code>GET /api/v1/articles/&lt;id&gt;</code></td><td>文章详情</td></tr>
-            <tr><td><code>GET /api/v1/banners/&lt;slug&gt;</code></td><td>轮播图分组（需启用轮播图插件）</td></tr>
+            <tr><td><code>GET /api/v1/site</code></td><td>{{ _('站点信息与导航') }}</td></tr>
+            <tr><td><code>GET /api/v1/columns</code></td><td>{{ _('栏目列表 / 树') }}</td></tr>
+            <tr><td><code>GET /api/v1/columns/&lt;slug&gt;</code></td><td>{{ _('栏目详情') }}</td></tr>
+            <tr><td><code>GET /api/v1/columns/&lt;slug&gt;/articles</code></td><td>{{ _('文章分页列表') }}</td></tr>
+            <tr><td><code>GET /api/v1/articles/&lt;id&gt;</code></td><td>{{ _('文章详情') }}</td></tr>
+            <tr><td><code>GET /api/v1/banners/&lt;slug&gt;</code></td><td>{{ _('轮播图分组（需启用轮播图插件）') }}</td></tr>
           </tbody>
         </table>
       </div>
       <div class="card-footer text-muted" style="font-size:12px;">
-        响应统一格式：<code>{"code":0,"message":"ok","data":...,"meta":...}</code>，完整文档见使用手册。
+        {{ _('响应统一格式：') }}<code>{"code":0,"message":"ok","data":...,"meta":...}</code>，{{ _('完整文档见使用手册。') }}
       </div>
     </div>
   </div>
 </div>
-<button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> 保存</button>
+<button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存') }}</button>
 </form>
 {% endblock %}

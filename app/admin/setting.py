@@ -12,6 +12,7 @@ from flask import (
     render_template, redirect, url_for, request, flash, abort, current_app,
     session,
 )
+from flask_babel import gettext as _gettext
 from flask_login import current_user
 
 from ..extensions import db
@@ -74,7 +75,7 @@ def setting_site():
             rel, url, err = save_upload_file(logo_file, sub_dir='site',
                                              allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'])
             if err:
-                flash(f'LOGO 上传失败：{err}', 'danger')
+                flash(_gettext('LOGO 上传失败：{0}').format(err), 'danger')
             else:
                 Setting.set('site_logo', url)
                 changed['site_logo'] = url
@@ -84,7 +85,7 @@ def setting_site():
 
         db.session.commit()
         clear_content_cache()
-        flash('网站设置已保存', 'success')
+        flash(_gettext('网站设置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'site', 'changed_keys': list(changed.keys())})
@@ -108,7 +109,7 @@ def setting_seo():
                 changed[key] = val
         db.session.commit()
         clear_content_cache()
-        flash('SEO 默认配置已保存', 'success')
+        flash(_gettext('SEO 默认配置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'seo', 'changed_keys': list(changed.keys())})
@@ -158,7 +159,7 @@ def setting_seo_advanced():
                 changed[key] = val
         db.session.commit()
         clear_content_cache()
-        flash('SEO 高级配置已保存', 'success')
+        flash(_gettext('SEO 高级配置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'seo_advanced', 'changed': changed})
@@ -184,7 +185,7 @@ def setting_upload():
             max_size = int(request.form.get('upload_max_size') or 0)
             val = str(max_size * 1024)
         except ValueError:
-            flash('文件大小必须是数字', 'danger')
+            flash(_gettext('文件大小必须是数字'), 'danger')
             return redirect(url_for('admin.setting_upload'))
         if Setting.get('upload_max_size') != val:
             Setting.set('upload_max_size', val)
@@ -194,7 +195,7 @@ def setting_upload():
             Setting.set('upload_allowed_exts', val)
             changed['upload_allowed_exts'] = val
         db.session.commit()
-        flash('上传基础配置已保存', 'success')
+        flash(_gettext('上传基础配置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'upload', 'changed': changed})
@@ -241,7 +242,7 @@ def setting_upload_security():
             Setting.set('upload_image_thumb_width', val)
             changed['upload_image_thumb_width'] = val
         db.session.commit()
-        flash('上传安全与图片优化配置已保存', 'success')
+        flash(_gettext('上传安全与图片优化配置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'upload_security', 'changed': changed})
@@ -276,9 +277,9 @@ def setting_security():
             if old_prefix != result:
                 changed['admin_prefix'] = (old_prefix, result)
                 _rebuild_admin_rules_now()
-                flash(f'后台路由已即时切换为 /{result}/ ，新地址立即可用，旧地址同步失效。', 'success')
+                flash(_gettext('后台路由已即时切换为 /{0}/ ，新地址立即可用，旧地址同步失效。').format(result), 'success')
             else:
-                flash(f'后台路由未变（仍为 /{result}/）。', 'info')
+                flash(_gettext('后台路由未变（仍为 /{0}/）。').format(result), 'info')
         # 2. 登录安全：失败次数/锁定分钟/异地IP提醒
         max_fail = max(3, min(50, _int_safe('login_max_fail', default=5)))
         lock_min = max(1, min(600, _int_safe('login_lock_minutes', default=10)))
@@ -297,7 +298,7 @@ def setting_security():
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'security', 'changed': changed})
         if 'admin_prefix' not in changed and not (set(changed.keys()) - {'admin_prefix'}):
-            flash('登录安全配置已保存', 'success')
+            flash(_gettext('登录安全配置已保存'), 'success')
         # 若改变了前缀，url_for 在本次请求中使用的旧 URL adapter 已与新 url_map 不匹配，
         # 直接字面量拼新前缀下的 security 设置页 URL，避免 BuildError。
         from app.utils.admin_prefix import load_admin_prefix as _lap
@@ -366,7 +367,7 @@ def setting_notify():
                 Setting.set(key, val)
                 changed[key] = val
         db.session.commit()
-        flash('消息通知配置已保存', 'success')
+        flash(_gettext('消息通知配置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'notify', 'changed_keys': list(changed.keys())})
@@ -413,7 +414,7 @@ def setting_api():
             Setting.set('api_cors_origins', val)
             changed['api_cors_origins'] = val
         db.session.commit()
-        flash('内容 API 配置已保存', 'success')
+        flash(_gettext('内容 API 配置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'api', 'changed': changed})
@@ -430,7 +431,21 @@ def setting_api():
 # ============ 国际化（v2.3.0 Flask-Babel）============
 
 # 后台切换器可选项（首版仅 zh/en，扩展仅需追加映射）
-_LOCALE_OPTIONS = [('zh', '中文'), ('en', 'English')]
+# 注意：N_=lazy_gettext，仅让 pybabel 抽取 msgid，运行时在模板里再用 gettext 翻译
+from flask_babel import lazy_gettext as N_  # noqa: F401
+_LOCALE_OPTIONS = [
+    ('zh', N_('中文')),
+    ('en', 'English'),
+    ('ja', N_('日本語')),
+    ('ko', N_('한국어')),
+]
+# 运行时真实原文 label（模板 label|code 成对，不能直接把 lazy string 当 key）
+_LOCALE_OPTIONS_PLAIN = [
+    ('zh', '中文'),
+    ('en', 'English'),
+    ('ja', '日本語'),
+    ('ko', '한국어'),
+]
 
 
 @admin_bp.route('/set-locale')
@@ -461,7 +476,7 @@ def setting_i18n():
             Setting.set('i18n_enable', val)
             changed['i18n_enable'] = val
         val = (request.form.get('i18n_default_locale') or 'zh').strip()
-        if val not in dict(_LOCALE_OPTIONS):
+        if val not in dict(_LOCALE_OPTIONS_PLAIN):
             val = 'zh'
         if Setting.get('i18n_default_locale') != val:
             Setting.set('i18n_default_locale', val)
@@ -472,7 +487,7 @@ def setting_i18n():
             Setting.set('i18n_available_locales', val)
             changed['i18n_available_locales'] = val
         db.session.commit()
-        flash('国际化配置已保存', 'success')
+        flash(_gettext('国际化配置已保存'), 'success')
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'i18n', 'changed': changed})
@@ -499,7 +514,7 @@ def profile():
         user.nickname = (request.form.get('nickname') or '').strip()
         user.email = (request.form.get('email') or '').strip()
         db.session.commit()
-        flash('个人资料已更新', 'success')
+        flash(_gettext('个人资料已更新'), 'success')
         if old_nick != user.nickname or old_email != user.email:
             audit_log(OP_UPDATE, MODULE_SETTING, user.id, user.username,
                       {'action': 'profile',
@@ -519,13 +534,13 @@ def password():
         confirm_pwd = request.form.get('confirm_password') or ''
 
         if not user.check_password(old_pwd):
-            flash('原密码错误', 'danger')
+            flash(_gettext('原密码错误'), 'danger')
             return redirect(url_for('admin.password'))
         if len(new_pwd) < 6:
-            flash('新密码长度不能少于 6 位', 'danger')
+            flash(_gettext('新密码长度不能少于 6 位'), 'danger')
             return redirect(url_for('admin.password'))
         if new_pwd != confirm_pwd:
-            flash('两次输入的新密码不一致', 'danger')
+            flash(_gettext('两次输入的新密码不一致'), 'danger')
             return redirect(url_for('admin.password'))
 
         user.set_password(new_pwd)
@@ -533,7 +548,7 @@ def password():
         user.login_fail_count = 0
         user.locked_until = None
         db.session.commit()
-        flash('密码修改成功', 'success')
+        flash(_gettext('密码修改成功'), 'success')
         audit_log(OP_UPDATE, MODULE_SETTING, user.id, user.username,
                   {'action': 'change_password'})
         return redirect(url_for('admin.password'))

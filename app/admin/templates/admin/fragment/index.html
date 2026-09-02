@@ -1,25 +1,25 @@
 {% extends 'admin/base.html' %}
-{% block title %}碎片字段 - {{ cms_name }}{% endblock %}
-{% block page_header %}碎片字段{% endblock %}
+{% block title %}{{ _('碎片字段') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('碎片字段') }}{% endblock %}
 {% set active_menu = 'fragment' %}
 
 {% block breadcrumb %}
-  <li class="breadcrumb-item"><a href="{{ url_for('admin.fragment_group_index') }}">碎片分组</a></li>
-  <li class="breadcrumb-item active">碎片字段</li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.fragment_group_index') }}">{{ _('碎片分组') }}</a></li>
+  <li class="breadcrumb-item active">{{ _('碎片字段') }}</li>
 {% endblock %}
 
 {% block content %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">碎片字段列表</h3>
+    <h3 class="card-title">{{ _('碎片字段列表') }}</h3>
     <div class="card-tools">
-      <a href="{{ url_for('admin.fragment_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 新增碎片</a>
+      <a href="{{ url_for('admin.fragment_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> {{ _('新增碎片') }}</a>
     </div>
   </div>
   <div class="card-body">
     <form method="get" class="form-inline mb-3">
       <select name="gid" class="form-control form-control-sm" onchange="this.form.submit()">
-        <option value="">— 全部分组 —</option>
+        <option value="">— {{ _('全部分组') }} —</option>
         {% for g in groups %}
         <option value="{{ g.id }}" {{ 'selected' if current_gid == g.id }}>{{ g.name }}</option>
         {% endfor %}
@@ -28,7 +28,7 @@
 
     <table class="table table-hover table-sm">
       <thead>
-        <tr><th>名称</th><th width="120">标识</th><th width="100">类型</th><th width="80">排序</th><th width="80">状态</th><th width="240">操作</th></tr>
+        <tr><th>{{ _('名称') }}</th><th width="120">{{ _('标识') }}</th><th width="100">{{ _('类型') }}</th><th width="80">{{ _('排序') }}</th><th width="80">{{ _('状态') }}</th><th width="240">{{ _('操作') }}</th></tr>
       </thead>
       <tbody>
         {% for f in fragments %}
@@ -38,23 +38,23 @@
           <td><span class="badge badge-info">{{ dict(field_types).get(f.field_type, f.field_type) }}</span></td>
           <td>{{ f.sort_order }}</td>
           <td>
-            {% if f.is_enabled %}<span class="badge badge-success">启用</span>
-            {% else %}<span class="badge badge-warning">禁用</span>{% endif %}
+            {% if f.is_enabled %}<span class="badge badge-success">{{ _('启用') }}</span>
+            {% else %}<span class="badge badge-warning">{{ _('禁用') }}</span>{% endif %}
           </td>
           <td>
             <div class="btn-group btn-group-sm">
-              <a href="{{ url_for('admin.fragment_edit', fid=f.id) }}" class="btn btn-default"><i class="fas fa-edit"></i> 编辑</a>
+              <a href="{{ url_for('admin.fragment_edit', fid=f.id) }}" class="btn btn-default"><i class="fas fa-edit"></i> {{ _('编辑') }}</a>
               <form method="post" action="{{ url_for('admin.fragment_toggle', fid=f.id) }}" class="d-inline">
-                <button class="btn btn-default" title="切换状态"><i class="fas {{ 'fa-toggle-on text-success' if f.is_enabled else 'fa-toggle-off text-muted' }}"></i></button>
+                <button class="btn btn-default" title="{{ _('切换状态') }}"><i class="fas {{ 'fa-toggle-on text-success' if f.is_enabled else 'fa-toggle-off text-muted' }}"></i></button>
               </form>
-              <form method="post" action="{{ url_for('admin.fragment_delete', fid=f.id) }}" class="d-inline" onsubmit="return confirm('确认删除？')">
+              <form method="post" action="{{ url_for('admin.fragment_delete', fid=f.id) }}" class="d-inline" onsubmit="return confirm('{{ _('确认删除？') }}')">
                 <button class="btn btn-danger"><i class="fas fa-trash"></i></button>
               </form>
             </div>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">暂无碎片字段</td></tr>
+        <tr><td colspan="6" class="text-center text-muted py-4">{{ _('暂无碎片字段') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

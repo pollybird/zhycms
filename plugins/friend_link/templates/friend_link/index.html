@@ -1,16 +1,16 @@
 {% extends 'admin/base.html' %}
-{% block title %}友情链接 - {{ cms_name }}{% endblock %}
-{% block page_header %}友情链接{% endblock %}
+{% block title %}{{ _p('friend_link', '友情链接') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('friend_link', '友情链接') }}{% endblock %}
 {% set active_menu = 'friend_link' %}
 
-{% block breadcrumb %}<li class="breadcrumb-item active">友情链接</li>{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">{{ _p('friend_link', '友情链接') }}</li>{% endblock %}
 
 {% block content %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">友情链接列表</h3>
+    <h3 class="card-title">{{ _p('friend_link', '友情链接列表') }}</h3>
     <div class="card-tools">
-      <a href="{{ url_for('admin.friend_link_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 新增链接</a>
+      <a href="{{ url_for('admin.friend_link_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> {{ _p('friend_link', '新增链接') }}</a>
     </div>
   </div>
   <div class="card-body p-0">
@@ -20,12 +20,12 @@
         <thead>
           <tr>
             <th width="40"><input type="checkbox" id="check-all"></th>
-            <th>名称</th>
+            <th>{{ _p('friend_link', '名称') }}</th>
             <th>URL</th>
             <th width="80">LOGO</th>
-            <th width="80">排序</th>
-            <th width="80">状态</th>
-            <th width="280">操作</th>
+            <th width="80">{{ _p('friend_link', '排序') }}</th>
+            <th width="80">{{ _p('friend_link', '状态') }}</th>
+            <th width="280">{{ _p('friend_link', '操作') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -37,32 +37,32 @@
             <td>{% if l.logo %}<img src="{{ l.logo }}" style="max-height:30px;">{% else %}-{% endif %}</td>
             <td>{{ l.sort_order }}</td>
             <td>
-              {% if l.is_enabled %}<span class="badge badge-success">启用</span>
-              {% else %}<span class="badge badge-warning">禁用</span>{% endif %}
+              {% if l.is_enabled %}<span class="badge badge-success">{{ _p('friend_link', '启用') }}</span>
+              {% else %}<span class="badge badge-warning">{{ _p('friend_link', '禁用') }}</span>{% endif %}
             </td>
             <td>
               <div class="btn-group btn-group-sm">
-                <a href="{{ url_for('admin.friend_link_edit', lid=l.id) }}" class="btn btn-default"><i class="fas fa-edit"></i> 编辑</a>
+                <a href="{{ url_for('admin.friend_link_edit', lid=l.id) }}" class="btn btn-default"><i class="fas fa-edit"></i> {{ _p('friend_link', '编辑') }}</a>
                 <form method="post" action="{{ url_for('admin.friend_link_toggle', lid=l.id) }}" class="d-inline">
                   <button class="btn btn-default"><i class="fas {{ 'fa-toggle-on text-success' if l.is_enabled else 'fa-toggle-off text-muted' }}"></i></button>
                 </form>
-                <form method="post" action="{{ url_for('admin.friend_link_delete', lid=l.id) }}" class="d-inline" onsubmit="return confirm('确认删除？')">
+                <form method="post" action="{{ url_for('admin.friend_link_delete', lid=l.id) }}" class="d-inline" onsubmit="return confirm('{{ _p('friend_link', '确认删除？') }}')">
                   <button class="btn btn-danger"><i class="fas fa-trash"></i></button>
                 </form>
               </div>
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="7" class="text-center text-muted py-4">暂无友情链接</td></tr>
+          <tr><td colspan="7" class="text-center text-muted py-4">{{ _p('friend_link', '暂无友情链接') }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </form>
   </div>
   <div class="card-footer">
-    <button type="button" class="btn btn-sm btn-success" onclick="batch_action('enable')">批量启用</button>
-    <button type="button" class="btn btn-sm btn-warning" onclick="batch_action('disable')">批量禁用</button>
-    <button type="button" class="btn btn-sm btn-danger" onclick="batch_action('delete')">批量删除</button>
+    <button type="button" class="btn btn-sm btn-success" onclick="batch_action('enable')">{{ _p('friend_link', '批量启用') }}</button>
+    <button type="button" class="btn btn-sm btn-warning" onclick="batch_action('disable')">{{ _p('friend_link', '批量禁用') }}</button>
+    <button type="button" class="btn btn-sm btn-danger" onclick="batch_action('delete')">{{ _p('friend_link', '批量删除') }}</button>
   </div>
 </div>
 {% endblock %}
@@ -71,8 +71,8 @@
 <script>
 $('#check-all').on('change', function(){ $('.row-check').prop('checked', this.checked); });
 function batch_action(action){
-  if ($('.row-check:checked').length === 0){ alert('请先选择'); return; }
-  if (action === 'delete' && !confirm('确认批量删除？')) return;
+  if ($('.row-check:checked').length === 0){ alert('{{ _p('friend_link', '请先选择') }}'); return; }
+  if (action === 'delete' && !confirm('{{ _p('friend_link', '确认批量删除？') }}')) return;
   $('#batch-action').val(action);
   $('#batch-form').submit();
 }

@@ -17,9 +17,7 @@ from .frontend import recruit_job_url, recruit_jobs
 
 class RecruitPlugin(PluginBase):
     slug = 'recruit'
-    name = '招聘管理'
     version = '1.0.0'
-    description = '招聘岗位发布与在线求职申请：岗位介绍、招聘截止时间、简历上传（word/excel/pdf），截止后自动关闭提交'
     author = 'ZhyCMS 社区示例'
 
     # ---- 声明式注册 ----
@@ -29,30 +27,40 @@ class RecruitPlugin(PluginBase):
         'content_editor': ['recruit:manage'],
         'content_auditor': ['recruit:manage'],
     }
-    audit_modules = [('recruit', '招聘管理')]
 
     # ---- 代码钩子 ----
+
+    @property
+    def name(self):
+        return self._('招聘管理')
+
+    @property
+    def description(self):
+        return self._(
+            '招聘岗位发布与在线求职申请：岗位介绍、招聘截止时间、简历上传（word/excel/pdf），截止后自动关闭提交'
+        )
+
+    @property
+    def audit_modules(self):
+        return [('recruit', self._('招聘管理'))]
 
     def get_admin_menu(self):
         return [
             {
-                'label': '招聘岗位',
+                'label': self._('招聘岗位'),
                 'endpoint': 'admin.recruit_job_index',
                 'icon': 'fa-briefcase',
                 'permission': 'recruit:manage',
                 'active_prefix': 'recruit_job',
             },
             {
-                'label': '求职申请',
+                'label': self._('求职申请'),
                 'endpoint': 'admin.recruit_application_index',
                 'icon': 'fa-user-graduate',
                 'permission': 'recruit:manage',
                 'active_prefix': 'recruit_app',
             },
         ]
-
-    def get_admin_menu_icon(self):
-        return 'fa-briefcase'
 
     def get_frontend_menu(self):
         """前台导航追加「招贤纳士」入口（插件启用时自动出现）。"""
@@ -61,7 +69,7 @@ class RecruitPlugin(PluginBase):
             url = url_for('recruit_frontend.job_list')
         except Exception:
             url = '/jobs'
-        return [{'label': '招贤纳士', 'url': url, 'target': ''}]
+        return [{'label': self._('招贤纳士'), 'url': url, 'target': ''}]
 
     def get_frontend_blueprint(self):
         from .frontend_routes import recruit_frontend

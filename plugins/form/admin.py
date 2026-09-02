@@ -17,6 +17,7 @@ from flask import (
     render_template, redirect, url_for, request,
     flash, abort, send_file
 )
+from flask_babel import gettext as _gettext
 from openpyxl import Workbook
 
 from app.extensions import db
@@ -98,12 +99,12 @@ def _save_form(form):
     name = (request.form.get('name') or '').strip()
     slug = (request.form.get('slug') or '').strip().lower()
     if not name or not slug:
-        flash('名称和标识必填', 'danger')
+        flash(_gettext('名称和标识必填'), 'danger')
         return None
 
     existing = Form.query.filter_by(slug=slug, is_deleted=False).first()
     if existing and (form is None or existing.id != form.id):
-        flash('表单标识已存在', 'danger')
+        flash(_gettext('表单标识已存在'), 'danger')
         return None
 
     is_new = form is None
@@ -126,7 +127,7 @@ def _save_form(form):
     _save_form_fields(form)
 
     db.session.commit()
-    flash('表单已保存', 'success')
+    flash(_gettext('表单已保存'), 'success')
     audit_log(OP_CREATE if is_new else OP_UPDATE, MODULE_FORM, form.id, form.name,
               {'slug': form.slug})
     return form
@@ -155,7 +156,7 @@ def _save_form_fields(form):
         if not key or not label:
             continue
         if key in seen_keys:
-            flash(f'字段标识 {key} 重复，已忽略', 'warning')
+            flash(_gettext('字段标识 {0} 重复，已忽略').format(key), 'warning')
             continue
         seen_keys.add(key)
 
@@ -218,7 +219,7 @@ def form_delete(fid):
     form = Form.query.get_or_404(fid)
     form.is_deleted = True
     db.session.commit()
-    flash('表单已删除', 'success')
+    flash(_gettext('表单已删除'), 'success')
     audit_log(OP_DELETE, MODULE_FORM, form.id, form.name, {})
     return redirect(url_for('admin.form_index'))
 
@@ -283,7 +284,7 @@ def form_submission_delete(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
     sub.is_deleted = True
     db.session.commit()
-    flash('已删除', 'success')
+    flash(_gettext('已删除'), 'success')
     return redirect(url_for('admin.form_submissions', fid=fid))
 
 
@@ -294,7 +295,7 @@ def form_submission_batch(fid):
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
     if not ids:
-        flash('未选择记录', 'warning')
+        flash(_gettext('未选择记录'), 'warning')
         return redirect(url_for('admin.form_submissions', fid=fid))
 
     subs = FormSubmission.query.filter(FormSubmission.id.in_(ids), FormSubmission.form_id == fid).all()
@@ -305,7 +306,7 @@ def form_submission_batch(fid):
     elif action == 'delete':
         for s in subs: s.is_deleted = True
     db.session.commit()
-    flash('批量操作完成', 'success')
+    flash(_gettext('批量操作完成'), 'success')
     return redirect(url_for('admin.form_submissions', fid=fid))
 
 

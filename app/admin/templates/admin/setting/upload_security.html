@@ -1,11 +1,11 @@
 {% extends 'admin/base.html' %}
-{% block title %}上传安全配置 - {{ cms_name }}{% endblock %}
-{% block page_header %}上传安全配置{% endblock %}
+{% block title %}{{ _('上传安全配置') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('上传安全配置') }}{% endblock %}
 {% set active_menu = 'setting_upload_security' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">系统设置</li>
-<li class="breadcrumb-item active">上传安全</li>
+<li class="breadcrumb-item">{{ _('系统设置') }}</li>
+<li class="breadcrumb-item active">{{ _('上传安全') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -13,45 +13,45 @@
 <div class="row">
   <div class="col-md-7">
     <div class="card card-outline card-danger">
-      <div class="card-header"><h3 class="card-title"><i class="fas fa-shield-alt"></i> 安全校验开关</h3></div>
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-shield-alt"></i> {{ _('安全校验开关') }}</h3></div>
       <div class="card-body">
         <div class="form-group">
           <div class="icheck-danger">
             <input type="checkbox" name="upload_enable_mime_check" value="on" id="mime" {{ 'checked' if settings.upload_enable_mime_check == 'on' }}>
-            <label for="mime">启用 MIME 类型二次校验（基于文件内容魔数识别，拦截伪装为图片的脚本/可执行文件，推荐开启）</label>
+            <label for="mime">{{ _('启用 MIME 类型二次校验（基于文件内容魔数识别，拦截伪装为图片的脚本/可执行文件，推荐开启）') }}</label>
           </div>
         </div>
         <div class="form-group">
-          <label class="required-mark">单文件最大上传尺寸（MB）</label>
+          <label class="required-mark">{{ _('单文件最大上传尺寸（MB）') }}</label>
           <input type="number" name="upload_single_max_size_mb" class="form-control" min="1" max="2048"
             value="{{ settings.upload_single_max_size_mb }}" required>
-          <small class="form-text text-muted">超过该尺寸的文件直接拒绝上传。</small>
+          <small class="form-text text-muted">{{ _('超过该尺寸的文件直接拒绝上传。') }}</small>
         </div>
       </div>
     </div>
 
     <div class="card card-outline card-success">
-      <div class="card-header"><h3 class="card-title"><i class="fas fa-compress-alt"></i> 图片压缩与缩略图</h3></div>
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-compress-alt"></i> {{ _('图片压缩与缩略图') }}</h3></div>
       <div class="card-body">
         <div class="form-group">
           <div class="icheck-primary">
             <input type="checkbox" name="upload_image_auto_compress" value="on" id="iac" {{ 'checked' if settings.upload_image_auto_compress == 'on' }}>
-            <label for="iac">上传图片自动压缩（JPEG/PNG/WEBP，不显著影响清晰度）</label>
+            <label for="iac">{{ _('上传图片自动压缩（JPEG/PNG/WEBP，不显著影响清晰度）') }}</label>
           </div>
         </div>
         <div class="form-group">
-          <label>压缩质量（1-100，越高越清晰、体积越大）</label>
+          <label>{{ _('压缩质量（1-100，越高越清晰、体积越大）') }}</label>
           <input type="number" name="upload_image_compress_quality" class="form-control" min="1" max="100"
             value="{{ settings.upload_image_compress_quality }}">
         </div>
         <div class="form-group">
           <div class="icheck-primary">
             <input type="checkbox" name="upload_image_thumb_enable" value="on" id="ite" {{ 'checked' if settings.upload_image_thumb_enable == 'on' }}>
-            <label for="ite">自动生成缩略图（命名 thumb_原文件名，便于列表页使用）</label>
+            <label for="ite">{{ _('自动生成缩略图（命名 thumb_原文件名，便于列表页使用）') }}</label>
           </div>
         </div>
         <div class="form-group">
-          <label>缩略图宽度（px，高度按比例自适应）</label>
+          <label>{{ _('缩略图宽度（px，高度按比例自适应）') }}</label>
           <input type="number" name="upload_image_thumb_width" class="form-control" min="50" max="2000"
             value="{{ settings.upload_image_thumb_width }}">
         </div>
@@ -61,22 +61,22 @@
 
   <div class="col-md-5">
     <div class="card card-outline card-info">
-      <div class="card-header"><h3 class="card-title"><i class="fas fa-copy"></i> 重复文件去重</h3></div>
+      <div class="card-header"><h3 class="card-title"><i class="fas fa-copy"></i> {{ _('重复文件去重') }}</h3></div>
       <div class="card-body">
         <div class="form-group">
           <div class="icheck-primary">
             <input type="checkbox" name="upload_enable_dedup" value="on" id="dedup" {{ 'checked' if settings.upload_enable_dedup == 'on' }}>
-            <label for="dedup">启用重复上传过滤（基于 SHA-256 内容哈希，相同文件只存储一份）</label>
+            <label for="dedup">{{ _('启用重复上传过滤（基于 SHA-256 内容哈希，相同文件只存储一份）') }}</label>
           </div>
-          <small class="form-text text-muted">启用后，重复文件复用首个物理文件并累加引用计数，减少冗余占用。</small>
+          <small class="form-text text-muted">{{ _('启用后，重复文件复用首个物理文件并累加引用计数，减少冗余占用。') }}</small>
         </div>
         <div class="alert alert-info mb-0">
-          <i class="fas fa-info-circle"></i> 所有改动保存后立即生效，无需重启服务。
+          <i class="fas fa-info-circle"></i> {{ _('所有改动保存后立即生效，无需重启服务。') }}
         </div>
       </div>
       <div class="card-footer">
-        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存上传安全配置</button>
-        <a href="{{ url_for('admin.setting_upload') }}" class="btn btn-default btn-block mt-2">返回上传基本配置</a>
+        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存上传安全配置') }}</button>
+        <a href="{{ url_for('admin.setting_upload') }}" class="btn btn-default btn-block mt-2">{{ _('返回上传基本配置') }}</a>
       </div>
     </div>
   </div>

@@ -1,28 +1,28 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ form.name }} 数据 - {{ cms_name }}{% endblock %}
-{% block page_header %}{{ form.name }} - 提交数据{% endblock %}
+{% block title %}{{ form.name }} {{ _p('form', '数据') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ form.name }} - {{ _p('form', '提交数据') }}{% endblock %}
 {% set active_menu = 'form' %}
 
 {% block breadcrumb %}
-  <li class="breadcrumb-item"><a href="{{ url_for('admin.form_index') }}">自定义表单</a></li>
-  <li class="breadcrumb-item active">{{ form.name }} 数据</li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.form_index') }}">{{ _p('form', '自定义表单') }}</a></li>
+  <li class="breadcrumb-item active">{{ form.name }} {{ _p('form', '数据') }}</li>
 {% endblock %}
 
 {% block content %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">提交记录（{{ pagination.total }}）</h3>
+    <h3 class="card-title">{{ _p('form', '提交记录') }}（{{ pagination.total }}）</h3>
     <div class="card-tools">
-      <a href="{{ url_for('admin.form_export', fid=form.id) }}" class="btn btn-success btn-sm"><i class="fas fa-file-export"></i> 导出 Excel</a>
-      <a href="{{ url_for('admin.form_edit', fid=form.id) }}" class="btn btn-default btn-sm"><i class="fas fa-edit"></i> 表单配置</a>
+      <a href="{{ url_for('admin.form_export', fid=form.id) }}" class="btn btn-success btn-sm"><i class="fas fa-file-export"></i> {{ _p('form', '导出 Excel') }}</a>
+      <a href="{{ url_for('admin.form_edit', fid=form.id) }}" class="btn btn-default btn-sm"><i class="fas fa-edit"></i> {{ _p('form', '表单配置') }}</a>
     </div>
   </div>
   <div class="card-body">
     <form method="get" class="form-inline mb-3">
       <select name="is_read" class="form-control form-control-sm" onchange="this.form.submit()">
-        <option value="">全部状态</option>
-        <option value="unread" {{ 'selected' if is_read == 'unread' }}>未读</option>
-        <option value="read" {{ 'selected' if is_read == 'read' }}>已读</option>
+        <option value="">{{ _p('form', '全部状态') }}</option>
+        <option value="unread" {{ 'selected' if is_read == 'unread' }}>{{ _p('form', '未读') }}</option>
+        <option value="read" {{ 'selected' if is_read == 'read' }}>{{ _p('form', '已读') }}</option>
       </select>
     </form>
 
@@ -33,12 +33,12 @@
           <tr>
             <th width="40"><input type="checkbox" id="check-all"></th>
             <th width="60">ID</th>
-            <th width="140">提交时间</th>
+            <th width="140">{{ _p('form', '提交时间') }}</th>
             <th>IP</th>
             {% for f in fields[:3] %}<th>{{ f.label }}</th>{% endfor %}
-            {% if fields|length > 3 %}<th>更多字段</th>{% endif %}
-            <th width="80">状态</th>
-            <th width="200">操作</th>
+            {% if fields|length > 3 %}<th>{{ _p('form', '更多字段') }}</th>{% endif %}
+            <th width="80">{{ _p('form', '状态') }}</th>
+            <th width="200">{{ _p('form', '操作') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -51,25 +51,25 @@
             {% for f in fields[:3] %}
             <td>{{ s.get_value(f.id)|truncate_text(30) }}</td>
             {% endfor %}
-            {% if fields|length > 3 %}<td><small class="text-muted">详情查看</small></td>{% endif %}
+            {% if fields|length > 3 %}<td><small class="text-muted">{{ _p('form', '详情查看') }}</small></td>{% endif %}
             <td>
-              {% if s.is_read %}<span class="badge badge-secondary">已读</span>
-              {% else %}<span class="badge badge-danger">未读</span>{% endif %}
+              {% if s.is_read %}<span class="badge badge-secondary">{{ _p('form', '已读') }}</span>
+              {% else %}<span class="badge badge-danger">{{ _p('form', '未读') }}</span>{% endif %}
             </td>
             <td>
               <div class="btn-group btn-group-sm">
-                <a href="{{ url_for('admin.form_submission_detail', fid=form.id, sid=s.id) }}" class="btn btn-info"><i class="fas fa-eye"></i> 详情</a>
+                <a href="{{ url_for('admin.form_submission_detail', fid=form.id, sid=s.id) }}" class="btn btn-info"><i class="fas fa-eye"></i> {{ _p('form', '详情') }}</a>
                 <form method="post" action="{{ url_for('admin.form_submission_toggle_read', fid=form.id, sid=s.id) }}" class="d-inline">
-                  <button class="btn btn-default" title="切换已读状态"><i class="fas fa-check"></i></button>
+                  <button class="btn btn-default" title="{{ _p('form', '切换已读状态') }}"><i class="fas fa-check"></i></button>
                 </form>
-                <form method="post" action="{{ url_for('admin.form_submission_delete', fid=form.id, sid=s.id) }}" class="d-inline" onsubmit="return confirm('确认删除？')">
+                <form method="post" action="{{ url_for('admin.form_submission_delete', fid=form.id, sid=s.id) }}" class="d-inline" onsubmit="return confirm('{{ _p('form', '确认删除？') }}')">
                   <button class="btn btn-danger"><i class="fas fa-trash"></i></button>
                 </form>
               </div>
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="{{ 6 + (fields[:3]|length) + (1 if fields|length > 3 else 0) }}" class="text-center text-muted py-4">暂无提交记录</td></tr>
+          <tr><td colspan="{{ 6 + (fields[:3]|length) + (1 if fields|length > 3 else 0) }}" class="text-center text-muted py-4">{{ _p('form', '暂无提交记录') }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -78,9 +78,9 @@
     {% include 'admin/_pagination.html' with context %}
   </div>
   <div class="card-footer">
-    <button type="button" class="btn btn-sm btn-success" onclick="batch_action('read')">批量标已读</button>
-    <button type="button" class="btn btn-sm btn-warning" onclick="batch_action('unread')">批量标未读</button>
-    <button type="button" class="btn btn-sm btn-danger" onclick="batch_action('delete')">批量删除</button>
+    <button type="button" class="btn btn-sm btn-success" onclick="batch_action('read')">{{ _p('form', '批量标已读') }}</button>
+    <button type="button" class="btn btn-sm btn-warning" onclick="batch_action('unread')">{{ _p('form', '批量标未读') }}</button>
+    <button type="button" class="btn btn-sm btn-danger" onclick="batch_action('delete')">{{ _p('form', '批量删除') }}</button>
   </div>
 </div>
 {% endblock %}
@@ -89,8 +89,8 @@
 <script>
 $('#check-all').on('change', function(){ $('.row-check').prop('checked', this.checked); });
 function batch_action(action){
-  if ($('.row-check:checked').length === 0){ alert('请先选择记录'); return; }
-  if (action === 'delete' && !confirm('确认批量删除？')) return;
+  if ($('.row-check:checked').length === 0){ alert('{{ _p('form', '请先选择记录') }}'); return; }
+  if (action === 'delete' && !confirm('{{ _p('form', '确认批量删除？') }}')) return;
   $('#batch-action').val(action);
   $('#batch-form').submit();
 }

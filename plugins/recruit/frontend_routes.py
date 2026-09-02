@@ -19,6 +19,7 @@ from functools import wraps
 from flask import (Blueprint, render_template, abort, redirect, request,
                    session, url_for, flash, current_app)
 
+from flask_babel import gettext as _gettext
 from app.extensions import db
 from app.models.setting import Setting
 from app.plugin_system import plugin_enabled
@@ -123,7 +124,7 @@ def job_apply(jid):
     """提交求职申请：验证码 → 截止时间 → 必填项 → 简历上传。"""
     job = _get_open_job(jid)
     if not job.is_open():
-        flash('该岗位招聘已截止，无法继续投递', 'warning')
+        flash(_gettext('该岗位招聘已截止，无法继续投递'), 'warning')
         return redirect(recruit_job_url(job))
 
     # 1. 图形验证码（与站点表单一致：核心 /captcha 端点 + form_captcha 会话键）
@@ -131,17 +132,17 @@ def job_apply(jid):
     expected = (session.get('form_captcha') or '').lower()
     session.pop('form_captcha', None)   # 一次性消费，防重放
     if not expected or given != expected:
-        flash('验证码错误，请重试', 'danger')
+        flash(_gettext('验证码错误，请重试'), 'danger')
         return redirect(recruit_job_url(job))
 
     # 2. 必填项
     name = (request.form.get('name') or '').strip()
     phone = (request.form.get('phone') or '').strip()
     if not name or not phone:
-        flash('请填写姓名和联系电话', 'danger')
+        flash(_gettext('请填写姓名和联系电话'), 'danger')
         return redirect(recruit_job_url(job))
     if len(name) > 64 or len(phone) > 32:
-        flash('姓名或电话长度超限', 'danger')
+        flash(_gettext('姓名或电话长度超限'), 'danger')
         return redirect(recruit_job_url(job))
 
     # 3. 简历上传（word/excel/pdf；从原始文件名提取后缀）
@@ -152,7 +153,7 @@ def job_apply(jid):
                                          allowed_exts=RESUME_EXTS,
                                          max_size=RESUME_MAX_SIZE)
         if err:
-            flash(f'简历上传失败：{err}', 'danger')
+            flash(_gettext('简历上传失败：{0}').format(err), 'danger')
             return redirect(recruit_job_url(job))
         resume_file, resume_name = rel, f.filename
 
@@ -170,7 +171,7 @@ def job_apply(jid):
     db.session.add(app_row)
     db.session.commit()
 
-    flash('申请提交成功，我们会尽快与您联系！', 'success')
+    flash(_gettext('申请提交成功，我们会尽快与您联系！'), 'success')
     return redirect(url_for('recruit_frontend.job_detail', jid=job.id,
                             submitted=1))
 

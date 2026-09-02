@@ -18,6 +18,7 @@ from app.models.setting import Setting
 from app.utils.helpers import permission_required, audit_log
 from app.plugin_system import plugin_enabled
 
+from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'analytics'
 
 # 可配置的代码字段（总开关 analytics_enable 单独处理）
@@ -56,7 +57,7 @@ def analytics_index():
         for key in _FIELDS:
             val = request.form.get(key) or ''
             if len(val) > _MAX_LEN:
-                flash(f'{key} 长度超过上限（{_MAX_LEN} 字符），已截断', 'warning')
+                flash(_gettext('{0} 长度超过上限（{1} 字符），已截断').format(key, _MAX_LEN), 'warning')
                 val = val[:_MAX_LEN]
             if Setting.get(key) != val:
                 Setting.set(key, val)
@@ -65,8 +66,8 @@ def analytics_index():
         if changed:
             audit_log(OP_CONFIG_CHANGE, AUDIT_MODULE, None, '统计代码配置',
                       {'action': '更新', 'changed_keys': list(changed.keys())})
-            flash('统计代码配置已保存，前台即时生效', 'success')
+            flash(_gettext('统计代码配置已保存，前台即时生效'), 'success')
         else:
-            flash('未检测到改动', 'info')
+            flash(_gettext('未检测到改动'), 'info')
         return redirect(url_for('admin.analytics_index'))
     return render_template('analytics/settings.html', settings=Setting.get_dict())

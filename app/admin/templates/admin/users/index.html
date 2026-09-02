@@ -1,55 +1,31 @@
 {% extends 'admin/base.html' %}
-{% block title %}用户列表 - {{ cms_name }}{% endblock %}
-{% block page_header %}用户列表{% endblock %}
-{% set active_menu = 'user_list' %}
+{% block title %}{{ _('账号管理') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('账号管理') }}{% endblock %}
+{% set active_menu = 'users' %}
 
-{% block breadcrumb %}
-<li class="breadcrumb-item">用户权限</li>
-<li class="breadcrumb-item active">用户列表</li>
-{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">{{ _('账号管理') }}</li>{% endblock %}
 
 {% block content %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">后台账号管理</h3>
+    <h3 class="card-title">{{ _('账号列表') }}</h3>
     <div class="card-tools">
-      <a href="{{ url_for('admin.user_create') }}" class="btn btn-primary btn-sm">
-        <i class="fas fa-plus"></i> 新增账号
-      </a>
+      <a href="{{ url_for('admin.user_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> {{ _('新增账号') }}</a>
+      <a href="{{ url_for('admin.role_index') }}" class="btn btn-default btn-sm"><i class="fas fa-user-tag"></i> {{ _('角色权限') }}</a>
     </div>
   </div>
-  <div class="card-body border-bottom">
-    <form method="get" class="form-inline">
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">关键词</span></div>
-        <input type="text" name="keyword" class="form-control" value="{{ request.args.get('keyword','') }}" placeholder="用户名/昵称/邮箱">
-      </div>
-      <div class="input-group input-group-sm mr-2 mb-2">
-        <div class="input-group-prepend"><span class="input-group-text">状态</span></div>
-        <select name="status" class="form-control">
-          <option value="">全部</option>
-          <option value="active" {{ 'selected' if request.args.get('status')=='active' }}>启用</option>
-          <option value="disabled" {{ 'selected' if request.args.get('status')=='disabled' }}>禁用</option>
-          <option value="locked" {{ 'selected' if request.args.get('status')=='locked' }}>已锁定</option>
-        </select>
-      </div>
-      <button type="submit" class="btn btn-sm btn-default mr-1 mb-2"><i class="fas fa-search"></i> 筛选</button>
-      <a href="{{ url_for('admin.user_index') }}" class="btn btn-sm btn-link mb-2">重置</a>
-    </form>
-  </div>
   <div class="card-body p-0">
-    <table class="table table-hover table-sm mb-0">
+    <table class="table table-hover table-sm">
       <thead>
         <tr>
           <th width="60">ID</th>
-          <th>用户名</th>
-          <th>昵称</th>
-          <th>邮箱</th>
-          <th>角色</th>
-          <th>状态</th>
-          <th>最近登录</th>
-          <th>创建时间</th>
-          <th width="300">操作</th>
+          <th>{{ _('账号') }}</th>
+          <th>{{ _('姓名/昵称') }}</th>
+          <th width="140">{{ _('角色') }}</th>
+          <th width="120">{{ _('登录IP') }}</th>
+          <th width="160">{{ _('最后登录') }}</th>
+          <th width="80">{{ _('状态') }}</th>
+          <th width="240">{{ _('操作') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -58,69 +34,80 @@
           <td>{{ u.id }}</td>
           <td>
             <strong>{{ u.username }}</strong>
-            {% if u.is_super %}<span class="badge badge-danger ml-1">超管</span>{% endif %}
+            {% if u.is_superadmin %}<span class="badge badge-danger ml-1">{{ _('超管') }}</span>{% endif %}
+            {% if u.is_preset %}<span class="badge badge-info ml-1">{{ _('预设') }}</span>{% endif %}
           </td>
-          <td>{{ u.nickname or '-' }}</td>
-          <td>{{ u.email or '-' }}</td>
+          <td>{{ u.display_name or '-' }}</td>
+          <td><span class="badge badge-secondary">{{ u.role.name if u.role else '-' }}</span></td>
+          <td><code>{{ u.last_login_ip or '-' }}</code></td>
+          <td>{{ u.last_login_at|datetime_format if u.last_login_at else '-' }}</td>
           <td>
-            {% for r in u._roles %}
-            <span class="badge badge-info mr-1">{{ r.name }}</span>
-            {% else %}
-            <span class="text-muted">-</span>
-            {% endfor %}
+            {% if u.is_active %}<span class="badge badge-success">{{ _('正常') }}</span>
+            {% else %}<span class="badge badge-warning">{{ _('锁定') }}</span>{% endif %}
           </td>
-          <td>
-            {% if u.is_locked %}
-            <span class="badge badge-dark">锁定中</span>
-            {% elif u.is_active_flag %}
-            <span class="badge badge-success">启用</span>
-            {% else %}
-            <span class="badge badge-warning">禁用</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if u.last_login_at %}
-            {{ u.last_login_at.strftime('%m-%d %H:%M') }}<br>
-            <small class="text-muted">{{ u.last_login_ip or '-' }} / {{ u.last_login_city or '' }}</small>
-            {% else %}<span class="text-muted">从未登录</span>{% endif %}
-          </td>
-          <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '-' }}</td>
           <td>
             <div class="btn-group btn-group-sm">
-              <a href="{{ url_for('admin.user_edit', uid=u.id) }}" class="btn btn-default" title="编辑"><i class="fas fa-edit"></i></a>
-              {% if current_user.id != u.id %}
-              <form method="post" action="{{ url_for('admin.user_toggle', uid=u.id) }}" class="d-inline" onsubmit="return confirm('确认{{ '禁用' if u.is_active_flag else '启用' }}该账号？');">
-                <button type="submit" class="btn btn-{{ 'warning' if u.is_active_flag else 'success' }}" title="{{ '禁用' if u.is_active_flag else '启用' }}">
-                  <i class="fas {{ 'fa-user-slash' if u.is_active_flag else 'fa-user-check' }}"></i>
+              <a href="{{ url_for('admin.user_edit', uid=u.id) }}" class="btn btn-default"><i class="fas fa-edit"></i> {{ _('编辑') }}</a>
+              <button type="button" class="btn btn-warning" onclick="reset_password({{ u.id }}, '{{ u.username }}')"><i class="fas fa-key"></i> {{ _('重置密码') }}</button>
+              {% if not u.is_preset %}
+              <form method="post" action="{{ url_for('admin.user_toggle', uid=u.id) }}" class="d-inline">
+                <button class="btn {{ 'btn-success' if not u.is_active else 'btn-secondary' }}" title="{{ _('解锁') if not u.is_active else _('锁定') }}">
+                  <i class="fas {{ 'fa-lock-open' if not u.is_active else 'fa-lock' }}"></i>
                 </button>
               </form>
-              {% endif %}
-              <form method="post" action="{{ url_for('admin.user_reset_password', uid=u.id) }}" class="d-inline reset-pwd-form">
-                <input type="hidden" name="new_password" class="new-pwd-input">
-                <button type="submit" class="btn btn-info" title="重置密码"
-                  onclick="var p=prompt('请输入新密码（至少 6 位）：','NewPass@123456');if(!p||p.length<6){return false;}$(this).closest('form').find('.new-pwd-input').val(p);return confirm('确认将 {{ u.username }} 的密码重置？');">
-                  <i class="fas fa-key"></i>
-                </button>
-              </form>
-              {% if current_user.id != u.id and not u.is_super %}
-              <form method="post" action="{{ url_for('admin.user_delete', uid=u.id) }}" class="d-inline" onsubmit="return confirm('确认删除账号 {{ u.username }}？删除后不可恢复。');">
-                <button type="submit" class="btn btn-danger" title="删除"><i class="fas fa-trash"></i></button>
+              <form method="post" action="{{ url_for('admin.user_delete', uid=u.id) }}" class="d-inline" onsubmit="return confirm('{{ _('确认删除该账号？') }}');">
+                <button class="btn btn-danger"><i class="fas fa-trash"></i></button>
               </form>
               {% endif %}
             </div>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="text-center text-muted py-4">暂无用户</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">{{ _('暂无账号') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  {% if pagination and pagination.pages > 1 %}
-  <div class="card-footer">
-    {% set pagination = pagination %}
-    {% include 'admin/_pagination.html' %}
-  </div>
-  {% endif %}
 </div>
+
+<div class="modal fade" id="pwd-modal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">{{ _('重置密码') }} - <span id="pwd-name"></span></h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+    <form method="post" id="pwd-form">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="required-mark">{{ _('新密码') }}</label>
+          <input type="password" name="password" id="pwd-input" class="form-control" minlength="6" required>
+        </div>
+        <div class="form-group">
+          <label class="required-mark">{{ _('确认密码') }}</label>
+          <input type="password" name="password2" id="pwd2-input" class="form-control" minlength="6" required>
+        </div>
+        <p class="text-muted small mb-0">{{ _('密码至少 6 位，建议包含字母、数字和符号') }}</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('取消') }}</button>
+        <button type="submit" class="btn btn-primary">{{ _('确认修改') }}</button>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+function reset_password(uid, name){
+  $('#pwd-name').text(name);
+  $('#pwd-input').val('');
+  $('#pwd2-input').val('');
+  $('#pwd-form').attr('action', '{{ url_for("admin.user_reset_password", uid=0) }}'.replace('/0', '/' + uid));
+  $('#pwd-modal').modal('show');
+}
+$('#pwd-form').on('submit', function(e){
+  if ($('#pwd-input').val() !== $('#pwd2-input').val()) {
+    e.preventDefault();
+    alert('{{ _('两次输入的密码不一致') }}');
+  }
+});
+</script>
 {% endblock %}

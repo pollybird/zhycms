@@ -1,0 +1,388 @@
+# English translations for ZhyCMS plugin.
+# Copyright (C) 2026 ZhyCMS
+# This file is distributed under the same license as the ZhyCMS project.
+#
+msgid ""
+msgstr ""
+msgid "编辑表单"
+msgstr "Edit Form"
+msgid "新增表单"
+msgstr "Add Form"
+msgid "自定义表单"
+msgstr "Custom Forms"
+msgid "编辑"
+msgstr "Edit"
+msgid "新增"
+msgstr "Add New"
+msgid "表单基础配置"
+msgstr "表单基础配置"
+
+msgid "表单名称"
+msgstr "Form Name"
+msgid "表单标识（英文，创建后不可修改）"
+msgstr "表单标识（英文，创建后不可修改）"
+
+msgid "前台访问地址："
+msgstr "前台访问地址："
+
+msgid "表单简介"
+msgstr "表单简介"
+
+msgid "提交成功提示语"
+msgstr "提交成功提示语"
+
+msgid "提交成功，感谢您的反馈！"
+msgstr "提交成功，感谢您的反馈！"
+
+msgid "防重复提交间隔（秒，0=不限制）"
+msgstr "防重复提交间隔（秒，0=不限制）"
+
+msgid "开启表单提交"
+msgstr "开启表单提交"
+
+msgid "表单字段"
+msgstr "Form Fields"
+msgid "添加字段"
+msgstr "Add Field"
+msgid "显示名称"
+msgstr "显示名称"
+
+msgid "英文标识"
+msgstr "英文标识"
+
+msgid "必填"
+msgstr "Required"
+msgid "提示文字"
+msgstr "提示文字"
+
+msgid "帮助说明"
+msgstr "帮助说明"
+
+msgid "每行一个选项"
+msgstr "每行一个选项"
+
+msgid "允许后缀(逗号分隔)"
+msgstr "允许后缀(逗号分隔)"
+
+msgid "最大KB"
+msgstr "最大KB"
+
+msgid "字段标识用于程序内部使用；多选/单选/下拉字段需填写每行一个的选项内容；文件字段需配置后缀和大小限制"
+msgstr "字段标识用于程序内部使用；多选/单选/下拉字段需填写每行一个的选项内容；文件字段需配置后缀和大小限制"
+
+msgid "保存表单"
+msgstr "保存表单"
+
+msgid "查看提交数据"
+msgstr "查看提交数据"
+
+msgid "前台预览"
+msgstr "前台预览"
+
+msgid "返回列表"
+msgstr "Back to List"
+msgid "表单列表"
+msgstr "表单列表"
+
+msgid "名称"
+msgstr "Name"
+msgid "标识"
+msgstr "标识"
+
+msgid "字段数"
+msgstr "字段数"
+
+msgid "未读"
+msgstr "未读"
+
+msgid "总数"
+msgstr "总数"
+
+msgid "状态"
+msgstr "Status"
+msgid "操作"
+msgstr "Actions"
+msgid "开放"
+msgstr "开放"
+
+msgid "关闭"
+msgstr "关闭"
+
+msgid "配置"
+msgstr "配置"
+
+msgid "数据"
+msgstr "数据"
+
+msgid "导出"
+msgstr "Export"
+msgid "确认删除？"
+msgstr "确认删除？"
+
+msgid "暂无表单"
+msgstr "暂无表单"
+
+msgid "提交数据"
+msgstr "Submissions"
+msgid "提交记录"
+msgstr "Submissions"
+# | msgid "å¯¼åº Excel"
+#, fuzzy
+msgid "导出 Excel"
+msgstr "Export Excel"
+
+msgid "表单配置"
+msgstr "Form Settings"
+msgid "全部状态"
+msgstr "全部状态"
+
+msgid "已读"
+msgstr "已读"
+
+msgid "提交时间"
+msgstr "Submitted At"
+msgid "更多字段"
+msgstr "更多字段"
+
+msgid "详情查看"
+msgstr "详情查看"
+
+msgid "详情"
+msgstr "详情"
+
+msgid "切换已读状态"
+msgstr "切换已读状态"
+
+msgid "暂无提交记录"
+msgstr "暂无提交记录"
+
+msgid "批量标已读"
+msgstr "批量标已读"
+
+msgid "批量标未读"
+msgstr "批量标未读"
+
+msgid "批量删除"
+msgstr "Batch Delete"
+msgid "请先选择记录"
+msgstr "请先选择记录"
+
+msgid "确认批量删除？"
+msgstr "确认批量删除？"
+
+msgid "提交详情"
+msgstr "Submission Detail"
+msgid "基础信息"
+msgstr "基础信息"
+
+msgid "IP 地址"
+msgstr "IP Address"
+msgid "已读状态"
+msgstr "已读状态"
+
+msgid "字段内容"
+msgstr "字段内容"
+
+msgid "下载附件"
+msgstr "下载附件"
+
+#~ msgid "IP å°å"
+#~ msgstr "IP address"
+
+#~ msgid "ä¸è½½éä»¶"
+#~ msgstr "Download attachment"
+
+#~ msgid "ä¿å­è¡¨å"
+#~ msgstr "Save form"
+
+#~ msgid "è®¸åç¼(éå·åé)"
+#~ msgstr ""
+
+#~ msgid "¨é¨ç¶æ"
+#~ msgstr ""
+
+#~ msgid "³é­"
+#~ msgstr ""
+
+#~ msgid "åæ¢å·²è¯»ç¶æ"
+#~ msgstr "Toggle read status"
+
+#~ msgid "åå°è®¿é®å°åï¼"
+#~ msgstr "Frontend URL:"
+
+#~ msgid "åå°é¢è§"
+#~ msgstr "Preview on site"
+
+#~ msgid "åç§°"
+#~ msgstr "Name"
+
+#~ msgid "åºç¡ä¿¡æ¯"
+#~ msgstr "Basic info"
+
+#~ msgid "å­æ®µåå®¹"
+#~ msgstr ""
+
+#~ msgid "å­æ®µæ°"
+#~ msgstr "Field count"
+
+#~ msgid ""
+#~ "å­æ®µæ "
+#~ "è¯ç¨äºç¨åºåé¨ä½¿ç¨ï¼å¤é/åé/ä¸æå­æ®µéå¡«åæ¯è¡ä¸ä¸ªçéé¡¹åå®¹ï¼æä»¶å­æ®µéç½®åç¼åå¤§å°éå¶"
+#~ msgstr ""
+
+#~ msgid "å¯¼åº"
+#~ msgstr "Export"
+
+#~ msgid "å·²è¯»"
+#~ msgstr "Read"
+
+#~ msgid "å·²è¯»ç¶æ"
+#~ msgstr "Read status"
+
+#~ msgid "å¸®å©è¯´æ"
+#~ msgstr "Help text"
+
+#~ msgid "å¼å¯è¡¨åæäº¤"
+#~ msgstr "Accept submissions"
+
+#~ msgid "å¼æ¾"
+#~ msgstr "Open"
+
+#~ msgid "åå¡«"
+#~ msgstr ""
+
+#~ msgid "æ»æ°"
+#~ msgstr "Total"
+
+#~ msgid "æ¹éå é¤"
+#~ msgstr "Bulk delete"
+
+#~ msgid "æ¹éæ å·²è¯»"
+#~ msgstr "Bulk mark as read"
+
+#~ msgid "æ¹éæ æªè¯»"
+#~ msgstr "Bulk mark as unread"
+
+#~ msgid "æäº¤æåæç¤ºè¯­"
+#~ msgstr "Success message"
+
+#~ msgid "æäº¤æåï¼æè°¢æ¨çåé¦ï¼"
+#~ msgstr "Submitted successfully, thanks for your feedback!"
+
+#~ msgid "æäº¤æ°æ®"
+#~ msgstr "Submissions"
+
+#~ msgid "æäº¤æ¶é´"
+#~ msgstr "Submitted at"
+
+#~ msgid "æäº¤è®°å½"
+#~ msgstr "Submission records"
+
+#~ msgid "æäº¤è¯¦æ"
+#~ msgstr ""
+
+#~ msgid "æç¤ºæå­"
+#~ msgstr "Placeholder"
+
+#~ msgid "æä½"
+#~ msgstr "Actions"
+
+#~ msgid "æ°æ®"
+#~ msgstr "Data"
+
+#~ msgid "æ°å¢"
+#~ msgstr "New"
+
+#~ msgid "æ°å¢è¡¨å"
+#~ msgstr "New form"
+
+#~ msgid "æ¾ç¤ºåç§°"
+#~ msgstr "Display name"
+
+#~ msgid "ææ æäº¤è®°å½"
+#~ msgstr "No submissions yet"
+
+#~ msgid "ææ è¡¨å"
+#~ msgstr "No forms yet"
+
+#~ msgid "æ´å¤å­æ®µ"
+#~ msgstr "More fields"
+
+#~ msgid "æå¤§KB"
+#~ msgstr "Max KB"
+
+#~ msgid "æªè¯»"
+#~ msgstr "Unread"
+
+#~ msgid "æ¥çæäº¤æ°æ®"
+#~ msgstr "View submissions"
+
+#~ msgid "æ è¯"
+#~ msgstr "Slug"
+
+#~ msgid "æ¯è¡ä¸ä¸ªéé¡¹"
+#~ msgstr "One option per line"
+
+#~ msgid "æ·»å å­æ®µ"
+#~ msgstr "Add field"
+
+#~ msgid "ç¶æ"
+#~ msgstr "Status"
+
+#~ msgid "ç¡®è®¤å é¤ï¼"
+#~ msgstr "Confirm delete?"
+
+#~ msgid "ç¡®è®¤æ¹éå é¤ï¼"
+#~ msgstr "Confirm bulk delete?"
+
+#~ msgid "ç¼è¾"
+#~ msgstr "Edit"
+
+#~ msgid "ç¼è¾è¡¨å"
+#~ msgstr "Edit form"
+
+#~ msgid "èªå®ä¹è¡¨å"
+#~ msgstr "Custom form"
+
+#~ msgid "è±ææ è¯"
+#~ msgstr "English slug"
+
+#~ msgid "è¡¨ååè¡¨"
+#~ msgstr "Form list"
+
+#~ msgid "è¡¨ååç§°"
+#~ msgstr "Form name"
+
+#~ msgid "è¡¨ååºç¡ç½®"
+#~ msgstr ""
+
+#~ msgid "è¡¨åå­æ®µ"
+#~ msgstr "Form fields"
+
+#~ msgid "è¡¨åæ è¯ï¼è±æï¼åå»ºåä¸å¯ä¿®æ¹ï¼"
+#~ msgstr "Form slug (English, cannot be changed after creation)"
+
+#~ msgid "è¡¨åç®ä»"
+#~ msgstr "Form intro"
+
+#~ msgid "è¡¨åç½®"
+#~ msgstr ""
+
+#~ msgid "è¯¦æ"
+#~ msgstr ""
+
+#~ msgid "è¯¦ææ¥ç"
+#~ msgstr ""
+
+#~ msgid "è¯·éæ©è®°å½"
+#~ msgstr ""
+
+#~ msgid "è¿ååè¡¨"
+#~ msgstr "Back to list"
+
+#~ msgid "ç½®"
+#~ msgstr ""
+
+#~ msgid "é²éå¤æäº¤é´éï¼ç§ï¼0=ä¸éå¶ï¼"
+#~ msgstr "Anti-duplicate interval in seconds (0 = no limit)"
+

@@ -14,7 +14,7 @@
 
   {% elif field.field_type == 'image' %}
     <input type="file" name="field_{{ field.id }}" class="form-control-file" accept="image/*">
-    {% if val %}<div class="mt-2"><img src="{{ val }}" style="max-height:120px;"><br><label><input type="checkbox" name="field_{{ field.id }}_remove"> 删除图片</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
+    {% if val %}<div class="mt-2"><img src="{{ val }}" style="max-height:120px;"><br><label><input type="checkbox" name="field_{{ field.id }}_remove"> {{ _('删除图片') }}</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
 
   {% elif field.field_type == 'url' %}
     <input type="url" name="field_{{ field.id }}" class="form-control" value="{{ val }}">
@@ -26,10 +26,10 @@
     <input type="file" name="field_{{ field.id }}" class="form-control-file"
       {% if field.allowed_exts %}accept=".{{ (field.allowed_exts.replace(',', ',.') if field.allowed_exts else '') }}"{% endif %}>
     <small class="form-text text-muted">
-      {% if field.allowed_exts %}允许后缀：{{ field.allowed_exts }}{% endif %}
-      {% if field.max_size %}，最大 {{ (field.max_size // 1024) }}KB{% endif %}
+      {% if field.allowed_exts %}{{ _('允许后缀：%(exts)s', exts=field.allowed_exts) }}{% endif %}
+      {% if field.max_size %}，{{ _('最大 %(size)sKB', size=(field.max_size // 1024)) }}{% endif %}
     </small>
-    {% if val %}<div class="mt-1"><a href="{{ val }}" target="_blank">查看已上传文件</a> <label><input type="checkbox" name="field_{{ field.id }}_remove"> 删除</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
+    {% if val %}<div class="mt-1"><a href="{{ val }}" target="_blank">{{ _('查看已上传文件') }}</a> <label><input type="checkbox" name="field_{{ field.id }}_remove"> {{ _('删除') }}</label><input type="hidden" name="field_{{ field.id }}_existing" value="{{ val }}"></div>{% endif %}
 
   {% endif %}
 </div>
@@ -37,14 +37,14 @@
 
 
 {% extends 'admin/base.html' %}
-{% block title %}{{ '编辑文章' if article else '新增文章' }} - {{ column.name }}{% endblock %}
-{% block page_header %}{{ '编辑文章' if article else '新增文章' }}{% endblock %}
+{% block title %}{{ _('编辑文章') if article else _('新增文章') }} - {{ column.name }}{% endblock %}
+{% block page_header %}{{ _('编辑文章') if article else _('新增文章') }}{% endblock %}
 {% set active_menu = 'column' %}
 
 {% block breadcrumb %}
-  <li class="breadcrumb-item"><a href="{{ url_for('admin.column_index') }}">栏目管理</a></li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.column_index') }}">{{ _('栏目管理') }}</a></li>
   <li class="breadcrumb-item"><a href="{{ url_for('admin.article_index', cid=column.id) }}">{{ column.name }}</a></li>
-  <li class="breadcrumb-item active">{{ '编辑' if article else '新增' }}</li>
+  <li class="breadcrumb-item active">{{ _('编辑') if article else _('新增') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -56,19 +56,19 @@
     <div class="col-md-8">
       {% if article and article.reject_reason %}
       <div class="alert alert-danger">
-        <h5 class="mb-1"><i class="fas fa-times-circle"></i> 该文章已被驳回</h5>
-        <p class="mb-0"><strong>驳回原因：</strong>{{ article.reject_reason }}</p>
-        <small class="text-muted">请修改内容后重新提交审核。</small>
+        <h5 class="mb-1"><i class="fas fa-times-circle"></i> {{ _('该文章已被驳回') }}</h5>
+        <p class="mb-0"><strong>{{ _('驳回原因：') }}</strong>{{ article.reject_reason }}</p>
+        <small class="text-muted">{{ _('请修改内容后重新提交审核。') }}</small>
       </div>
       {% endif %}
       <div class="card">
         <div class="card-body">
           <div class="form-group">
-            <label class="required-mark">标题</label>
+            <label class="required-mark">{{ _('标题') }}</label>
             <input type="text" name="title" class="form-control form-control-lg" value="{{ article.title if article else '' }}" required>
           </div>
           <div class="form-group">
-            <label>摘要</label>
+            <label>{{ _('摘要') }}</label>
             <textarea name="summary" rows="2" class="form-control">{{ article.summary if article else '' }}</textarea>
           </div>
         </div>
@@ -76,10 +76,10 @@
 
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title"><i class="fas fa-edit"></i> 正文内容</h3>
+          <h3 class="card-title"><i class="fas fa-edit"></i> {{ _('正文内容') }}</h3>
           <div class="card-tools">
             <button type="button" class="btn btn-outline-primary btn-sm" id="import-word-btn">
-              <i class="fas fa-file-word"></i> 从 Word 导入
+              <i class="fas fa-file-word"></i> {{ _('从 Word 导入') }}
             </button>
             <input type="file" id="import-word-file" accept=".docx" style="display:none;">
           </div>
@@ -91,7 +91,7 @@
 
       {% if fields %}
       <div class="card">
-        <div class="card-header"><h3 class="card-title">自定义字段</h3></div>
+        <div class="card-header"><h3 class="card-title">{{ _('自定义字段') }}</h3></div>
         <div class="card-body">
           {% for f in fields %}
             {{ field_input(f, article) }}
@@ -103,34 +103,34 @@
 
     <div class="col-md-4">
       <div class="card">
-        <div class="card-header"><h3 class="card-title">发布设置</h3></div>
+        <div class="card-header"><h3 class="card-title">{{ _('发布设置') }}</h3></div>
         <div class="card-body">
           <div class="form-group">
-            <label>排序优先级</label>
+            <label>{{ _('排序优先级') }}</label>
             <input type="number" name="sort_order" class="form-control" value="{{ article.sort_order if article else 0 }}">
           </div>
           <div class="form-group">
-            <label>发布时间</label>
+            <label>{{ _('发布时间') }}</label>
             <input type="text" name="published_at" class="form-control" value="{{ article.published_at|datetime('%Y-%m-%d %H:%M') if article and article.published_at else '' }}" placeholder="YYYY-MM-DD HH:MM">
           </div>
           <div class="form-group">
-            <label>作者</label>
+            <label>{{ _('作者') }}</label>
             <input type="text" name="author" class="form-control" value="{{ article.author if article else '' }}">
           </div>
           <div class="form-group">
-            <label>来源</label>
+            <label>{{ _('来源') }}</label>
             <input type="text" name="source" class="form-control" value="{{ article.source if article else '' }}">
           </div>
           <div class="form-group">
-            <label>封面图</label>
+            <label>{{ _('封面图') }}</label>
             <input type="file" name="cover" class="form-control-file" accept="image/*">
             {% if article and article.cover %}
             <div class="mt-2"><img src="{{ article.cover }}" style="max-height:100px;"></div>
-            <label><input type="checkbox" name="cover_remove"> 删除封面</label>
+            <label><input type="checkbox" name="cover_remove"> {{ _('删除封面') }}</label>
             {% endif %}
           </div>
           <div class="form-group">
-            <label>工作流状态</label>
+            <label>{{ _('工作流状态') }}</label>
             <select name="status" class="form-control">
               {% for v, label in status_choices %}
               {% if v != 'published' or can_publish %}
@@ -139,19 +139,19 @@
               {% endfor %}
             </select>
             <small class="form-text text-muted">
-              草稿：仅后台可见；待审核：等待审核员处理；已发布：前台展示；已归档：不再展示。
-              {% if not can_review %}您无审核权限，建议保存为草稿后提交审核。{% endif %}
+              {{ _('草稿：仅后台可见；待审核：等待审核员处理；已发布：前台展示；已归档：不再展示。') }}
+              {% if not can_review %}{{ _('您无审核权限，建议保存为草稿后提交审核。') }}{% endif %}
             </small>
           </div>
           {% if article %}
           <div class="form-group">
-            <label>历史版本</label>
+            <label>{{ _('历史版本') }}</label>
             <div>
               <a href="{{ url_for('admin.article_versions', cid=column.id, aid=article.id) }}" class="btn btn-outline-primary btn-sm">
-                <i class="fas fa-history"></i> 查看 / 回滚历史版本（{{ versions|length }}）
+                <i class="fas fa-history"></i> {{ _('查看 / 回滚历史版本（%(count)s）', count=versions|length) }}
               </a>
             </div>
-            <small class="form-text text-muted">每次保存自动生成版本快照，可随时回滚。</small>
+            <small class="form-text text-muted">{{ _('每次保存自动生成版本快照，可随时回滚。') }}</small>
           </div>
           {% endif %}
         </div>
@@ -161,15 +161,15 @@
         <div class="card-header"><h3 class="card-title">SEO</h3></div>
         <div class="card-body">
           <div class="form-group">
-            <label>SEO 标题</label>
+            <label>{{ _('SEO 标题') }}</label>
             <input type="text" name="seo_title" class="form-control" value="{{ article.seo_title if article else '' }}">
           </div>
           <div class="form-group">
-            <label>SEO 关键词</label>
+            <label>{{ _('SEO 关键词') }}</label>
             <input type="text" name="seo_keywords" class="form-control" value="{{ article.seo_keywords if article else '' }}">
           </div>
           <div class="form-group">
-            <label>SEO 描述</label>
+            <label>{{ _('SEO 描述') }}</label>
             <textarea name="seo_description" rows="2" class="form-control">{{ article.seo_description if article else '' }}</textarea>
           </div>
         </div>
@@ -177,8 +177,8 @@
 
       <div class="card">
         <div class="card-body">
-          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存文章</button>
-          <a href="{{ url_for('admin.article_index', cid=column.id) }}" class="btn btn-default btn-block">返回列表</a>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存文章') }}</button>
+          <a href="{{ url_for('admin.article_index', cid=column.id) }}" class="btn btn-default btn-block">{{ _('返回列表') }}</a>
         </div>
       </div>
     </div>
@@ -191,20 +191,20 @@
     <div class="modal-content">
       <form method="post" action="{{ url_for('admin.article_review_reject', cid=column.id, aid=article.id) }}">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-times-circle text-danger"></i> 驳回文章</h5>
+          <h5 class="modal-title"><i class="fas fa-times-circle text-danger"></i> {{ _('驳回文章') }}</h5>
           <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span>&times;</span></button>
         </div>
         <div class="modal-body">
-          <p class="mb-2">驳回后文章将回到<strong>草稿</strong>状态，驳回原因会展示给编辑供修改。</p>
+          <p class="mb-2">{{ _('驳回后文章将回到草稿状态，驳回原因会展示给编辑供修改。') }}</p>
           <div class="form-group">
-            <label class="required-mark">驳回原因（必填）</label>
+            <label class="required-mark">{{ _('驳回原因（必填）') }}</label>
             <textarea name="reject_reason" rows="4" class="form-control" required
-              placeholder="请说明需要修改的问题，如：数据未更新、图片模糊、错别字等"></textarea>
+              placeholder="{{ _('请说明需要修改的问题，如：数据未更新、图片模糊、错别字等') }}"></textarea>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
-          <button type="submit" class="btn btn-danger" onclick="return confirm('确认驳回该文章？');"><i class="fas fa-times"></i> 确认驳回</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('取消') }}</button>
+          <button type="submit" class="btn btn-danger" onclick="return confirm('{{ _('确认驳回该文章？') }}');"><i class="fas fa-times"></i> {{ _('确认驳回') }}</button>
         </div>
       </form>
     </div>
@@ -227,7 +227,7 @@
   const ckConfig = {
     licenseKey: 'GPL',
     language: 'zh-cn',
-    placeholder: '在此输入内容……',
+    placeholder: '{{ _('在此输入内容……') }}',
     toolbar: {
       items: [
         'undo', 'redo', '|',
@@ -296,7 +296,7 @@
       const file = fileInput.files[0];
       if (!file) return;
       if (!/\.docx$/i.test(file.name)) {
-        alert('仅支持 .docx 格式（旧版 .doc 请先在 Word 中另存为 .docx）');
+        alert('{{ _('仅支持 .docx 格式（旧版 .doc 请先在 Word 中另存为 .docx）') }}');
         fileInput.value = '';
         return;
       }
@@ -305,26 +305,26 @@
 
       const original = btn.innerHTML;
       btn.disabled = true;
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 导入中…';
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> {{ _('导入中…') }}';
 
       fetch(importUrl, { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} })
         .then(r => r.json().then(data => ({ok: r.ok, data})))
         .then(({ok, data}) => {
-          if (!ok || data.error) throw new Error(data.error || '导入失败');
-          if (!mainEditor) { alert('编辑器尚未就绪，请稍候重试'); return; }
+          if (!ok || data.error) throw new Error(data.error || '{{ _('导入失败') }}');
+          if (!mainEditor) { alert('{{ _('编辑器尚未就绪，请稍候重试') }}'); return; }
           const current = (mainEditor.getData() || '').trim();
-          if (current && !confirm('正文已有内容。点击“确定”在末尾追加导入内容，点击“取消”则替换全部内容。')) {
-            mainEditor.setData(data.html);           // 取消 → 替换
+          if (current && !confirm('{{ _('正文已有内容。点击“确定”在末尾追加导入内容，点击“取消”则替换全部内容。') }}')) {
+            mainEditor.setData(data.html);           // {{ _('取消 → 替换') }}
           } else if (current) {
-            mainEditor.setData(current + data.html); // 确定 → 追加
+            mainEditor.setData(current + data.html); // {{ _('确定 → 追加') }}
           } else {
-            mainEditor.setData(data.html);           // 原本为空 → 直接填入
+            mainEditor.setData(data.html);           // {{ _('原本为空 → 直接填入') }}
           }
           if (data.messages && data.messages.length) {
-            console.warn('Word 导入提示：', data.messages);
+            console.warn('{{ _('Word 导入提示：') }}', data.messages);
           }
         })
-        .catch(err => { alert('Word 导入失败：' + err.message); })
+        .catch(err => { alert('{{ _('Word 导入失败：') }}' + err.message); })
         .finally(() => {
           btn.disabled = false;
           btn.innerHTML = original;

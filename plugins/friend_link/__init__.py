@@ -24,11 +24,7 @@ from .frontend import friend_links
 
 class FriendLinkPlugin(PluginBase):
     slug = 'friend_link'
-    name = '友情链接'
     version = '1.0.0'
-    description = ('站点友情链接管理：名称/LOGO/排序/启停，前台模板 '
-                   'friend_links() 一行调用；v2.2.0 起由核心功能转为内置插件，'
-                   '老站数据无缝保留')
     author = 'ZhyCMS 官方'
 
     # ---- 声明式注册 ----
@@ -36,13 +32,28 @@ class FriendLinkPlugin(PluginBase):
     # 需要时可由超级管理员在「角色权限」中为自定义角色勾选
     permissions = [('friend_link:manage', '友情链接管理', '友情链接的增删改与启停')]
     preset_role_grants = {}
-    audit_modules = [('friend_link', '友情链接')]
 
     # ---- 代码钩子 ----
 
+    @property
+    def name(self):
+        return self._('友情链接')
+
+    @property
+    def description(self):
+        return self._(
+            '站点友情链接管理：名称/LOGO/排序/启停，前台模板 '
+            'friend_links() 一行调用；v2.2.0 起由核心功能转为内置插件，'
+            '老站数据无缝保留'
+        )
+
+    @property
+    def audit_modules(self):
+        return [('friend_link', self._('友情链接'))]
+
     def get_admin_menu(self):
         return [{
-            'label': '友情链接',
+            'label': self._('友情链接'),
             'endpoint': 'admin.friend_link_index',
             'icon': 'fa-link',
             'permission': 'friend_link:manage',

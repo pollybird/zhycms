@@ -21,9 +21,7 @@ from .frontend import (
 
 class ProductPlugin(PluginBase):
     slug = 'product'
-    name = '产品展示'
     version = '1.0.0'
-    description = '产品多图相册与规格参数表，归属栏目树管理，区别普通文章，适合制造业企业'
     author = 'ZhyCMS 官方'
 
     # ---- 声明式注册 ----
@@ -32,13 +30,24 @@ class ProductPlugin(PluginBase):
         'content_auditor': ['product:manage'],
         'content_editor': ['product:manage'],
     }
-    audit_modules = [('product', '产品管理')]
 
     # ---- 代码钩子 ----
 
+    @property
+    def name(self):
+        return self._('产品展示')
+
+    @property
+    def description(self):
+        return self._('产品多图相册与规格参数表，归属栏目树管理，区别普通文章，适合制造业企业')
+
+    @property
+    def audit_modules(self):
+        return [('product', self._('产品管理'))]
+
     def get_admin_menu(self):
         return [{
-            'label': '产品管理',
+            'label': self._('产品管理'),
             'endpoint': 'admin.product_index',
             'icon': 'fa-box-open',
             'permission': 'product:manage',

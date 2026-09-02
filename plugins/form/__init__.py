@@ -29,10 +29,7 @@ from .frontend_routes import form_frontend  # noqa: F401
 
 class FormPlugin(PluginBase):
     slug = 'form'
-    name = '自定义表单'
     version = '1.0.0'
-    description = ('可视化表单设计与提交收集：字段类型/验证/文件上传/提交记录导出/'
-                   '邮件·企业微信通知；v2.3.0 起由核心功能转为内置插件，老站数据无缝保留')
     author = 'ZhyCMS 官方'
 
     # ---- 声明式注册 ----
@@ -43,14 +40,28 @@ class FormPlugin(PluginBase):
         ('form:view', '表单查看', '查看表单与导出提交记录'),
     ]
     preset_role_grants = {}
-    # 审计模块代码与核心版常量值一致（form / form_submission）
-    audit_modules = [('form', '表单'), ('form_submission', '表单提交')]
 
     # ---- 代码钩子 ----
 
+    @property
+    def name(self):
+        return self._('自定义表单')
+
+    @property
+    def description(self):
+        return self._(
+            '可视化表单设计与提交收集：字段类型/验证/文件上传/提交记录导出/'
+            '邮件·企业微信通知；v2.3.0 起由核心功能转为内置插件，老站数据无缝保留'
+        )
+
+    @property
+    def audit_modules(self):
+        return [('form', self._('表单')),
+                ('form_submission', self._('表单提交'))]
+
     def get_admin_menu(self):
         return [{
-            'label': '自定义表单',
+            'label': self._('自定义表单'),
             'endpoint': 'admin.form_index',
             'icon': 'fa-comments',
             'permission': 'form:view',
