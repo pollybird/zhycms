@@ -36,7 +36,11 @@
         <p>{{ _('未读表单提交') }}</p>
       </div>
       <div class="icon"><i class="fas fa-inbox"></i></div>
+      {% if form_plugin_enabled %}
       <a href="{{ url_for('admin.form_index') }}" class="small-box-footer">{{ _('查看表单') }} <i class="fas fa-arrow-circle-right"></i></a>
+      {% else %}
+      <span class="small-box-footer">{{ _('表单插件未启用') }}</span>
+      {% endif %}
     </div>
   </div>
   <div class="col-lg-3 col-6">

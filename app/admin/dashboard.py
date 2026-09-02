@@ -68,4 +68,5 @@ def dashboard():
     except Exception:
         monitor = None
     return render_template('admin/dashboard.html', stats=stats, monitor=monitor,
-                           dashboard_audit_maps=dashboard_audit_maps)
+                           dashboard_audit_maps=dashboard_audit_maps,
+                           form_plugin_enabled=plugin_enabled('form'))

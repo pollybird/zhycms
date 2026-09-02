@@ -19,29 +19,19 @@
   {% endif %}
 {% endwith %}
 
-{# 发现插件 / 上传插件 / 扫描提示 #}
+{# 上传插件 #}
 <div class="card card-primary card-outline">
   <div class="card-header">
     <h3 class="card-title">{{ _('上传插件') }}</h3>
-    <div class="card-tools">
-      <form method="post" action="{{ url_for('admin.plugin_discover') }}" class="d-inline">
-        <button class="btn btn-info btn-sm" title="{{ _('扫描 %(plugins_dir)s 下的 %(suffix)s 子目录，自动发现新安装的插件', plugins_dir='plugins/', suffix='__plugin__.py') }}">
-          <i class="fas fa-sync-alt"></i> {{ _('发现插件') }}
-        </button>
-      </form>
-      {% if not plugins_discovered %}
-      <span class="text-muted small ml-2"><i class="fas fa-info-circle"></i> {{ _('首次使用请先点击右上角"发现插件"进行安装') }}</span>
-      {% endif %}
-    </div>
   </div>
   <div class="card-body">
     <form method="post" action="{{ url_for('admin.plugin_upload') }}" enctype="multipart/form-data" id="upload-form">
       <div class="custom-file mb-3">
-        <input type="file" name="file" id="plugin-file" class="custom-file-input" accept=".zip" required>
+        <input type="file" name="archive" id="plugin-file" class="custom-file-input" accept=".zip" required>
         <label class="custom-file-label" for="plugin-file" data-browse="{{ _('选择文件') }}">{{ _('请选择 zip 插件包') }}</label>
       </div>
       <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> {{ _('上传并安装') }}</button>
-      <small class="form-text text-muted mt-2">{{ _('zip 根目录须包含 %(suffix)s 描述文件；若插件已存在将跳过并给出提示', suffix='__plugin__.py') }}</small>
+      <small class="form-text text-muted mt-2">{{ _('zip 根目录须包含 manifest.json 和 __init__.py；若插件已存在将跳过并给出提示') }}</small>
     </form>
   </div>
 </div>
@@ -71,44 +61,28 @@
           </td>
           <td>
             {{ p.description }}
-            {% if p.required_cms_version %}<br><small class="text-muted">{{ _('要求 CMS 版本 >= %(ver)s', ver=p.required_cms_version) }}</small>{% endif %}
           </td>
           <td>
             <div>{{ p.author or '-' }}</div>
             <small class="text-muted">{{ _('v%(ver)s', ver=(p.version or '?')) }}</small>
           </td>
           <td>
-            {% if p.is_installed and p.is_enabled %}<span class="badge badge-success">{{ _('已启用') }}</span>
-            {% elif p.is_installed and not p.is_enabled %}<span class="badge badge-secondary">{{ _('已禁用') }}</span>
-            {% elif p.is_installed %}<span class="badge badge-warning">{{ _('已安装') }}</span>
-            {% else %}<span class="badge badge-info">{{ _('发现未安装') }}</span>{% endif %}
+            {% if p.enabled %}<span class="badge badge-success">{{ _('已启用') }}</span>
+            {% else %}<span class="badge badge-secondary">{{ _('已禁用') }}</span>{% endif %}
           </td>
           <td>
             <div class="btn-group btn-group-sm">
-              {% if not p.is_installed %}
-              <form method="post" action="{{ url_for('admin.plugin_install', pid=p.id) }}" class="d-inline">
-                <button class="btn btn-success" title="{{ _('安装到数据库并注册') }}" data-toggle="tooltip"><i class="fas fa-download"></i> {{ _('安装') }}</button>
+              {% if p.enabled %}
+              <form method="post" action="{{ url_for('admin.plugin_toggle', slug=p.slug) }}" class="d-inline">
+                <button class="btn btn-warning" title="{{ _('禁用该插件，但保留配置和数据库数据') }}"><i class="fas fa-pause"></i> {{ _('禁用') }}</button>
               </form>
               {% else %}
-                {% if p.is_enabled %}
-                <form method="post" action="{{ url_for('admin.plugin_disable', pid=p.id) }}" class="d-inline">
-                  <button class="btn btn-warning" title="{{ _('禁用该插件，但保留配置和数据库数据') }}"><i class="fas fa-pause"></i> {{ _('禁用') }}</button>
-                </form>
-                {% else %}
-                <form method="post" action="{{ url_for('admin.plugin_enable', pid=p.id) }}" class="d-inline">
-                  <button class="btn btn-success" title="{{ _('启用该插件') }}"><i class="fas fa-play"></i> {{ _('启用') }}</button>
-                </form>
-                {% endif %}
-                {% if p.has_settings %}
-                <a href="{{ url_for('admin.plugin_settings', pid=p.id) }}" class="btn btn-info" title="{{ _('打开插件配置页') }}"><i class="fas fa-cog"></i> {{ _('配置') }}</a>
-                {% endif %}
-              {% endif %}
-              {% if p.is_downloadable %}
-              <form method="post" action="{{ url_for('admin.plugin_download', pid=p.id) }}" class="d-inline">
-                <button class="btn btn-default" title="{{ _('打包下载该插件目录为 zip') }}" data-toggle="tooltip"><i class="fas fa-file-archive"></i></button>
+              <form method="post" action="{{ url_for('admin.plugin_toggle', slug=p.slug) }}" class="d-inline">
+                <button class="btn btn-success" title="{{ _('启用该插件') }}"><i class="fas fa-play"></i> {{ _('启用') }}</button>
               </form>
               {% endif %}
-              <button type="button" class="btn btn-danger" onclick="confirm_delete({{ p.id }}, '{{ p.name }}')" title="{{ _('卸载插件（将删除数据库记录和插件目录）') }}">
+              <a href="{{ url_for('admin.plugin_download', slug=p.slug) }}" class="btn btn-default" title="{{ _('打包下载该插件目录为 zip') }}"><i class="fas fa-file-archive"></i></a>
+              <button type="button" class="btn btn-danger" onclick="confirm_delete('{{ p.slug }}', '{{ p.name }}')" title="{{ _('卸载插件（将删除插件目录）') }}">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -117,7 +91,7 @@
         {% else %}
         <tr><td colspan="5" class="text-center text-muted py-5">
           <i class="fas fa-box-open fa-2x mb-3"></i><br>
-          {{ _('暂无已安装插件。请上传 zip 插件包或在 %(plugins_dir)s 目录放入插件文件夹后点击"发现插件"按钮进行安装。', plugins_dir='plugins/') }}
+          {{ _('暂无已安装插件。请上传 zip 插件包。') }}
         </td></tr>
         {% endfor %}
       </tbody>
@@ -125,20 +99,19 @@
   </div>
 </div>
 
-{# 删除确认模态框 #}
+{# 卸载确认模态框 #}
 <div class="modal fade" id="delete-modal" tabindex="-1">
   <div class="modal-dialog"><div class="modal-content">
     <div class="modal-header bg-danger text-white"><h5 class="modal-title">{{ _('卸载插件') }}</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
     <div class="modal-body">
       <p id="delete-tip"></p>
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="delete-data" checked>
-        <label class="form-check-label" for="delete-data">{{ _('同时卸载插件数据（执行 %(uninstall)s 并删除该插件目录）', uninstall='on_uninstall()') }}</label>
+      <div class="alert alert-warning small mb-0">
+        <i class="fas fa-exclamation-triangle"></i>
+        {{ _('卸载将删除插件目录，数据库表保留。重新上传同名插件可恢复使用。') }}
       </div>
     </div>
     <div class="modal-footer">
       <form method="post" id="delete-form">
-        <input type="hidden" name="delete_data" id="delete-data-input" value="1">
         <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('取消') }}</button>
         <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> {{ _('确认卸载') }}</button>
       </form>
@@ -149,22 +122,16 @@
 
 {% block js %}
 <script>
-  // 替换 custom-file-label（原生占位显示中英文替换）
   $('#plugin-file').on('change', function(e){
     const name = e.target.files[0]?.name || '{{ _('请选择 zip 插件包') }}';
     $(this).next('.custom-file-label').text(name);
   });
 
-  function confirm_delete(pid, name){
-    $('#delete-tip').html('{{ _('确定要卸载插件 <strong>%(name)s</strong> 吗？', name='') }}'.replace('</strong>', name + '</strong>'));
-    $('#delete-data').prop('checked', true);
-    $('#delete-form').attr('action', '{{ url_for("admin.plugin_uninstall", pid=0) }}'.replace('/0', '/' + pid));
+  function confirm_delete(slug, name){
+    $('#delete-tip').html('{{ _('确定要卸载插件') }} <strong>' + name + '</strong> ?');
+    var baseUrl = '{{ url_for("admin.plugin_delete", slug="__SLUG__") }}'.replace('__SLUG__', slug);
+    $('#delete-form').attr('action', baseUrl);
     $('#delete-modal').modal('show');
   }
-  $('#delete-data').on('change', function(){
-    $('#delete-data-input').val(this.checked ? '1' : '0');
-  });
-  // data-toggle="tooltip"
-  $('[data-toggle="tooltip"]').tooltip();
 </script>
 {% endblock %}
