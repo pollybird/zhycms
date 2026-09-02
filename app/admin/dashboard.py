@@ -11,12 +11,28 @@ from ..extensions import db
 from ..models.user import LoginLog, User
 from ..models.column import Column
 from ..models.article import Article
-from ..models.form import FormSubmission
 from ..models.workflow import STATUS_REVIEW
 from ..models.audit import AuditLog
 from ..utils.helpers import admin_required
 from ..utils.backup_utils import system_monitor_stats
+from ..plugin_system import plugin_enabled
 from . import admin_bp
+
+
+from flask_babel import gettext as _gettext
+def _pending_form_submissions():
+    """待处理表单提交数（表单插件禁用时返回 0）。
+
+    自定义表单 v2.3.0 起转为内置插件 plugins/form，表单模型不再属于核心，
+    故此处按插件启用状态懒加载，禁用时仪表盘不展示该计数。
+    """
+    if not plugin_enabled('form'):
+        return 0
+    try:
+        from plugins.form.models import FormSubmission
+        return FormSubmission.query.filter_by(is_deleted=False, is_read=False).count()
+    except Exception:
+        return 0
 
 
 @admin_bp.route('/')
@@ -28,8 +44,7 @@ def dashboard():
         city = abnormal.get('city') or '未知地区'
         ip = abnormal.get('ip') or '未知IP'
         tm = abnormal.get('time') or ''
-        flash(f'检测到本次登录可能为异地登录（城市：{city}，IP：{ip}，时间：{tm}）。'
-              f'若不是本人操作请立即修改密码并联系超级管理员。', 'warning')
+        flash(_gettext('检测到本次登录可能为异地登录（城市：{0}，IP：{1}，时间：{2}）。若不是本人操作请立即修改密码并联系超级管理员。').format(city, ip, tm), 'warning')
 
     stats = {
         'users': User.query.filter_by(is_deleted=False).count(),
@@ -38,9 +53,7 @@ def dashboard():
         'articles_pending_review': Article.query.filter_by(
             is_deleted=False, status=STATUS_REVIEW
         ).count(),
-        'pending_submissions': FormSubmission.query.filter_by(
-            is_deleted=False, is_read=False
-        ).count(),
+        'pending_submissions': _pending_form_submissions(),
         'recent_logs': LoginLog.query.order_by(LoginLog.created_at.desc()).limit(8).all(),
         'recent_audits': AuditLog.query.order_by(AuditLog.created_at.desc()).limit(10).all(),
     }
@@ -55,4 +68,5 @@ def dashboard():
     except Exception:
         monitor = None
     return render_template('admin/dashboard.html', stats=stats, monitor=monitor,
-                           dashboard_audit_maps=dashboard_audit_maps)
+                           dashboard_audit_maps=dashboard_audit_maps,
+                           form_plugin_enabled=plugin_enabled('form'))

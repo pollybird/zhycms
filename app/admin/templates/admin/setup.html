@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>系统初始化 - 钟毓企业网站CMS</title>
+  <title>{{ _('系统初始化') }} - ZHYCMS</title>
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
   <style>
     body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    /* 表单较长时避免 login-page 的垂直居中把顶部裁掉：改为顶部对齐并允许滚动 */
     body.login-page {
       display: block;
       min-height: 100vh;
@@ -17,7 +16,7 @@
       overflow-y: auto;
       padding: 40px 15px;
     }
-    .setup-box { width: 520px; max-width: 100%; margin: 0 auto; }
+    .setup-box { width: 560px; max-width: 100%; margin: 0 auto; }
     .setup-logo a { color: #495057; }
     .setup-card-body { border-radius: 4px; }
     .step-indicator {
@@ -35,17 +34,27 @@
 </head>
 <body class="hold-transition login-page">
 <div class="setup-box">
+  {# 语言切换（未登录页面，直接用 ?lang= 参数，select_locale 会写入 session） #}
+  {% set _locales = available_locales() %}
+  {% if _locales %}
+  <div class="text-right mb-2">
+    {% for loc in _locales %}
+    <a href="?lang={{ loc.code }}" class="btn btn-sm {{ 'btn-primary' if loc.active else 'btn-light' }}"><i class="fas fa-language"></i> {{ loc.label }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="setup-logo text-center mb-3">
-    <a href="#"><b>钟毓企业网站CMS</b></a>
+    <a href="#"><b>{{ _('钟毓企业网站CMS') }}</b></a>
   </div>
   <div class="card">
     <div class="card-body setup-card-body">
       <p class="login-box-msg">
-        <span class="step-indicator">1</span>系统初始化
+        <span class="step-indicator">1</span>{{ _('系统初始化') }}
       </p>
 
       <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> 首次使用，请设置管理员账号与密码。
+        <i class="fas fa-info-circle"></i> {{ _('首次使用，请设置管理员账号与密码。') }}
       </div>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -60,87 +69,89 @@
       {% endwith %}
 
       <form method="post" autocomplete="off">
+        {# ========== 管理员账号 ========== #}
         <div class="form-group">
-          <label>管理员账号 <span class="text-danger">*</span></label>
+          <label>{{ _('管理员账号') }} <span class="text-danger">*</span></label>
           <div class="input-group">
-            <input type="text" name="username" class="form-control" placeholder="至少 3 个字符" value="{{ username or '' }}" required minlength="3" autofocus>
+            <input type="text" name="username" class="form-control" placeholder="{{ _('至少 3 个字符') }}" value="{{ username or '' }}" required minlength="3" autofocus>
             <div class="input-group-append"><div class="input-group-text"><span class="fas fa-user"></span></div></div>
           </div>
         </div>
 
         <div class="form-group">
-          <label>管理员昵称</label>
-          <input type="text" name="nickname" class="form-control" placeholder="显示在后台，如：超级管理员" value="{{ nickname or '' }}">
+          <label>{{ _('管理员昵称') }}</label>
+          <input type="text" name="nickname" class="form-control" placeholder="{{ _('显示在后台，如：超级管理员') }}" value="{{ nickname or '' }}">
         </div>
 
         <div class="form-group">
-          <label>登录密码 <span class="text-danger">*</span></label>
+          <label>{{ _('登录密码') }} <span class="text-danger">*</span></label>
           <div class="input-group">
-            <input type="password" name="password" class="form-control" placeholder="至少 6 个字符" required minlength="6">
+            <input type="password" name="password" class="form-control" placeholder="{{ _('至少 6 个字符') }}" required minlength="6">
             <div class="input-group-append"><div class="input-group-text"><span class="fas fa-lock"></span></div></div>
           </div>
         </div>
 
         <div class="form-group">
-          <label>确认密码 <span class="text-danger">*</span></label>
+          <label>{{ _('确认密码') }} <span class="text-danger">*</span></label>
           <div class="input-group">
-            <input type="password" name="password_confirm" class="form-control" placeholder="再次输入密码" required minlength="6">
+            <input type="password" name="password_confirm" class="form-control" placeholder="{{ _('再次输入密码') }}" required minlength="6">
             <div class="input-group-append"><div class="input-group-text"><span class="fas fa-lock"></span></div></div>
           </div>
         </div>
 
         <hr>
 
+        {# ========== 数据库类型 ========== #}
         <div class="form-group">
-          <label><strong>数据库类型</strong></label>
+          <label><strong>{{ _('数据库类型') }}</strong></label>
           <small class="text-muted d-block mb-2">
-            生产环境请选择 <b>MySQL 5.7+ / PostgreSQL 12+</b>（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。
+            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
           </small>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_mysql" name="db_type" value="mysql" {{ 'checked' if db_type == 'mysql' else '' }}>
             <label for="db_mysql">
-              <strong>MySQL</strong> <span class="badge badge-success">生产推荐</span>
-              <small class="text-muted d-block">生产环境首选（5.7+），需已创建目标数据库（建议字符集 utf8mb4）</small>
+              <strong>MySQL</strong> <span class="badge badge-success">{{ _('生产推荐') }}</span>
+              <small class="text-muted d-block">{{ _('生产环境首选（5.7+），需已创建目标数据库（建议字符集 utf8mb4）') }}</small>
             </label>
           </div>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_pg" name="db_type" value="postgresql" {{ 'checked' if db_type == 'postgresql' else '' }}>
             <label for="db_pg">
-              <strong>PostgreSQL</strong> <span class="badge badge-success">生产推荐</span>
-              <small class="text-muted d-block">生产环境可选（12+），功能强大，需已创建目标数据库</small>
+              <strong>PostgreSQL</strong> <span class="badge badge-success">{{ _('生产推荐') }}</span>
+              <small class="text-muted d-block">{{ _('生产环境可选（12+），性能强大，需已创建目标数据库') }}</small>
             </label>
           </div>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_sqlite" name="db_type" value="sqlite" {{ 'checked' if (db_type or 'sqlite') == 'sqlite' else '' }}>
             <label for="db_sqlite">
-              <strong>SQLite</strong> <span class="badge badge-secondary">仅开发/测试</span>
-              <small class="text-muted d-block">默认，开箱即用（instance/zhycms.db）；不支持并发写入，<b>不要用于生产环境</b></small>
+              <strong>SQLite</strong> <span class="badge badge-secondary">{{ _('仅开发/测试') }}</span>
+              <small class="text-muted d-block">{{ _('默认，开箱即用（instance/zhycms.db）；不支持并发写入，不要用于生产环境') }}</small>
             </label>
           </div>
 
           <div id="db-conn-fields" style="display:none;">
             <div class="row">
               <div class="col-8">
-                <label>主机 <span class="text-danger">*</span></label>
-                <input type="text" name="db_host" class="form-control" placeholder="如 127.0.0.1" value="{{ db_host or '' }}">
+                <label>{{ _('主机') }} <span class="text-danger">*</span></label>
+                <input type="text" name="db_host" class="form-control" placeholder="127.0.0.1" value="{{ db_host or '' }}">
               </div>
               <div class="col-4">
-                <label>端口</label>
-                <input type="text" name="db_port" class="form-control" placeholder="默认端口" value="{{ db_port or '' }}">
+                <label>{{ _('端口') }}</label>
+                <input type="text" name="db_port" class="form-control" placeholder="{{ _('默认端口') }}" value="{{ db_port or '' }}">
               </div>
             </div>
             <div class="form-group mt-2">
-              <label>数据库名 <span class="text-danger">*</span></label>
-              <input type="text" name="db_name" class="form-control" placeholder="需提前创建，如 zhycms" value="{{ db_name or '' }}">
+              <label>{{ _('数据库名') }} <span class="text-danger">*</span></label>
+              <input type="text" name="db_name" class="form-control" placeholder="{{ _('需提前创建，如 zhycms') }}" value="{{ db_name or '' }}">
             </div>
             <div class="row">
               <div class="col-6">
-                <label>用户名 <span class="text-danger">*</span></label>
-                <input type="text" name="db_user" class="form-control" placeholder="数据库账号" value="{{ db_user or '' }}">
+                <label>{{ _('用户名') }} <span class="text-danger">*</span></label>
+                <input type="text" name="db_user" class="form-control" placeholder="{{ _('数据库账号') }}" value="{{ db_user or '' }}">
               </div>
               <div class="col-6">
-                <label>密码</label>
-                <input type="password" name="db_password" class="form-control" placeholder="数据库密码" autocomplete="new-password">
+                <label>{{ _('密码') }}</label>
+                <input type="password" name="db_password" class="form-control" placeholder="{{ _('数据库密码') }}" autocomplete="new-password">
               </div>
             </div>
           </div>
@@ -148,33 +159,58 @@
 
         <hr>
 
+        {# ========== 演示数据（行业模板） ========== #}
         <div class="form-group">
-          <label><strong>演示数据</strong></label>
+          <label><strong>{{ _('演示数据') }}</strong></label>
           <small class="text-muted d-block mb-2">
-            选择要生成的演示数据，便于查看运行效果。所有公司名称均为虚构，仅供参考。
+            {{ _('选择要生成的演示数据，便于查看运行效果。所有公司名称均为虚构，仅供参考。') }}
           </small>
           <div class="icheck-primary d-block mb-2">
-            <input type="radio" id="demo_none" name="demo_type" value="none">
+            <input type="radio" id="demo_none" name="demo_type" value="none" {{ 'checked' if demo_type == 'none' else '' }}>
             <label for="demo_none">
-              不生成演示数据
-              <small class="text-muted d-block">创建空白站点，所有栏目、内容、碎片、表单均为空</small>
+              {{ _('不生成演示数据') }}
+              <small class="text-muted d-block">{{ _('创建空白站点，所有栏目、内容、碎片、表单均为空') }}</small>
             </label>
           </div>
           <div class="icheck-primary d-block mb-2">
-            <input type="radio" id="demo_mfg" name="demo_type" value="manufacturing" checked>
+            <input type="radio" id="demo_mfg" name="demo_type" value="manufacturing" {{ 'checked' if (demo_type or 'manufacturing') == 'manufacturing' else '' }}>
             <label for="demo_mfg">
-              <strong>制造业演示数据</strong>
+              <strong>{{ _('制造业演示数据') }}</strong>
               <small class="text-muted d-block">
-                虚构企业「瑞景精工有限公司」：关于我们 / 新闻中心 / 产品中心（精密零部件、自动化设备）/ 服务支持 / 联系我们
+                {{ _('虚拟企业「瑞精工有限公司」：关于我们 / 新闻中心 / 产品中心（精密零部件、自动化设备）/ 服务支持 / 联系我们') }}
               </small>
             </label>
           </div>
           <div class="icheck-primary d-block">
-            <input type="radio" id="demo_svc" name="demo_type" value="service">
+            <input type="radio" id="demo_svc" name="demo_type" value="service" {{ 'checked' if demo_type == 'service' else '' }}>
             <label for="demo_svc">
-              <strong>服务业演示数据</strong>
+              <strong>{{ _('服务业演示数据') }}</strong>
               <small class="text-muted d-block">
-                虚构企业「云岚咨询管理有限公司」：关于我们 / 新闻动态 / 服务项目（战略咨询、人力资源、企业培训）/ 客户案例 / 联系我们
+                {{ _('虚拟企业「云业咨询管理有限公司」：关于我们 / 新闻动态 / 服务项目（战略咨询、人力资源、企业培训）/ 客户案例 / 联系我们') }}
+              </small>
+            </label>
+          </div>
+
+          <div class="form-row mt-3 mb-1">
+            <div class="col"><hr style="border-top:1px dashed #ced4da;margin:0;"></div>
+            <span class="col-auto px-2 text-muted small" style="white-space:nowrap;">English Templates</span>
+            <div class="col"><hr style="border-top:1px dashed #ced4da;margin:0;"></div>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="demo_mfg_en" name="demo_type" value="manufacturing_en" {{ 'checked' if demo_type == 'manufacturing_en' else '' }}>
+            <label for="demo_mfg_en">
+              <strong>{{ _('Manufacturing Demo (EN)') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('Fictional company "Ruijing Precision Works Co., Ltd.": About Us / News / Products (Precision Parts, Automation Equipment) / Service / Contact') }}
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block">
+            <input type="radio" id="demo_default_en" name="demo_type" value="default_en" {{ 'checked' if demo_type == 'default_en' else '' }}>
+            <label for="demo_default_en">
+              <strong>{{ _('English Default Theme (No Demo Data)') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('Blank site with English default theme. All columns, content, fragments, and forms are empty.') }}
               </small>
             </label>
           </div>
@@ -182,36 +218,37 @@
 
         <hr>
 
+        {# ========== 功能插件 ========== #}
         <div class="form-group">
-          <label><strong>功能插件</strong></label>
+          <label><strong>{{ _('功能插件') }}</strong></label>
           <small class="text-muted d-block mb-2">
-            勾选要启用的官方插件，初始化后可在「后台 → 插件管理」随时启用/停用。<br>
-            选择行业演示数据时，<b>轮播图、友情链接</b>（选制造业另含<b>产品展示</b>）会自动启用，无需勾选。
+            {{ _('勾选要启用的官方插件，初始化后可在「后台 → 插件管理」随时启用/停用。') }}<br>
+            {{ _('选择行业演示数据时，轮播图、友情链接（选制造业另含产品展示）会自动启用，无需勾选。') }}
           </small>
           <div class="icheck-primary d-block mb-2">
             <input type="checkbox" id="plug_banner" name="plugins" value="banner" {{ 'checked' if 'banner' in (plugins or []) else '' }}>
             <label for="plug_banner">
-              <strong>轮播图</strong>
+              <strong>{{ _('轮播图') }}</strong>
               <small class="text-muted d-block">
-                首页幻灯片/广告位分组管理，模板 banner_items() 一行调用；初始化轮播数据由本插件生成（不再使用碎片）
+                {{ _('首页屏幕/广告位分组管理，模板 banner_items() 一行调用；初始化轮播数据由本插件生成（不再使用碎片）') }}
               </small>
             </label>
           </div>
           <div class="icheck-primary d-block">
             <input type="checkbox" id="plug_product" name="plugins" value="product" {{ 'checked' if 'product' in (plugins or []) else '' }}>
             <label for="plug_product">
-              <strong>产品展示</strong>
+              <strong>{{ _('产品展示') }}</strong>
               <small class="text-muted d-block">
-                产品多图相册与规格参数表，区别普通文章，适合制造业企业；演示数据含产品示例（仅制造业）
+                {{ _('产品多图相册与规格参数表，区别普通文章，适合制造业企业；演示数据含产品示例（仅制造业）') }}
               </small>
             </label>
           </div>
           <div class="icheck-primary d-block">
             <input type="checkbox" id="plug_friend_link" name="plugins" value="friend_link" {{ 'checked' if 'friend_link' in (plugins or []) else '' }}>
             <label for="plug_friend_link">
-              <strong>友情链接</strong>
+              <strong>{{ _('友情链接') }}</strong>
               <small class="text-muted d-block">
-                站点友情链接管理，前台模板 friend_links() 一行调用；演示数据含 3 条示例链接
+                {{ _('站点友情链接管理，前台模板 friend_links() 一行调用；演示数据含 3 条示例链接') }}
               </small>
             </label>
           </div>
@@ -219,13 +256,13 @@
 
         <div class="row">
           <div class="col-12">
-            <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-check"></i> 开始初始化</button>
+            <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-check"></i> {{ _('开始初始化') }}</button>
           </div>
         </div>
       </form>
 
       <p class="mt-3 mb-0 text-muted text-center" style="font-size:12px;">
-        钟毓企业网站CMS · 版权所有：泰州姜堰钟毓信息技术有限公司
+        {{ _('钟毓企业网站CMS · 版权所有：泰州姜堰钟毓信息技术有限公司') }}
       </p>
     </div>
   </div>
@@ -251,7 +288,6 @@
       var el = document.querySelector('input[name="' + name + '"]');
       if (el) { if (needConn) { el.setAttribute('required', 'required'); } else { el.removeAttribute('required'); } }
     });
-    // 端口未手动填写时自动带出默认端口
     if (needConn && portInput && !portInput.value) {
       portInput.value = DEFAULT_PORTS[type];
     }
@@ -264,7 +300,6 @@
 
   document.querySelectorAll('input[name="db_type"]').forEach(function (radio) {
     radio.addEventListener('change', function () {
-      // 切换类型时，若端口为空或仍是另一类型的默认端口，则刷新为当前类型默认端口
       var type = currentType();
       if (portInput && (type === 'mysql' || type === 'postgresql')) {
         var other = type === 'mysql' ? DEFAULT_PORTS.postgresql : DEFAULT_PORTS.mysql;

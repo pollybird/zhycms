@@ -6,6 +6,7 @@ from flask import (
     render_template, redirect, url_for, request, flash, abort,
     send_file, current_app, jsonify
 )
+from flask_babel import gettext as _gettext
 from flask_login import current_user
 
 from ..extensions import db
@@ -70,12 +71,12 @@ def backup_manual():
     record, err = create_backup(trigger=TRIGGER_MANUAL, remark=remark,
                                 created_by=getattr(current_user, 'id', None))
     if err:
-        flash(f'备份失败：{err}', 'danger')
+        flash(_gettext('备份失败：{0}').format(err), 'danger')
         audit_log(OP_BACKUP_CREATE, MODULE_BACKUP, None, None,
                   {'status': 'failed', 'error': str(err)})
     else:
         size_mb = (record.file_size or 0) / 1024 / 1024
-        flash(f'备份成功：{record.filename}（{size_mb:.2f} MB）', 'success')
+        flash(_gettext('备份成功：{0}（{1:.2f} MB）').format(record.filename, size_mb), 'success')
         audit_log(OP_BACKUP_CREATE, MODULE_BACKUP, record.id, record.filename,
                   {'file_size_mb': round(size_mb, 2), 'remark': remark})
     return redirect(url_for('admin.backup_index'))
@@ -86,11 +87,11 @@ def backup_manual():
 def backup_download(bid):
     record = BackupRecord.query.get_or_404(bid)
     if record.status != 'ok':
-        flash('该备份文件状态异常，无法下载', 'warning')
+        flash(_gettext('该备份文件状态异常，无法下载'), 'warning')
         return redirect(url_for('admin.backup_index'))
     path = record.abs_path
     if not os.path.isfile(path):
-        flash('备份文件不存在（可能已被清理或手动删除）', 'danger')
+        flash(_gettext('备份文件不存在（可能已被清理或手动删除）'), 'danger')
         return redirect(url_for('admin.backup_index'))
     audit_log(OP_EXPORT, MODULE_BACKUP, record.id, record.filename,
               {'action': 'download'})
@@ -105,12 +106,12 @@ def backup_restore(bid):
         abort(403)
     record = BackupRecord.query.get_or_404(bid)
     if record.status != 'ok':
-        flash('该备份文件状态异常，无法恢复', 'danger')
+        flash(_gettext('该备份文件状态异常，无法恢复'), 'danger')
         return redirect(url_for('admin.backup_index'))
     # 二次确认
     confirm = request.form.get('confirm') == 'YES_I_UNDERSTAND'
     if not confirm:
-        flash('请先勾选「我已清楚：恢复将覆盖现有数据库」再操作', 'warning')
+        flash(_gettext('请先勾选「我已清楚：恢复将覆盖现有数据库」再操作'), 'warning')
         return redirect(url_for('admin.backup_index'))
     # 恢复会 DROP 重建 backup_records 表：本条记录（及之后新增的记录）会随
     # 快照消失，恢复后访问 record.* 属性会抛 ObjectDeletedError，须提前取值
@@ -119,16 +120,16 @@ def backup_restore(bid):
     try:
         ok, msg = restore_backup(record)
         if ok:
-            flash(f'恢复成功：{rec_filename}。{msg}', 'success')
+            flash(_gettext('恢复成功：{0}。{1}').format(rec_filename, msg), 'success')
             audit_log(OP_BACKUP_RESTORE, MODULE_BACKUP, rec_id, rec_filename,
                       {'status': 'success'})
         else:
-            flash(f'恢复失败：{msg}', 'danger')
+            flash(_gettext('恢复失败：{0}').format(msg), 'danger')
             audit_log(OP_BACKUP_RESTORE, MODULE_BACKUP, rec_id, rec_filename,
                       {'status': 'failed', 'error': msg})
     except Exception as e:
         current_app.logger.exception('restore failed')
-        flash(f'恢复异常：{e}', 'danger')
+        flash(_gettext('恢复异常：{0}').format(e), 'danger')
         audit_log(OP_BACKUP_RESTORE, MODULE_BACKUP, rec_id, rec_filename,
                   {'status': 'error', 'error': str(e)})
     return redirect(url_for('admin.backup_index'))
@@ -143,20 +144,20 @@ def backup_restore_upload():
     f = request.files.get('backup_file')
     confirm = request.form.get('confirm_upload') == 'YES_I_UNDERSTAND'
     if not f or not f.filename:
-        flash('请先选择备份文件（.sql.gz 或 .json.gz）', 'warning')
+        flash(_gettext('请先选择备份文件（.sql.gz 或 .json.gz）'), 'warning')
         return redirect(url_for('admin.backup_index'))
     if not confirm:
-        flash('请先勾选「我已清楚：恢复将覆盖现有数据库」再操作', 'warning')
+        flash(_gettext('请先勾选「我已清楚：恢复将覆盖现有数据库」再操作'), 'warning')
         return redirect(url_for('admin.backup_index'))
     # 保存到 backups 临时目录
     name = f.filename.lower()
     allowed = ('.sql.gz', '.json.gz', '.gz', '.sql', '.json')
     if not any(name.endswith(ext) for ext in allowed):
-        flash('仅支持 .sql.gz / .json.gz / .gz / .sql / .json 备份文件', 'danger')
+        flash(_gettext('仅支持 .sql.gz / .json.gz / .gz / .sql / .json 备份文件'), 'danger')
         return redirect(url_for('admin.backup_index'))
     rel, url, err = save_upload_file(f, sub_dir='backup_temp', allowed_exts=['gz', 'sql', 'json'])
     if err:
-        flash(f'文件保存失败：{err}', 'danger')
+        flash(_gettext('文件保存失败：{0}').format(err), 'danger')
         return redirect(url_for('admin.backup_index'))
     abs_path = os.path.join(current_app.config.get('UPLOAD_FOLDER') or
                             os.path.join(os.path.dirname(os.path.dirname(current_app.instance_path)),
@@ -176,16 +177,16 @@ def backup_restore_upload():
     try:
         ok, msg = restore_backup(temp_path)
         if ok:
-            flash(f'上传备份恢复成功。{msg}', 'success')
+            flash(_gettext('上传备份恢复成功。{0}').format(msg), 'success')
             audit_log(OP_BACKUP_RESTORE, MODULE_BACKUP, None, temp_name,
                       {'status': 'success', 'from': 'upload'})
         else:
-            flash(f'恢复失败：{msg}', 'danger')
+            flash(_gettext('恢复失败：{0}').format(msg), 'danger')
             audit_log(OP_BACKUP_RESTORE, MODULE_BACKUP, None, temp_name,
                       {'status': 'failed', 'error': msg, 'from': 'upload'})
     except Exception as e:
         current_app.logger.exception('upload restore failed')
-        flash(f'恢复异常：{e}', 'danger')
+        flash(_gettext('恢复异常：{0}').format(e), 'danger')
     finally:
         # 清理临时文件
         try:
@@ -208,10 +209,10 @@ def backup_delete(bid):
             os.remove(path)
     except Exception as e:
         current_app.logger.exception('backup file delete failed')
-        flash(f'物理文件删除失败：{e}', 'warning')
+        flash(_gettext('物理文件删除失败：{0}').format(e), 'warning')
     db.session.delete(record)
     db.session.commit()
-    flash('备份记录已删除', 'success')
+    flash(_gettext('备份记录已删除'), 'success')
     audit_log(OP_DELETE, MODULE_BACKUP, record.id, record.filename, {})
     return redirect(url_for('admin.backup_index'))
 
@@ -234,7 +235,7 @@ def setting_backup_save():
             raise ValueError
         Setting.set('backup_schedule_time', time_val)
     except Exception:
-        flash('备份时间格式应为 HH:MM（00:00-23:59），已回退为 03:00', 'warning')
+        flash(_gettext('备份时间格式应为 HH:MM（00:00-23:59），已回退为 03:00'), 'warning')
         Setting.set('backup_schedule_time', '03:00')
     try:
         keep_days = int(request.form.get('backup_keep_days') or 30)
@@ -268,7 +269,7 @@ def setting_backup_save():
     except Exception:
         current_app.logger.exception('reschedule backup job failed')
 
-    flash('备份运维配置已保存，定时任务即时更新', 'success')
+    flash(_gettext('备份运维配置已保存，定时任务即时更新'), 'success')
     audit_log(OP_UPDATE, MODULE_BACKUP, None, None,
               {'action': 'update_schedule',
                'enable': Setting.get('backup_enable_scheduled'),
@@ -283,9 +284,57 @@ def setting_backup_save():
 
 @admin_bp.route('/monitor')
 @permission_required('system:backup')
-def monitor_page():
+def monitor_index():
+    """系统监控页：服务器/磁盘/数据库状态。"""
+    import platform, sys as _sys, time as _time, os as _os
+    from ..config import BASE_DIR
     stats = system_monitor_stats()
-    return render_template('admin/backup/monitor.html', stats=stats)
+
+    # 服务器信息
+    sys_info = {
+        'os': f"{platform.system()} {platform.release()}",
+        'python': platform.python_version(),
+        'timezone': getattr(_os, 'environ', {}).get('TZ', 'UTC'),
+        'requests': getattr(_sys, '_zhy_request_count', 0),
+        'server_software': _os.environ.get('SERVER_SOFTWARE', '-'),
+        'wsgi': getattr(_sys, 'WSGI_SERVER', '-'),
+        'pid': _os.getpid(),
+    }
+
+    # 运行时长
+    uptime = stats.get('uptime_seconds', 0)
+    runtime = type('Runtime', (), {
+        'days': int(uptime // 86400),
+        'hours': int((uptime % 86400) // 3600),
+        'minutes': int((uptime % 3600) // 60),
+    })()
+
+    # 磁盘信息
+    disk_info = {
+        'project_path': BASE_DIR,
+        'total': f"{stats.get('disk_total_gb', 0)} GB",
+        'used': f"{stats.get('disk_used_gb', 0)} GB",
+        'free': f"{stats.get('disk_free_gb', 0)} GB",
+        'percent': stats.get('disk_used_pct', 0),
+    }
+
+    # 数据库信息
+    from ..utils.backup_utils import _db_type_and_path
+    try:
+        db_type, db_name = _db_type_and_path()[:2]
+    except Exception:
+        db_type, db_name = 'unknown', '-'
+    db_info = {
+        'driver': db_type,
+        'name': db_name,
+        'size': f"{stats.get('db_size_mb', 0)} MB",
+        'ok': stats.get('db_alive', False),
+    }
+
+    return render_template('admin/backup/monitor.html', stats=stats,
+                           sys_info=sys_info, runtime=runtime,
+                           disk_info=disk_info, db_info=db_info,
+                           cms_version=Setting.CMS_VERSION)
 
 
 @admin_bp.route('/api/monitor')

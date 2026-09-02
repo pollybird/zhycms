@@ -1,11 +1,11 @@
 {% extends 'admin/base.html' %}
-{% block title %}{{ '编辑表单' if form else '新增表单' }} - {{ cms_name }}{% endblock %}
-{% block page_header %}{{ '编辑表单' if form else '新增表单' }}{% endblock %}
+{% block title %}{{ _p('form', '编辑表单') if form else _p('form', '新增表单') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('form', '编辑表单') if form else _p('form', '新增表单') }}{% endblock %}
 {% set active_menu = 'form' %}
 
 {% block breadcrumb %}
-  <li class="breadcrumb-item"><a href="{{ url_for('admin.form_index') }}">自定义表单</a></li>
-  <li class="breadcrumb-item active">{{ '编辑' if form else '新增' }}</li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.form_index') }}">{{ _p('form', '自定义表单') }}</a></li>
+  <li class="breadcrumb-item active">{{ _p('form', '编辑') if form else _p('form', '新增') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -13,29 +13,29 @@
   <div class="row">
     <div class="col-md-8">
       <div class="card">
-        <div class="card-header"><h3 class="card-title">表单基础配置</h3></div>
+        <div class="card-header"><h3 class="card-title">{{ _p('form', '表单基础配置') }}</h3></div>
         <div class="card-body">
           <div class="form-group">
-            <label class="required-mark">表单名称</label>
+            <label class="required-mark">{{ _p('form', '表单名称') }}</label>
             <input type="text" name="name" class="form-control" value="{{ form.name if form else '' }}" required>
           </div>
           <div class="form-group">
-            <label class="required-mark">表单标识（英文，创建后不可修改）</label>
+            <label class="required-mark">{{ _p('form', '表单标识（英文，创建后不可修改）') }}</label>
             <input type="text" name="slug" class="form-control" pattern="[a-zA-Z][a-zA-Z0-9_]*" value="{{ form.slug if form else '' }}" {{ 'readonly' if form else 'required' }}>
-            <small class="form-text text-muted">前台访问地址：<code>{{ request.host_url }}form/<标识></code></small>
+            <small class="form-text text-muted">{{ _p('form', '前台访问地址：') }}<code>{{ request.host_url }}form/<标识></code></small>
           </div>
           <div class="form-group">
-            <label>表单简介</label>
+            <label>{{ _p('form', '表单简介') }}</label>
             <textarea name="description" rows="2" class="form-control">{{ form.description if form else '' }}</textarea>
           </div>
           <div class="form-group">
-            <label>提交成功提示语</label>
-            <input type="text" name="success_message" class="form-control" value="{{ form.success_message if form else '提交成功，感谢您的反馈！' }}">
+            <label>{{ _p('form', '提交成功提示语') }}</label>
+            <input type="text" name="success_message" class="form-control" value="{{ form.success_message if form else _p('form', '提交成功，感谢您的反馈！') }}">
           </div>
           <div class="form-row">
             <div class="col-md-6">
               <div class="form-group">
-                <label>防重复提交间隔（秒，0=不限制）</label>
+                <label>{{ _p('form', '防重复提交间隔（秒，0=不限制）') }}</label>
                 <input type="number" name="submit_interval" min="0" class="form-control" value="{{ form.submit_interval if form else 60 }}">
               </div>
             </div>
@@ -43,7 +43,7 @@
               <div class="form-group pt-4">
                 <div class="custom-control custom-switch">
                   <input type="checkbox" name="is_open" class="custom-control-input" id="is_open" {{ 'checked' if form is none or form.is_open }}>
-                  <label class="custom-control-label" for="is_open">开启表单提交</label>
+                  <label class="custom-control-label" for="is_open">{{ _p('form', '开启表单提交') }}</label>
                 </div>
               </div>
             </div>
@@ -53,9 +53,9 @@
 
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">表单字段</h3>
+          <h3 class="card-title">{{ _p('form', '表单字段') }}</h3>
           <div class="card-tools">
-            <button type="button" class="btn btn-success btn-sm" onclick="add_field()"><i class="fas fa-plus"></i> 添加字段</button>
+            <button type="button" class="btn btn-success btn-sm" onclick="add_field()"><i class="fas fa-plus"></i> {{ _p('form', '添加字段') }}</button>
           </div>
         </div>
         <div class="card-body">
@@ -66,10 +66,10 @@
                 <input type="hidden" name="field_sort[]" value="{{ f.sort_order }}">
                 <div class="form-row">
                   <div class="col-md-2">
-                    <input type="text" name="field_label[]" class="form-control form-control-sm mb-1" placeholder="显示名称" value="{{ f.label }}" required>
+                    <input type="text" name="field_label[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '显示名称') }}" value="{{ f.label }}" required>
                   </div>
                   <div class="col-md-2">
-                    <input type="text" name="field_key[]" class="form-control form-control-sm mb-1" placeholder="英文标识" value="{{ f.field_key }}" pattern="[a-zA-Z][a-zA-Z0-9_]*" required>
+                    <input type="text" name="field_key[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '英文标识') }}" value="{{ f.field_key }}" pattern="[a-zA-Z][a-zA-Z0-9_]*" required>
                   </div>
                   <div class="col-md-2">
                     <select name="field_type[]" class="form-control form-control-sm mb-1 field-type-select">
@@ -80,7 +80,7 @@
                   </div>
                   <div class="col-md-1 text-center pt-2">
                     <label class="small">
-                      <input type="checkbox" name="field_required[]" value="{{ loop.index0 }}" {{ 'checked' if f.is_required }}> 必填
+                      <input type="checkbox" name="field_required[]" value="{{ loop.index0 }}" {{ 'checked' if f.is_required }}> {{ _p('form', '必填') }}
                     </label>
                   </div>
                   <div class="col-md-1">
@@ -89,29 +89,29 @@
                 </div>
                 <div class="form-row mt-1">
                   <div class="col-md-4">
-                    <input type="text" name="field_placeholder[]" class="form-control form-control-sm mb-1" placeholder="提示文字" value="{{ f.placeholder or '' }}">
+                    <input type="text" name="field_placeholder[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '提示文字') }}" value="{{ f.placeholder or '' }}">
                   </div>
                   <div class="col-md-4">
-                    <input type="text" name="field_help[]" class="form-control form-control-sm mb-1" placeholder="帮助说明" value="{{ f.help_text or '' }}">
+                    <input type="text" name="field_help[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '帮助说明') }}" value="{{ f.help_text or '' }}">
                   </div>
                 </div>
                 <div class="form-row mt-1 options-block" style="{{ '' if f.field_type in ('select','checkbox','radio') else 'display:none;' }}">
                   <div class="col-md-8">
-                    <textarea name="field_options[]" rows="2" class="form-control form-control-sm" placeholder="每行一个选项">{{ '\n'.join(f.get_options()) if f.get_options() }}</textarea>
+                    <textarea name="field_options[]" rows="2" class="form-control form-control-sm" placeholder="{{ _p('form', '每行一个选项') }}">{{ '\n'.join(f.get_options()) if f.get_options() }}</textarea>
                   </div>
                 </div>
                 <div class="form-row mt-1 file-block" style="{{ '' if f.field_type == 'file' else 'display:none;' }}">
                   <div class="col-md-4">
-                    <input type="text" name="field_exts[]" class="form-control form-control-sm" placeholder="允许后缀(逗号分隔)" value="{{ f.allowed_exts or '' }}">
+                    <input type="text" name="field_exts[]" class="form-control form-control-sm" placeholder="{{ _p('form', '允许后缀(逗号分隔)') }}" value="{{ f.allowed_exts or '' }}">
                   </div>
                   <div class="col-md-3">
-                    <input type="number" name="field_maxsize[]" class="form-control form-control-sm" placeholder="最大KB" value="{{ (f.max_size // 1024) if f.max_size else '' }}">
+                    <input type="number" name="field_maxsize[]" class="form-control form-control-sm" placeholder="{{ _p('form', '最大KB') }}" value="{{ (f.max_size // 1024) if f.max_size else '' }}">
                   </div>
                 </div>
               </div>
               {% endfor %}
           </div>
-          <small class="form-text text-muted">字段标识用于程序内部使用；多选/单选/下拉字段需填写每行一个的选项内容；文件字段需配置后缀和大小限制</small>
+          <small class="form-text text-muted">{{ _p('form', '字段标识用于程序内部使用；多选/单选/下拉字段需填写每行一个的选项内容；文件字段需配置后缀和大小限制') }}</small>
         </div>
       </div>
     </div>
@@ -119,12 +119,12 @@
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> 保存表单</button>
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _p('form', '保存表单') }}</button>
           {% if form %}
-          <a href="{{ url_for('admin.form_submissions', fid=form.id) }}" class="btn btn-info btn-block"><i class="fas fa-inbox"></i> 查看提交数据</a>
-          <a href="{{ url_for('frontend.form_submit', slug=form.slug) }}" target="_blank" class="btn btn-default btn-block"><i class="fas fa-eye"></i> 前台预览</a>
+          <a href="{{ url_for('admin.form_submissions', fid=form.id) }}" class="btn btn-info btn-block"><i class="fas fa-inbox"></i> {{ _p('form', '查看提交数据') }}</a>
+          <a href="{{ url_for('form_frontend.form_submit', slug=form.slug) }}" target="_blank" class="btn btn-default btn-block"><i class="fas fa-eye"></i> {{ _p('form', '前台预览') }}</a>
           {% endif %}
-          <a href="{{ url_for('admin.form_index') }}" class="btn btn-default btn-block">返回列表</a>
+          <a href="{{ url_for('admin.form_index') }}" class="btn btn-default btn-block">{{ _p('form', '返回列表') }}</a>
         </div>
       </div>
     </div>
@@ -143,10 +143,10 @@ function add_field(){
       <input type="hidden" name="field_sort[]" value="${fieldIndex}">
       <div class="form-row">
         <div class="col-md-2">
-          <input type="text" name="field_label[]" class="form-control form-control-sm mb-1" placeholder="显示名称" required>
+          <input type="text" name="field_label[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '显示名称') }}" required>
         </div>
         <div class="col-md-2">
-          <input type="text" name="field_key[]" class="form-control form-control-sm mb-1" placeholder="英文标识" pattern="[a-zA-Z][a-zA-Z0-9_]*" required>
+          <input type="text" name="field_key[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '英文标识') }}" pattern="[a-zA-Z][a-zA-Z0-9_]*" required>
         </div>
         <div class="col-md-2">
           <select name="field_type[]" class="form-control form-control-sm mb-1 field-type-select">
@@ -157,7 +157,7 @@ function add_field(){
         </div>
         <div class="col-md-1 text-center pt-2">
           <label class="small">
-            <input type="checkbox" name="field_required[]" value="${fieldIndex}"> 必填
+            <input type="checkbox" name="field_required[]" value="${fieldIndex}"> {{ _p('form', '必填') }}
           </label>
         </div>
         <div class="col-md-1">
@@ -166,23 +166,23 @@ function add_field(){
       </div>
       <div class="form-row mt-1">
         <div class="col-md-4">
-          <input type="text" name="field_placeholder[]" class="form-control form-control-sm mb-1" placeholder="提示文字">
+          <input type="text" name="field_placeholder[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '提示文字') }}">
         </div>
         <div class="col-md-4">
-          <input type="text" name="field_help[]" class="form-control form-control-sm mb-1" placeholder="帮助说明">
+          <input type="text" name="field_help[]" class="form-control form-control-sm mb-1" placeholder="{{ _p('form', '帮助说明') }}">
         </div>
       </div>
       <div class="form-row mt-1 options-block" style="display:none;">
         <div class="col-md-8">
-          <textarea name="field_options[]" rows="2" class="form-control form-control-sm" placeholder="每行一个选项"></textarea>
+          <textarea name="field_options[]" rows="2" class="form-control form-control-sm" placeholder="{{ _p('form', '每行一个选项') }}"></textarea>
         </div>
       </div>
       <div class="form-row mt-1 file-block" style="display:none;">
         <div class="col-md-4">
-          <input type="text" name="field_exts[]" class="form-control form-control-sm" placeholder="允许后缀(逗号分隔)">
+          <input type="text" name="field_exts[]" class="form-control form-control-sm" placeholder="{{ _p('form', '允许后缀(逗号分隔)') }}">
         </div>
         <div class="col-md-3">
-          <input type="number" name="field_maxsize[]" class="form-control form-control-sm" placeholder="最大KB">
+          <input type="number" name="field_maxsize[]" class="form-control form-control-sm" placeholder="{{ _p('form', '最大KB') }}">
         </div>
       </div>
     </div>`;

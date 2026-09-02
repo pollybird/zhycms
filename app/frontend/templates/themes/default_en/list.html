@@ -1,0 +1,77 @@
+{% extends theme_base %}
+{% block title %}{{ column.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">Home</a></li>
+    <li class="breadcrumb-item active">{{ column.name }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  <div class="col-md-12">
+    <h1>{{ column.name }}</h1>
+    {% if column.summary %}<p class="text-muted">{{ column.summary }}</p>{% endif %}
+    <hr>
+
+    {% if articles %}
+    <div class="list-group mb-4">
+      {% for a in articles %}
+      <a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=a.id) }}" class="list-group-item list-group-item-action list-article">
+        <div class="row">
+          <div class="col-md-2">
+            {% if a.cover %}
+              <img src="{{ a.cover }}" class="img-fluid rounded" alt="{{ a.title }}">
+            {% else %}
+              <div class="bg-light d-flex align-items-center justify-content-center rounded" style="height:60px;">
+                <i class="fas fa-image text-muted"></i>
+              </div>
+            {% endif %}
+          </div>
+          <div class="col-md-10">
+            <h5 class="mb-1">{{ a.title }}</h5>
+            <p class="text-muted mb-1 small">{{ a.summary|truncate_text(80) }}</p>
+            <small class="text-muted">
+              <i class="far fa-clock"></i> {{ a.published_at|date }}
+              {% if a.author %}<span class="ml-2"><i class="fas fa-user"></i> {{ a.author }}</span>{% endif %}
+              <span class="ml-2"><i class="far fa-eye"></i> {{ a.viewed }}</span>
+            </small>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+
+    {# Pagination #}
+    {% if pagination.pages > 1 %}
+    <nav>
+      <ul class="pagination justify-content-center">
+        <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+          <a class="page-link" href="{{ frontend_pager_url(column, pagination.prev_num or 1) }}">&laquo; Previous</a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if p %}
+          <li class="page-item {{ 'active' if p == pagination.page }}">
+            <a class="page-link" href="{{ frontend_pager_url(column, p) }}">{{ p }}</a>
+          </li>
+          {% else %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+          <a class="page-link" href="{{ frontend_pager_url(column, pagination.next_num or pagination.page) }}">Next &raquo;</a>
+        </li>
+      </ul>
+    </nav>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="far fa-folder-open" style="font-size:48px;"></i>
+      <p class="mt-3">No content</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

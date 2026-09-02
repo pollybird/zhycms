@@ -17,6 +17,7 @@ from app.plugin_system import plugin_enabled
 
 from .models import FriendLink
 
+from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'friend_link'
 
 
@@ -69,7 +70,7 @@ def _save_link(link):
     name = (request.form.get('name') or '').strip()
     url = (request.form.get('url') or '').strip()
     if not name or not url:
-        flash('名称和 URL 必填', 'danger')
+        flash(_gettext('名称和 URL 必填'), 'danger')
         return None
 
     is_new = link is None
@@ -88,7 +89,7 @@ def _save_link(link):
         rel, file_url, err = save_upload_file(logo_file, sub_dir='friend_link',
                                               allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp'])
         if err:
-            flash(f'LOGO 上传失败：{err}', 'danger')
+            flash(_gettext('LOGO 上传失败：{0}').format(err), 'danger')
             return None
         link.logo = file_url
     elif request.form.get('logo_remove') == 'on':
@@ -99,7 +100,7 @@ def _save_link(link):
     db.session.commit()
     audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE,
               link.id, link.name, {'action': '链接', 'url': link.url})
-    flash('友情链接已保存', 'success')
+    flash(_gettext('友情链接已保存'), 'success')
     return link
 
 
@@ -111,7 +112,7 @@ def friend_link_delete(lid):
     link.is_deleted = True
     db.session.commit()
     audit_log(OP_DELETE, AUDIT_MODULE, link.id, link.name, {'action': '链接'})
-    flash('已删除', 'success')
+    flash(_gettext('已删除'), 'success')
     return redirect(url_for('admin.friend_link_index'))
 
 
@@ -134,7 +135,7 @@ def friend_link_batch():
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
     if not ids:
-        flash('未选择', 'warning')
+        flash(_gettext('未选择'), 'warning')
         return redirect(url_for('admin.friend_link_index'))
 
     links = FriendLink.query.filter(FriendLink.id.in_(ids)).all()
@@ -150,5 +151,5 @@ def friend_link_batch():
     db.session.commit()
     audit_log(OP_BATCH, AUDIT_MODULE, None, None,
               {'action': f'批量{action}', 'count': len(links)})
-    flash('批量操作完成', 'success')
+    flash(_gettext('批量操作完成'), 'success')
     return redirect(url_for('admin.friend_link_index'))

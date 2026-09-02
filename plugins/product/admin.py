@@ -23,6 +23,7 @@ from app.plugin_system import plugin_enabled
 
 from .models import Product
 
+from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'product'
 
 _IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
@@ -221,12 +222,12 @@ def _save_product(product):
     title = (request.form.get('title') or '').strip()
     column_id = request.form.get('column_id', type=int)
     if not title:
-        flash('标题必填', 'danger')
+        flash(_gettext('标题必填'), 'danger')
         return None
     col = Column.query.filter_by(id=column_id or 0,
                                  is_deleted=False).first() if column_id else None
     if col is None or col.type != 'list':
-        flash('请选择有效的列表栏目', 'danger')
+        flash(_gettext('请选择有效的列表栏目'), 'danger')
         return None
     _check_column_access(col.id)   # 含编辑时目标栏目（换栏目即移动）
     if not is_new and product.column_id != col.id:
@@ -241,7 +242,7 @@ def _save_product(product):
         kept = []
     unknown = [u for u in kept if u not in old_urls]
     if unknown:
-        flash('相册数据异常（包含非本产品图片），已拒绝保存', 'danger')
+        flash(_gettext('相册数据异常（包含非本产品图片），已拒绝保存'), 'danger')
         return None
 
     new_urls = []
@@ -251,7 +252,7 @@ def _save_product(product):
         rel, url, err = save_upload_file(f, sub_dir='product',
                                          allowed_exts=_IMAGE_EXTS)
         if err:
-            flash(f'相册图片上传失败：{err}', 'danger')
+            flash(_gettext('相册图片上传失败：{0}').format(err), 'danger')
             return None
         new_urls.append(url)
     gallery_urls = kept + new_urls
@@ -263,7 +264,7 @@ def _save_product(product):
         rel, url, err = save_upload_file(upload_cover, sub_dir='product',
                                          allowed_exts=_IMAGE_EXTS)
         if err:
-            flash(f'封面上传失败：{err}', 'danger')
+            flash(_gettext('封面上传失败：{0}').format(err), 'danger')
             return None
         cover = url
     elif request.form.get('cover_remove') == 'on':
@@ -273,7 +274,7 @@ def _save_product(product):
     # ---- 规格参数 ----
     specs = _parse_specs(request.form.get('specs_json'))
     if specs is None:
-        flash('规格参数数据格式错误，请检查编辑器内容', 'danger')
+        flash(_gettext('规格参数数据格式错误，请检查编辑器内容'), 'danger')
         return None
 
     product.column_id = col.id
@@ -301,7 +302,7 @@ def _save_product(product):
                'gallery_count': len(gallery_urls),
                'specs_groups': len(specs)})
     clear_content_cache(column_id=col.id)
-    flash('产品已保存', 'success')
+    flash(_gettext('产品已保存'), 'success')
     return product
 
 
@@ -322,7 +323,7 @@ def product_delete(pid):
     audit_log(OP_DELETE, AUDIT_MODULE, pid, product.title,
               {'action': '产品', 'column_id': product.column_id})
     clear_content_cache(column_id=product.column_id)
-    flash('产品已删除（软删除，可由管理员在数据库恢复）', 'success')
+    flash(_gettext('产品已删除（软删除，可由管理员在数据库恢复）'), 'success')
     return redirect(url_for('admin.product_index',
                             cid=product.column_id))
 
@@ -334,13 +335,13 @@ def product_batch():
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
     if not ids:
-        flash('未选择产品', 'warning')
+        flash(_gettext('未选择产品'), 'warning')
         return redirect(url_for('admin.product_index'))
 
     products = Product.query.filter(Product.id.in_(ids),
                                     Product.is_deleted == False).all()  # noqa: E712
     if not products:
-        flash('未找到可选产品', 'warning')
+        flash(_gettext('未找到可选产品'), 'warning')
         return redirect(url_for('admin.product_index'))
     _check_columns_access([p.column_id for p in products])
 
@@ -362,14 +363,14 @@ def product_batch():
         target = Column.query.filter_by(id=target_id or 0, type='list',
                                         is_deleted=False).first()
         if target is None:
-            flash('目标栏目无效', 'danger')
+            flash(_gettext('目标栏目无效'), 'danger')
             return redirect(url_for('admin.product_index'))
         _check_column_access(target.id)
         for p in products:
             p.column_id = target.id
         col_ids.add(target.id)
     else:
-        flash('未知批量操作', 'warning')
+        flash(_gettext('未知批量操作'), 'warning')
         return redirect(url_for('admin.product_index'))
 
     db.session.commit()
@@ -377,5 +378,5 @@ def product_batch():
               {'action': f'批量{action}', 'count': len(products)})
     for cid in col_ids:
         clear_content_cache(column_id=cid)
-    flash('批量操作完成', 'success')
+    flash(_gettext('批量操作完成'), 'success')
     return redirect(url_for('admin.product_index'))

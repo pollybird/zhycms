@@ -9,6 +9,7 @@ from functools import wraps
 from flask import (render_template, redirect, url_for, request, flash, abort,
                    send_file, current_app)
 
+from flask_babel import gettext as _gettext
 from app.extensions import db
 from app.admin import admin_bp
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
@@ -126,12 +127,12 @@ def _save_job(job):
 
     title = (request.form.get('title') or '').strip()
     if not title:
-        flash('岗位名称必填', 'danger')
+        flash(_gettext('岗位名称必填'), 'danger')
         return None
     try:
         deadline = _parse_deadline(request.form.get('deadline'))
     except ValueError:
-        flash('招聘截止时间格式不正确', 'danger')
+        flash(_gettext('招聘截止时间格式不正确'), 'danger')
         return None
 
     job.title = title
@@ -152,7 +153,7 @@ def _save_job(job):
               job.id, job.title,
               {'action': '岗位', 'deadline': job.deadline.strftime('%Y-%m-%d %H:%M')
                if job.deadline else '长期有效'})
-    flash('岗位已保存', 'success')
+    flash(_gettext('岗位已保存'), 'success')
     return job
 
 
@@ -166,7 +167,7 @@ def recruit_job_delete(jid):
     job.is_deleted = True
     db.session.commit()
     audit_log(OP_DELETE, AUDIT_MODULE, jid, job.title, {'action': '岗位'})
-    flash('岗位已删除（软删除，可由管理员在数据库恢复）', 'success')
+    flash(_gettext('岗位已删除（软删除，可由管理员在数据库恢复）'), 'success')
     return redirect(url_for('admin.recruit_job_index'))
 
 
@@ -177,7 +178,7 @@ def recruit_job_batch():
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
     if not ids:
-        flash('未选择岗位', 'warning')
+        flash(_gettext('未选择岗位'), 'warning')
         return redirect(url_for('admin.recruit_job_index'))
     jobs = RecruitJob.query.filter(RecruitJob.id.in_(ids),
                                    RecruitJob.is_deleted == False).all()  # noqa: E712
@@ -191,12 +192,12 @@ def recruit_job_batch():
         for j in jobs:
             j.is_deleted = True
     else:
-        flash('未知批量操作', 'warning')
+        flash(_gettext('未知批量操作'), 'warning')
         return redirect(url_for('admin.recruit_job_index'))
     db.session.commit()
     audit_log(OP_BATCH, AUDIT_MODULE, None, None,
               {'action': f'批量{action}', 'count': len(jobs), 'module': '招聘岗位'})
-    flash('批量操作完成', 'success')
+    flash(_gettext('批量操作完成'), 'success')
     return redirect(url_for('admin.recruit_job_index'))
 
 
@@ -239,7 +240,7 @@ def recruit_application_resume(aid):
     app_row = RecruitApplication.query.get_or_404(aid)
     path = resume_abs_path(app_row)
     if path is None:
-        flash('简历文件不存在或已丢失', 'warning')
+        flash(_gettext('简历文件不存在或已丢失'), 'warning')
         return redirect(url_for('admin.recruit_application_index'))
     return send_file(path, as_attachment=True,
                      download_name=app_row.resume_name or 'resume')
@@ -253,14 +254,14 @@ def recruit_application_status(aid):
     app_row = RecruitApplication.query.get_or_404(aid)
     new_status = request.form.get('status', '')
     if new_status not in RecruitApplication.STATUS_LABELS:
-        flash('未知状态', 'warning')
+        flash(_gettext('未知状态'), 'warning')
         return redirect(url_for('admin.recruit_application_index'))
     old = app_row.status
     app_row.status = new_status
     db.session.commit()
     audit_log(OP_UPDATE, AUDIT_MODULE, aid, f'{app_row.name} → {app_row.job.title}',
               {'action': '申请状态', 'from': old, 'to': new_status})
-    flash(f'申请状态已更新为「{app_row.status_label()}」', 'success')
+    flash(_gettext('申请状态已更新为「{0}」').format(app_row.status_label()), 'success')
     return redirect(url_for('admin.recruit_application_index',
                             status=request.form.get('back_status') or None,
                             job_id=request.form.get('back_job_id', type=int) or None))
@@ -278,5 +279,5 @@ def recruit_application_delete(aid):
     db.session.commit()
     audit_log(OP_DELETE, AUDIT_MODULE, aid, name,
               {'action': '求职申请', 'job': job_title})
-    flash('申请记录已删除', 'success')
+    flash(_gettext('申请记录已删除'), 'success')
     return redirect(url_for('admin.recruit_application_index'))

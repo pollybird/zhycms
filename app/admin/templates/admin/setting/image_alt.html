@@ -1,42 +1,42 @@
 {% extends 'admin/base.html' %}
-{% block title %}图片 ALT 批量管理 - {{ cms_name }}{% endblock %}
-{% block page_header %}图片 ALT 批量管理{% endblock %}
+{% block title %}{{ _('图片 ALT 批量管理') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('图片 ALT 批量管理') }}{% endblock %}
 {% set active_menu = 'tool_image_alt' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">系统设置</li>
-<li class="breadcrumb-item active">图片ALT批量管理</li>
+<li class="breadcrumb-item">{{ _('系统设置') }}</li>
+<li class="breadcrumb-item active">{{ _('图片ALT批量管理') }}</li>
 {% endblock %}
 
 {% block content %}
 <div class="card card-outline card-info">
-  <div class="card-header"><h3 class="card-title"><i class="fas fa-images"></i> 功能说明</h3></div>
+  <div class="card-header"><h3 class="card-title"><i class="fas fa-images"></i> {{ _('功能说明') }}</h3></div>
   <div class="card-body">
-    <p class="mb-2">SEO 中 <code>alt</code> 属性是搜索引擎识别图片内容的主要依据，缺失或为空会影响图片搜索收录与页面关键词权重。</p>
+    <p class="mb-2">{{ _('SEO 中 alt 属性是搜索引擎识别图片内容的主要依据，缺失或为空会影响图片搜索收录与页面关键词权重。') }}</p>
     <ul>
-      <li><strong>前台自动兜底：</strong>若在 <a href="{{ url_for('admin.setting_seo_advanced') }}">SEO 高级</a> 中设置了「默认 ALT 文案」，前台渲染文章、单页内容时，缺失或空的 <code>alt</code> 会自动填充。</li>
-      <li><strong>历史内容批量补齐：</strong>请前往「SEO 高级配置」页面设置默认 ALT 文案，其会在渲染时自动注入到历史内容，无需修改数据库。</li>
-      <li><strong>单张自定义：</strong>在编辑文章/单页时，点击编辑器中的图片即可手工设置 alt，优先级高于默认文案。</li>
+      <li><strong>{{ _('前台自动兜底：') }}</strong>{{ _('若在 %(a_start)sSEO 高级%(a_end)s 中设置了「默认 ALT 文案」，前台渲染文章、单页内容时，缺失或空的 alt 会自动填充。', a_start='<a href="' + url_for('admin.setting_seo_advanced') + '">', a_end='</a>') }}</li>
+      <li><strong>{{ _('历史内容批量补齐：') }}</strong>{{ _('请前往「SEO 高级配置」页面设置默认 ALT 文案，其会在渲染时自动注入到历史内容，无需修改数据库。') }}</li>
+      <li><strong>{{ _('单张自定义：') }}</strong>{{ _('在编辑文章/单页时，点击编辑器中的图片即可手工设置 alt，优先级高于默认文案。') }}</li>
     </ul>
   </div>
   <div class="card-footer">
     <a href="{{ url_for('admin.setting_seo_advanced') }}" class="btn btn-primary">
-      <i class="fas fa-arrow-right"></i> 前往设置默认 ALT 文案
+      <i class="fas fa-arrow-right"></i> {{ _('前往设置默认 ALT 文案') }}
     </a>
     <a href="{{ url_for('admin.column_index') }}" class="btn btn-default ml-2">
-      <i class="fas fa-edit"></i> 去栏目选择文章手工补充
+      <i class="fas fa-edit"></i> {{ _('去栏目选择文章手工补充') }}
     </a>
   </div>
 </div>
 
 <div class="card card-outline card-default mt-3">
-  <div class="card-header"><h3 class="card-title"><i class="fas fa-info-circle"></i> 本系统 ALT 注入规则</h3></div>
+  <div class="card-header"><h3 class="card-title"><i class="fas fa-info-circle"></i> {{ _('本系统 ALT 注入规则') }}</h3></div>
   <div class="card-body">
     <ol class="mb-0">
-      <li>文章正文 <code>&lt;img alt=""&gt;</code> 或缺失 alt：替换为 <code>seo_image_alt_default</code>。</li>
-      <li>单页栏目自定义 page_content：同上。</li>
-      <li>文章摘要 summary：同上。</li>
-      <li>已有非空 alt：保留原文，不覆盖，尊重手工编辑结果。</li>
+      <li>{{ _('文章正文 img alt=\"\" 或缺失 alt：替换为 seo_image_alt_default。') }}</li>
+      <li>{{ _('单页栏目自定义 page_content：同上。') }}</li>
+      <li>{{ _('文章摘要 summary：同上。') }}</li>
+      <li>{{ _('已有非空 alt：保留原文，不覆盖，尊重手工编辑结果。') }}</li>
     </ol>
   </div>
 </div>

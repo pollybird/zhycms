@@ -1,40 +1,103 @@
 {% extends 'admin/base.html' %}
-{% block title %}新增角色 - {{ cms_name }}{% endblock %}
-{% block page_header %}新增自定义角色{% endblock %}
-{% set active_menu = 'user_role' %}
+{% block title %}{{ _('编辑角色') if role else _('新增角色') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('编辑角色') if role else _('新增角色') }}{% endblock %}
+{% set active_menu = 'users' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">用户权限</li>
-<li class="breadcrumb-item"><a href="{{ url_for('admin.role_index') }}">角色与权限</a></li>
-<li class="breadcrumb-item active">新增角色</li>
+  <li class="breadcrumb-item"><a href="{{ url_for('admin.role_index') }}">{{ _('角色权限') }}</a></li>
+  <li class="breadcrumb-item active">{{ _('编辑') if role else _('新增') }}</li>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col-md-6 offset-md-3">
-    <div class="card card-outline card-primary">
-      <div class="card-header"><h3 class="card-title">角色信息</h3></div>
-      <form method="post" class="card-body">
-        <div class="form-group">
-          <label class="required-mark">角色代码（英文/数字/下划线）</label>
-          <input type="text" name="code" class="form-control" pattern="[a-zA-Z0-9_]+" placeholder="如：marketing" required>
-          <small class="form-text text-muted">创建后不可修改，用于程序内部识别。</small>
+<form method="post">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group">
+            <label class="required-mark">{{ _('角色名称') }}</label>
+            <input type="text" name="name" class="form-control" value="{{ role.name if role else '' }}" required>
+          </div>
+          <div class="form-group">
+            <label>{{ _('备注') }}</label>
+            <textarea name="description" rows="2" class="form-control">{{ role.description if role else '' }}</textarea>
+          </div>
+
+          <div class="form-group">
+            <label>{{ _('角色代码') }}</label>
+            <input type="text" name="code" class="form-control" value="{{ role.code if role else '' }}"
+              {{ 'readonly class="form-control-plaintext"' if role and role.is_system else '' }}
+              placeholder="{{ _('仅英文、数字、下划线') }}" required>
+          </div>
+
+          <div class="form-group">
+            <label class="required-mark">{{ _('权限分配') }}</label>
+            {% set groups = {} %}
+            {% for p in role_permissions if role %}
+              {% set _ = groups.setdefault(p.group, []).append(p) %}
+            {% endfor %}
+            {% if not groups %}
+              {% for p in all_permissions %}
+                {% set _ = groups.setdefault(p.group, []).append(p) %}
+              {% endfor %}
+            {% endif %}
+            {% for group_key, perms in groups.items() %}
+            <div class="card card-default mb-2">
+              <div class="card-header py-2">
+                <label class="mb-0">
+                  <input type="checkbox" class="group-check" data-group="{{ group_key }}">
+                  <strong>{{ group_label_map.get(group_key, group_key) }}</strong>
+                </label>
+              </div>
+              <div class="card-body py-2">
+                <div class="row">
+                  {% for perm in perms %}
+                  <div class="col-md-3 col-sm-4">
+                    <label class="d-inline">
+                      <input type="checkbox" name="permission_codes[]" value="{{ perm.code }}" class="perm-check" data-group="{{ group_key }}"
+                        {{ 'checked' if role and perm.code in role.permission_codes }}>
+                      {{ perm.name }} <small class="text-muted">({{ perm.code }})</small>
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
         </div>
-        <div class="form-group">
-          <label class="required-mark">角色名称</label>
-          <input type="text" name="name" class="form-control" placeholder="如：市场人员" required>
-        </div>
-        <div class="form-group">
-          <label>描述</label>
-          <textarea name="description" rows="3" class="form-control" placeholder="可选，说明该角色的职责范围"></textarea>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-plus"></i> 创建角色</button>
-        <a href="{{ url_for('admin.role_index') }}" class="btn btn-default btn-block mt-2">返回</a>
-      </form>
+      </div>
     </div>
-    <div class="alert alert-info">
-      <i class="fas fa-info-circle"></i> 创建成功后，请回到「角色与权限」列表页，点击对应角色的权限勾选框完成授权，再到「用户列表」把角色分配给具体账号。
+
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存角色') }}</button>
+          <a href="{{ url_for('admin.role_index') }}" class="btn btn-default btn-block">{{ _('返回') }}</a>
+        </div>
+      </div>
     </div>
   </div>
-</div>
+</form>
+{% endblock %}
+
+{% block js %}
+<script>
+  // 全组勾选
+  $('.group-check').on('change', function(){
+    const g = $(this).data('group');
+    $('.perm-check[data-group="' + g + '"]').prop('checked', this.checked);
+  });
+  // 初始化每组勾选状态（全部选中时自动勾选组级）
+  $('.group-check').each(function(){
+    const g = $(this).data('group');
+    const checks = $('.perm-check[data-group="' + g + '"]');
+    this.checked = checks.length > 0 && checks.length === checks.filter(':checked').length;
+  });
+  $('.perm-check').on('change', function(){
+    const g = $(this).data('group');
+    const checks = $('.perm-check[data-group="' + g + '"]');
+    $('.group-check[data-group="' + g + '"]').prop('checked', checks.length === checks.filter(':checked').length);
+  });
+</script>
 {% endblock %}

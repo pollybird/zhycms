@@ -28,7 +28,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '2.2.0'
+    CMS_VERSION = '2.3.0'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -104,6 +104,19 @@ class Setting(db.Model):
         'api_token': '',                     # 非空时要求请求头 X-API-Token
         'api_cache_ttl': '60',               # 接口缓存秒数（0=不缓存）
         'api_cors_origins': '',              # 跨域白名单，逗号分隔，* 全部
+
+        # ===== v2.3.0：第三方统计代码（plugins/analytics，键值存储零迁移）=====
+        'analytics_enable': '0',             # 1=启用前台注入 / 0=关闭
+        'analytics_google': '',              # Google Analytics 代码（注入 head）
+        'analytics_baidu': '',               # 百度统计代码（注入 head）
+        'analytics_webmaster': '',            # 站长工具代码 cnzz/51la（注入 head）
+        'analytics_custom_head': '',          # 自定义 </head> 前注入代码
+        'analytics_custom_body': '',          # 自定义 </body> 前注入代码
+
+        # ===== v2.3.0：国际化（Flask-Babel，核心能力非插件）=====
+        'i18n_enable': '0',                  # 1=启用 / 0=关闭（默认关闭，全站中文）
+        'i18n_default_locale': 'zh',         # 默认语种（zh 中文 / en 英文）
+        'i18n_available_locales': 'zh',      # 可用语种清单，逗号分隔，如 zh,en
     }
 
     @classmethod

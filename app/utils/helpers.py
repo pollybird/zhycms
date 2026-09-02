@@ -8,6 +8,7 @@ from flask import request, redirect, url_for, abort, flash, current_app
 from flask_login import current_user
 
 
+from flask_babel import gettext as _gettext
 # ============================================================
 # 后台通用鉴权
 # ============================================================
@@ -23,7 +24,7 @@ def admin_required(func):
         if getattr(u, 'is_deleted', False) or (hasattr(u, 'is_active_flag') and not u.is_active_flag):
             from flask_login import logout_user
             logout_user()
-            flash('账号已被禁用，请联系超级管理员', 'warning')
+            flash(_gettext('账号已被禁用，请联系超级管理员'), 'warning')
             return redirect(url_for('admin_auth.login'))
         return func(*args, **kwargs)
     return wrapper
@@ -47,7 +48,7 @@ def permission_required(perm_code, column_id_arg=None, any_of=None):
             if getattr(u, 'is_deleted', False) or (hasattr(u, 'is_active_flag') and not u.is_active_flag):
                 from flask_login import logout_user
                 logout_user()
-                flash('账号已被禁用', 'warning')
+                flash(_gettext('账号已被禁用'), 'warning')
                 return redirect(url_for('admin_auth.login'))
 
             # 超级管理员直接放行
@@ -291,6 +292,15 @@ def register_template_filters(app):
 
     @app.template_filter('date')
     def format_date(value, fmt='%Y-%m-%d'):
+        if not value:
+            return ''
+        if isinstance(value, str):
+            return value
+        return value.strftime(fmt)
+
+    @app.template_filter('datetime_format')
+    def datetime_format(value, fmt='%Y-%m-%d %H:%M:%S'):
+        """datetime 过滤器别名（模板沿用历史命名 datetime_format）。"""
         if not value:
             return ''
         if isinstance(value, str):

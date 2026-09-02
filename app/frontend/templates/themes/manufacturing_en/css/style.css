@@ -1,0 +1,41 @@
+/* ZhyCMS 制造业主题样式（base.html 外置） */
+:root {
+  --mfg-primary: #0b3d91;   /* 工业深蓝 */
+  --mfg-accent: #ff7a00;    /* 机械橙 */
+  --mfg-dark: #1a2233;
+}
+body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #2b2b2b; }
+a { color: var(--mfg-primary); }
+a:hover { color: var(--mfg-accent); }
+.btn-primary { background: var(--mfg-primary); border-color: var(--mfg-primary); }
+.btn-primary:hover { background: #092f70; border-color: #092f70; }
+.btn-accent { background: var(--mfg-accent); border-color: var(--mfg-accent); color: #fff; }
+.btn-accent:hover { background: #e56c00; border-color: #e56c00; color: #fff; }
+.text-primary { color: var(--mfg-primary) !important; }
+.bg-primary { background: var(--mfg-primary) !important; }
+/* 顶部信息条 */
+.topbar { background: var(--mfg-dark); color: #cdd6e5; font-size: 13px; }
+.topbar a { color: #cdd6e5; }
+/* 导航 */
+.navbar-mfg { background: var(--mfg-primary); }
+.navbar-brand img { max-height: 42px; }
+.navbar-mfg .nav-link { color: #fff !important; font-weight: 500; }
+.navbar-mfg .nav-link:hover { color: var(--mfg-accent) !important; }
+.nav-item.dropdown:hover > .dropdown-menu { display: block; }
+.dropdown-menu { border-radius: 0; border-top: 3px solid var(--mfg-accent); }
+/* 通用区块标题 */
+.section-title { text-align: center; margin-bottom: 8px; font-weight: 700; color: var(--mfg-dark); }
+.section-title::after { content: ""; display: block; width: 56px; height: 3px; background: var(--mfg-accent); margin: 12px auto 0; }
+.section-sub { text-align: center; color: #8a94a6; margin-bottom: 32px; }
+/* 页脚 */
+.footer { background: var(--mfg-dark); color: #c3ccdb; padding: 40px 0 20px; margin-top: 50px; }
+.footer a { color: #c3ccdb; }
+.footer a:hover { color: var(--mfg-accent); }
+.footer h5 { color: #fff; }
+.breadcrumb { background: transparent; padding: 0; }
+.article-content img { max-width: 100%; height: auto; }
+.article-content p { line-height: 1.8; margin-bottom: 1em; }
+.list-article { transition: all 0.2s; }
+.list-article:hover { background: #f5f7fb; }
+.friend-link img { max-height: 50px; }
+.card { border: none; box-shadow: 0 2px 12px rgba(11,61,145,.08); }

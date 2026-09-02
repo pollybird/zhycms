@@ -12,7 +12,7 @@ from . import dashboard  # noqa: E402,F401
 from . import column  # noqa: E402,F401
 from . import article  # noqa: E402,F401
 from . import fragment  # noqa: E402,F401
-from . import form  # noqa: E402,F401
+# 自定义表单 v2.3.0 起转为内置插件 plugins/form，后台路由由插件注册到 admin_bp
 from . import setting  # noqa: E402,F401
 from . import upload  # noqa: E402,F401
 # 模块1 RBAC：用户与角色管理

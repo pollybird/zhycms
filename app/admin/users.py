@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import (
     render_template, redirect, url_for, request, flash, abort, jsonify
 )
+from flask_babel import gettext as _gettext
 from flask_login import current_user
 
 from ..extensions import db
@@ -109,13 +110,13 @@ def user_create():
         is_super = request.form.get('is_super') == 'on'
 
         if not username or len(username) < 3:
-            flash('用户名至少 3 位', 'danger')
+            flash(_gettext('用户名至少 3 位'), 'danger')
         elif User.query.filter_by(username=username, is_deleted=False).first():
-            flash('用户名已存在', 'danger')
+            flash(_gettext('用户名已存在'), 'danger')
         elif len(password) < 6:
-            flash('密码至少 6 位', 'danger')
+            flash(_gettext('密码至少 6 位'), 'danger')
         elif password != confirm:
-            flash('两次输入的密码不一致', 'danger')
+            flash(_gettext('两次输入的密码不一致'), 'danger')
         else:
             try:
                 role_ids = [int(x) for x in role_ids if x.isdigit()]
@@ -146,7 +147,7 @@ def user_create():
                 ))
 
             db.session.commit()
-            flash('账号创建成功', 'success')
+            flash(_gettext('账号创建成功'), 'success')
             audit_log(OP_CREATE, MODULE_USER, user.id, user.username,
                       {'nickname': nickname, 'email': email, 'role_ids': role_ids})
             return redirect(url_for('admin.user_index'))
@@ -166,7 +167,7 @@ def user_edit(uid):
         abort(404)
     # 禁止修改自己的权限（防止越权操作，让超级管理员之间互改）
     if user.id == current_user.id and not current_user.is_super:
-        flash('不能修改自己的账号权限，请联系其他超级管理员', 'warning')
+        flash(_gettext('不能修改自己的账号权限，请联系其他超级管理员'), 'warning')
         return redirect(url_for('admin.user_index'))
 
     if request.method == 'POST':
@@ -179,9 +180,9 @@ def user_edit(uid):
         is_super = request.form.get('is_super') == 'on'
 
         if password and len(password) < 6:
-            flash('密码至少 6 位', 'danger')
+            flash(_gettext('密码至少 6 位'), 'danger')
         elif password and password != confirm:
-            flash('两次输入的密码不一致', 'danger')
+            flash(_gettext('两次输入的密码不一致'), 'danger')
         else:
             try:
                 role_ids = [int(x) for x in role_ids if x.isdigit()]
@@ -217,7 +218,7 @@ def user_edit(uid):
                 ))
 
             db.session.commit()
-            flash('账号保存成功', 'success')
+            flash(_gettext('账号保存成功'), 'success')
             audit_log(OP_UPDATE, MODULE_USER, user.id, user.username,
                       {'nickname': nickname, 'email': email, 'role_ids': role_ids,
                        'is_active': is_active, 'pwd_changed': bool(password)})
@@ -247,12 +248,12 @@ def user_edit(uid):
 def user_toggle(uid):
     user = User.query.filter_by(id=uid, is_deleted=False).first() or abort(404)
     if user.id == current_user.id:
-        flash('不能禁用自己的账号', 'warning')
+        flash(_gettext('不能禁用自己的账号'), 'warning')
         return redirect(url_for('admin.user_index'))
     user.is_active_flag = not user.is_active_flag
     db.session.commit()
     msg = '已启用' if user.is_active_flag else '已禁用'
-    flash(f'{msg}账号：{user.username}', 'success')
+    flash(_gettext('{0}账号：{1}').format(msg, user.username), 'success')
     audit_log(OP_USER_MANAGE, MODULE_USER, user.id, user.username,
               {'action': 'toggle', 'is_active_flag': user.is_active_flag})
     return redirect(url_for('admin.user_index'))
@@ -263,15 +264,15 @@ def user_toggle(uid):
 def user_delete(uid):
     user = User.query.filter_by(id=uid, is_deleted=False).first() or abort(404)
     if user.id == current_user.id:
-        flash('不能删除自己的账号', 'warning')
+        flash(_gettext('不能删除自己的账号'), 'warning')
         return redirect(url_for('admin.user_index'))
     if user.is_super and User.query.filter_by(is_super=True, is_deleted=False).count() <= 1:
-        flash('至少保留一个超级管理员账号', 'danger')
+        flash(_gettext('至少保留一个超级管理员账号'), 'danger')
         return redirect(url_for('admin.user_index'))
     user.is_deleted = True
     user.is_active_flag = False
     db.session.commit()
-    flash(f'已删除账号：{user.username}', 'success')
+    flash(_gettext('已删除账号：{0}').format(user.username), 'success')
     audit_log(OP_DELETE, MODULE_USER, user.id, user.username, {})
     return redirect(url_for('admin.user_index'))
 
@@ -283,14 +284,14 @@ def user_reset_password(uid):
     user = User.query.filter_by(id=uid, is_deleted=False).first() or abort(404)
     new_pwd = request.form.get('new_password') or ''
     if len(new_pwd) < 6:
-        flash('新密码至少 6 位', 'danger')
+        flash(_gettext('新密码至少 6 位'), 'danger')
         return redirect(url_for('admin.user_edit', uid=uid))
     user.set_password(new_pwd)
     # 重置锁定计数
     user.login_fail_count = 0
     user.locked_until = None
     db.session.commit()
-    flash('密码重置成功，用户锁定状态已解除', 'success')
+    flash(_gettext('密码重置成功，用户锁定状态已解除'), 'success')
     audit_log(OP_USER_MANAGE, MODULE_USER, user.id, user.username, {'action': 'reset_password'})
     return redirect(url_for('admin.user_edit', uid=uid))
 
@@ -317,7 +318,7 @@ def role_index():
 def role_save_permissions(rid):
     role = Role.query.filter_by(id=rid, is_deleted=False).first() or abort(404)
     if role.code == ROLE_SUPER_ADMIN:
-        flash('超级管理员角色权限不可修改（由 is_super 字段兜底）', 'warning')
+        flash(_gettext('超级管理员角色权限不可修改（由 is_super 字段兜底）'), 'warning')
         return redirect(url_for('admin.role_index'))
     codes = request.form.getlist('permission_codes[]')
     # 只接收存在于 permissions 表的 code
@@ -326,7 +327,7 @@ def role_save_permissions(rid):
     from ..models.rbac import RolePermission
     RolePermission.ensure_for_role(role.id, codes)
     db.session.commit()
-    flash(f'角色「{role.name}」的权限已保存', 'success')
+    flash(_gettext('角色「{0}」的权限已保存').format(role.name), 'success')
     audit_log(OP_UPDATE, MODULE_ROLE, role.id, role.name,
               {'permission_codes_count': len(codes)})
     return redirect(url_for('admin.role_index'))
@@ -338,21 +339,63 @@ def role_create():
     if request.method == 'POST':
         code = (request.form.get('code') or '').strip().lower()
         name = (request.form.get('name') or '').strip()
-        description = (request.form.get('description') or '').strip()
+        description = (request.form.get('description') or request.form.get('remark') or '').strip()
         if not code or not code.replace('_', '').isalnum():
-            flash('角色代码必填，只能包含字母数字下划线', 'danger')
+            flash(_gettext('角色代码必填，只能包含字母数字下划线'), 'danger')
         elif not name:
-            flash('角色名称必填', 'danger')
+            flash(_gettext('角色名称必填'), 'danger')
         elif Role.query.filter_by(code=code, is_deleted=False).first():
-            flash('角色代码已存在', 'danger')
+            flash(_gettext('角色代码已存在'), 'danger')
         else:
             role = Role(code=code, name=name, description=description, is_system=False)
             db.session.add(role)
             db.session.commit()
-            flash(f'角色「{name}」创建成功', 'success')
+            flash(_gettext('角色「{0}」创建成功').format(name), 'success')
             audit_log(OP_CREATE, MODULE_ROLE, role.id, role.name, {'code': code})
             return redirect(url_for('admin.role_index'))
-    return render_template('admin/users/role_form.html', role=None)
+    from ..models.rbac import Permission as _Perm
+    perms = _Perm.query.order_by(_Perm.group.asc(), _Perm.code.asc()).all()
+    return render_template('admin/users/role_form.html', role=None,
+                           all_permissions=perms, role_permissions=[],
+                           group_label_map={})
+
+
+@admin_bp.route('/roles/<int:rid>/edit', methods=['GET', 'POST'])
+@permission_required('system:user_manage')
+def role_edit(rid):
+    role = Role.query.filter_by(id=rid, is_deleted=False).first() or abort(404)
+    if request.method == 'POST':
+        if role.is_system:
+            flash(_gettext('系统预设角色的代码/名称不可修改（仅可修改备注）'), 'warning')
+            remark = (request.form.get('description') or request.form.get('remark') or '').strip()
+            role.description = remark
+        else:
+            code = (request.form.get('code') or '').strip().lower()
+            name = (request.form.get('name') or '').strip()
+            description = (request.form.get('description') or request.form.get('remark') or '').strip()
+            if not code or not code.replace('_', '').isalnum():
+                flash(_gettext('角色代码必填，只能包含字母数字下划线'), 'danger')
+                return redirect(url_for('admin.role_edit', rid=rid))
+            if not name:
+                flash(_gettext('角色名称必填'), 'danger')
+                return redirect(url_for('admin.role_edit', rid=rid))
+            dup = Role.query.filter(Role.code == code, Role.id != role.id,
+                                    Role.is_deleted.is_(False)).first()
+            if dup:
+                flash(_gettext('角色代码已存在'), 'danger')
+                return redirect(url_for('admin.role_edit', rid=rid))
+            role.code = code
+            role.name = name
+            role.description = description
+        db.session.commit()
+        flash(_gettext('角色「{0}」修改成功').format(role.name), 'success')
+        audit_log(OP_UPDATE, MODULE_ROLE, role.id, role.name, {})
+        return redirect(url_for('admin.role_index'))
+    from ..models.rbac import Permission as _Perm
+    perms = _Perm.query.order_by(_Perm.group.asc(), _Perm.code.asc()).all()
+    return render_template('admin/users/role_form.html', role=role,
+                           all_permissions=perms, role_permissions=perms,
+                           group_label_map={})
 
 
 @admin_bp.route('/roles/<int:rid>/delete', methods=['POST'])
@@ -360,15 +403,15 @@ def role_create():
 def role_delete(rid):
     role = Role.query.filter_by(id=rid, is_deleted=False).first() or abort(404)
     if role.is_system:
-        flash('系统预设角色不可删除', 'danger')
+        flash(_gettext('系统预设角色不可删除'), 'danger')
         return redirect(url_for('admin.role_index'))
     # 检查是否有用户绑定该角色
     bound_count = UserRole.query.filter_by(role_id=role.id).count()
     if bound_count:
-        flash(f'该角色有 {bound_count} 个用户绑定，请先移除后再删除', 'warning')
+        flash(_gettext('该角色有 {0} 个用户绑定，请先移除后再删除').format(bound_count), 'warning')
         return redirect(url_for('admin.role_index'))
     role.is_deleted = True
     db.session.commit()
-    flash('角色已删除', 'success')
+    flash(_gettext('角色已删除'), 'success')
     audit_log(OP_DELETE, MODULE_ROLE, role.id, role.name, {})
     return redirect(url_for('admin.role_index'))

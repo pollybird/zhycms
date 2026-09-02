@@ -19,9 +19,7 @@ from .frontend import banner_items
 
 class BannerPlugin(PluginBase):
     slug = 'banner'
-    name = '轮播图'
     version = '1.0.0'
-    description = '首页幻灯片/广告位分组管理，模板 banner_items() 一行调用，替代碎片拼轮播'
     author = 'ZhyCMS 官方'
 
     # ---- 声明式注册 ----
@@ -30,13 +28,24 @@ class BannerPlugin(PluginBase):
         'content_auditor': ['banner:manage'],
         'content_editor': ['banner:manage'],
     }
-    audit_modules = [('banner', '轮播图')]
 
     # ---- 代码钩子 ----
 
+    @property
+    def name(self):
+        return self._('轮播图')
+
+    @property
+    def description(self):
+        return self._('首页幻灯片/广告位分组管理，模板 banner_items() 一行调用，替代碎片拼轮播')
+
+    @property
+    def audit_modules(self):
+        return [('banner', self._('轮播图'))]
+
     def get_admin_menu(self):
         return [{
-            'label': '轮播管理',
+            'label': self._('轮播管理'),
             'endpoint': 'admin.banner_group_index',
             'icon': 'fa-images',
             'permission': 'banner:manage',

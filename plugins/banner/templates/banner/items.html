@@ -1,20 +1,20 @@
 {% extends 'admin/base.html' %}
-{% block title %}图片管理 · {{ group.name }} - {{ cms_name }}{% endblock %}
-{% block page_header %}图片管理 · {{ group.name }}{% endblock %}
+{% block title %}{{ _p('banner', '图片管理') }} · {{ group.name }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('banner', '图片管理') }} · {{ group.name }}{% endblock %}
 {% set active_menu = 'banner' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item"><a href="{{ url_for('admin.banner_group_index') }}">轮播图</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.banner_group_index') }}">{{ _p('banner', '轮播图') }}</a></li>
 <li class="breadcrumb-item active">{{ group.name }}</li>
 {% endblock %}
 
 {% block content %}
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">图片列表（共 {{ items|length }} 张）</h3>
+    <h3 class="card-title">{{ _p('banner', '图片列表') }}（共 {{ items|length }} {{ _p('banner', '张') }}）</h3>
     <div class="card-tools">
-      <a href="{{ url_for('admin.banner_item_create', gid=group.id) }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> 新增图片</a>
-      <a href="{{ url_for('admin.banner_group_index') }}" class="btn btn-default btn-sm">返回分组</a>
+      <a href="{{ url_for('admin.banner_item_create', gid=group.id) }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> {{ _p('banner', '新增图片') }}</a>
+      <a href="{{ url_for('admin.banner_group_index') }}" class="btn btn-default btn-sm">{{ _p('banner', '返回分组') }}</a>
     </div>
   </div>
   <div class="card-body p-0">
@@ -24,13 +24,13 @@
         <thead>
           <tr>
             <th width="40"><input type="checkbox" id="check-all"></th>
-            <th width="90">缩略图</th>
-            <th>标题（alt）</th>
-            <th>链接</th>
-            <th width="70">排序</th>
-            <th width="160">定时上下线</th>
-            <th width="80">状态</th>
-            <th width="230">操作</th>
+            <th width="90">{{ _p('banner', '缩略图') }}</th>
+            <th>{{ _p('banner', '标题（alt）') }}</th>
+            <th>{{ _p('banner', '链接') }}</th>
+            <th width="70">{{ _p('banner', '排序') }}</th>
+            <th width="160">{{ _p('banner', '定时上下线') }}</th>
+            <th width="80">{{ _p('banner', '状态') }}</th>
+            <th width="230">{{ _p('banner', '操作') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -40,34 +40,34 @@
             <td><img src="{{ b.image_url() }}" alt="{{ b.title }}" style="max-height:48px;max-width:120px;"></td>
             <td>{{ b.title or '—' }}</td>
             <td class="text-muted">
-              {% if b.link_url %}<a href="{{ b.link_url }}" target="_blank">{{ b.link_url|truncate_text(40) }}</a>{% else %}纯展示{% endif %}
+              {% if b.link_url %}<a href="{{ b.link_url }}" target="_blank">{{ b.link_url|truncate_text(40) }}</a>{% else %}{{ _p('banner', '纯展示') }}{% endif %}
             </td>
             <td>{{ b.sort_order }}</td>
             <td class="text-muted" style="font-size:12px;">
-              {% if b.start_at %}起 {{ b.start_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
-              {% if b.end_at %}{% if b.start_at %}<br>{% endif %}止 {{ b.end_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
-              {% if not b.start_at and not b.end_at %}长期有效{% endif %}
+              {% if b.start_at %}{{ _p('banner', '起') }} {{ b.start_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+              {% if b.end_at %}{% if b.start_at %}<br>{% endif %}{{ _p('banner', '止') }} {{ b.end_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}
+              {% if not b.start_at and not b.end_at %}{{ _p('banner', '长期有效') }}{% endif %}
             </td>
             <td>
-              {% if b.is_enabled %}<span class="badge badge-success">启用</span>
-              {% else %}<span class="badge badge-secondary">停用</span>{% endif %}
+              {% if b.is_enabled %}<span class="badge badge-success">{{ _p('banner', '启用') }}</span>
+              {% else %}<span class="badge badge-secondary">{{ _p('banner', '停用') }}</span>{% endif %}
             </td>
             <td>
-              <a href="{{ url_for('admin.banner_item_edit', gid=group.id, bid=b.id) }}" class="btn btn-default btn-sm"><i class="fas fa-edit"></i> 编辑</a>
+              <a href="{{ url_for('admin.banner_item_edit', gid=group.id, bid=b.id) }}" class="btn btn-default btn-sm"><i class="fas fa-edit"></i> {{ _p('banner', '编辑') }}</a>
               <form method="post" action="{{ url_for('admin.banner_item_toggle', gid=group.id, bid=b.id) }}" class="d-inline">
                 <button class="btn btn-{{ 'warning' if b.is_enabled else 'success' }} btn-sm">
-                  <i class="fas fa-toggle-{{ 'on' if b.is_enabled else 'off' }}"></i> {{ '停用' if b.is_enabled else '启用' }}
+                  <i class="fas fa-toggle-{{ 'on' if b.is_enabled else 'off' }}"></i> {{ _p('banner', '停用') if b.is_enabled else _p('banner', '启用') }}
                 </button>
               </form>
               <form method="post" action="{{ url_for('admin.banner_item_delete', gid=group.id, bid=b.id) }}" class="d-inline"
-                    onsubmit="return confirm('确认删除该图片？')">
-                <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> 删除</button>
+                    onsubmit="return confirm('{{ _p('banner', '确认删除该图片？') }}')">
+                <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> {{ _p('banner', '删除') }}</button>
               </form>
             </td>
           </tr>
           {% else %}
           <tr><td colspan="8" class="text-center text-muted py-4">
-            暂无图片，点击右上角「新增图片」上传第一张轮播图
+            {{ _p('banner', '暂无图片，点击右上角「新增图片」上传第一张轮播图') }}
           </td></tr>
           {% endfor %}
         </tbody>
@@ -77,9 +77,9 @@
   {% if items %}
   <div class="card-footer">
     <div class="btn-group btn-group-sm">
-      <button type="button" class="btn btn-success" onclick="batch('enable')"><i class="fas fa-check"></i> 批量启用</button>
-      <button type="button" class="btn btn-warning" onclick="batch('disable')"><i class="fas fa-pause"></i> 批量停用</button>
-      <button type="button" class="btn btn-danger" onclick="batch('delete')"><i class="fas fa-trash"></i> 批量删除</button>
+      <button type="button" class="btn btn-success" onclick="batch('enable')"><i class="fas fa-check"></i> {{ _p('banner', '批量启用') }}</button>
+      <button type="button" class="btn btn-warning" onclick="batch('disable')"><i class="fas fa-pause"></i> {{ _p('banner', '批量停用') }}</button>
+      <button type="button" class="btn btn-danger" onclick="batch('delete')"><i class="fas fa-trash"></i> {{ _p('banner', '批量删除') }}</button>
     </div>
   </div>
   {% endif %}
@@ -92,8 +92,8 @@ $('#check-all').on('change', function(){
   $('.row-check').prop('checked', this.checked);
 });
 function batch(action){
-  if (action === 'delete' && !confirm('确认批量删除选中图片？')) return;
-  if (!$('.row-check:checked').length) { alert('请先勾选图片'); return; }
+  if (action === 'delete' && !confirm('{{ _p('banner', '确认批量删除选中图片？') }}')) return;
+  if (!$('.row-check:checked').length) { alert('{{ _p('banner', '请先勾选图片') }}'); return; }
   $('#batch-action').val(action);
   $('#batch-form').submit();
 }

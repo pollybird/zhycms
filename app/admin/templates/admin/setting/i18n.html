@@ -1,0 +1,79 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('国际化') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('国际化') }}{% endblock %}
+{% set active_menu = 'setting_i18n' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">{{ _('系统设置') }}</li>
+<li class="breadcrumb-item active">{{ _('国际化') }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <div class="card card-outline card-primary">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-toggle-on"></i> {{ _('总开关') }}</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <div class="icheck-primary">
+          <input type="checkbox" name="i18n_enable" value="on" id="ie" {{ 'checked' if settings.i18n_enable == '1' }}>
+          <label for="ie">{{ _('启用国际化（关闭则全站按默认中文渲染，不加载翻译）') }}</label>
+        </div>
+        <div class="alert alert-info mb-0">
+          <small>{{ _('启用后，前台/后台将出现语种切换器，并按各语种翻译文件渲染界面文案。数据库内容（栏目名、文章标题等动态数据）不参与国际化，仅界面文案翻译。') }}</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card card-outline card-info">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-language"></i> {{ _('默认语种') }}</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>{{ _('未明确选择语种时使用的默认语种') }}</label>
+            <select name="i18n_default_locale" class="form-control">
+              {% for code, label in locale_options %}
+              <option value="{{ code }}" {{ 'selected' if settings.i18n_default_locale == code }}>{{ _(label) }}（{{ code }}）</option>
+              {% endfor %}
+            </select>
+            <small class="form-text text-muted">{{ _('Accept-Language 无法匹配时，亦回落至此默认值。') }}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-outline card-success">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-list"></i> {{ _('可用语种') }}</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>{{ _('勾选站点对外提供的语种（切换器仅显示此处勾选项）') }}</label>
+            {% for code, label in locale_options %}
+            <div class="icheck-primary">
+              <input type="checkbox" name="i18n_available_locales" value="{{ code }}" id="al_{{ code }}" {{ 'checked' if code in available }}>
+              <label for="al_{{ code }}">{{ _(label) }}（{{ code }}）</label>
+            </div>
+            {% endfor %}
+            <small class="form-text text-muted">{{ _('至少保留一个语种；新增语种需先执行 pybabel init/compile 生成翻译。') }}</small>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存国际化配置') }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="callout callout-info">
+  <p class="mb-1"><i class="fas fa-info-circle"></i> <b>{{ _('翻译文件维护流程') }}</b></p>
+  <pre class="mb-0" style="background:transparent;font-size:13px;"># {{ _('提取待翻译字符串') }}
+pybabel extract -F babel.cfg -o app/translations/messages.pot app/
+# {{ _('新增语种（首次）') }}
+pybabel init -i app/translations/messages.pot -d app/translations -l en
+# {{ _('翻译变更后更新') }}
+pybabel update -i app/translations/messages.pot -d app/translations
+# {{ _('部署前编译（生成 .mo）') }}
+pybabel compile -d app/translations</pre>
+</div>
+{% endblock %}

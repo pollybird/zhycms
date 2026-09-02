@@ -1,0 +1,181 @@
+# English translations for ZhyCMS plugin.
+# Copyright (C) 2026 ZhyCMS
+# This file is distributed under the same license as the ZhyCMS project.
+#
+msgid ""
+msgstr ""
+msgid "编辑友情链接"
+msgstr "编辑友情链接"
+
+msgid "新增友情链接"
+msgstr "新增友情链接"
+
+msgid "友情链接"
+msgstr "Friend Links"
+msgid "编辑"
+msgstr "Edit"
+msgid "新增"
+msgstr "Add New"
+msgid "链接名称"
+msgstr "Link Name"
+msgid "链接 URL"
+msgstr "链接 URL"
+
+msgid "LOGO 图片"
+msgstr "LOGO 图片"
+
+msgid "删除 LOGO"
+msgstr "删除 LOGO"
+
+msgid "备注"
+msgstr "备注"
+
+msgid "排序优先级"
+msgstr "排序优先级"
+
+msgid "打开方式"
+msgstr "打开方式"
+
+msgid "新窗口"
+msgstr "新窗口"
+
+msgid "当前窗口"
+msgstr "当前窗口"
+
+msgid "启用"
+msgstr "Enabled"
+msgid "保存"
+msgstr "Save"
+msgid "返回"
+msgstr "返回"
+
+msgid "友情链接列表"
+msgstr "友情链接列表"
+
+msgid "新增链接"
+msgstr "Add Link"
+msgid "名称"
+msgstr "Name"
+msgid "排序"
+msgstr "Order"
+msgid "状态"
+msgstr "Status"
+msgid "操作"
+msgstr "Actions"
+msgid "禁用"
+msgstr "禁用"
+
+msgid "确认删除？"
+msgstr "确认删除？"
+
+msgid "暂无友情链接"
+msgstr "暂无友情链接"
+
+msgid "批量启用"
+msgstr "批量启用"
+
+msgid "批量禁用"
+msgstr "批量禁用"
+
+msgid "批量删除"
+msgstr "批量删除"
+
+msgid "请先选择"
+msgstr "请先选择"
+
+msgid "确认批量删除？"
+msgstr "确认批量删除？"
+
+#~ msgid "LOGO å¾ç"
+#~ msgstr "Logo image"
+
+#~ msgid "ä¿å­"
+#~ msgstr "Save"
+
+#~ msgid "å é¤ LOGO"
+#~ msgstr "Remove logo"
+
+#~ msgid "åæé¾æ¥"
+#~ msgstr ""
+
+#~ msgid "åæé¾æ¥åè¡¨"
+#~ msgstr ""
+
+#~ msgid "åç§°"
+#~ msgstr "Name"
+
+#~ msgid "å¯ç¨"
+#~ msgstr "Enable"
+
+#~ msgid "å¤æ³¨"
+#~ msgstr "Remarks"
+
+#~ msgid "å½åçªå£"
+#~ msgstr "Same tab"
+
+#~ msgid "æå¼æ¹å¼"
+#~ msgstr "Target"
+
+#~ msgid "æ¹éå é¤"
+#~ msgstr "Bulk delete"
+
+#~ msgid "æ¹éå¯ç¨"
+#~ msgstr "Bulk enable"
+
+#~ msgid "æ¹éç¦ç¨"
+#~ msgstr "Bulk disable"
+
+#~ msgid "æåº"
+#~ msgstr "Sort"
+
+#~ msgid "æåºä¼çº§"
+#~ msgstr ""
+
+#~ msgid "æä½"
+#~ msgstr "Actions"
+
+#~ msgid "æ°å¢"
+#~ msgstr "New"
+
+#~ msgid "æ°å¢åæé¾æ¥"
+#~ msgstr ""
+
+#~ msgid "æ°å¢é¾æ¥"
+#~ msgstr "New link"
+
+#~ msgid "æ°çªå£"
+#~ msgstr "New tab"
+
+#~ msgid "ææ åæé¾æ¥"
+#~ msgstr ""
+
+#~ msgid "ç¶æ"
+#~ msgstr "Status"
+
+#~ msgid "ç¡®è®¤å é¤ï¼"
+#~ msgstr "Confirm delete?"
+
+#~ msgid "ç¡®è®¤æ¹éå é¤ï¼"
+#~ msgstr "Confirm bulk delete?"
+
+#~ msgid "ç¦ç¨"
+#~ msgstr "Disable"
+
+#~ msgid "ç¼è¾"
+#~ msgstr "Edit"
+
+#~ msgid "ç¼è¾åæé¾æ¥"
+#~ msgstr ""
+
+#~ msgid "è¯·éæ©"
+#~ msgstr ""
+
+#~ msgid "è¿å"
+#~ msgstr "Back"
+
+#~ msgid "é¾æ¥ URL"
+#~ msgstr "Link URL"
+
+#~ msgid "é¾æ¥åç§°"
+#~ msgstr "Link name"
+

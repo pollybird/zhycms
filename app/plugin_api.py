@@ -1,4 +1,4 @@
-"""插件开发接口（v2.2.0 插件机制）。
+"""插件开发接口（v2.2.0 插件机制 / v2.3.0 新增国际化钩子）。
 
 插件目录约定：项目根 plugins/<slug>/，内含 manifest.json（纯元数据）与
 __init__.py（定义 PluginBase 子类并实例化为模块级变量 `plugin`）。
@@ -13,9 +13,16 @@ __init__.py（定义 PluginBase 子类并实例化为模块级变量 `plugin`）
   - get_admin_menu()             声明后台侧边栏菜单（启用且有权限才显示）
   - get_sitemap_urls()           向 sitemap.xml 贡献 URL
   - generate_demo_data()         演示数据生成钩子（仅启用时调用）
+  - get_i18n_dir()               v2.3：返回插件自有翻译目录（默认 translations/），
+                                 存在时自动作为独立 domain 加载；模板中
+                                 `{{ _p('<slug>', '原文')|safe }}` 或 Python 代码
+                                 `plugin._('原文')` 走插件域翻译。
 
 启用/禁用即时生效（运行时 Setting 门控），无需重启。
 """
+
+import os
+import importlib
 
 
 class PluginBase:
@@ -37,6 +44,37 @@ class PluginBase:
     audit_modules = []
 
     # ---- 代码钩子 ----
+
+    # ---- 国际化（v2.3） ----
+
+    def get_i18n_dir(self):
+        """返回插件自有翻译目录（绝对或相对插件包目录）。
+
+        默认返回插件包下的 translations/。若该目录存在且包含
+        ``<locale>/LC_MESSAGES/messages.(po|mo)``，核心会自动把
+        ``messages`` 作为 Babel 补充域挂到当前 locale 下，使：
+          - Jinja: ``{{ _p('<slug>', '原文') }}``
+          - Python: ``self._('原文')`` / ``self.ngettext(sing, plur, n)``
+        三者生效。翻译不命中时 fallback 到原文（中文）。
+        """
+        try:
+            mod = importlib.import_module(type(self).__module__)
+            base = os.path.dirname(os.path.abspath(mod.__file__))
+        except Exception:
+            base = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base, 'translations')
+
+    def _(self, message):
+        """便捷翻译函数：等价于 ``plugin_gettext(self.slug, message)``。"""
+        from .i18n import plugin_gettext
+        return plugin_gettext(self.slug, message)
+
+    def ngettext(self, singular, plural, n):
+        """便捷复数翻译函数：等价于 ``plugin_ngettext(self.slug, s, p, n)``。"""
+        from .i18n import plugin_ngettext
+        return plugin_ngettext(self.slug, singular, plural, n)
+
+    # ---- 路由与模板注册 ----
 
     def get_admin_routes(self, admin_bp):
         """在核心后台蓝本上注册路由（@admin_bp.route）。

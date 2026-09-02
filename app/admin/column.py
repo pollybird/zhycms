@@ -6,6 +6,7 @@ from flask import (
     flash, jsonify, abort
 )
 
+from flask_babel import gettext as _gettext
 from ..extensions import db
 from ..models.column import Column, ColumnField, ColumnFieldValue
 from ..utils.helpers import permission_required, audit_log, clear_content_cache
@@ -159,31 +160,31 @@ def _save_column(column):
     col_type = request.form.get('type') or 'page'
 
     if not name:
-        flash('栏目名称必填', 'danger')
+        flash(_gettext('栏目名称必填'), 'danger')
         return None
     if not slug:
-        flash('栏目标识必填', 'danger')
+        flash(_gettext('栏目标识必填'), 'danger')
         return None
 
     # 唯一性校验
     existing = Column.query.filter_by(slug=slug, is_deleted=False).first()
     if existing and (column is None or existing.id != column.id):
-        flash('栏目标识已存在，请更换', 'danger')
+        flash(_gettext('栏目标识已存在，请更换'), 'danger')
         return None
 
     if parent_id:
         try:
             parent_id = int(parent_id)
         except (TypeError, ValueError):
-            flash('父栏目无效', 'danger')
+            flash(_gettext('父栏目无效'), 'danger')
             return None
 
         if column is not None and parent_id == column.id:
-            flash('不能将自身设为父栏目', 'danger')
+            flash(_gettext('不能将自身设为父栏目'), 'danger')
             return None
 
         if column is not None and parent_id in column.get_descendant_ids():
-            flash('不能将下级栏目设为父栏目（防止循环引用）', 'danger')
+            flash(_gettext('不能将下级栏目设为父栏目（防止循环引用）'), 'danger')
             return None
     else:
         parent_id = None
@@ -238,7 +239,7 @@ def _save_column(column):
             return None
 
     db.session.commit()
-    flash('栏目保存成功', 'success')
+    flash(_gettext('栏目保存成功'), 'success')
     clear_content_cache(column_id=column.id)
     audit_log(OP_CREATE if is_new else OP_UPDATE, MODULE_COLUMN, column.id, column.name,
               {'slug': column.slug, 'type': column.type, 'parent_id': column.parent_id})
@@ -271,7 +272,7 @@ def _save_page_field_values(column):
                 rel, url, err = save_upload_file(file_obj, sub_dir='column',
                                                  allowed_exts=allowed, max_size=maxsize)
                 if err:
-                    flash(f'字段 {f.label} 上传失败：{err}', 'danger')
+                    flash(_gettext('字段 {0} 上传失败：{1}').format(f.label, err), 'danger')
                     return None
                 value = url
             elif request.form.get(f'field_{f.id}_remove') == 'on':
@@ -282,7 +283,7 @@ def _save_page_field_values(column):
             value = request.form.get(f'field_{f.id}') or ''
 
         if f.is_required and not value:
-            flash(f'字段 {f.label} 为必填', 'danger')
+            flash(_gettext('字段 {0} 为必填').format(f.label), 'danger')
             return None
 
         if value is not None:
@@ -307,7 +308,7 @@ def _save_fields(column):
     seen_keys = set()
     for f in new_fields:
         if f['field_key'] in seen_keys:
-            flash(f'字段标识 {f["field_key"]} 重复，已忽略', 'warning')
+            flash(_gettext('字段标识 {0} 重复，已忽略').format(f["field_key"]), 'warning')
             continue
         seen_keys.add(f['field_key'])
 
@@ -333,13 +334,13 @@ def _save_fields(column):
 def column_delete(cid):
     col = Column.query.get_or_404(cid)
     if col.is_parent:
-        flash('该栏目存在子栏目，请先删除子栏目后再操作', 'danger')
+        flash(_gettext('该栏目存在子栏目，请先删除子栏目后再操作'), 'danger')
         return redirect(url_for('admin.column_index'))
 
     col.is_deleted = True
     db.session.commit()
     clear_content_cache(column_id=cid)
-    flash('栏目已删除', 'success')
+    flash(_gettext('栏目已删除'), 'success')
     audit_log(OP_DELETE, MODULE_COLUMN, col.id, col.name, {})
     return redirect(url_for('admin.column_index'))
 
@@ -351,7 +352,7 @@ def column_toggle(cid):
     col.is_enabled = not col.is_enabled
     db.session.commit()
     clear_content_cache(column_id=cid)
-    flash('已更新栏目状态', 'success')
+    flash(_gettext('已更新栏目状态'), 'success')
     audit_log(OP_UPDATE, MODULE_COLUMN, col.id, col.name,
               {'action': 'toggle', 'is_enabled': col.is_enabled})
     return redirect(url_for('admin.column_index'))
@@ -364,23 +365,23 @@ def column_batch():
     ids = request.form.getlist('ids[]')
     ids = [int(i) for i in ids if i.isdigit()]
     if not ids:
-        flash('未选择任何栏目', 'warning')
+        flash(_gettext('未选择任何栏目'), 'warning')
         return redirect(url_for('admin.column_index'))
 
     cols = Column.query.filter(Column.id.in_(ids)).all()
     if action == 'enable':
         for c in cols:
             c.is_enabled = True
-        flash(f'已启用 {len(cols)} 个栏目', 'success')
+        flash(_gettext('已启用 {0} 个栏目').format(len(cols)), 'success')
     elif action == 'disable':
         for c in cols:
             c.is_enabled = False
-        flash(f'已禁用 {len(cols)} 个栏目', 'success')
+        flash(_gettext('已禁用 {0} 个栏目').format(len(cols)), 'success')
     elif action == 'delete':
         for c in cols:
             if not c.is_parent:
                 c.is_deleted = True
-        flash('已删除可删除的栏目（含子栏目的父栏目已跳过）', 'success')
+        flash(_gettext('已删除可删除的栏目（含子栏目的父栏目已跳过）'), 'success')
     db.session.commit()
     for c in cols:
         clear_content_cache(column_id=c.id)

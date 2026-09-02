@@ -6,7 +6,8 @@ from flask import Flask, redirect, url_for, request, g
 from flask_login import current_user
 
 from .config import config
-from .extensions import db, login_manager, cache, set_scheduler
+from .extensions import db, login_manager, cache, set_scheduler, babel
+from .i18n import select_locale, available_locales, current_locale, _p
 
 
 # ============================================================
@@ -320,6 +321,10 @@ def create_app(config_name=None):
         'CACHE_DIR': app.config.get('CACHE_DIR'),
     })
 
+    # v2.3.0 国际化：初始化 Babel 并注册 locale 选择器
+    # （须在 db 之后：selector 内读 Setting；在蓝图注册之前）
+    babel.init_app(app, locale_selector=select_locale)
+
     # 注册用户加载器
     from .models.user import User
 
@@ -332,7 +337,8 @@ def create_app(config_name=None):
 
     # 登录视图名：需要兼容自定义前缀，login_manager.login_view 使用 endpoint，故保持默认即可
     login_manager.login_view = 'admin_auth.login'
-    login_manager.login_message = '请先登录后再访问该页面'
+    from flask_babel import lazy_gettext
+    login_manager.login_message = lazy_gettext('请先登录后再访问该页面')
     login_manager.login_message_category = 'warning'
 
     # 注入全局模板变量
@@ -407,6 +413,11 @@ def create_app(config_name=None):
     from .frontend.views import frontend_pager_url
     app.jinja_env.globals['frontend_pager_url'] = frontend_pager_url
 
+    # v2.3.0 国际化：注入切换器渲染函数与插件翻译 _p（_ 由 Flask-Babel 自动注入）
+    app.jinja_env.globals['available_locales'] = available_locales
+    app.jinja_env.globals['current_locale'] = current_locale
+    app.jinja_env.globals['_p'] = _p
+
     # 初始化数据库表结构
     with app.app_context():
         from . import models  # noqa: F401  保证模型被导入
@@ -439,6 +450,22 @@ def create_app(config_name=None):
                     and not Setting.get('friend_link_plugin_migrated')):
                 enable_plugin('friend_link')
                 Setting.set('friend_link_plugin_migrated', '1')
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        # ===== v2.3 升级兼容：老站点一次性自动启用内置表单插件 =====
+        # 新装站点在初始化向导中写入 form_plugin_migrated 标记，避免误触发；
+        # 仅已初始化站点（v2.2 及以前升级，缺本标记）才自动启用一次。
+        # 表名/审计模块代码/后台路由路径/权限点与核心版完全一致，
+        # 老站表单数据、提交记录与历史审计日志无缝保留。
+        try:
+            from .models.setting import Setting
+            from .plugin_system import enable_plugin
+            if (User.query.filter_by(is_deleted=False).first() is not None
+                    and not Setting.get('form_plugin_migrated')):
+                enable_plugin('form')
+                Setting.set('form_plugin_migrated', '1')
                 db.session.commit()
         except Exception:
             db.session.rollback()

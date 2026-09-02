@@ -1,0 +1,9 @@
+{
+  "slug": "manufacturing_en",
+  "name": "Manufacturing (EN)",
+  "version": "2.3.0",
+  "description": "Official built-in: Manufacturing theme in English. Homepage with hero banner + product showcase layout. Ideal for factories, machinery, and manufacturing businesses. Product cards auto-display when product plugin is enabled.",
+  "author": "ZhyCMS Official",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

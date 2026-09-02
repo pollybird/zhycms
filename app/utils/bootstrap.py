@@ -14,7 +14,7 @@ from ..models.setting import Setting
 from ..models.column import Column, ColumnField, ColumnFieldValue
 from ..models.article import Article, ArticleFieldValue
 from ..models.fragment import Fragment, FragmentGroup
-from ..models.form import Form, FormField, FormSubmission, FormSubmissionValue
+# 自定义表单 v2.3.0 起转为内置插件 plugins/form，演示数据由插件 demo.py 钩子生成
 
 
 # 演示图片根路径（/static/uploads/demo/ 下的文件）
@@ -26,9 +26,10 @@ def init_default_settings():
     for key, value in Setting.DEFAULTS.items():
         if not Setting.query.filter_by(key=key).first():
             db.session.add(Setting(key=key, value=str(value), description=key))
-    # 标记为新装站点：v2.2 升级兼容逻辑（create_app 中老站自动启用
-    # 友情链接插件）仅对没有本标记的已初始化站点生效
+    # 标记为新装站点：v2.2/v2.3 升级兼容逻辑（create_app 中老站自动启用
+    # 友情链接/自定义表单插件）仅对没有本标记的已初始化站点生效
     Setting.set('friend_link_plugin_migrated', '1')
+    Setting.set('form_plugin_migrated', '1')
     db.session.commit()
 
 
@@ -75,24 +76,23 @@ def generate_demo_data(industry='manufacturing'):
     """生成演示数据。
 
     industry: 'manufacturing' 制造业 / 'service' 服务业
+              'manufacturing_en' 英文制造业
     """
     _clean_demo_data()
     if industry == 'service':
         _generate_service_demo()
+    elif industry == 'manufacturing_en':
+        _generate_manufacturing_demo_en()
     else:
         _generate_manufacturing_demo()
 
 
 def _clean_demo_data():
-    """清理旧的演示数据（栏目/文章/碎片/表单），保留用户与站点设置。
+    """清理旧的演示数据（栏目/文章/碎片），保留用户与站点设置。
 
-    友情链接改由 friend_link 插件演示数据钩子负责清理与重建。
+    友情链接/自定义表单改由对应插件演示数据钩子负责清理与重建。
     """
     # 按外键依赖顺序删除
-    FormSubmissionValue.query.delete()
-    FormSubmission.query.delete()
-    FormField.query.delete()
-    Form.query.delete()
     ArticleFieldValue.query.delete()
     Article.query.delete()
     ColumnFieldValue.query.delete()
@@ -228,9 +228,6 @@ def _generate_manufacturing_demo():
 
     # ============ 碎片 ============
     _mfg_init_fragments(company, brand)
-
-    # ============ 表单 ============
-    _init_forms()
 
     db.session.commit()
 
@@ -411,6 +408,306 @@ def _mfg_init_fragments(company, brand):
 
 
 # ============================================================
+# 英文制造业演示数据：虚构企业「Ruijing Precision Works Co., Ltd.」
+# ============================================================
+
+def _generate_manufacturing_demo_en():
+    """English manufacturing demo data: precision machinery company."""
+    now = datetime.now()
+
+    company = 'Ruijing Precision Works Co., Ltd.'
+    brand = 'Ruijing Precision'
+
+    Setting.set('site_name', company)
+    Setting.set('site_subtitle', 'Dedicated to Precision Manufacturing for Over 20 Years')
+    Setting.set('footer_copyright', f'Copyright © {company}')
+    Setting.set('site_theme', 'manufacturing_en')
+    Setting.set('seo_title', f'{brand} - Precision Manufacturing Expert')
+    Setting.set('seo_keywords', 'precision machining,CNC parts,automation equipment,smart manufacturing')
+    Setting.set('seo_description', f'{brand} specializes in R&D and manufacturing of precision mechanical components, providing automation equipment and one-stop solutions.')
+
+    # ============ Column structure ============
+    about = Column(name='About Us', slug='about', type='page', sort_order=100,
+                   is_enabled=True, parent_mode='first_child',
+                   summary=f'Learn about {brand}\'s history and philosophy',
+                   page_content=_mfg_en_about_content())
+    db.session.add(about)
+
+    news = Column(name='News', slug='news', type='list', sort_order=90,
+                  is_enabled=True, parent_mode='first_child',
+                  summary='Company news and industry updates', page_size=10)
+    db.session.add(news)
+
+    company_news = Column(name='Company News', slug='company-news', type='list',
+                          parent_id=None, sort_order=95, is_enabled=True,
+                          parent_mode='first_child', page_size=10,
+                          summary='Internal company news')
+    industry_news = Column(name='Industry News', slug='industry-news', type='list',
+                           parent_id=None, sort_order=90, is_enabled=True,
+                           parent_mode='first_child', page_size=10,
+                           summary='Industry trends and insights')
+    db.session.add_all([company_news, industry_news])
+    db.session.flush()
+    company_news.parent_id = news.id
+    industry_news.parent_id = news.id
+
+    products = Column(name='Products', slug='products', type='list', sort_order=80,
+                      is_enabled=True, parent_mode='list_children',
+                      summary='Our products and solutions', page_size=12)
+    db.session.add(products)
+
+    precision_parts = Column(name='Precision Parts', slug='precision-parts', type='list',
+                             sort_order=95, is_enabled=True,
+                             parent_mode='first_child', page_size=12,
+                             summary='High-precision mechanical components')
+    automation = Column(name='Automation Equipment', slug='automation', type='list',
+                        sort_order=90, is_enabled=True,
+                        parent_mode='first_child', page_size=12,
+                        summary='Industrial automation equipment and production lines')
+    db.session.add_all([precision_parts, automation])
+    db.session.flush()
+    precision_parts.parent_id = products.id
+    automation.parent_id = products.id
+
+    service = Column(name='Service & Support', slug='service', type='page', sort_order=70,
+                     is_enabled=True, parent_mode='first_child',
+                     summary='Professional technical service and after-sales support',
+                     page_content=_mfg_en_service_content())
+    db.session.add(service)
+
+    contact = Column(name='Contact Us', slug='contact', type='page', sort_order=60,
+                     is_enabled=True, parent_mode='first_child',
+                     summary='Contact information and address',
+                     page_content=_mfg_en_contact_content())
+    db.session.add(contact)
+
+    db.session.flush()
+
+    # ============ Company News ============
+    _add_article(company_news, f'{brand} Passes ISO 9001 Quality Management Certification',
+                 f'Recently, {company} officially passed the ISO 9001:2015 quality management certification.',
+                 _mfg_en_news_content_1(), now - timedelta(days=2), sort_order=100,
+                 cover=f'{_DEMO_IMG}/mfg_news1.jpg')
+    _add_article(company_news, 'New Five-Axis Machining Center Installed, Capacity Up 40%',
+                 'To meet growing customer demand, the company has added two five-axis machining centers.',
+                 _mfg_en_news_content_2(), now - timedelta(days=5), sort_order=90,
+                 cover=f'{_DEMO_IMG}/mfg_news2.jpg')
+    _add_article(company_news, '2026 Annual Technology Exchange Conference Successfully Held',
+                 'The conference themed "Lean Manufacturing · Smart Future" brought all employees together.',
+                 _mfg_en_news_content_3(), now - timedelta(days=10), sort_order=80,
+                 cover=f'{_DEMO_IMG}/mfg_news3.jpg')
+
+    # ============ Industry News ============
+    _add_article(industry_news, 'MIIT Releases Smart Manufacturing Development Plan (2026-2030)',
+                 'The Ministry of Industry and Information Technology recently released the smart manufacturing development plan.',
+                 _mfg_en_industry_content_1(), now - timedelta(days=3), sort_order=100)
+    _add_article(industry_news, 'How SMEs Can Embrace Smart Manufacturing in the Industry 4.0 Era',
+                 'As Industry 4.0 deepens, more manufacturers are exploring intelligent transformation.',
+                 _mfg_en_industry_content_2(), now - timedelta(days=7), sort_order=90)
+    _add_article(industry_news, 'High-End Equipment Manufacturing Maintains Steady Growth',
+                 'According to a recent market research report, high-end equipment manufacturing maintains steady growth.',
+                 _mfg_en_industry_content_3(), now - timedelta(days=12), sort_order=80)
+
+    # ============ Precision Parts ============
+    _add_article(precision_parts, 'High-Precision Spindle',
+                 'High-precision spindle for CNC machine tools, rotational accuracy ≤0.003mm.',
+                 _mfg_en_product_shaft(), now - timedelta(days=1), sort_order=100,
+                 cover=f'{_DEMO_IMG}/mfg_product_a.jpg')
+    _add_article(precision_parts, 'Precision Gear Assembly',
+                 'Made of premium alloy steel with carburizing and quenching, smooth transmission and low noise.',
+                 _mfg_en_product_gear(), now - timedelta(days=4), sort_order=90,
+                 cover=f'{_DEMO_IMG}/mfg_product_b.jpg')
+
+    # ============ Automation Equipment ============
+    _add_article(automation, 'Automated Assembly Line',
+                 'Custom automated assembly line for electronics and automotive parts industries.',
+                 _mfg_en_product_line(), now - timedelta(days=2), sort_order=100,
+                 cover=f'{_DEMO_IMG}/mfg_factory.jpg')
+    _add_article(automation, 'Industrial Robot Workstation',
+                 'Six-axis industrial robot workstation supporting welding, handling, palletizing and more.',
+                 _mfg_en_product_robot(), now - timedelta(days=6), sort_order=90,
+                 cover=f'{_DEMO_IMG}/mfg_workshop.jpg')
+
+    # ============ Fragments ============
+    _mfg_en_init_fragments(company, brand)
+
+    db.session.commit()
+
+
+# ============ English Manufacturing Content ============
+
+def _mfg_en_about_content():
+    return '''<p>Ruijing Precision Works Co., Ltd. was established in 2003. It is a high-tech enterprise specializing in R&D and manufacturing of precision mechanical components, headquartered in the core manufacturing hub of the Yangtze River Delta.</p>
+<h3>Company Overview</h3>
+<p>Ruijing Precision is dedicated to providing high-quality precision components and automation solutions for equipment manufacturing, automotive, and electronics industries. The company covers 30,000 square meters, with modern climate-controlled workshops and a comprehensive testing center, employing over 300 people including a R&D team of more than 40.</p>
+<h3>Corporate Culture</h3>
+<p>We adhere to the philosophy of "Excellence in Every Detail · Craftsmanship in Manufacturing," taking quality as our lifeline and innovation as our driving force, continuously creating value for our customers.</p>
+<h3>Business Scope</h3>
+<ul>
+  <li>Precision mechanical component machining (CNC turning, milling, five-axis)</li>
+  <li>Industrial automation equipment R&D and integration</li>
+  <li>Custom non-standard equipment design and manufacturing</li>
+  <li>Mechanical assembly and testing services</li>
+  <li>Technical consulting services</li>
+</ul>
+<h3>Vision</h3>
+<p>To become a leading precision manufacturing solution provider, empowering the transformation and upgrading of China's manufacturing industry.</p>'''
+
+
+def _mfg_en_service_content():
+    return '''<h3>Service Commitment</h3>
+<p>We provide 24/7 technical support, promising a 2-hour response during business hours and solutions within 4 hours for urgent issues.</p>
+<h3>Service Scope</h3>
+<ul>
+  <li><strong>Pre-sales Consulting</strong>: Professional selection advice and solution design based on customer needs</li>
+  <li><strong>In-sales Support</strong>: Full tracking of order progress with technical briefings</li>
+  <li><strong>After-sales Maintenance</strong>: Equipment installation, commissioning, operator training, and regular follow-ups</li>
+  <li><strong>Spare Parts Supply</strong>: Long-term supply of original parts to ensure stable equipment operation</li>
+  <li><strong>Technical Upgrades</strong>: Equipment upgrade solutions based on process development</li>
+</ul>
+<h3>Contact</h3>
+<p>Technical Service Hotline: 400-888-8888<br>
+Service Email: service@ruijing-precision.com</p>'''
+
+
+def _mfg_en_contact_content():
+    return '''<h3>Contact Us</h3>
+<p><strong>Company:</strong> Ruijing Precision Works Co., Ltd.</p>
+<p><strong>Address:</strong> No. XX, XX Road, Industrial Park, Suzhou, Jiangsu Province</p>
+<p><strong>Phone:</strong> 0512-88888888</p>
+<p><strong>Fax:</strong> 0512-88888889</p>
+<p><strong>Service Hotline:</strong> 400-888-8888</p>
+<p><strong>Email:</strong> contact@ruijing-precision.com</p>
+<p><strong>Postal Code:</strong> 215000</p>
+<p><strong>Business Hours:</strong> Monday to Friday 8:30-17:30</p>'''
+
+
+def _mfg_en_news_content_1():
+    return f'''<p>Recently, following a rigorous audit by an authoritative certification body, Ruijing Precision Works Co., Ltd. officially passed the ISO 9001:2015 quality management certification, marking a recognized milestone in the company's quality management.</p>
+<p>ISO 9001 is an internationally recognized quality management standard. The certification process rigorously audits the entire process including design, procurement, production, inspection, and sales. This achievement reflects Ruijing Precision's long-standing commitment to quality-first principles.</p>
+<p>The company's leadership stated that this certification will serve as an opportunity to further improve the quality management system and provide customers with better products and services.</p>'''
+
+
+def _mfg_en_news_content_2():
+    return '''<p>To meet growing customer demand, the company has recently added two imported five-axis machining centers, further enhancing its capability for complex component machining.</p>
+<p>The new equipment features high rigidity and precision, enabling multi-face machining in a single setup, significantly improving efficiency and consistency. After commissioning, the precision component production capacity is expected to increase by 40%.</p>
+<p>This is an important step in the company's 2026 capacity expansion plan. The company will continue to invest in advanced equipment based on market demand.</p>'''
+
+
+def _mfg_en_news_content_3():
+    return '''<p>Ruijing Precision's 2026 Annual Technology Exchange Conference was successfully held at the headquarters. The conference themed "Lean Manufacturing · Smart Future" brought all employees together for this event.</p>
+<p>The conference reviewed the achievements of the past year and recognized outstanding teams and individuals. The technical department heads shared cutting-edge trends in precision machining, and multiple project teams presented process improvement case studies.</p>
+<p>In the closing remarks, the company's general manager outlined the development direction for the new year, encouraging all employees to continue focusing on technological innovation to create greater value for customers.</p>'''
+
+
+def _mfg_en_industry_content_1():
+    return '''<p>Recently, the Ministry of Industry and Information Technology officially released the "Smart Manufacturing Development Plan (2026-2030)," proposing the goal of achieving comprehensive digitization, networking, and intelligence in manufacturing by 2030.</p>
+<p>The plan outlines multiple supportive policies, including increasing technological transformation investment, encouraging smart manufacturing equipment R&D, promoting industrial internet applications, and strengthening talent development. The plan specifically emphasizes supporting SMEs in intelligent transformation and encouraging professional service providers to offer comprehensive solutions.</p>
+<p>Industry experts indicate that the release of this plan will bring new development opportunities for the equipment manufacturing industry, especially in high-end equipment and precision manufacturing.</p>'''
+
+
+def _mfg_en_industry_content_2():
+    return '''<p>As Industry 4.0 deepens, more manufacturing companies are exploring intelligent transformation paths. Smart manufacturing has become key to enhancing competitiveness.</p>
+<p>Currently, the main application scenarios of smart manufacturing in SMEs include digital workshops, intelligent production lines, remote equipment monitoring, and quality traceability. Through intelligent transformation, companies can significantly improve production efficiency and reduce operating costs.</p>
+<p>Experts point out that SMEs face challenges such as funding and talent in smart manufacturing transformation, and recommend implementing in phases, starting with projects that have short payback periods.</p>'''
+
+
+def _mfg_en_industry_content_3():
+    return '''<p>According to a recently released market research report, the high-end equipment manufacturing industry maintains steady growth, serving as an important pillar of manufacturing transformation and upgrading.</p>
+<p>The report shows that in 2025, the value-added of high-end equipment manufacturing grew by over 10% year-on-year, with industrial robots, CNC machine tools, and automated production lines performing particularly well. Dual-driven by policy support and market demand, industry prosperity continues to rise.</p>
+<p>For precision component manufacturers, the rapid development of high-end equipment means more supporting opportunities and higher technical requirements.</p>'''
+
+
+def _mfg_en_product_shaft():
+    return '''<h3>Product Overview</h3>
+<p>The high-precision spindle is a core component of CNC machine tools, made of premium alloy steel, precision-ground and dynamically balanced, with rotational accuracy ≤0.003mm.</p>
+<h3>Technical Specifications</h3>
+<ul>
+  <li>Spindle diameter: φ40 - φ200mm (customizable)</li>
+  <li>Rotational accuracy: ≤0.003mm</li>
+  <li>Radial runout: ≤0.005mm</li>
+  <li>Max speed: 8000 rpm</li>
+  <li>Surface roughness: Ra 0.4</li>
+  <li>Dynamic balance grade: G2.5</li>
+</ul>
+<h3>Applications</h3>
+<p>Widely used in CNC lathes, machining centers, grinding machines, and precision measuring equipment.</p>'''
+
+
+def _mfg_en_product_gear():
+    return '''<h3>Product Overview</h3>
+<p>The precision gear assembly is made of premium alloy steel with carburizing and quenching, achieving gear accuracy of GB/T 10095 Grade 5, with smooth transmission, low noise, and long service life.</p>
+<h3>Technical Specifications</h3>
+<ul>
+  <li>Module: 1 - 8 (customizable)</li>
+  <li>Gear accuracy: Grade 5 (GB/T 10095)</li>
+  <li>Material: 20CrMnTi / 42CrMo</li>
+  <li>Heat treatment: Carburizing and quenching HRC58-62</li>
+  <li>Surface treatment: Shot peening, phosphating, etc.</li>
+</ul>
+<h3>Applications</h3>
+<p>Suitable for industrial robots, precision reducers, automated production lines, machine tool transmission systems, etc.</p>'''
+
+
+def _mfg_en_product_line():
+    return '''<h3>Product Overview</h3>
+<p>The automated assembly line is custom-designed for electronics and automotive parts industries, integrating feeding, assembly, inspection, and unloading processes for fully automated production.</p>
+<h3>System Features</h3>
+<ul>
+  <li>Modular design, flexible combination based on process requirements</li>
+  <li>Equipped with vision inspection system to ensure assembly quality</li>
+  <li>Supports multi-variant switching for flexible production</li>
+  <li>Cycle time as low as 3 seconds per unit</li>
+  <li>Integrated MES system for production data traceability</li>
+</ul>
+<h3>Application Cases</h3>
+<p>Successfully applied in automotive sensor assembly, electronic connector assembly, home appliance controller assembly, and more.</p>'''
+
+
+def _mfg_en_product_robot():
+    return '''<h3>Product Overview</h3>
+<p>The six-axis industrial robot workstation supports welding, handling, palletizing, dispensing, and other processes. End effectors and fixtures can be customized based on customer process requirements.</p>
+<h3>Technical Specifications</h3>
+<ul>
+  <li>Payload: 10kg - 200kg options</li>
+  <li>Reach: 1.4m - 3.1m options</li>
+  <li>Repeatability: ±0.05mm</li>
+  <li>Supports offline programming and teach pendant programming</li>
+  <li>Integrated safety protection system</li>
+</ul>
+<h3>Applications</h3>
+<p>Automotive manufacturing, metal processing, electronic assembly, logistics and warehousing, etc.</p>'''
+
+
+def _mfg_en_init_fragments(company, brand):
+    """Initialize fragments (English manufacturing)."""
+    grp_contact = FragmentGroup(name='Contact Info', sort_order=100)
+    grp_home = FragmentGroup(name='Home Content', sort_order=90)
+    db.session.add_all([grp_contact, grp_home])
+    db.session.flush()
+
+    fragments = [
+        Fragment(name='Service Phone', slug='contact_phone', group_id=grp_contact.id,
+                 field_type='text', value='400-888-8888', sort_order=100, is_enabled=True),
+        Fragment(name='Service Email', slug='contact_email', group_id=grp_contact.id,
+                 field_type='text', value='contact@ruijing-precision.com', sort_order=90, is_enabled=True),
+        Fragment(name='Company Address', slug='contact_address', group_id=grp_contact.id,
+                 field_type='textarea',
+                 value='No. XX, XX Road, Industrial Park, Suzhou, Jiangsu Province', sort_order=80, is_enabled=True),
+        Fragment(name='ICP Filing', slug='icp', group_id=grp_contact.id,
+                 field_type='text', value='SuICP No. 2026000000', sort_order=70, is_enabled=True),
+        Fragment(name='WeChat QR Code', slug='wechat_qrcode', group_id=grp_contact.id,
+                 field_type='image', value='', sort_order=60, is_enabled=True),
+
+        Fragment(name='Home Notice', slug='home_notice', group_id=grp_home.id,
+                 field_type='richtext',
+                 value=f'<p>Welcome to {company} official website! Dedicated to precision manufacturing for over 20 years.</p>',
+                 sort_order=100, is_enabled=True),
+    ]
+    db.session.add_all(fragments)
+
+
+# ============================================================
 # 服务业演示数据：虚构企业「云岚咨询管理有限公司」
 # ============================================================
 
@@ -555,9 +852,6 @@ def _generate_service_demo():
 
     # ============ 碎片 ============
     _svc_init_fragments(company, brand)
-
-    # ============ 表单 ============
-    _init_forms()
 
     db.session.commit()
 
@@ -782,35 +1076,3 @@ def _add_article(column, title, summary, content, published_at, sort_order=50, c
         cover=cover,
     )
     db.session.add(article)
-
-
-def _init_forms():
-    """初始化自定义表单。"""
-    # 在线留言表单
-    form = Form(
-        name='在线留言',
-        slug='message',
-        description='欢迎您留下宝贵的意见和建议，我们会尽快与您联系。',
-        success_message='感谢您的留言，我们会尽快与您联系！',
-        submit_interval=60,
-        is_open=True,
-    )
-    db.session.add(form)
-    db.session.flush()
-
-    fields = [
-        FormField(label='姓名', field_key='name', field_type='text',
-                  is_required=True, placeholder='请输入您的姓名',
-                  sort_order=100, form_id=form.id),
-        FormField(label='手机号', field_key='phone', field_type='phone',
-                  is_required=True, placeholder='请输入手机号',
-                  help_text='我们会对您的信息严格保密',
-                  sort_order=90, form_id=form.id),
-        FormField(label='邮箱', field_key='email', field_type='email',
-                  is_required=False, placeholder='请输入邮箱',
-                  sort_order=80, form_id=form.id),
-        FormField(label='留言内容', field_key='content', field_type='textarea',
-                  is_required=True, placeholder='请输入留言内容',
-                  sort_order=70, form_id=form.id),
-    ]
-    db.session.add_all(fields)

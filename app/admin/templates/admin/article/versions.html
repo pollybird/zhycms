@@ -1,12 +1,12 @@
 {% extends 'admin/base.html' %}
-{% block title %}历史版本 - {{ cms_name }}{% endblock %}
-{% block page_header %}历史版本 · {{ article.title or '（无标题）' }}{% endblock %}
+{% block title %}{{ _('历史版本') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('历史版本 · %(title)s', title=article.title or _('（无标题）')) }}{% endblock %}
 {% set active_menu = 'column' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">内容管理</li>
-<li class="breadcrumb-item"><a href="{{ url_for('admin.article_index', cid=article.column_id) }}">文章列表</a></li>
-<li class="breadcrumb-item active">历史版本</li>
+<li class="breadcrumb-item">{{ _('内容管理') }}</li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.article_index', cid=article.column_id) }}">{{ _('文章列表') }}</a></li>
+<li class="breadcrumb-item active">{{ _('历史版本') }}</li>
 {% endblock %}
 
 {% block content %}
@@ -14,23 +14,23 @@
   <div class="card-body">
     <div class="row">
       <div class="col-md-8">
-        <h5>{{ article.title or '（无标题）' }}</h5>
+        <h5>{{ article.title or _('（无标题）') }}</h5>
         <div class="mb-1">
           <span class="badge badge-info mr-1">{{ article.column.name if article.column else '-' }}</span>
           <span class="badge badge-{{ 'success' if article.status=='published' else 'warning' if article.status=='review' else 'secondary' if article.status=='archived' else 'dark' }} mr-1">
             {{ article.status|status_label }}
           </span>
-          {% if article.reject_reason %}<span class="badge badge-danger">驳回</span>{% endif %}
+          {% if article.reject_reason %}<span class="badge badge-danger">{{ _('驳回') }}</span>{% endif %}
         </div>
         {% if article.reject_reason %}
         <div class="alert alert-danger mb-0">
-          <strong>驳回原因：</strong>{{ article.reject_reason }}
+          <strong>{{ _('驳回原因：') }}</strong>{{ article.reject_reason }}
         </div>
         {% endif %}
       </div>
       <div class="col-md-4 text-right">
         <a href="{{ url_for('admin.article_edit', cid=article.column_id, aid=article.id) }}" class="btn btn-default btn-sm">
-          <i class="fas fa-edit"></i> 返回编辑
+          <i class="fas fa-edit"></i> {{ _('返回编辑') }}
         </a>
       </div>
     </div>
@@ -39,19 +39,19 @@
 
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title">共 {{ versions.total }} 个历史快照（最新在前）</h3>
+    <h3 class="card-title">{{ _('共 %(total)s 个历史快照（最新在前）', total=versions.total) }}</h3>
   </div>
   <div class="card-body p-0">
     <table class="table table-hover table-sm mb-0">
       <thead>
         <tr>
-          <th width="80">版本号</th>
-          <th width="120">状态</th>
-          <th>标题快照</th>
-          <th>摘要 / 备注</th>
-          <th width="120">保存人</th>
-          <th width="160">保存时间</th>
-          <th width="100">操作</th>
+          <th width="80">{{ _('版本号') }}</th>
+          <th width="120">{{ _('状态') }}</th>
+          <th>{{ _('标题快照') }}</th>
+          <th>{{ _('摘要 / 备注') }}</th>
+          <th width="120">{{ _('保存人') }}</th>
+          <th width="160">{{ _('保存时间') }}</th>
+          <th width="100">{{ _('操作') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -70,8 +70,8 @@
           <td>
             {% if article.status != 'published' or current_user.is_super or current_user.has_permission('content:rollback') %}
             <form method="post" action="{{ url_for('admin.article_rollback', cid=article.column_id, aid=article.id, vid=v.id) }}"
-              onsubmit="return confirm('确认回滚到版本 #{{ v.version_no }}？当前内容会被覆盖，并自动回到草稿状态。');" class="d-inline">
-              <button type="submit" class="btn btn-warning btn-sm"><i class="fas fa-undo"></i> 回滚</button>
+              onsubmit="return confirm('{{ _('确认回滚到版本 #%(no)s？当前内容会被覆盖，并自动回到草稿状态。', no=v.version_no) }}');" class="d-inline">
+              <button type="submit" class="btn btn-warning btn-sm"><i class="fas fa-undo"></i> {{ _('回滚') }}</button>
             </form>
             {% else %}
             <span class="text-muted">-</span>
@@ -79,7 +79,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">暂无历史版本，首次保存文章后将自动生成版本快照。</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">{{ _('暂无历史版本，首次保存文章后将自动生成版本快照。') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

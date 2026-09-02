@@ -27,20 +27,33 @@
         <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
       </li>
       <li class="nav-item d-none d-sm-inline-block">
-        <a href="{{ url_for('frontend.index') }}" target="_blank" class="nav-link"><i class="fas fa-globe"></i> 查看前台</a>
+        <a href="{{ url_for('frontend.index') }}" target="_blank" class="nav-link"><i class="fas fa-globe"></i> {{ _('查看前台') }}</a>
       </li>
     </ul>
 
     <ul class="navbar-nav ml-auto">
+      {% set _locales = available_locales() %}
+      {% if _locales %}
+      <li class="nav-item dropdown">
+        <a class="nav-link" data-toggle="dropdown" href="#">
+          <i class="fas fa-language"></i> {{ current_locale()|upper }}
+        </a>
+        <div class="dropdown-menu dropdown-menu-right">
+          {% for loc in _locales %}
+          <a href="{{ url_for('admin.set_locale', lang=loc.code, next=request.path) }}" class="dropdown-item {{ 'active' if loc.active }}">{{ loc.label }}</a>
+          {% endfor %}
+        </div>
+      </li>
+      {% endif %}
       <li class="nav-item dropdown">
         <a class="nav-link" data-toggle="dropdown" href="#">
           <i class="fas fa-user-circle"></i> {{ current_user.nickname or current_user.username }}
         </a>
         <div class="dropdown-menu dropdown-menu-right">
-          <a href="{{ url_for('admin.profile') }}" class="dropdown-item"><i class="fas fa-id-card mr-2"></i>个人资料</a>
-          <a href="{{ url_for('admin.password') }}" class="dropdown-item"><i class="fas fa-key mr-2"></i>修改密码</a>
+          <a href="{{ url_for('admin.profile') }}" class="dropdown-item"><i class="fas fa-id-card mr-2"></i>{{ _('个人资料') }}</a>
+          <a href="{{ url_for('admin.password') }}" class="dropdown-item"><i class="fas fa-key mr-2"></i>{{ _('修改密码') }}</a>
           <div class="dropdown-divider"></div>
-          <a href="{{ url_for('admin_auth.logout') }}" class="dropdown-item"><i class="fas fa-sign-out-alt mr-2"></i>退出登录</a>
+          <a href="{{ url_for('admin_auth.logout') }}" class="dropdown-item"><i class="fas fa-sign-out-alt mr-2"></i>{{ _('退出登录') }}</a>
         </div>
       </li>
     </ul>
@@ -57,19 +70,19 @@
         <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
           <li class="nav-item">
             <a href="{{ url_for('admin.dashboard') }}" class="nav-link {{ 'active' if active_menu == 'dashboard' }}">
-              <i class="nav-icon fas fa-tachometer-alt"></i><p>仪表盘</p>
+              <i class="nav-icon fas fa-tachometer-alt"></i><p>{{ _('仪表盘') }}</p>
             </a>
           </li>
 
           {% if current_user.has_any_permission('column:manage', 'content_manage:all_columns', 'content:create', 'content:edit', 'content:delete', 'content:submit_review', 'content:review', 'content:publish', 'content:archive', 'content:batch', 'content:rollback') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('column') or active_menu and active_menu.startswith('article') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('column') or active_menu.startswith('article')) }}">
-              <i class="nav-icon fas fa-sitemap"></i><p>内容管理<i class="right fas fa-angle-left"></i></p>
+              <i class="nav-icon fas fa-sitemap"></i><p>{{ _('内容管理') }}<i class="right fas fa-angle-left"></i></p>
             </a>
             <ul class="nav nav-treeview">
               <li class="nav-item">
                 <a href="{{ url_for('admin.column_index') }}" class="nav-link {{ 'active' if active_menu == 'column' }}">
-                  <i class="far fa-circle nav-icon"></i><p>栏目管理</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('栏目管理') }}</p>
                 </a>
               </li>
             </ul>
@@ -79,39 +92,25 @@
           {% if current_user.has_permission('system:settings') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('fragment') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('fragment') }}">
-              <i class="nav-icon fas fa-puzzle-piece"></i><p>碎片管理<i class="right fas fa-angle-left"></i></p>
+              <i class="nav-icon fas fa-puzzle-piece"></i><p>{{ _('碎片管理') }}<i class="right fas fa-angle-left"></i></p>
             </a>
             <ul class="nav nav-treeview">
               <li class="nav-item">
                 <a href="{{ url_for('admin.fragment_group_index') }}" class="nav-link {{ 'active' if active_menu == 'fragment_group' }}">
-                  <i class="far fa-circle nav-icon"></i><p>碎片分组</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('碎片分组') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.fragment_index') }}" class="nav-link {{ 'active' if active_menu == 'fragment' }}">
-                  <i class="far fa-circle nav-icon"></i><p>碎片字段</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('碎片字段') }}</p>
                 </a>
               </li>
             </ul>
           </li>
           {% endif %}
 
-          {% if current_user.has_permission('form:view') %}
-          <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('form') }}">
-            <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('form') }}">
-              <i class="nav-icon fas fa-comments"></i><p>自定义表单<i class="right fas fa-angle-left"></i></p>
-            </a>
-            <ul class="nav nav-treeview">
-              <li class="nav-item">
-                <a href="{{ url_for('admin.form_index') }}" class="nav-link {{ 'active' if active_menu == 'form' }}">
-                  <i class="far fa-circle nav-icon"></i><p>表单管理</p>
-                </a>
-              </li>
-            </ul>
-          </li>
-          {% endif %}
-
-          {# v2.2.0 插件菜单：启用且当前用户有权限才显示 #}
+          {# v2.2.0/v2.3.0 插件菜单：启用且当前用户有权限才显示
+             自定义表单 v2.3.0 起由 plugins/form 提供，核心不再硬编码菜单项 #}
           {% for pm in plugin_admin_menus %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith(pm['slug']) }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith(pm['slug']) }}">
@@ -132,17 +131,17 @@
           {% if current_user.is_super or current_user.has_permission('system:user_manage') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('user') }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and active_menu.startswith('user') }}">
-              <i class="nav-icon fas fa-users-cog"></i><p>用户权限<i class="right fas fa-angle-left"></i></p>
+              <i class="nav-icon fas fa-users-cog"></i><p>{{ _('用户权限') }}<i class="right fas fa-angle-left"></i></p>
             </a>
             <ul class="nav nav-treeview">
               <li class="nav-item">
                 <a href="{{ url_for('admin.user_index') }}" class="nav-link {{ 'active' if active_menu == 'user_list' }}">
-                  <i class="far fa-circle nav-icon"></i><p>用户列表</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('用户列表') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.role_index') }}" class="nav-link {{ 'active' if active_menu == 'user_role' }}">
-                  <i class="far fa-circle nav-icon"></i><p>角色与权限</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('角色与权限') }}</p>
                 </a>
               </li>
             </ul>
@@ -152,7 +151,7 @@
           {% if current_user.is_super or current_user.has_permission('system:audit_log') %}
           <li class="nav-item">
             <a href="{{ url_for('admin.audit_index') }}" class="nav-link {{ 'active' if active_menu == 'audit' }}">
-              <i class="nav-icon fas fa-clipboard-list"></i><p>审计日志</p>
+              <i class="nav-icon fas fa-clipboard-list"></i><p>{{ _('审计日志') }}</p>
             </a>
           </li>
           {% endif %}
@@ -160,17 +159,17 @@
           {% if current_user.is_super or current_user.has_permission('system:backup') %}
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and active_menu.startswith('backup') or active_menu == 'monitor' }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('backup') or active_menu == 'monitor') }}">
-              <i class="nav-icon fas fa-database"></i><p>备份运维<i class="right fas fa-angle-left"></i></p>
+              <i class="nav-icon fas fa-database"></i><p>{{ _('备份运维') }}<i class="right fas fa-angle-left"></i></p>
             </a>
             <ul class="nav nav-treeview">
               <li class="nav-item">
                 <a href="{{ url_for('admin.backup_index') }}" class="nav-link {{ 'active' if active_menu == 'backup_list' }}">
-                  <i class="far fa-circle nav-icon"></i><p>备份列表</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('备份列表') }}</p>
                 </a>
               </li>
               <li class="nav-item">
-                <a href="{{ url_for('admin.monitor_page') }}" class="nav-link {{ 'active' if active_menu == 'monitor' }}">
-                  <i class="far fa-circle nav-icon"></i><p>系统监控</p>
+                <a href="{{ url_for('admin.monitor_index') }}" class="nav-link {{ 'active' if active_menu == 'monitor' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('系统监控') }}</p>
                 </a>
               </li>
             </ul>
@@ -179,90 +178,95 @@
 
           <li class="nav-item has-treeview {{ 'menu-open' if active_menu and (active_menu.startswith('setting') or active_menu in ['profile','password','logs']) }}">
             <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('setting') or active_menu in ['profile','password','logs']) }}">
-              <i class="nav-icon fas fa-cog"></i><p>系统设置<i class="right fas fa-angle-left"></i></p>
+              <i class="nav-icon fas fa-cog"></i><p>{{ _('系统设置') }}<i class="right fas fa-angle-left"></i></p>
             </a>
             <ul class="nav nav-treeview">
               {% if current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_site') }}" class="nav-link {{ 'active' if active_menu == 'setting_site' }}">
-                  <i class="far fa-circle nav-icon"></i><p>网站设置</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('网站设置') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_seo') }}" class="nav-link {{ 'active' if active_menu == 'setting_seo' }}">
-                  <i class="far fa-circle nav-icon"></i><p>SEO 默认配置</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('SEO 默认配置') }}</p>
                 </a>
               </li>
               {% endif %}
               {% if current_user.is_super or current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_seo_advanced') }}" class="nav-link {{ 'active' if active_menu == 'setting_seo_advanced' }}">
-                  <i class="far fa-circle nav-icon"></i><p>SEO 高级</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('SEO 高级') }}</p>
                 </a>
               </li>
               {% endif %}
               {% if current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_upload') }}" class="nav-link {{ 'active' if active_menu == 'setting_upload' }}">
-                  <i class="far fa-circle nav-icon"></i><p>上传配置</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('上传配置') }}</p>
                 </a>
               </li>
               {% endif %}
               {% if current_user.is_super or current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_upload_security') }}" class="nav-link {{ 'active' if active_menu == 'setting_upload_security' }}">
-                  <i class="far fa-circle nav-icon"></i><p>上传安全</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('上传安全') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_notify') }}" class="nav-link {{ 'active' if active_menu == 'setting_notify' }}">
-                  <i class="far fa-circle nav-icon"></i><p>消息通知</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('消息通知') }}</p>
                 </a>
               </li>
               {% endif %}
               {% if current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_security') }}" class="nav-link {{ 'active' if active_menu == 'setting_security' }}">
-                  <i class="far fa-circle nav-icon"></i><p>后台安全</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('后台安全') }}</p>
                 </a>
               </li>
               {% endif %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.profile') }}" class="nav-link {{ 'active' if active_menu == 'profile' }}">
-                  <i class="far fa-circle nav-icon"></i><p>个人资料</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('个人资料') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.password') }}" class="nav-link {{ 'active' if active_menu == 'password' }}">
-                  <i class="far fa-circle nav-icon"></i><p>修改密码</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('修改密码') }}</p>
                 </a>
               </li>
               {% if current_user.has_permission('system:audit_log') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if active_menu == 'logs' }}">
-                  <i class="far fa-circle nav-icon"></i><p>登录日志</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('登录日志') }}</p>
                 </a>
               </li>
               {% endif %}
               {% if current_user.is_super or current_user.has_permission('system:settings') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.tool_image_alt') }}" class="nav-link {{ 'active' if active_menu == 'tool_image_alt' }}">
-                  <i class="far fa-circle nav-icon"></i><p>图片ALT批量管理</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('图片ALT批量管理') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.plugin_index') }}" class="nav-link {{ 'active' if active_menu == 'plugin' }}">
-                  <i class="far fa-circle nav-icon"></i><p>插件管理</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('插件管理') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.theme_index') }}" class="nav-link {{ 'active' if active_menu == 'theme' }}">
-                  <i class="far fa-circle nav-icon"></i><p>主题管理</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('主题管理') }}</p>
                 </a>
               </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_api') }}" class="nav-link {{ 'active' if active_menu == 'setting_api' }}">
-                  <i class="far fa-circle nav-icon"></i><p>内容 API</p>
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('内容 API') }}</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_i18n') }}" class="nav-link {{ 'active' if active_menu == 'setting_i18n' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('国际化') }}</p>
                 </a>
               </li>
               {% endif %}
@@ -283,7 +287,7 @@
           </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-right">
-              <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">首页</a></li>
+              <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">{{ _('首页') }}</a></li>
               {% block breadcrumb %}{% endblock %}
             </ol>
           </div>
@@ -311,8 +315,8 @@
 
   <footer class="main-footer">
     <strong>{{ cms_copyright }}</strong>
-    <span class="ml-1">官网：<a href="https://www.tzzhy.cn/" target="_blank" rel="noopener">https://www.tzzhy.cn/</a></span>
-    <div class="float-right d-none d-sm-inline-block"><b>Version</b> {{ cms_version }}</div>
+    <span class="ml-1">{{ _('官网') }}：<a href="https://www.tzzhy.cn/" target="_blank" rel="noopener">https://www.tzzhy.cn/</a></span>
+    <div class="float-right d-none d-sm-inline-block"><b>{{ _('Version') }}</b> {{ cms_version }}</div>
   </footer>
 </div>
 

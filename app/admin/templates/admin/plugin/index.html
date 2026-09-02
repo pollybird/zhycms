@@ -1,238 +1,137 @@
 {% extends 'admin/base.html' %}
-{% block title %}插件管理 - {{ cms_name }}{% endblock %}
-{% block page_header %}插件管理{% endblock %}
+{% block title %}{{ _('插件管理') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('插件管理') }}{% endblock %}
 {% set active_menu = 'plugin' %}
 
-{% block breadcrumb %}<li class="breadcrumb-item active">插件管理</li>{% endblock %}
+{% block breadcrumb %}<li class="breadcrumb-item active">{{ _('插件管理') }}</li>{% endblock %}
 
 {% block content %}
+{# 操作结果提示 #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, msg in messages %}
+      <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+        <i class="icon fas {{ 'fa-check-circle' if category == 'success' else 'fa-exclamation-circle' }}"></i>
+        {{ msg }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
 
-{# ------- 上传插件压缩包卡片 ------- #}
-<div class="card card-outline card-primary">
+{# 上传插件 #}
+<div class="card card-primary card-outline">
   <div class="card-header">
-    <h3 class="card-title">
-      <i class="fas fa-cloud-upload-alt mr-1"></i>上传插件压缩包
-    </h3>
-    <div class="card-tools">
-      <span class="badge badge-warning mr-1">支持格式：{{ allowed_exts }}</span>
-      <span class="badge badge-info">启用仍需手动，即时生效</span>
-    </div>
+    <h3 class="card-title">{{ _('上传插件') }}</h3>
   </div>
   <div class="card-body">
-    <form id="plug_upload_form" method="post" action="{{ url_for('admin.plugin_upload') }}"
-          enctype="multipart/form-data"
-          onsubmit="var btn=this.querySelector('button[type=submit]'); if(btn){btn.disabled=true;btn.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> 上传中…';}return true;">
-      <div class="row align-items-end">
-        <div class="col-12 col-md-8">
-          <div class="form-group mb-md-0">
-            <label>选择压缩包 <span class="text-danger">*</span></label>
-            <div class="custom-file">
-              <input type="file" id="plug_archive" name="archive"
-                     accept=".zip,.tar.gz,.tgz,application/zip,application/x-tar"
-                     class="custom-file-input" required>
-              <label class="custom-file-label" for="plug_archive">选择压缩包文件…</label>
-            </div>
-            <small class="text-muted d-block mt-1">
-              必备文件：<b>{{ required_files }}</b>（api.py 等为可选）。压缩包结构支持：
-              <code>my_plugin.zip → my_plugin/...</code>（推荐） 或
-              <code>my_plugin.zip → ...平铺文件</code>（自动识别并放入同名目录）。
-            </small>
-          </div>
-        </div>
-        <div class="col-12 col-md-4">
-          <button type="submit" class="btn btn-primary btn-block btn-flat">
-            <i class="fas fa-upload"></i> 上传并解压
-          </button>
-        </div>
+    <form method="post" action="{{ url_for('admin.plugin_upload') }}" enctype="multipart/form-data" id="upload-form">
+      <div class="custom-file mb-3">
+        <input type="file" name="archive" id="plugin-file" class="custom-file-input" accept=".zip" required>
+        <label class="custom-file-label" for="plugin-file" data-browse="{{ _('选择文件') }}">{{ _('请选择 zip 插件包') }}</label>
       </div>
-      <div class="alert alert-warning mt-2 mb-0 py-2 px-3" style="font-size:13px;">
-        <b>安全与校验说明：</b>
-        压缩包会进行 8 项校验（扩展名白名单 / 路径穿越拦截 / 绝对路径拦截 / 符号链接跳过 /
-        manifest.json 合法性 / slug 格式 / 必备文件存在 / 已存在目录禁止覆盖）；
-        任一失败立即回滚，不写入 <code>plugins/</code>。
-        上传成功后应用仍处于旧状态：<b>如未发现新插件请重启应用重新加载</b>。
-      </div>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> {{ _('上传并安装') }}</button>
+      <small class="form-text text-muted mt-2">{{ _('zip 根目录须包含 manifest.json 和 __init__.py；若插件已存在将跳过并给出提示') }}</small>
     </form>
   </div>
 </div>
 
-{# ------- 已发现插件列表 ------- #}
-<div class="card mt-3">
+{# 插件列表 #}
+<div class="card">
   <div class="card-header">
-    <h3 class="card-title">已发现插件</h3>
-    <div class="card-tools">
-      <span class="badge badge-info">启停即时生效，无需重启</span>
-    </div>
+    <h3 class="card-title">{{ _('插件列表') }}</h3>
   </div>
   <div class="card-body p-0">
-    <table class="table table-hover">
+    <table class="table table-hover mb-0">
       <thead>
         <tr>
-          <th>插件</th>
-          <th width="90">版本</th>
-          <th>功能说明</th>
-          <th width="140">权限点</th>
-          <th width="110">状态</th>
-          <th width="245">操作</th>
+          <th width="250">{{ _('插件信息') }}</th>
+          <th>{{ _('说明') }}</th>
+          <th width="120">{{ _('作者/版本') }}</th>
+          <th width="80">{{ _('状态') }}</th>
+          <th width="280">{{ _('操作') }}</th>
         </tr>
       </thead>
       <tbody>
         {% for p in plugins %}
         <tr>
           <td>
-            <i class="fas fa-plug text-muted mr-1"></i> <b>{{ p.name }}</b>
-            <span class="text-muted">（{{ p.slug }}）</span>
-            {% if p.author %}<span class="text-muted" style="font-size:12px;">{{ p.author }}</span>{% endif %}
+            <strong>{{ p.name }}</strong>
+            <br><small class="text-muted">{{ p.slug }}</small>
           </td>
-          <td>{{ p.version }}</td>
           <td>
             {{ p.description }}
-            {% if p.menu %}
-            <div class="text-muted" style="font-size:12px;">
-              菜单：{% for m in p.menu %}{{ m.label }}{% if not loop.last %}、{% endif %}{% endfor %}
-            </div>
-            {% endif %}
           </td>
           <td>
-            {% if p.permissions %}
-              {% for code, label, desc in p.permissions %}
-              <span class="badge badge-light">{{ code }}</span>
-              {% endfor %}
-            {% else %}<span class="text-muted">—</span>{% endif %}
+            <div>{{ p.author or '-' }}</div>
+            <small class="text-muted">{{ _('v%(ver)s', ver=(p.version or '?')) }}</small>
           </td>
           <td>
-            {% if p.error %}
-              <span class="badge badge-danger" title="{{ p.error }}">加载失败</span>
-            {% elif p.enabled %}
-              <span class="badge badge-success">已启用</span>
-            {% else %}
-              <span class="badge badge-secondary">未启用</span>
-            {% endif %}
+            {% if p.enabled %}<span class="badge badge-success">{{ _('已启用') }}</span>
+            {% else %}<span class="badge badge-secondary">{{ _('已禁用') }}</span>{% endif %}
           </td>
           <td>
-            {% if not p.error %}
-            <form method="post" action="{{ url_for('admin.plugin_toggle', slug=p.slug) }}" class="d-inline">
+            <div class="btn-group btn-group-sm">
               {% if p.enabled %}
-              <button class="btn btn-warning btn-sm" onclick="return confirm('禁用后其后台菜单、前台路由与模板函数将立即失效（数据保留），确认禁用？')">
-                <i class="fas fa-toggle-off"></i> 禁用</button>
+              <form method="post" action="{{ url_for('admin.plugin_toggle', slug=p.slug) }}" class="d-inline">
+                <button class="btn btn-warning" title="{{ _('禁用该插件，但保留配置和数据库数据') }}"><i class="fas fa-pause"></i> {{ _('禁用') }}</button>
+              </form>
               {% else %}
-              <button class="btn btn-success btn-sm">
-                <i class="fas fa-toggle-on"></i> 启用</button>
+              <form method="post" action="{{ url_for('admin.plugin_toggle', slug=p.slug) }}" class="d-inline">
+                <button class="btn btn-success" title="{{ _('启用该插件') }}"><i class="fas fa-play"></i> {{ _('启用') }}</button>
+              </form>
               {% endif %}
-            </form>
-            {% else %}
-            <span class="text-muted" style="font-size:12px;" data-toggle="tooltip" title="{{ p.error }}">查看错误</span>
-            {% endif %}
-            {% if p.builtin %}
-            <button type="button" class="btn btn-outline-secondary btn-sm" disabled data-toggle="tooltip"
-                    title="官方内置插件不支持卸载；如不需要可禁用">
-              <i class="fas fa-trash"></i> 卸载</button>
-            {% elif p.enabled %}
-            <button type="button" class="btn btn-outline-secondary btn-sm" disabled data-toggle="tooltip"
-                    title="插件启用中，请先禁用再卸载">
-              <i class="fas fa-trash"></i> 卸载</button>
-            {% else %}
-            <button type="button" class="btn btn-outline-danger btn-sm" data-toggle="tooltip"
-                    title="卸载并删除插件目录（不可恢复）"
-                    onclick="askDeletePlugin(this)"
-                    data-slug="{{ p.slug }}" data-name="{{ p.name }}">
-              <i class="fas fa-trash"></i> 卸载</button>
-            {% endif %}
-            <a class="btn btn-outline-info btn-sm" data-toggle="tooltip"
-               title="打包下载为 zip（可在其他站点上传复用）"
-               href="{{ url_for('admin.plugin_download', slug=p.slug) }}">
-              <i class="fas fa-download"></i> 下载</a>
+              <a href="{{ url_for('admin.plugin_download', slug=p.slug) }}" class="btn btn-default" title="{{ _('打包下载该插件目录为 zip') }}"><i class="fas fa-file-archive"></i></a>
+              <button type="button" class="btn btn-danger" onclick="confirm_delete('{{ p.slug }}', '{{ p.name }}')" title="{{ _('卸载插件（将删除插件目录）') }}">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">
-          未发现任何插件：请使用上方「上传插件压缩包」或手动放入项目根
-          <code>plugins/</code> 目录后<b>重启应用</b>重新加载。
+        <tr><td colspan="5" class="text-center text-muted py-5">
+          <i class="fas fa-box-open fa-2x mb-3"></i><br>
+          {{ _('暂无已安装插件。请上传 zip 插件包。') }}
         </td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <div class="card-footer text-muted" style="font-size:12px;">
-    提示：启用插件将自动创建其权限点并授权给预设角色；禁用不删除数据，重新启用后原样恢复。
-  </div>
 </div>
 
-{# ------- 卸载确认模态框 ------- #}
-<div class="modal fade" id="delPluginModal" tabindex="-1" role="dialog" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header bg-danger">
-        <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> 危险操作：确认卸载插件</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+{# 卸载确认模态框 #}
+<div class="modal fade" id="delete-modal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header bg-danger text-white"><h5 class="modal-title">{{ _('卸载插件') }}</h5><button type="button" class="close" data-dismiss="modal">&times;</button></div>
+    <div class="modal-body">
+      <p id="delete-tip"></p>
+      <div class="alert alert-warning small mb-0">
+        <i class="fas fa-exclamation-triangle"></i>
+        {{ _('卸载将删除插件目录，数据库表保留。重新上传同名插件可恢复使用。') }}
       </div>
-      <form id="delPluginForm" method="post" action="" autocomplete="off">
-        <div class="modal-body">
-          <p>即将卸载插件：<b id="delPluginName"></b></p>
-          <div class="callout callout-danger py-2 px-3" style="font-size:13px;">
-            <p class="mb-1"><b>此操作不可恢复！</b>将从服务器 <code>plugins/</code>
-              目录中永久删除该插件的全部代码文件。</p>
-            <p class="mb-0">插件的数据表与数据将保留；重新上传同名插件包可恢复使用。官方内置插件不支持卸载。</p>
-          </div>
-          <div class="form-group">
-            <label>请输入右侧图形验证码以确认卸载 <span class="text-danger">*</span></label>
-            <div class="input-group" style="max-width:330px;">
-              <input type="text" name="captcha" class="form-control" placeholder="验证码（不区分大小写）" required autocomplete="off">
-              <div class="input-group-append">
-                <img id="delPluginCaptchaImg" src="{{ url_for('admin.delete_captcha_image') }}"
-                     alt="验证码" title="看不清？点击刷新"
-                     style="height:40px;cursor:pointer;border:1px solid #dee2e6;border-left:0;border-radius:0 .25rem .25rem 0;">
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer justify-content-between">
-          <span class="text-muted" style="font-size:12px;"><i class="fas fa-info-circle"></i> 看不清可点击验证码图片刷新</span>
-          <div>
-            <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
-            <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> 确认卸载</button>
-          </div>
-        </div>
+    </div>
+    <div class="modal-footer">
+      <form method="post" id="delete-form">
+        <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('取消') }}</button>
+        <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> {{ _('确认卸载') }}</button>
       </form>
     </div>
-  </div>
+  </div></div>
 </div>
 {% endblock %}
 
 {% block js %}
 <script>
-  // Custom file label 显示文件名（支持中文）
-  document.getElementById('plug_archive').addEventListener('change', function () {
-    var label = this.nextElementSibling;
-    label.textContent = this.files.length ? this.files[0].name : '选择压缩包文件…';
+  $('#plugin-file').on('change', function(e){
+    const name = e.target.files[0]?.name || '{{ _('请选择 zip 插件包') }}';
+    $(this).next('.custom-file-label').text(name);
   });
-  // 上传按钮防重复 + 为空时阻止提交
-  document.getElementById('plug_upload_form').addEventListener('submit', function (e) {
-      var inp = this.querySelector('input[name=archive]');
-      if (!inp || !inp.files || !inp.files.length) {
-        e.preventDefault();
-        alert('请选择插件压缩包');
-      }
-    });
-  // 卸载确认弹窗
-  var DEL_CAPTCHA_URL = "{{ url_for('admin.delete_captcha_image') }}";
-  function refreshPluginDelCaptcha() {
-    document.getElementById('delPluginCaptchaImg').src =
-      DEL_CAPTCHA_URL + '?t=' + Date.now();
+
+  function confirm_delete(slug, name){
+    $('#delete-tip').html('{{ _('确定要卸载插件') }} <strong>' + name + '</strong> ?');
+    var baseUrl = '{{ url_for("admin.plugin_delete", slug="__SLUG__") }}'.replace('__SLUG__', slug);
+    $('#delete-form').attr('action', baseUrl);
+    $('#delete-modal').modal('show');
   }
-  function askDeletePlugin(btn) {
-    var slug = btn.getAttribute('data-slug');
-    var name = btn.getAttribute('data-name');
-    document.getElementById('delPluginName').textContent =
-      name + '（' + slug + '）';
-    var tpl = "{{ url_for('admin.plugin_delete', slug='__SLUG__') }}";
-    document.getElementById('delPluginForm').action =
-      tpl.replace('__SLUG__', encodeURIComponent(slug));
-    document.querySelector('#delPluginForm input[name=captcha]').value = '';
-    refreshPluginDelCaptcha();
-    $('#delPluginModal').modal('show');
-  }
-  document.getElementById('delPluginCaptchaImg')
-    .addEventListener('click', refreshPluginDelCaptcha);
 </script>
 {% endblock %}

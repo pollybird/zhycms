@@ -2,7 +2,7 @@ from .user import User, LoginLog
 from .column import Column, ColumnField, ColumnFieldValue
 from .article import Article, ArticleFieldValue
 from .fragment import Fragment, FragmentGroup
-from .form import Form, FormField, FormSubmission, FormSubmissionValue
+# 自定义表单 v2.3.0 起转为内置插件 plugins/form，模型由插件注册
 from .setting import Setting
 from .rbac import (
     Role, Permission, RolePermission, UserRole, UserColumnPermission,
@@ -29,7 +29,6 @@ __all__ = [
     'Column', 'ColumnField', 'ColumnFieldValue',
     'Article', 'ArticleFieldValue',
     'Fragment', 'FragmentGroup',
-    'Form', 'FormField', 'FormSubmission', 'FormSubmissionValue',
     'Setting',
     # RBAC
     'Role', 'Permission', 'RolePermission', 'UserRole', 'UserColumnPermission',

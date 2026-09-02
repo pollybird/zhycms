@@ -1,0 +1,226 @@
+# English translations for ZhyCMS plugin.
+# Copyright (C) 2026 ZhyCMS
+# This file is distributed under the same license as the ZhyCMS project.
+#
+msgid ""
+msgstr ""
+msgid "编辑产品"
+msgstr "Edit Product"
+msgid "新增产品"
+msgstr "Add Product"
+msgid "产品管理"
+msgstr "Product Management"
+msgid "编辑"
+msgstr "Edit"
+msgid "新增"
+msgstr "Add New"
+msgid "标题"
+msgstr "Title"
+msgid "摘要"
+msgstr "Summary"
+msgid "列表页展示的产品简介"
+msgstr "Product summary shown on the list page"
+
+msgid "产品详情"
+msgstr "Product Detail"
+msgid "产品相册"
+msgstr "Product Gallery"
+msgid "拖拽图片调整顺序；未单独上传封面时，列表取第一张为封面"
+msgstr "Drag images to reorder; if no cover is uploaded separately, the first image is used as cover on the list."
+
+msgid "相册图"
+msgstr "Gallery Images"
+
+msgid "移除"
+msgstr "Remove"
+
+msgid "上传新图片（可多选）"
+msgstr "Upload new images (multi-select supported)"
+
+msgid "新上传图片将排在相册末尾；保存后可再调整顺序。"
+msgstr "Newly uploaded images are appended to the gallery; order can be adjusted after saving."
+
+msgid "规格参数"
+msgstr "Specifications"
+
+msgid "添加分组"
+msgstr "Add Group"
+
+msgid "分组名称（如：基本参数）"
+msgstr "Group name (e.g. Basic Parameters)"
+
+msgid "删除分组"
+msgstr "Delete Group"
+
+msgid "参数名"
+msgstr "Parameter Name"
+
+msgid "参数值"
+msgstr "Value"
+msgid "如：型号"
+msgstr "e.g. Model"
+
+msgid "添加参数"
+msgstr "Add Parameter"
+
+msgid "参数名为空的行保存时自动忽略；前台详情页按分组渲染规格表。"
+msgstr "Rows with empty parameter names are automatically ignored on save; the detail page renders specs by group."
+
+msgid "发布设置"
+msgstr "Publish Settings"
+
+msgid "所属栏目"
+msgstr "Parent Column"
+msgid "请选择列表栏目"
+msgstr "Please select a list column"
+
+msgid "产品归入列表栏目；栏目级内容权限与文章一致。"
+msgstr "Products are assigned to list columns; column-level content permissions are the same as articles."
+
+msgid "排序优先级"
+msgstr "Sort Priority"
+
+msgid "启用（前台展示）"
+msgstr "Enabled (shown on frontend)"
+
+msgid "封面图"
+msgstr "Cover Image"
+msgid "删除封面"
+msgstr "Remove Cover"
+
+msgid "删除后展示取相册第一张（如有）。"
+msgstr "After deletion, the first gallery image (if any) will be shown instead."
+
+msgid "未设置封面时展示取相册第一张（如有）。"
+msgstr "When no cover is set, the first gallery image (if any) is displayed."
+
+msgid "SEO 标题"
+msgstr "SEO Title"
+msgid "SEO 关键词"
+msgstr "SEO Keywords"
+msgid "SEO 描述"
+msgstr "SEO Description"
+msgid "保存产品"
+msgstr "Save Product"
+
+msgid "返回列表"
+msgstr "Back to List"
+msgid "在此输入产品详情……"
+msgstr "Enter product details here..."
+
+msgid "产品列表"
+msgstr "Product List"
+
+msgid "栏目"
+msgstr "Column"
+
+msgid "全部栏目"
+msgstr "All Columns"
+
+msgid "标题关键词"
+msgstr "Title Keyword"
+
+msgid "全部状态"
+msgstr "All Status"
+
+msgid "启用"
+msgstr "Enabled"
+msgid "停用"
+msgstr "Disabled"
+msgid "筛选"
+msgstr "Filter"
+
+msgid "重置"
+msgstr "Reset"
+msgid "封面"
+msgstr "Cover"
+
+msgid "排序"
+msgstr "Order"
+msgid "状态"
+msgstr "Status"
+msgid "更新时间"
+msgstr "Updated At"
+msgid "操作"
+msgstr "Actions"
+msgid "无封面（取相册第一张）"
+msgstr "No cover (uses first gallery image)"
+
+msgid "相册图片数"
+msgstr "Gallery Count"
+
+msgid "图"
+msgstr "img"
+
+msgid "含规格参数"
+msgstr "Has Specs"
+
+msgid "规格"
+msgstr "Specs"
+
+msgid "前台预览"
+msgstr "Preview"
+
+msgid "确认删除《"
+msgstr "Confirm delete 《"
+
+msgid "删除"
+msgstr "Delete"
+msgid "暂无产品，点击右上角「新增产品」创建第一个产品"
+msgstr "No products yet. Click \"Add Product\" at the top right to create the first product."
+
+msgid "批量启用"
+msgstr "Bulk Enable"
+
+msgid "批量停用"
+msgstr "Bulk Disable"
+
+msgid "批量删除"
+msgstr "Bulk Delete"
+
+msgid "移动到栏目…"
+msgstr "Move to column…"
+
+msgid "批量移动"
+msgstr "Bulk Move"
+
+msgid "移动"
+msgstr "Move"
+
+msgid "未选择产品时操作无效"
+msgstr "No action taken: no products selected."
+
+msgid "请先选择产品"
+msgstr "Please select products first."
+
+msgid "确认批量启用所选产品？"
+msgstr "Confirm bulk enable the selected products?"
+
+msgid "确认批量停用所选产品？停用后前台不再展示。"
+msgstr "Confirm bulk disable the selected products? They will no longer appear on the frontend."
+
+msgid "确认批量删除所选产品？"
+msgstr "Confirm bulk delete the selected products?"
+
+msgid "请先选择目标栏目"
+msgstr "Please select a target column first."
+
+msgid "确认将所选产品移动到目标栏目？"
+msgstr "Confirm moving the selected products to the target column?"
+
+msgid "首页"
+msgstr "Home"
+
+msgid "图片"
+msgstr "Image"
+msgid "上一个产品"
+msgstr "Previous product"
+
+msgid "下一个产品"
+msgstr "Next product"
+
+msgid "最新产品"
+msgstr "Latest products"
+
+msgid "暂无其他产品"
+msgstr "No other products"

@@ -3,6 +3,7 @@ from flask import (
     render_template, redirect, url_for, request, flash, abort
 )
 
+from flask_babel import gettext as _gettext
 from ..extensions import db
 from ..models.fragment import Fragment, FragmentGroup
 from ..utils.helpers import permission_required, audit_log, clear_content_cache
@@ -38,12 +39,12 @@ def fragment_group_index():
 def fragment_group_create():
     name = (request.form.get('name') or '').strip()
     if not name:
-        flash('分组名称必填', 'danger')
+        flash(_gettext('分组名称必填'), 'danger')
         return redirect(url_for('admin.fragment_group_index'))
     g = FragmentGroup(name=name, sort_order=int(request.form.get('sort_order') or 0))
     db.session.add(g)
     db.session.commit()
-    flash('分组已创建', 'success')
+    flash(_gettext('分组已创建'), 'success')
     return redirect(url_for('admin.fragment_group_index'))
 
 
@@ -54,7 +55,7 @@ def fragment_group_edit(gid):
     g.name = (request.form.get('name') or '').strip() or g.name
     g.sort_order = int(request.form.get('sort_order') or 0)
     db.session.commit()
-    flash('分组已更新', 'success')
+    flash(_gettext('分组已更新'), 'success')
     return redirect(url_for('admin.fragment_group_index'))
 
 
@@ -63,11 +64,11 @@ def fragment_group_edit(gid):
 def fragment_group_delete(gid):
     g = FragmentGroup.query.get_or_404(gid)
     if g.fragments.filter_by(is_deleted=False).count() > 0:
-        flash('该分组下还有碎片，请先移动或删除碎片', 'danger')
+        flash(_gettext('该分组下还有碎片，请先移动或删除碎片'), 'danger')
         return redirect(url_for('admin.fragment_group_index'))
     g.is_deleted = True
     db.session.commit()
-    flash('分组已删除', 'success')
+    flash(_gettext('分组已删除'), 'success')
     return redirect(url_for('admin.fragment_group_index'))
 
 
@@ -128,12 +129,12 @@ def _save_fragment(fragment):
     slug = (request.form.get('slug') or '').strip().lower()
     field_type = request.form.get('field_type') or 'text'
     if not name or not slug:
-        flash('名称和标识必填', 'danger')
+        flash(_gettext('名称和标识必填'), 'danger')
         return None
 
     existing = Fragment.query.filter_by(slug=slug, is_deleted=False).first()
     if existing and (fragment is None or existing.id != fragment.id):
-        flash('标识已存在', 'danger')
+        flash(_gettext('标识已存在'), 'danger')
         return None
 
     gid = request.form.get('group_id') or None
@@ -159,7 +160,7 @@ def _save_fragment(fragment):
             rel, url, err = save_upload_file(file_obj, sub_dir=f'fragment/{field_type}',
                                              allowed_exts=allowed)
             if err:
-                flash(f'文件上传失败：{err}', 'danger')
+                flash(_gettext('文件上传失败：{0}').format(err), 'danger')
                 return None
             fragment.value = url
         elif request.form.get('value_remove') == 'on':
@@ -169,7 +170,7 @@ def _save_fragment(fragment):
         fragment.value = request.form.get('value') or ''
 
     db.session.commit()
-    flash('碎片保存成功', 'success')
+    flash(_gettext('碎片保存成功'), 'success')
     return fragment
 
 
@@ -179,7 +180,7 @@ def fragment_delete(fid):
     frag = Fragment.query.get_or_404(fid)
     frag.is_deleted = True
     db.session.commit()
-    flash('碎片已删除', 'success')
+    flash(_gettext('碎片已删除'), 'success')
     return redirect(url_for('admin.fragment_index'))
 
 

@@ -1,0 +1,189 @@
+{% extends theme_base %}
+{% block title %}{{ site_settings.site_name }} - {{ site_settings.site_subtitle }}{% endblock %}
+
+{% block banner %}
+{# ===== Top carousel banner (v2.2.0 carousel plugin first, fragment fallback) ===== #}
+{% set hero_banners = banner_items('home-hero') %}
+{% if hero_banners %}
+{% include 'banner/hero_carousel.html' %}
+{% else %}
+{% set banners = [] %}
+{% if site_fragments.home_banner_1 and site_fragments.home_banner_1.value %}{% set _ = banners.append(site_fragments.home_banner_1.value) %}{% endif %}
+{% if site_fragments.home_banner_2 and site_fragments.home_banner_2.value %}{% set _ = banners.append(site_fragments.home_banner_2.value) %}{% endif %}
+{% if site_fragments.home_banner_3 and site_fragments.home_banner_3.value %}{% set _ = banners.append(site_fragments.home_banner_3.value) %}{% endif %}
+{% if banners %}
+<div id="homeBanner" class="carousel slide" data-ride="carousel">
+  <ol class="carousel-indicators">
+    {% for b in banners %}
+    <li data-target="#homeBanner" data-slide-to="{{ loop.index0 }}" class="{{ 'active' if loop.first }}"></li>
+    {% endfor %}
+  </ol>
+  <div class="carousel-inner">
+    {% for b in banners %}
+    <div class="carousel-item {{ 'active' if loop.first }}">
+      <img src="{{ b }}" class="d-block w-100" style="height:420px;object-fit:cover;" alt="banner">
+      <div class="carousel-caption d-none d-md-block" style="background:rgba(11,61,145,.55);border-radius:6px;padding:16px;">
+        <h2 style="font-weight:700;">{{ site_settings.site_name }}</h2>
+        <p class="lead mb-0">{{ site_settings.site_subtitle }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if banners|length > 1 %}
+  <a class="carousel-control-prev" href="#homeBanner" role="button" data-slide="prev">
+    <span class="carousel-control-prev-icon"></span>
+  </a>
+  <a class="carousel-control-next" href="#homeBanner" role="button" data-slide="next">
+    <span class="carousel-control-next-icon"></span>
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{# Notice #}
+{% if site_fragments.home_notice and site_fragments.home_notice.value %}
+<div class="alert alert-warning">
+  <i class="fas fa-bullhorn"></i> {{ site_fragments.home_notice.value|safe }}
+</div>
+{% endif %}
+
+{# ===== Products showcase (pinned, highlighting manufacturing features; v2.2.0 product plugin first, article fallback) ===== #}
+{% set prods = product_latest('products', 8) %}
+{% if prods %}
+<section class="py-4">
+  <h2 class="section-title">{{ products_col.name if products_col else 'Products' }}</h2>
+  <p class="section-sub">{{ products_col.summary if products_col and products_col.summary else 'Providing trusted industry solutions' }}</p>
+  <div class="row row-cols-2 row-cols-md-4 g-4">
+    {% for p in prods %}
+    <div class="col mb-4">
+      <a href="{{ p.url }}" class="card h-100 text-decoration-none text-dark">
+        {% if p.cover %}
+        <img src="{{ p.cover }}" class="card-img-top" alt="{{ p.title }}" style="height:180px;object-fit:cover;">
+        {% else %}
+        <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height:180px;">
+          <i class="fas fa-cog text-muted" style="font-size:36px;"></i>
+        </div>
+        {% endif %}
+        <div class="card-body text-center py-3">
+          <h6 class="card-title mb-0 text-truncate">{{ p.title }}</h6>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% if products_col %}
+  <div class="text-center mt-2">
+    <a href="{{ url_for('frontend.column_detail', slug=products_col.slug) }}" class="btn btn-outline-primary">View All Products <i class="fas fa-arrow-right"></i></a>
+  </div>
+  {% endif %}
+</section>
+{% elif products %}
+<section class="py-4">
+  <h2 class="section-title">{{ products_col.name if products_col else 'Products' }}</h2>
+  <p class="section-sub">{{ products_col.summary if products_col and products_col.summary else 'Providing trusted industry solutions' }}</p>
+  <div class="row row-cols-2 row-cols-md-4 g-4">
+    {% for p in products %}
+    <div class="col mb-4">
+      <a href="{{ url_for('frontend.article_detail', slug=p.column.slug, aid=p.id) }}" class="card h-100 text-decoration-none text-dark">
+        {% if p.cover %}
+        <img src="{{ p.cover }}" class="card-img-top" alt="{{ p.title }}" style="height:180px;object-fit:cover;">
+        {% else %}
+        <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height:180px;">
+          <i class="fas fa-cog text-muted" style="font-size:36px;"></i>
+        </div>
+        {% endif %}
+        <div class="card-body text-center py-3">
+          <h6 class="card-title mb-0 text-truncate">{{ p.title }}</h6>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% if products_col %}
+  <div class="text-center mt-2">
+    <a href="{{ url_for('frontend.column_detail', slug=products_col.slug) }}" class="btn btn-outline-primary">View All Products <i class="fas fa-arrow-right"></i></a>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{# ===== News (large image on left + list on right) ===== #}
+{% if news %}
+<section class="py-4 bg-light" style="margin:0 -9999px;padding-left:9999px;padding-right:9999px;">
+  <div class="container">
+    <h2 class="section-title">{{ news_col.name if news_col else 'News' }}</h2>
+    <p class="section-sub">{{ news_col.summary if news_col and news_col.summary else 'Focus on industry dynamics, delivering corporate voice' }}</p>
+    <div class="row">
+      {% set feature = news[0] %}
+      <div class="col-md-5 mb-3">
+        <a href="{{ url_for('frontend.article_detail', slug=feature.column.slug, aid=feature.id) }}" class="card h-100 text-decoration-none text-dark">
+          {% if feature.cover %}
+          <img src="{{ feature.cover }}" class="card-img-top" alt="{{ feature.title }}" style="height:240px;object-fit:cover;">
+          {% else %}
+          <div class="card-img-top d-flex align-items-center justify-content-center bg-secondary text-white" style="height:240px;">
+            <i class="far fa-newspaper" style="font-size:42px;"></i>
+          </div>
+          {% endif %}
+          <div class="card-body">
+            <h5 class="card-title">{{ feature.title|truncate_text(30) }}</h5>
+            <p class="card-text text-muted small">{{ feature.summary|truncate_text(70) }}</p>
+            <small class="text-muted"><i class="far fa-clock"></i> {{ feature.published_at|date }}</small>
+          </div>
+        </a>
+      </div>
+      <div class="col-md-7">
+        <div class="list-group">
+          {% for a in news[1:] %}
+          <a href="{{ url_for('frontend.article_detail', slug=a.column.slug, aid=a.id) }}" class="list-group-item list-group-item-action list-article d-flex justify-content-between align-items-center">
+            <div class="text-truncate mr-2">
+              <i class="fas fa-angle-right text-primary"></i>
+              <strong>{{ a.title }}</strong>
+              <small class="text-muted ml-1">[{{ a.column.name }}]</small>
+            </div>
+            <small class="text-muted flex-shrink-0">{{ a.published_at|date }}</small>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ===== About Us summary ===== #}
+{% if about_col %}
+<section class="py-4">
+  <div class="row align-items-center">
+    <div class="col-md-8">
+      <h2 class="mb-3" style="font-weight:700;">{{ about_col.name }}</h2>
+      {% if about_col.summary %}<p class="text-muted">{{ about_col.summary }}</p>{% endif %}
+      <div class="article-content" style="max-height:220px;overflow:hidden;">
+        {{ about_col.page_content|safe }}
+      </div>
+      <a href="{{ url_for('frontend.column_detail', slug=about_col.slug) }}" class="btn btn-primary mt-2">Learn More <i class="fas fa-arrow-right"></i></a>
+    </div>
+    <div class="col-md-4">
+      {% if site_fragments.home_banner_3 and site_fragments.home_banner_3.value %}
+      <img src="{{ site_fragments.home_banner_3.value }}" class="img-fluid rounded" alt="{{ about_col.name }}">
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{# ===== Friendly links (provided by friend_link plugin; auto-hidden when plugin disabled) ===== #}
+{% set friend_links = friend_links() %}
+{% if friend_links %}
+<section class="py-3 border-top">
+  <span class="text-muted mr-3"><i class="fas fa-link"></i> Friendly Links:</span>
+  {% for l in friend_links %}
+  <a href="{{ l.url }}" target="{{ l.target }}" class="mr-3" title="{{ l.name }}">
+    {% if l.logo %}<img src="{{ l.logo }}" alt="{{ l.name }}" style="height:26px;vertical-align:middle;">{% else %}{{ l.name }}{% endif %}
+  </a>
+  {% endfor %}
+</section>
+{% endif %}
+{% endblock %}

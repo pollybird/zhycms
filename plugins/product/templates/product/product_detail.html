@@ -4,7 +4,7 @@
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
-    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">{{ _p('product', '首页') }}</a></li>
     <li class="breadcrumb-item"><a href="{{ url_for('frontend.column_detail', slug=column.slug) }}">{{ column.name }}</a></li>
     <li class="breadcrumb-item active">{{ product.title|truncate_text(30) }}</li>
   </ol>
@@ -30,7 +30,7 @@
           {% for url in gallery %}
           <img src="{{ url }}" class="rounded border mr-2 mb-2 gallery-thumb {{ 'border-primary' if loop.first }}"
                style="width:72px;height:56px;object-fit:cover;cursor:pointer;"
-               onclick="switchGallery(this)" alt="{{ product.title }} 图片{{ loop.index }}">
+               onclick="switchGallery(this)" alt="{{ product.title }} {{ _p('product', '图片') }}{{ loop.index }}">
           {% endfor %}
         </div>
         {% endif %}
@@ -49,7 +49,7 @@
       <hr>
       <div class="card bg-light">
         <div class="card-body">
-          <h6 class="card-title"><i class="fas fa-list"></i> 规格参数</h6>
+          <h6 class="card-title"><i class="fas fa-list"></i> {{ _p('product', '规格参数') }}</h6>
           {% for g in specs %}
           {% if g['group'] %}<div class="font-weight-bold mt-3 mb-1">{{ g['group'] }}</div>{% endif %}
           <table class="table table-sm table-striped mb-0 bg-white">
@@ -69,14 +69,14 @@
         <div class="col-6">
           {% if prev_product %}
           <a href="{{ frontend_product_url(prev_product, column) }}" class="btn btn-outline-secondary btn-block text-left">
-            <small>上一个产品</small><br>{{ prev_product.title|truncate_text(20) }}
+            <small>{{ _p('product', '上一个产品') }}</small><br>{{ prev_product.title|truncate_text(20) }}
           </a>
           {% endif %}
         </div>
         <div class="col-6">
           {% if next_product %}
           <a href="{{ frontend_product_url(next_product, column) }}" class="btn btn-outline-secondary btn-block text-right">
-            <small>下一个产品</small><br>{{ next_product.title|truncate_text(20) }}
+            <small>{{ _p('product', '下一个产品') }}</small><br>{{ next_product.title|truncate_text(20) }}
           </a>
           {% endif %}
         </div>
@@ -86,14 +86,14 @@
 
   <div class="col-md-3">
     <div class="card">
-      <div class="card-header"><i class="fas fa-box-open"></i> 最新产品</div>
+      <div class="card-header"><i class="fas fa-box-open"></i> {{ _p('product', '最新产品') }}</div>
       <div class="list-group list-group-flush">
         {% for p in product_latest(column.slug, 8) %}
         <a href="{{ p.url }}" class="list-group-item list-group-item-action small {{ 'active' if p.id == product.id }}">
           {{ p.title|truncate_text(25) }}
         </a>
         {% else %}
-        <div class="list-group-item text-muted small">暂无其他产品</div>
+        <div class="list-group-item text-muted small">{{ _p('product', '暂无其他产品') }}</div>
         {% endfor %}
       </div>
     </div>

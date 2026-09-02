@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('frontend.theme_asset', slug=current_theme, filename='css/style.css') }}">
   {% block css %}{% endblock %}
+  {{ analytics_head()|safe }}
 </head>
 <body>
 
@@ -27,7 +28,7 @@
     <div class="collapse navbar-collapse" id="mainNav">
       <ul class="navbar-nav mr-auto">
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('frontend.index') }}">首页</a>
+          <a class="nav-link" href="{{ url_for('frontend.index') }}">{{ _('首页') }}</a>
         </li>
         {% macro render_nav(node) %}
           {% set col = node.node %}
@@ -59,8 +60,24 @@
         {% endfor %}
       </ul>
 
+      {% block locale_switcher %}
+      {% set _locales = available_locales() %}
+      {% if _locales %}
+      <div class="dropdown d-inline-block ml-2 mb-2 mb-lg-0">
+        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" data-toggle="dropdown">
+          <i class="fas fa-language"></i> {{ current_locale()|upper }}
+        </button>
+        <div class="dropdown-menu dropdown-menu-right">
+          {% for loc in _locales %}
+          <a class="dropdown-item {{ 'active' if loc.active }}" href="{{ request.path }}?lang={{ loc.code }}">{{ loc.label }}</a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% endblock %}
+
       <form class="form-inline my-2 my-lg-0" action="{{ url_for('frontend.search') }}" method="get">
-        <input class="form-control mr-sm-2" type="search" name="q" placeholder="搜索文章" value="{{ keyword|default('') }}">
+        <input class="form-control mr-sm-2" type="search" name="q" placeholder="{{ _('搜索文章') }}" value="{{ keyword|default('') }}">
         <button class="btn btn-outline-light my-2 my-sm-0" type="submit"><i class="fas fa-search"></i></button>
       </form>
     </div>
@@ -107,5 +124,6 @@
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
 {% block js %}{% endblock %}
+{{ analytics_body()|safe }}
 </body>
 </html>

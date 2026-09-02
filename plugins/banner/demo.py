@@ -25,6 +25,13 @@ def generate(industry):
             ('高效办公协作', f'{_DEMO_IMG}/svc_office.jpg'),
             ('客户会议洽谈', f'{_DEMO_IMG}/svc_meeting.jpg'),
         ]
+    elif industry == 'manufacturing_en':
+        name, remark = 'Home Hero', 'Manufacturing demo (EN)'
+        imgs = [
+            ('Modern Production Workshop', f'{_DEMO_IMG}/mfg_workshop.jpg'),
+            ('Smart Factory Overview', f'{_DEMO_IMG}/mfg_factory.jpg'),
+            ('Featured Products', f'{_DEMO_IMG}/mfg_product_a.jpg'),
+        ]
     else:
         name, remark = '首页大图', '制造业演示数据'
         imgs = [

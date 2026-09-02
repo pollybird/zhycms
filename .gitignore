@@ -23,7 +23,9 @@ instance/
 *.sqlite3
 
 # ===== 用户上传文件 =====
-app/static/uploads/
+# 忽略 uploads 下所有用户上传内容，但保留 demo/ 演示数据图片
+app/static/uploads/*
+!app/static/uploads/demo/
 
 # ===== 日志与临时文件 =====
 *.log
@@ -31,6 +33,9 @@ app/static/uploads/
 *.pid
 *.bak
 *.tmp
+
+# ===== 国际化编译产物（部署时由 pybabel compile 生成，不入库）=====
+*.mo
 
 # ===== 环境变量（可能含密钥、数据库密码）=====
 .env

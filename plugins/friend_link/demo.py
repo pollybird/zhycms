@@ -20,6 +20,11 @@ _DEMO_LINKS = {
         ('国家市场监督管理总局', 'https://www.samr.gov.cn/'),
         ('中国机械工业联合会', 'https://www.cmif.org.cn/'),
     ],
+    'manufacturing_en': [
+        ('Ministry of Industry and IT', 'https://www.miit.gov.cn/'),
+        ('State Administration for Market Regulation', 'https://www.samr.gov.cn/'),
+        ('China Machinery Industry Federation', 'https://www.cmif.org.cn/'),
+    ],
 }
 
 

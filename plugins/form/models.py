@@ -1,7 +1,14 @@
+"""自定义表单插件：数据模型。
+
+Form / FormField / FormSubmission / FormSubmissionValue
+表结构沿用核心迁移前定义（forms / form_fields / form_submissions /
+form_submission_values），旧站点升级后数据无缝保留；启用插件时由
+db.create_all() 兜底建表（表已存在则跳过）。
+"""
 import json
 from datetime import datetime
 
-from ..extensions import db
+from app.extensions import db
 
 
 class Form(db.Model):

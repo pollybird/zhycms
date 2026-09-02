@@ -11,6 +11,7 @@ from flask import (
     render_template, redirect, url_for, request,
     flash, session, Response, current_app
 )
+from flask_babel import gettext as _gettext
 from flask_login import login_user, logout_user, current_user, login_required
 
 from ..extensions import db
@@ -47,7 +48,7 @@ def _is_initialized():
 
 
 # 向导可勾选的官方插件（与 plugins/ 目录一一对应；第三方插件请在插件管理页启用）
-SETUP_PLUGINS = ('banner', 'product', 'friend_link')
+SETUP_PLUGINS = ('banner', 'product', 'friend_link', 'form')
 
 
 def _form_ctx(request):
@@ -72,7 +73,7 @@ def _form_ctx(request):
 @admin_auth_bp.route('/setup', methods=['GET', 'POST'])
 def setup():
     if _is_initialized():
-        flash('系统已初始化，请直接登录', 'info')
+        flash(_gettext('系统已初始化，请直接登录'), 'info')
         return redirect(url_for('admin_auth.login'))
 
     if request.method == 'POST':
@@ -89,13 +90,13 @@ def setup():
         db_password = request.form.get('db_password') or ''
 
         if not username or len(username) < 3:
-            flash('管理员账号至少 3 个字符', 'danger')
+            flash(_gettext('管理员账号至少 3 个字符'), 'danger')
             return render_template('admin/setup.html', **ctx)
         if len(password) < 6:
-            flash('管理员密码至少 6 个字符', 'danger')
+            flash(_gettext('管理员密码至少 6 个字符'), 'danger')
             return render_template('admin/setup.html', **ctx)
         if password != password_confirm:
-            flash('两次输入的密码不一致', 'danger')
+            flash(_gettext('两次输入的密码不一致'), 'danger')
             return render_template('admin/setup.html', **ctx)
 
         if db_type in ('mysql', 'postgresql'):
@@ -104,12 +105,12 @@ def setup():
             name = ctx['db_name']
             user = ctx['db_user']
             if not host or not name or not user:
-                flash('请填写完整的数据库连接信息（主机、数据库名、用户名）', 'danger')
+                flash(_gettext('请填写完整的数据库连接信息（主机、数据库名、用户名）'), 'danger')
                 return render_template('admin/setup.html', **ctx)
             try:
                 new_uri = build_uri(db_type, host, port, name, user, db_password)
             except ValueError as e:
-                flash(f'数据库连接信息有误：{e}', 'danger')
+                flash(_gettext('数据库连接信息有误：%(error)s') % {'error': e}, 'danger')
                 return render_template('admin/setup.html', **ctx)
             ok, msg = test_connection(new_uri)
             if not ok:
@@ -129,10 +130,10 @@ def setup():
                     switch_engine(current_app, db, old_uri)
                 except Exception:
                     pass
-                flash(f'切换到 {db_type} 失败，已回退到原数据库：{e}', 'danger')
+                flash(_gettext('切换到 %(dbtype)s 失败，已回退到原数据库：%(error)s') % {'dbtype': db_type, 'error': e}, 'danger')
                 return render_template('admin/setup.html', **ctx)
             if _is_initialized():
-                flash('目标数据库已包含管理员账号，无需重复初始化，请直接登录', 'info')
+                flash(_gettext('目标数据库已包含管理员账号，无需重复初始化，请直接登录'), 'info')
                 return redirect(url_for('admin_auth.login'))
         else:
             clear_db_config()
@@ -141,42 +142,62 @@ def setup():
 
         admin = create_admin(username, password, nickname=nickname or '超级管理员')
         if admin is None:
-            flash('初始化失败：已存在管理员账号', 'danger')
+            flash(_gettext('初始化失败：已存在管理员账号'), 'danger')
             return redirect(url_for('admin_auth.login'))
 
-        if demo_type in ('manufacturing', 'service'):
+        if demo_type in ('manufacturing', 'service', 'manufacturing_en', 'default_en'):
             # v2.2.0：行业演示数据与官方插件联动 —— 轮播图、友情链接在两个
             # 行业模板下均强制启用；制造业演示数据的产品页依赖 product 插件
             # （多图相册/规格参数/伪静态详情，演示钩子会把产品子栏目切换为
             # list_product 模板），同样强制启用。
             # 不生成演示数据时，仍按向导勾选启用。
+            # v2.3.0：英文模板（manufacturing_en / default_en）同联动逻辑。
             from ..plugin_system import enable_plugin, run_demo_data_hooks
-            auto_plugins = {'banner', 'friend_link'}
-            if demo_type == 'manufacturing':
+            auto_plugins = {'banner', 'friend_link', 'form'}
+            if demo_type in ('manufacturing', 'manufacturing_en'):
                 auto_plugins.add('product')
             for slug in dict.fromkeys(list(ctx['plugins']) + sorted(auto_plugins)):
                 if slug not in SETUP_PLUGINS:
                     continue
                 err = enable_plugin(slug)
                 if err:
-                    flash(f'插件启用失败：{err}', 'warning')
+                    flash(_gettext('插件启用失败：%(error)s') % {'error': err}, 'warning')
             try:
-                generate_demo_data(industry=demo_type)
-                for slug, err in run_demo_data_hooks(demo_type):
-                    flash(f'插件 {slug} 演示数据生成失败：{err}', 'warning')
-                label = '制造业' if demo_type == 'manufacturing' else '服务业'
-                flash(f'系统初始化完成，{label}演示数据已生成', 'success')
+                if demo_type in ('manufacturing', 'service'):
+                    generate_demo_data(industry=demo_type)
+                    for slug, err in run_demo_data_hooks(demo_type):
+                        flash(_gettext('插件 %(slug)s 演示数据生成失败：%(error)s') % {'slug': slug, 'error': err}, 'warning')
+                    label = _gettext('制造业') if demo_type == 'manufacturing' else _gettext('服务业')
+                    flash(_gettext('系统初始化完成，%(label)s演示数据已生成') % {'label': label}, 'success')
+                elif demo_type == 'manufacturing_en':
+                    # v2.3.0：英文模板需启用 i18n 并设默认语言为 en
+                    from ..models.setting import Setting
+                    Setting.set('i18n_enable', '1')
+                    Setting.set('i18n_default_locale', 'en')
+                    Setting.set('i18n_available_locales', 'zh,en')
+                    generate_demo_data(industry='manufacturing_en')
+                    for slug, err in run_demo_data_hooks('manufacturing_en'):
+                        flash(_gettext('插件 %(slug)s 演示数据生成失败：%(error)s') % {'slug': slug, 'error': err}, 'warning')
+                    flash(_gettext('系统初始化完成，Manufacturing (EN) 演示数据已生成'), 'success')
+                elif demo_type == 'default_en':
+                    # 英文默认主题：启用 i18n + 默认语言 en，不生成演示数据
+                    from ..models.setting import Setting
+                    Setting.set('i18n_enable', '1')
+                    Setting.set('i18n_default_locale', 'en')
+                    Setting.set('i18n_available_locales', 'zh,en')
+                    Setting.set('site_theme', 'default_en')
+                    flash(_gettext('系统初始化完成，请登录后台开始配置'), 'success')
             except Exception as e:
                 db.session.rollback()
-                flash(f'演示数据生成失败：{e}', 'warning')
+                flash(_gettext('演示数据生成失败：%(error)s') % {'error': e}, 'warning')
         else:
             # 不生成演示数据时同样启用勾选的插件
             from ..plugin_system import enable_plugin
             for slug in ctx['plugins']:
                 err = enable_plugin(slug)
                 if err:
-                    flash(f'插件启用失败：{err}', 'warning')
-            flash('系统初始化完成，请登录后台开始配置', 'success')
+                    flash(_gettext('插件启用失败：%(error)s') % {'error': err}, 'warning')
+            flash(_gettext('系统初始化完成，请登录后台开始配置'), 'success')
 
         return redirect(url_for('admin_auth.login'))
 
@@ -203,7 +224,7 @@ def login():
         session_captcha = (session.get('captcha') or '').lower()
 
         if not captcha or captcha != session_captcha:
-            flash('验证码错误', 'danger')
+            flash(_gettext('验证码错误'), 'danger')
             log_login(username, 'failed', '验证码错误')
             return render_template('admin/login.html', username=username)
 
@@ -213,7 +234,7 @@ def login():
         if user and user.is_locked:
             remaining = int((user.locked_until - datetime.now()).total_seconds())
             mm, ss = divmod(remaining, 60) if remaining > 0 else (0, 0)
-            msg = f'账号已被锁定，请 {mm} 分 {ss} 秒后再试'
+            msg = _gettext('账号已被锁定，请 %(mm)d 分 %(ss)d 秒后再试') % {'mm': mm, 'ss': ss}
             flash(msg, 'danger')
             log_login(username, 'locked', msg, user_id=user.id)
             audit_log(OP_LOGIN, MODULE_USER, target_id=user.id, target_name=username,
@@ -230,12 +251,14 @@ def login():
                 except Exception:
                     db.session.rollback()
                 if user.is_locked:
-                    msg = f'连续密码错误 {_login_max_fail()} 次，账号锁定 {_login_lock_minutes()} 分钟'
+                    _lf = _login_max_fail()
+                    _ll = _login_lock_minutes()
+                    msg = _gettext('连续密码错误 %(n)d 次，账号锁定 %(m)d 分钟') % {'n': _lf, 'm': _ll}
                     log_login(username, 'locked', msg, user_id=user.id)
                     audit_log(OP_LOGIN, MODULE_USER, target_id=user.id, target_name=username, detail=msg)
                     flash(msg, 'danger')
                     return render_template('admin/login.html', username=username)
-            flash('账号或密码错误', 'danger')
+            flash(_gettext('账号或密码错误'), 'danger')
             log_login(username, 'failed', '账号或密码错误', user_id=user.id if user else None)
             return render_template('admin/login.html', username=username)
 

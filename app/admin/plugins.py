@@ -26,6 +26,7 @@ from datetime import datetime
 
 from flask import (render_template, redirect, url_for, request, flash,
                    current_app, send_file)
+from flask_babel import gettext as _gettext
 from werkzeug.utils import secure_filename
 
 from ..models.audit import OP_UPDATE, OP_UPLOAD, OP_DELETE, OP_EXPORT, MODULE_PLUGIN
@@ -58,21 +59,21 @@ def plugin_index():
 def plugin_toggle(slug):
     rec = plugin_system.get_record(slug)
     if rec is None:
-        flash('插件不存在', 'danger')
+        flash(_gettext('插件不存在'), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     name = rec.name
     if plugin_system.plugin_enabled(slug):
         plugin_system.disable_plugin(slug)
         action = 'disable'
-        flash(f'插件「{name}」已禁用', 'success')
+        flash(_gettext('插件「{0}」已禁用').format(name), 'success')
     else:
         err = plugin_system.enable_plugin(slug)
         if err:
-            flash(f'插件「{name}」启用失败：{err}', 'danger')
+            flash(_gettext('插件「{0}」启用失败：{1}').format(name, err), 'danger')
             return redirect(url_for('admin.plugin_index'))
         action = 'enable'
-        flash(f'插件「{name}」已启用', 'success')
+        flash(_gettext('插件「{0}」已启用').format(name), 'success')
 
     audit_log(OP_UPDATE, MODULE_PLUGIN, target_id=slug, target_name=name,
               detail={'action': '启用' if action == 'enable' else '禁用',
@@ -95,22 +96,22 @@ def plugin_delete(slug):
 
     # slug 来自 URL，必须严格校验，防止 ".." 等穿越
     if not _PLUGIN_SLUG_RE.match(slug or ''):
-        flash('非法的插件标识', 'danger')
+        flash(_gettext('非法的插件标识'), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     rec = plugin_system.get_record(slug)
     if rec is not None and rec.manifest.get('builtin'):
-        flash(f'「{rec.name}」为官方内置插件，不支持卸载；如不需要可在插件管理中禁用',
+        flash(_gettext('「{0}」为官方内置插件，不支持卸载；如不需要可在插件管理中禁用').format(rec.name),
               'danger')
         return redirect(url_for('admin.plugin_index'))
 
     if plugin_system.plugin_enabled(slug):
-        flash('插件正在启用中，请先禁用再卸载', 'danger')
+        flash(_gettext('插件正在启用中，请先禁用再卸载'), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     pkg_dir = os.path.join(plugin_system.PLUGINS_DIR, slug)
     if not os.path.isdir(pkg_dir):
-        flash(f'插件目录不存在：plugins/{slug}/', 'danger')
+        flash(_gettext('插件目录不存在：plugins/{0}/').format(slug), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     name = rec.name if rec is not None else slug
@@ -119,7 +120,7 @@ def plugin_delete(slug):
     try:
         shutil.rmtree(pkg_dir)
     except OSError as e:
-        flash(f'删除插件目录失败：{e}（请检查目录写权限）', 'danger')
+        flash(_gettext('删除插件目录失败：{0}（请检查目录写权限）').format(e), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     # 当前进程注册表移除：列表/菜单/sitemap/审计聚合立即消失
@@ -127,8 +128,7 @@ def plugin_delete(slug):
 
     audit_log(OP_DELETE, MODULE_PLUGIN, target_id=slug, target_name=name,
               detail={'action': '卸载插件', 'version': version})
-    flash(f'插件「{name}」已卸载，目录 plugins/{slug}/ 已删除'
-          f'（数据表保留，重新上传同名插件包可恢复使用）', 'success')
+    flash(_gettext('插件「{0}」已卸载，目录 plugins/{1}/ 已删除（数据表保留，重新上传同名插件包可恢复使用）').format(name, slug), 'success')
     return redirect(url_for('admin.plugin_index'))
 
 
@@ -137,12 +137,12 @@ def plugin_delete(slug):
 def plugin_download(slug):
     """打包下载插件目录为 zip（单目录形态，可在其他站点直接上传复用）。"""
     if not _PLUGIN_SLUG_RE.match(slug or ''):
-        flash('非法的插件标识', 'danger')
+        flash(_gettext('非法的插件标识'), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     pkg_dir = os.path.join(plugin_system.PLUGINS_DIR, slug)
     if not os.path.isdir(pkg_dir):
-        flash(f'插件目录不存在：plugins/{slug}/', 'danger')
+        flash(_gettext('插件目录不存在：plugins/{0}/').format(slug), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     rec = plugin_system.get_record(slug)
@@ -168,7 +168,7 @@ def plugin_upload():
     """插件压缩包上传入口。全程校验不通过时不写入 plugins/ 目录。"""
     f = request.files.get('archive')
     if f is None or not f.filename:
-        flash('请选择要上传的插件压缩包', 'danger')
+        flash(_gettext('请选择要上传的插件压缩包'), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
     # 1. 扩展名白名单（原始文件名取后缀，避免 secure_filename 剥离中文后丢失类型）
@@ -179,7 +179,7 @@ def plugin_upload():
     else:
         ext = lower.rsplit('.', 1)[-1] if '.' in lower else ''
     if ext not in _PLUGIN_ALLOWED_EXTS:
-        flash(f'非法文件类型：仅允许 {" / ".join(_PLUGIN_ALLOWED_EXTS)}',
+        flash(_gettext('非法文件类型：仅允许 {0}').format(" / ".join(_PLUGIN_ALLOWED_EXTS)),
               'danger')
         return redirect(url_for('admin.plugin_index'))
 
@@ -193,7 +193,7 @@ def plugin_upload():
         os.makedirs(unpacked, exist_ok=True)
         err = _extract_archive(f.stream, ext, unpacked)
         if err:
-            flash(f'解压失败：{err}', 'danger')
+            flash(_gettext('解压失败：{0}').format(err), 'danger')
             return redirect(url_for('admin.plugin_index'))
 
         # 3. 识别插件根目录 & 校验（返回 (root, slug, manifest) 或抛字符串错误）
@@ -201,7 +201,7 @@ def plugin_upload():
             root, slug, manifest, meta = _validate_plugin_package(
                 unpacked, raw_name, plugins_dir)
         except ValueError as e:
-            flash(f'插件包不合法：{e}', 'danger')
+            flash(_gettext('插件包不合法：{0}').format(e), 'danger')
             return redirect(url_for('admin.plugin_index'))
 
         # 4. 移动到 plugins/<slug>/
@@ -209,14 +209,13 @@ def plugin_upload():
         try:
             shutil.move(root, target)
         except OSError as e:
-            flash(f'写入 plugins 目录失败：{e}', 'danger')
+            flash(_gettext('写入 plugins 目录失败：{0}').format(e), 'danger')
             return redirect(url_for('admin.plugin_index'))
 
         # 5. 审计日志 + 成功提示
         name = manifest.get('name') or slug
         ver = manifest.get('version') or ''
-        flash(f'插件「{name}」（{slug} v{ver or "-"}）上传成功，请到列表页启用。'
-              f' 未生效可重启应用重新加载。', 'success')
+        flash(_gettext('插件「{0}」（{1} v{2}）上传成功，请到列表页启用。 未生效可重启应用重新加载。').format(name, slug, ver or "-"), 'success')
         audit_log(OP_UPLOAD, MODULE_PLUGIN,
                   target_id=slug, target_name=name,
                   detail={'action': '上传插件',
@@ -239,7 +238,7 @@ def plugin_upload():
 def _safe_join(base, member_path):
     """在 base 目录内安全拼接路径；路径穿越（../ 或绝对路径）抛 ValueError。"""
     if os.path.isabs(member_path):
-        raise ValueError(f'文件包含绝对路径：{member_path}')
+        raise ValueError(_gettext('文件包含绝对路径：{0}').format(member_path))
     # 统一反斜杠（来自 Windows 打包机的 zip）
     normalized = member_path.replace('\\', '/').lstrip('/')
     target = os.path.normpath(os.path.join(base, normalized))
@@ -247,7 +246,7 @@ def _safe_join(base, member_path):
     target_abs = os.path.normpath(os.path.abspath(target))
     if not (target_abs == base_abs
             or target_abs.startswith(base_abs + os.sep)):
-        raise ValueError(f'文件包含路径穿越：{member_path}')
+        raise ValueError(_gettext('文件包含路径穿越：{0}').format(member_path))
     return target
 
 
@@ -349,13 +348,13 @@ def _validate_plugin_package(unpacked, archive_name, plugins_dir):
     """
     root = _find_plugin_root(unpacked)
     if root is None:
-        raise ValueError('未找到 manifest.json，压缩包结构不符合规范')
+        raise ValueError(_gettext('未找到 manifest.json，压缩包结构不符合规范'))
 
     # 必备文件
     for req in _PLUGIN_REQUIRED_FILES:
         p = os.path.join(root, req)
         if not os.path.isfile(p):
-            raise ValueError(f'缺少必备文件：{req}')
+            raise ValueError(_gettext('缺少必备文件：{0}').format(req))
         if req == '__init__.py' and os.path.getsize(p) == 0:
             # 0 字节 __init__.py 语法上合法但 import 后通常无 plugin 实例，管理页会"加载失败"；先放行，
             # 但在 meta 中标记，避免过度拦截合法的"只放 models"场景。
@@ -367,18 +366,17 @@ def _validate_plugin_package(unpacked, archive_name, plugins_dir):
         with open(mf, 'r', encoding='utf-8') as f:
             manifest = json.load(f)
     except (ValueError, OSError) as e:
-        raise ValueError(f'manifest.json 解析失败：{e}')
+        raise ValueError(_gettext('manifest.json 解析失败：{0}').format(e))
     if not isinstance(manifest, dict):
-        raise ValueError('manifest.json 必须是 JSON 对象（不是数组或字符串）')
+        raise ValueError(_gettext('manifest.json 必须是 JSON 对象（不是数组或字符串）'))
 
     # slug 字段
     slug = (manifest.get('slug') or '').strip()
     if not slug:
-        raise ValueError('manifest.json 缺少必填字段 slug')
+        raise ValueError(_gettext('manifest.json 缺少必填字段 slug'))
     if not _PLUGIN_SLUG_RE.match(slug):
         raise ValueError(
-            f'manifest.json 的 slug 格式不合法，只能包含字母/数字/连字符/下划线，'
-            f'长度 2-32 位（当前：{slug}）')
+            _gettext('manifest.json 的 slug 格式不合法，只能包含字母/数字/连字符/下划线，长度 2-32 位（当前：{0}）').format(slug))
 
     # 形态 B 时根目录名可能与 slug 不一致：若根 = unpacked 本身（平铺），
     # 先把子项重命名到 unpacked/{slug}/，再让上层用新 root。
@@ -400,8 +398,7 @@ def _validate_plugin_package(unpacked, archive_name, plugins_dir):
     target = os.path.join(plugins_dir, slug)
     if os.path.exists(target):
         raise ValueError(
-            f'插件目录已存在：plugins/{slug}/，请先备份并删除该目录后再上传，'
-            f'避免误覆盖正在运行中的自定义插件代码。')
+            _gettext('插件目录已存在：plugins/{0}/，请先备份并删除该目录后再上传，避免误覆盖正在运行中的自定义插件代码。').format(slug))
 
     # 汇总元数据
     file_count = 0

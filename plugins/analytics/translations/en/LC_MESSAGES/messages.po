@@ -1,0 +1,131 @@
+# English translations for ZhyCMS plugin.
+# Copyright (C) 2026 ZhyCMS
+# This file is distributed under the same license as the ZhyCMS project.
+#
+msgid ""
+msgstr ""
+msgid "统计代码配置"
+msgstr "Analytics Settings"
+msgid "插件"
+msgstr "Plugins"
+msgid "统计代码"
+msgstr "Analytics"
+msgid "总开关"
+msgstr "Master Switch"
+msgid "启用前台统计代码注入（关闭后所有页面不再注入任何统计代码）"
+msgstr "Enable analytics injection (when off, no analytics code is injected on any page)"
+msgid "启用后，下列已填写的代码将自动注入到前台所有主题页面（不影响后台管理页）。保存即生效，无需重启。"
+msgstr "When enabled, any filled analytics code below is automatically injected on all frontend theme pages (not on admin pages). Saved changes take effect immediately, no restart required."
+msgid "GA4 代码（含 <script> 标签，注入到 </head> 前）"
+msgstr "GA4 代码（含 <script> 标签，注入到 </head> 前）"
+
+msgid "粘贴 GA4 代码片段，含 script 标签"
+msgstr "粘贴 GA4 代码片段，含 script 标签"
+
+msgid "官方建议放 head，账号 ID 内嵌（如 G-XXXXXXXX）。"
+msgstr "Officially recommended in <head>, with account ID embedded (e.g. G-XXXXXXXX)."
+msgid "百度统计"
+msgstr "Baidu Tongji"
+msgid "百度统计代码（含 <script> 标签，注入到 </head> 前）"
+msgstr "Baidu Tongji code (with <script> tag, injected before </head>)"
+msgid "粘贴百度统计代码片段，含 script 标签"
+msgstr "Paste the Baidu Tongji snippet including the <script> tag"
+msgid "在百度统计后台获取 hm.js 代码。"
+msgstr "Get the hm.js snippet from the Baidu Tongji console."
+msgid "站长工具"
+msgstr "Webmaster Tools"
+msgid "cnzz / 51la 等站长统计代码（注入到 </head> 前）"
+msgstr "CNZZ / 51LA and similar webmaster analytics snippets (injected before </head>)"
+msgid "粘贴 cnzz / 51la 等站长工具代码片段"
+msgstr "Paste the CNZZ / 51LA snippet or equivalent"
+msgid "直接粘贴官方提供的统计代码即可。"
+msgstr "Simply paste the analytics snippet provided by your vendor."
+msgid "自定义代码"
+msgstr "Custom Code"
+msgid "自定义 </head> 前注入（任意第三方 / 埋点 / 像素代码）"
+msgstr "自定义 </head> 前注入（任意第三方 / 埋点 / 像素代码）"
+
+msgid "任意注入到 head 末尾的代码"
+msgstr "任意注入到 head 末尾的代码"
+
+msgid "自定义 </body> 前注入"
+msgstr "自定义 </body> 前注入"
+
+msgid "任意注入到 body 末尾的代码"
+msgstr "Any code injected at the end of <body>"
+msgid "保存统计代码配置"
+msgstr "Save Analytics Settings"
+#~ msgid "cnzz / 51la ç­ç«é¿ç»è®¡ä»£ç ï¼æ³¨¥å° </head> åï¼"
+#~ msgstr ""
+
+#~ msgid "GA4 ä»£ç ï¼å« <script> æ ç­¾ï¼æ³¨¥å° </head> åï¼"
+#~ msgstr ""
+
+#~ msgid "ä»»ææ³¨¥å° body æ«å°¾çä»£ç "
+#~ msgstr ""
+
+#~ msgid "ä»»ææ³¨¥å° head æ«å°¾çä»£ç "
+#~ msgstr ""
+
+#~ msgid "ä¿å­ç»è®¡ä»£ç ç½®"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "å¯ç¨åå°ç»è®¡ä»£ç "
+#~ "æ³¨¥ï¼³é­åææé¡µé¢ä¸åæ³¨¥ä»»ä½ç»è®¡ä»£ç ï¼"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "å¯ç¨åï¼ä¸åå·²å¡«åçä»£ç "
+#~ "å°èªå¨æ³¨¥å°åå°ææä¸»é¢é¡µé¢ï¼ä¸å½±ååå°ç®¡çé¡µï¼ãä¿å­å³çæï¼æ"
+#~ " ééå¯ã"
+#~ msgstr ""
+
+#~ msgid "å¨ç¾åº¦ç»è®¡åå°è·å hm.js ä»£ç ã"
+#~ msgstr "Get the hm.js code from your Baidu Tongji dashboard."
+
+#~ msgid "å®æ¹å»ºè®®æ¾ headï¼è´¦å· ID ååµï¼å¦ G-XXXXXXXXï¼ã"
+#~ msgstr ""
+
+#~ msgid "æ»å¼³"
+#~ msgstr ""
+
+#~ msgid "æä»¶"
+#~ msgstr "Plugins"
+
+#~ msgid "ç¾åº¦ç»è®¡"
+#~ msgstr "Baidu Tongji"
+
+#~ msgid "ç¾åº¦ç»è®¡ä»£ç ï¼å« <script> æ ç­¾ï¼æ³¨¥å° </head> åï¼"
+#~ msgstr ""
+
+#~ msgid "ç´æ¥ç²è´´å®æ¹æä¾çç»è®¡ä»£ç å³å¯ã"
+#~ msgstr "Just paste the analytics code provided by the official vendor."
+
+#~ msgid "ç«é¿å·¥·"
+#~ msgstr ""
+
+#~ msgid "ç²è´´ cnzz / 51la ç­ç«é¿å·¥·ä»£ç çæ®µ"
+#~ msgstr ""
+
+#~ msgid "ç²è´´ GA4 ä»£ç çæ®µï¼å« script æ ç­¾"
+#~ msgstr "Paste the GA4 code snippet, including the <script> tags"
+
+#~ msgid "ç²è´´ç¾åº¦ç»è®¡ä»£ç çæ®µï¼å« script æ ç­¾"
+#~ msgstr "Paste the Baidu Tongji code snippet, including the <script> tags"
+
+#~ msgid "ç»è®¡ä»£ç "
+#~ msgstr "Analytics code"
+
+#~ msgid "ç»è®¡ä»£ç ç½®"
+#~ msgstr ""
+
+#~ msgid "èªå®ä¹ </body> åæ³¨¥"
+#~ msgstr ""
+
+#~ msgid "èªå®ä¹ </head> åæ³¨¥ï¼ä»»æç¬¬ä¸æ¹ / åç¹ / åç´ ä»£ç ï¼"
+#~ msgstr ""
+
+#~ msgid "èªå®ä¹ä»£ç "
+#~ msgstr "Custom code"
+
