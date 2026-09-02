@@ -19,80 +19,80 @@ msgstr "Title"
 msgid "摘要"
 msgstr "Summary"
 msgid "列表页展示的产品简介"
-msgstr "列表页展示的产品简介"
+msgstr "Product summary shown on the list page"
 
 msgid "产品详情"
 msgstr "Product Detail"
 msgid "产品相册"
 msgstr "Product Gallery"
 msgid "拖拽图片调整顺序；未单独上传封面时，列表取第一张为封面"
-msgstr "拖拽图片调整顺序；未单独上传封面时，列表取第一张为封面"
+msgstr "Drag images to reorder; if no cover is uploaded separately, the first image is used as cover on the list."
 
 msgid "相册图"
-msgstr "相册图"
+msgstr "Gallery Images"
 
 msgid "移除"
-msgstr "移除"
+msgstr "Remove"
 
 msgid "上传新图片（可多选）"
-msgstr "上传新图片（可多选）"
+msgstr "Upload new images (multi-select supported)"
 
 msgid "新上传图片将排在相册末尾；保存后可再调整顺序。"
-msgstr "新上传图片将排在相册末尾；保存后可再调整顺序。"
+msgstr "Newly uploaded images are appended to the gallery; order can be adjusted after saving."
 
 msgid "规格参数"
-msgstr "规格参数"
+msgstr "Specifications"
 
 msgid "添加分组"
-msgstr "添加分组"
+msgstr "Add Group"
 
 msgid "分组名称（如：基本参数）"
-msgstr "分组名称（如：基本参数）"
+msgstr "Group name (e.g. Basic Parameters)"
 
 msgid "删除分组"
-msgstr "删除分组"
+msgstr "Delete Group"
 
 msgid "参数名"
-msgstr "参数名"
+msgstr "Parameter Name"
 
 msgid "参数值"
 msgstr "Value"
 msgid "如：型号"
-msgstr "如：型号"
+msgstr "e.g. Model"
 
 msgid "添加参数"
-msgstr "添加参数"
+msgstr "Add Parameter"
 
 msgid "参数名为空的行保存时自动忽略；前台详情页按分组渲染规格表。"
-msgstr "参数名为空的行保存时自动忽略；前台详情页按分组渲染规格表。"
+msgstr "Rows with empty parameter names are automatically ignored on save; the detail page renders specs by group."
 
 msgid "发布设置"
-msgstr "发布设置"
+msgstr "Publish Settings"
 
 msgid "所属栏目"
 msgstr "Parent Column"
 msgid "请选择列表栏目"
-msgstr "请选择列表栏目"
+msgstr "Please select a list column"
 
 msgid "产品归入列表栏目；栏目级内容权限与文章一致。"
-msgstr "产品归入列表栏目；栏目级内容权限与文章一致。"
+msgstr "Products are assigned to list columns; column-level content permissions are the same as articles."
 
 msgid "排序优先级"
-msgstr "排序优先级"
+msgstr "Sort Priority"
 
 msgid "启用（前台展示）"
-msgstr "启用（前台展示）"
+msgstr "Enabled (shown on frontend)"
 
 msgid "封面图"
 msgstr "Cover Image"
 msgid "删除封面"
-msgstr "删除封面"
+msgstr "Remove Cover"
 
 msgid "删除后展示取相册第一张（如有）。"
-msgstr "删除后展示取相册第一张（如有）。"
+msgstr "After deletion, the first gallery image (if any) will be shown instead."
 
 msgid "未设置封面时展示取相册第一张（如有）。"
-msgstr "未设置封面时展示取相册第一张（如有）。"
+msgstr "When no cover is set, the first gallery image (if any) is displayed."
 
 msgid "SEO 标题"
 msgstr "SEO Title"
@@ -101,39 +101,39 @@ msgstr "SEO Keywords"
 msgid "SEO 描述"
 msgstr "SEO Description"
 msgid "保存产品"
-msgstr "保存产品"
+msgstr "Save Product"
 
 msgid "返回列表"
 msgstr "Back to List"
 msgid "在此输入产品详情……"
-msgstr "在此输入产品详情……"
+msgstr "Enter product details here..."
 
 msgid "产品列表"
-msgstr "产品列表"
+msgstr "Product List"
 
 msgid "栏目"
-msgstr "栏目"
+msgstr "Column"
 
 msgid "全部栏目"
-msgstr "全部栏目"
+msgstr "All Columns"
 
 msgid "标题关键词"
-msgstr "标题关键词"
+msgstr "Title Keyword"
 
 msgid "全部状态"
-msgstr "全部状态"
+msgstr "All Status"
 
 msgid "启用"
 msgstr "Enabled"
 msgid "停用"
 msgstr "Disabled"
 msgid "筛选"
-msgstr "筛选"
+msgstr "Filter"
 
 msgid "重置"
 msgstr "Reset"
 msgid "封面"
-msgstr "封面"
+msgstr "Cover"
 
 msgid "排序"
 msgstr "Order"
@@ -144,347 +144,83 @@ msgstr "Updated At"
 msgid "操作"
 msgstr "Actions"
 msgid "无封面（取相册第一张）"
-msgstr "无封面（取相册第一张）"
+msgstr "No cover (uses first gallery image)"
 
 msgid "相册图片数"
-msgstr "相册图片数"
+msgstr "Gallery Count"
 
 msgid "图"
-msgstr "图"
+msgstr "img"
 
 msgid "含规格参数"
-msgstr "含规格参数"
+msgstr "Has Specs"
 
 msgid "规格"
-msgstr "规格"
+msgstr "Specs"
 
 msgid "前台预览"
-msgstr "前台预览"
+msgstr "Preview"
 
 msgid "确认删除《"
-msgstr "确认删除《"
+msgstr "Confirm delete 《"
 
 msgid "删除"
 msgstr "Delete"
 msgid "暂无产品，点击右上角「新增产品」创建第一个产品"
-msgstr "暂无产品，点击右上角「新增产品」创建第一个产品"
+msgstr "No products yet. Click \"Add Product\" at the top right to create the first product."
 
 msgid "批量启用"
-msgstr "批量启用"
+msgstr "Bulk Enable"
 
 msgid "批量停用"
-msgstr "批量停用"
+msgstr "Bulk Disable"
 
 msgid "批量删除"
-msgstr "批量删除"
+msgstr "Bulk Delete"
 
 msgid "移动到栏目…"
-msgstr "移动到栏目…"
+msgstr "Move to column…"
 
 msgid "批量移动"
-msgstr "批量移动"
+msgstr "Bulk Move"
 
 msgid "移动"
-msgstr "移动"
+msgstr "Move"
 
 msgid "未选择产品时操作无效"
-msgstr "未选择产品时操作无效"
+msgstr "No action taken: no products selected."
 
 msgid "请先选择产品"
-msgstr "请先选择产品"
+msgstr "Please select products first."
 
 msgid "确认批量启用所选产品？"
-msgstr "确认批量启用所选产品？"
+msgstr "Confirm bulk enable the selected products?"
 
 msgid "确认批量停用所选产品？停用后前台不再展示。"
-msgstr "确认批量停用所选产品？停用后前台不再展示。"
+msgstr "Confirm bulk disable the selected products? They will no longer appear on the frontend."
 
 msgid "确认批量删除所选产品？"
-msgstr "确认批量删除所选产品？"
+msgstr "Confirm bulk delete the selected products?"
 
 msgid "请先选择目标栏目"
-msgstr "请先选择目标栏目"
+msgstr "Please select a target column first."
 
 msgid "确认将所选产品移动到目标栏目？"
-msgstr "确认将所选产品移动到目标栏目？"
+msgstr "Confirm moving the selected products to the target column?"
 
 msgid "首页"
-msgstr "首页"
+msgstr "Home"
 
 msgid "图片"
 msgstr "Image"
 msgid "上一个产品"
-msgstr "上一个产品"
+msgstr "Previous product"
 
 msgid "下一个产品"
-msgstr "下一个产品"
+msgstr "Next product"
 
 msgid "最新产品"
-msgstr "最新产品"
+msgstr "Latest products"
 
 msgid "暂无其他产品"
-msgstr "暂无其他产品"
-
-#~ msgid "SEO ³é®è¯"
-#~ msgstr ""
-
-#~ msgid "SEO æè¿°"
-#~ msgstr "SEO description"
-
-#~ msgid "SEO æ é¢"
-#~ msgstr "SEO title"
-
-#~ msgid "ä¸ä¸ä¸ªäº§å"
-#~ msgstr "Previous product"
-
-#~ msgid "ä¸ä¼ æ°å¾çï¼å¯å¤éï¼"
-#~ msgstr "Upload new images (multi-select supported)"
-
-#~ msgid "ä¸ä¸ä¸ªäº§å"
-#~ msgstr "Next product"
-
-#~ msgid "äº§ååè¡¨"
-#~ msgstr "Product list"
-
-#~ msgid "äº§åå½¥åè¡¨æ ç®ï¼æ ç®çº§åå®¹æéä¸æç« ä¸è´ã"
-#~ msgstr ""
-
-#~ msgid "äº§åç¸å"
-#~ msgstr "Product gallery"
-
-#~ msgid "äº§åç®¡ç"
-#~ msgstr "Product management"
-
-#~ msgid "äº§åè¯¦æ"
-#~ msgstr ""
-
-#~ msgid "ä¿å­äº§å"
-#~ msgstr "Save product"
-
-#~ msgid "åç¨"
-#~ msgstr "Disable"
-
-#~ msgid "¨é¨æ ç®"
-#~ msgstr ""
-
-#~ msgid "¨é¨ç¶æ"
-#~ msgstr ""
-
-#~ msgid "åç»åç§°ï¼å¦ï¼åºæ¬åæ°ï¼"
-#~ msgstr "Group name (e.g. Basic specs)"
-
-#~ msgid "åè¡¨é¡µå±ç¤ºçäº§åç®ä»"
-#~ msgstr "Product summary shown on the list page"
-
-#~ msgid "å é¤"
-#~ msgstr "Delete"
-
-#~ msgid "å é¤åç»"
-#~ msgstr "Delete group"
-
-#~ msgid "å é¤åå±ç¤ºåç¸åç¬¬ä¸å¼ ï¼å¦æï¼ã"
-#~ msgstr "After deletion, the first gallery image (if any) will be shown instead."
-
-#~ msgid "å é¤å°é¢"
-#~ msgstr "Remove cover"
-
-#~ msgid "åå°é¢è§"
-#~ msgstr "Preview on site"
-
-#~ msgid "åæ°å¼"
-#~ msgstr "Value"
-
-#~ msgid "åæ°å"
-#~ msgstr "Name"
-
-#~ msgid ""
-#~ "åæ°åä¸ºç©ºçè¡ä¿å­æ¶èªå¨å¿½ç¥ï¼åå°è¯¦æé¡µæåç»æ¸²æè§æ"
-#~ " ¼è¡¨ã"
-#~ msgstr ""
-
-#~ msgid "åå¸è®¾ç½®"
-#~ msgstr "Publishing settings"
-
-#~ msgid "å«è§æ ¼åæ°"
-#~ msgstr "Has specs"
-
-#~ msgid "å¯ç¨"
-#~ msgstr "Enable"
-
-#~ msgid "å¯ç¨ï¼åå°å±ç¤ºï¼"
-#~ msgstr "Enabled (shown on frontend)"
-
-#~ msgid "å¾"
-#~ msgstr "Cover"
-
-#~ msgid "å¾ç"
-#~ msgstr "Images"
-
-#~ msgid "å¨æ­¤è¾¥äº§åè¯¦æâ¦â¦"
-#~ msgstr ""
-
-#~ msgid "å¦ï¼åå·"
-#~ msgstr "e.g. Model"
-
-#~ msgid "å°é¢"
-#~ msgstr "Cover"
-
-#~ msgid "å°é¢å¾"
-#~ msgstr "Cover image"
-
-#~ msgid "æå±æ ç®"
-#~ msgstr "Column"
-
-#~ msgid "æ¹éåç¨"
-#~ msgstr "Bulk disable"
-
-#~ msgid "æ¹éå é¤"
-#~ msgstr "Bulk delete"
-
-#~ msgid "æ¹éå¯ç¨"
-#~ msgstr "Bulk enable"
-
-#~ msgid "æ¹éç§»å¨"
-#~ msgstr "Bulk move"
-
-#~ msgid ""
-#~ "ææ½å¾çè°æ´é¡ºåºï¼æªåç¬ä¸ä¼ "
-#~ "å°é¢æ¶ï¼åè¡¨åç¬¬ä¸å¼ ä¸ºå°é¢"
-#~ msgstr ""
-#~ "Drag images to reorder; if no "
-#~ "cover is uploaded separately, the first"
-#~ " image is used as cover on the"
-#~ " list."
-
-#~ msgid "æåº"
-#~ msgstr "Sort"
-
-#~ msgid "æåºä¼çº§"
-#~ msgstr ""
-
-#~ msgid "æè¦"
-#~ msgstr "Summary"
-
-#~ msgid "æä½"
-#~ msgstr "Actions"
-
-#~ msgid "æ°ä¸ä¼ å¾çå°æå¨ç¸åæ«å°¾ï¼ä¿å­åå¯åè°æ´é¡ºåºã"
-#~ msgstr ""
-#~ "Newly uploaded images are appended to"
-#~ " the gallery; order can be adjusted"
-#~ " after saving."
-
-#~ msgid "æ°å¢"
-#~ msgstr "New"
-
-#~ msgid "æ°å¢äº§å"
-#~ msgstr "New product"
-
-#~ msgid "æ å°é¢ï¼åç¸åç¬¬ä¸å¼ ï¼"
-#~ msgstr "No cover (uses first gallery image)"
-
-#~ msgid "ææ äº§åï¼ç¹å»å³ä¸è§ãæ°å¢äº§åãåå»ºç¬¬ä¸ä¸ªäº§å"
-#~ msgstr ""
-#~ "No products yet. Click \"New product\""
-#~ " at the top right to create the"
-#~ " first one."
-
-#~ msgid "ææ ¶ä»äº§å"
-#~ msgstr ""
-
-#~ msgid "æ´æ°æ¶é´"
-#~ msgstr "Updated"
-
-#~ msgid "ææ°äº§å"
-#~ msgstr "Latest products"
-
-#~ msgid "æªè®¾ç½®å°é¢æ¶å±ç¤ºåç¸åç¬¬ä¸å¼ ï¼å¦æï¼ã"
-#~ msgstr "When no cover is set, the first gallery image (if any) is displayed."
-
-#~ msgid "æªéæ©äº§åæ¶æä½æ æ"
-#~ msgstr "No action taken: no products selected."
-
-#~ msgid "æ é¢"
-#~ msgstr "Title"
-
-#~ msgid "æ é¢³é®è¯"
-#~ msgstr ""
-
-#~ msgid "æ ç®"
-#~ msgstr "Column"
-
-#~ msgid "æ·»å åç»"
-#~ msgstr "Add group"
-
-#~ msgid "æ·»å åæ°"
-#~ msgstr "Add parameter"
-
-#~ msgid "ç¶æ"
-#~ msgstr "Status"
-
-#~ msgid "ç¸åå¾"
-#~ msgstr "Gallery images"
-
-#~ msgid "ç¸åå¾çæ°"
-#~ msgstr "Gallery count"
-
-#~ msgid "ç¡®è®¤å é¤ã"
-#~ msgstr "Confirm delete 《"
-
-#~ msgid "ç¡®è®¤å°æéäº§åç§»å¨å°ç®æ æ ç®ï¼"
-#~ msgstr "Confirm moving the selected products to the target column?"
-
-#~ msgid "ç¡®è®¤æ¹éåç¨æéäº§åï¼åç¨ååå°ä¸åå±ç¤ºã"
-#~ msgstr ""
-#~ "Confirm bulk disable the selected "
-#~ "products? They will no longer appear "
-#~ "on the frontend."
-
-#~ msgid "ç¡®è®¤æ¹éå é¤æéäº§åï¼"
-#~ msgstr "Confirm bulk delete the selected products?"
-
-#~ msgid "ç¡®è®¤æ¹éå¯ç¨æéäº§åï¼"
-#~ msgstr "Confirm bulk enable the selected products?"
-
-#~ msgid "ç§»å¨"
-#~ msgstr "Move"
-
-#~ msgid "ç§»å¨å°æ ç®â¦"
-#~ msgstr "Move to column…"
-
-#~ msgid "ç§»é¤"
-#~ msgstr "Remove"
-
-#~ msgid "ç­é"
-#~ msgstr "Filter"
-
-#~ msgid "ç¼è¾"
-#~ msgstr "Edit"
-
-#~ msgid "ç¼è¾äº§å"
-#~ msgstr "Edit product"
-
-#~ msgid "è§æ ¼"
-#~ msgstr "Specs"
-
-#~ msgid "è§æ ¼åæ°"
-#~ msgstr "Specs"
-
-#~ msgid "è¯·éæ©äº§å"
-#~ msgstr ""
-
-#~ msgid "è¯·éæ©ç®æ æ ç®"
-#~ msgstr ""
-
-#~ msgid "è¯·éæ©åè¡¨æ ç®"
-#~ msgstr "Please select a list column"
-
-#~ msgid "è¿ååè¡¨"
-#~ msgstr "Back to list"
-
-#~ msgid "éç½®"
-#~ msgstr "Reset"
-
-#~ msgid "é¦é¡µ"
-#~ msgstr "Home"
-
+msgstr "No other products"

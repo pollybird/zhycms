@@ -1,0 +1,120 @@
+{% extends theme_base %}
+{% block title %}{{ form.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">Home</a></li>
+    <li class="breadcrumb-item active">{{ form.name }}</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="fas fa-comment-dots"></i> {{ form.name }}</h4>
+      </div>
+      <div class="card-body">
+        {% if form.description %}
+        <div class="text-muted mb-3">{{ form.description|safe }}</div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" id="submit-form">
+          {% for f in fields %}
+          <div class="form-group">
+            <label for="field_{{ f.id }}">
+              {{ f.label }}
+              {% if f.is_required %}<span class="text-danger">*</span>{% endif %}
+            </label>
+
+            {% if f.field_type == 'text' %}
+              <input type="text" id="field_{{ f.id }}" name="field_{{ f.id }}" class="form-control"
+                placeholder="{{ f.placeholder or '' }}" {{ 'required' if f.is_required }}>
+
+            {% elif f.field_type == 'textarea' %}
+              <textarea id="field_{{ f.id }}" name="field_{{ f.id }}" rows="4" class="form-control"
+                placeholder="{{ f.placeholder or '' }}" {{ 'required' if f.is_required }}></textarea>
+
+            {% elif f.field_type == 'phone' %}
+              <input type="tel" id="field_{{ f.id }}" name="field_{{ f.id }}" class="form-control"
+                pattern="[0-9]*" placeholder="{{ f.placeholder or 'Enter phone number' }}" {{ 'required' if f.is_required }}>
+
+            {% elif f.field_type == 'email' %}
+              <input type="email" id="field_{{ f.id }}" name="field_{{ f.id }}" class="form-control"
+                placeholder="{{ f.placeholder or 'Enter email' }}" {{ 'required' if f.is_required }}>
+
+            {% elif f.field_type == 'select' %}
+              <select id="field_{{ f.id }}" name="field_{{ f.id }}" class="form-control" {{ 'required' if f.is_required }}>
+                <option value="">— Please select —</option>
+                {% for opt in f.get_options() %}
+                <option value="{{ opt }}">{{ opt }}</option>
+                {% endfor %}
+              </select>
+
+            {% elif f.field_type == 'radio' %}
+              <div>
+                {% for opt in f.get_options() %}
+                <div class="form-check">
+                  <input type="radio" id="field_{{ f.id }}_{{ loop.index }}" name="field_{{ f.id }}" value="{{ opt }}" class="form-check-input" {{ 'required' if f.is_required }}>
+                  <label for="field_{{ f.id }}_{{ loop.index }}" class="form-check-label">{{ opt }}</label>
+                </div>
+                {% endfor %}
+              </div>
+
+            {% elif f.field_type == 'checkbox' %}
+              <div>
+                {% for opt in f.get_options() %}
+                <div class="form-check">
+                  <input type="checkbox" id="field_{{ f.id }}_{{ loop.index }}" name="field_{{ f.id }}" value="{{ opt }}" class="form-check-input">
+                  <label for="field_{{ f.id }}_{{ loop.index }}" class="form-check-label">{{ opt }}</label>
+                </div>
+                {% endfor %}
+              </div>
+
+            {% elif f.field_type == 'file' %}
+              <input type="file" id="field_{{ f.id }}" name="field_{{ f.id }}" class="form-control-file"
+                {% if f.allowed_exts %}accept=".{{ f.allowed_exts.replace(',', ',.') }}"{% endif %}
+                {{ 'required' if f.is_required }}>
+              {% if f.allowed_exts or f.max_size %}
+              <small class="form-text text-muted">
+                {% if f.allowed_exts %}Allowed: {{ f.allowed_exts }}{% endif %}
+                {% if f.max_size %} Max {{ (f.max_size // 1024) }}KB{% endif %}
+              </small>
+              {% endif %}
+
+            {% endif %}
+
+            {% if f.help_text %}<small class="form-text text-muted">{{ f.help_text }}</small>{% endif %}
+          </div>
+          {% endfor %}
+
+          <div class="form-group">
+            <label for="captcha">Captcha <span class="text-danger">*</span></label>
+            <div class="d-flex align-items-center">
+              <input type="text" id="captcha" name="captcha" class="form-control mr-2"
+                style="max-width:180px;" placeholder="Enter the captcha on the right" autocomplete="off" required>
+              <img src="{{ url_for('frontend.captcha') }}" alt="Captcha" title="Can't read? Click to refresh"
+                id="captcha-img" data-src="{{ url_for('frontend.captcha') }}"
+                style="height:40px;cursor:pointer;">
+            </div>
+            <small class="form-text text-muted">Can't read? Click image to refresh</small>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Submit</button>
+        </form>
+        <script>
+          (function () {
+            var img = document.getElementById('captcha-img');
+            if (img) {
+              img.addEventListener('click', function () {
+                this.src = this.dataset.src + '?t=' + Date.now();
+              });
+            }
+          })();
+        </script>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

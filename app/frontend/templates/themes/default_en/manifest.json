@@ -1,0 +1,9 @@
+{
+  "slug": "default_en",
+  "name": "Classic Default (EN)",
+  "version": "2.3.0",
+  "description": "Official built-in: Classic default theme in English, clean and neutral style. Includes column/detail/page/search/form templates. Suitable for any business type.",
+  "author": "ZhyCMS Official",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

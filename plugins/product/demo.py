@@ -29,6 +29,19 @@ def _demo_specs(model, power, material):
     ], ensure_ascii=False)
 
 
+def _demo_specs_en(model, power, material):
+    return json.dumps([
+        {'group': 'Basic Parameters', 'items': [
+            {'name': 'Model', 'value': model},
+            {'name': 'Material', 'value': material},
+        ]},
+        {'group': 'Technical Parameters', 'items': [
+            {'name': 'Rated Power', 'value': power},
+            {'name': 'Protection Rating', 'value': 'IP54'},
+        ]},
+    ], ensure_ascii=False)
+
+
 def _generate(column, title, summary, content, gallery, specs,
               sort_order, now):
     db.session.add(Product(
@@ -54,6 +67,77 @@ def generate(industry):
             col = Column.query.filter_by(slug=slug).first()
             if col is not None and col.list_template == 'list_product':
                 col.list_template = None
+        db.session.commit()
+        return
+
+    if industry == 'manufacturing_en':
+        parts = Column.query.filter_by(slug='precision-parts',
+                                       is_deleted=False).first()
+        automation = Column.query.filter_by(slug='automation',
+                                            is_deleted=False).first()
+        if parts is not None:
+            parts.list_template = 'list_product'
+        if automation is not None:
+            automation.list_template = 'list_product'
+        db.session.flush()
+
+        if parts is not None:
+            _generate(
+                parts, 'High-Precision Spindle ZX-100',
+                'High-precision spindle for CNC machine tools, rotational accuracy ≤0.003mm.',
+                '<p>Features integrated cast iron base with active temperature control system, '
+                'minimal thermal deformation during long-term operation, '
+                'suitable for high-speed precision turning and grinding.</p><ul>'
+                '<li>Rotational accuracy ≤0.003mm</li><li>Max speed 12000rpm</li>'
+                '<li>Optional built-in encoder and cooling kit</li></ul>',
+                [f'{_DEMO_IMG}/mfg_product_a.jpg',
+                 f'{_DEMO_IMG}/mfg_workshop.jpg',
+                 f'{_DEMO_IMG}/mfg_factory.jpg'],
+                _demo_specs_en('ZX-100', '7.5 kW', '38CrMoAl Nitrided Steel'), 100, now)
+            _generate(
+                parts, 'Precision Gear Assembly ZX-200',
+                'Made of premium alloy steel with carburizing and quenching, smooth transmission and low noise.',
+                '<p>Gear grinding accuracy DIN 5, surface roughness Ra0.4, '
+                'widely used in precision reducers and printing machinery.</p>',
+                [f'{_DEMO_IMG}/mfg_product_b.jpg',
+                 f'{_DEMO_IMG}/mfg_workshop.jpg',
+                 f'{_DEMO_IMG}/mfg_factory.jpg'],
+                _demo_specs_en('ZX-200', '—', '20CrMnTi Carburizing Steel'), 90, now)
+            _generate(
+                parts, 'Linear Guide Block ZX-300',
+                'Four-direction equal-load design, heavy duty, low noise, high positioning accuracy and long service life.',
+                '<p>Available in ball and roller types with low friction coefficient, '
+                'suitable for high positioning accuracy and rapid movement applications.</p>',
+                [f'{_DEMO_IMG}/mfg_product_a.jpg',
+                 f'{_DEMO_IMG}/mfg_product_b.jpg'],
+                _demo_specs_en('ZX-300', '—', 'GCr15 Bearing Steel'), 80, now)
+
+        if automation is not None:
+            _generate(
+                automation, 'Automated Assembly Line ZD-A1',
+                'Custom automated assembly line for electronics and automotive parts industries.',
+                '<p>Modular design with adjustable cycle time, supports in-line inspection and MES integration, '
+                'max line rate 12 units/min.</p>',
+                [f'{_DEMO_IMG}/mfg_factory.jpg',
+                 f'{_DEMO_IMG}/mfg_workshop.jpg'],
+                _demo_specs_en('ZD-A1', '18 kW', 'Carbon Steel Painted'), 100, now)
+            _generate(
+                automation, 'Industrial Robot Workstation ZD-B2',
+                'Six-axis industrial robot workstation supporting welding, handling, palletizing and more.',
+                '<p>Standard vision guidance and offline programming interface, changeover time under 30 minutes, '
+                'repeatability ±0.02mm.</p>',
+                [f'{_DEMO_IMG}/mfg_workshop.jpg',
+                 f'{_DEMO_IMG}/mfg_product_a.jpg'],
+                _demo_specs_en('ZD-B2', '9 kW', 'Aluminum + Sheet Metal'), 90, now)
+            _generate(
+                automation, 'Smart Inspection & Sorting System ZD-C3',
+                'Machine vision-based inline inspection and auto sorting, false rejection rate below 0.1%.',
+                '<p>Supports multi-station parallel inspection with configurable inspection items, '
+                'data auto-uploaded to quality traceability system.</p>',
+                [f'{_DEMO_IMG}/mfg_factory.jpg',
+                 f'{_DEMO_IMG}/mfg_product_b.jpg'],
+                _demo_specs_en('ZD-C3', '6 kW', 'Stainless Steel Frame'), 80, now)
+
         db.session.commit()
         return
 

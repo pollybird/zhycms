@@ -23,7 +23,9 @@ instance/
 *.sqlite3
 
 # ===== 用户上传文件 =====
-app/static/uploads/
+# 忽略 uploads 下所有用户上传内容，但保留 demo/ 演示数据图片
+app/static/uploads/*
+!app/static/uploads/demo/
 
 # ===== 日志与临时文件 =====
 *.log

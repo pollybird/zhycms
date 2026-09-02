@@ -5,11 +5,9 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-## [2.3.0] - 2026-09-01（Pre-release 预发布）
+## [2.3.0] - 2026-09-02
 
-> ⚠️ **预发布版本**：英文翻译尚不完整，国际化默认关闭（`i18n_enable=0`），中文站点不受影响；翻译补全后发布正式版。
-
-**国际化 + 统计插件 + 表单插件化**版本。**无数据库结构变更，v2.2.x 直接覆盖代码即可升级**；自定义表单由核心转为内置插件（表名/路由/设置键/审计模块代码不变，老站数据无缝保留），国际化默认关闭、不改变现有站点行为。
+**国际化 + 统计插件 + 表单插件化 + 英文主题**版本。**无数据库结构变更，v2.2.x 直接覆盖代码即可升级**；自定义表单由核心转为内置插件（表名/路由/设置键/审计模块代码不变，老站数据无缝保留），国际化默认关闭、不改变现有站点行为。
 
 ### Added
 
@@ -20,6 +18,9 @@
   - 后台顶栏与前台主题 `base.html` 语言切换器（`available_locales()` / `current_locale()` 全局函数）；未启用时切换器自动隐藏。
   - 切换路由 `/admin/set-locale`（归属核心）；核心模板（后台 base 与全部主题 base 等界面文案）已标记 `_()` 并提供英文翻译（`app/translations/en/LC_MESSAGES/messages.po`）。
   - 默认关闭（`i18n_enable=0`）：关闭时全站按中文渲染，与 v2.2.0 行为完全一致；内容数据（栏目名/文章标题等动态数据）不在翻译范围，仅界面文案国际化。
+  - **插件独立翻译域**：每个插件可在 `plugins/<slug>/translations/<lang>/LC_MESSAGES/messages.po` 自带译文；模板使用 `{{ _p('<slug>', '原文') }}`，Python 层使用 `self._('原文')`；启停不影响核心译文，独立打包上传插件时译文随目录携带。
+  - **英文主题模板**（v2.3 新增 2 套官方内置主题）：`default_en`（经典默认英文版）与 `manufacturing_en`（制造业英文版），全部模板文件（base/index/list/article/page/404/500/form/search 等）硬编码文案已英文化，`<html lang="en">`；初始化向导新增 `manufacturing_en` 和 `default_en` 两个演示数据选项，选择英文制造业演示数据时自动启用 banner + product + friend_link + form 插件并生成全英文演示数据（栏目、文章、产品、轮播图、友情链接、表单均为英文内容）；同时自动配置 i18n（`i18n_enable=1`、`i18n_default_locale=en`、`i18n_available_locales=zh,en`），确保前台 locale 为英文、插件翻译域生效。
+  - 全部官方插件（banner / product / friend_link / form）的演示数据钩子均已支持 `manufacturing_en` 参数，生成对应英文内容；产品插件 `.po` 翻译文件已全量补全（85 条），含 `Previous product` / `Next product` / `Latest products` 等前台界面文案。
 - **统计代码插件 `analytics`（官方内置）**：
   - 后台「插件管理」独立配置页（权限 `analytics:manage`）：百度统计 / Google Analytics 4 / 站长工具（cnzz、51la 等）/ 自定义 head 与 body 代码，均为直接粘贴官方代码片段，保存即生效、无需重启。
   - 前台注入采用「插件 Jinja 全局函数 + 主题注入点」模式：主题 `base.html` 的 `</head>` 前调用 `{{ analytics_head()|safe }}`、`</body>` 前调用 `{{ analytics_body()|safe }}`，4 套内置主题均已接入；禁用插件时函数返回空串、模板零报错。
@@ -40,6 +41,11 @@
 
 - 统计插件管理页模板路径：插件注册前台蓝图（即使无前台路由）将自身 `templates/` 目录加入 Jinja 搜索路径，杜绝 `TemplateNotFound`。
 - 表单插件后台菜单图标改用 Font Awesome 5 solid 图标（`fas` 前缀），并移除核心模板中硬编码的重复菜单。
+- `.gitignore` 修复：`app/static/uploads/` 整体忽略导致 `demo/` 演示图片无法入库（安装后图片 404）；改为 `uploads/*` + `!uploads/demo/`，15 张演示图片随仓库分发。
+- 产品插件 `messages.po` 英文翻译全量补全（85 条），修复 `上一个产品` / `下一个产品` / `最新产品` / `暂无其他产品` 等前台界面文案在英文 locale 下仍显示中文的问题。
+- 后台多个路由名修正：`monitor_page` → `monitor_index`、`backup_create` → `backup_manual`、backup 按钮参数 `name` → `bid`；setup 页面静态资源恢复 CDN 引用；setup 模板变量引用与 input name 修正。
+- `CMS_VERSION` 改用 `Setting.CMS_VERSION` 类属性访问，避免实例化查询；`monitor_index` 视图传齐模板所需变量。
+- `i18n` 关闭时不支持语言切换（恢复原始行为），避免关闭态下切换器误触发。
 
 ## [2.2.0] - 2026-08-31
 

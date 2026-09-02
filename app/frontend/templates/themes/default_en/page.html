@@ -1,0 +1,42 @@
+{% extends theme_base %}
+{% block title %}{{ column.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">Home</a></li>
+    <li class="breadcrumb-item active">{{ column.name }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  <div class="col-md-12">
+    <h1>{{ column.name }}</h1>
+    {% if column.summary %}<p class="text-muted">{{ column.summary }}</p>{% endif %}
+
+    {# Column custom fields (only frontend-visible fields, values entered in backend "Page Field Content") #}
+    {% for f in fields %}
+      {% set v = column.get_field_value(f.id) %}
+      {% if v %}
+        {% if f.field_type == 'image' %}
+          <div class="mb-3"><img src="{{ v }}" class="img-fluid"></div>
+        {% elif f.field_type == 'file' %}
+          <div class="mb-3"><a href="{{ v }}" class="btn btn-success"><i class="fas fa-download"></i> {{ f.label }}</a></div>
+        {% elif f.field_type == 'url' %}
+          <div class="mb-3"><a href="{{ v }}" target="_blank">{{ f.label }}: {{ v }}</a></div>
+        {% elif f.field_type == 'richtext' %}
+          <div class="mb-3">{{ v|safe }}</div>
+        {% elif f.field_type in ('text','textarea','number') %}
+          <div class="mb-3"><strong>{{ f.label }}:</strong> {{ v }}</div>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+
+    <hr>
+
+    <div class="article-content">
+      {{ column.page_content|safe }}
+    </div>
+  </div>
+</div>
+{% endblock %}

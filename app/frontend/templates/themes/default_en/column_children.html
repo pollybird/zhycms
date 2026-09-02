@@ -1,0 +1,48 @@
+{% extends theme_base %}
+{% block title %}{{ column.name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">Home</a></li>
+    <li class="breadcrumb-item active">{{ column.name }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  <div class="col-md-12">
+    <h1>{{ column.name }}</h1>
+    {% if column.summary %}<p class="text-muted">{{ column.summary }}</p>{% endif %}
+
+    {# Parent column custom fields (can be used for list page header display) #}
+    {% for fv in column.field_values %}
+      {% if fv.field.field_type in ('text','textarea','richtext') %}
+        <div class="mb-3">{{ fv.value|safe }}</div>
+      {% endif %}
+    {% endfor %}
+
+    <hr>
+
+    <div class="row">
+      {% for child in children %}
+      <div class="col-md-4 mb-4">
+        <div class="card h-100">
+          {% if child.cover %}
+            <img src="{{ child.cover }}" class="card-img-top" alt="{{ child.name }}">
+          {% endif %}
+          <div class="card-body">
+            <h5 class="card-title">
+              <a href="{{ url_for('frontend.column_detail', slug=child.slug) }}">{{ child.name }}</a>
+            </h5>
+            <p class="card-text text-muted">{{ child.summary|truncate_text(60) }}</p>
+          </div>
+          <div class="card-footer bg-transparent">
+            <a href="{{ url_for('frontend.column_detail', slug=child.slug) }}" class="btn btn-sm btn-primary">View Details <i class="fas fa-arrow-right"></i></a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

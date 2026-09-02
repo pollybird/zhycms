@@ -190,6 +190,30 @@
               </small>
             </label>
           </div>
+
+          <div class="form-row mt-3 mb-1">
+            <div class="col"><hr style="border-top:1px dashed #ced4da;margin:0;"></div>
+            <span class="col-auto px-2 text-muted small" style="white-space:nowrap;">English Templates</span>
+            <div class="col"><hr style="border-top:1px dashed #ced4da;margin:0;"></div>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="demo_mfg_en" name="demo_type" value="manufacturing_en" {{ 'checked' if demo_type == 'manufacturing_en' else '' }}>
+            <label for="demo_mfg_en">
+              <strong>{{ _('Manufacturing Demo (EN)') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('Fictional company "Ruijing Precision Works Co., Ltd.": About Us / News / Products (Precision Parts, Automation Equipment) / Service / Contact') }}
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block">
+            <input type="radio" id="demo_default_en" name="demo_type" value="default_en" {{ 'checked' if demo_type == 'default_en' else '' }}>
+            <label for="demo_default_en">
+              <strong>{{ _('English Default Theme (No Demo Data)') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('Blank site with English default theme. All columns, content, fragments, and forms are empty.') }}
+              </small>
+            </label>
+          </div>
         </div>
 
         <hr>

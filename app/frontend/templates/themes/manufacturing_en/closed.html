@@ -1,0 +1,12 @@
+{% extends theme_base %}
+{% block title %}Site Under Maintenance{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 text-center py-5">
+    <i class="fas fa-tools text-warning" style="font-size:64px;"></i>
+    <h2 class="mt-3">Site Under Maintenance</h2>
+    <p class="text-muted">{{ site_settings.site_close_reason|safe }}</p>
+  </div>
+</div>
+{% endblock %}

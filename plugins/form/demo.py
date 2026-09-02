@@ -17,6 +17,36 @@ def generate(industry):
     Form.query.delete()
     db.session.flush()
 
+    if industry == 'manufacturing_en':
+        form = Form(
+            name='Online Message',
+            slug='message',
+            description='We welcome your feedback and suggestions. We will get back to you as soon as possible.',
+            success_message='Thank you for your message. We will contact you shortly!',
+            submit_interval=60,
+            is_open=True,
+        )
+        db.session.add(form)
+        db.session.flush()
+        fields = [
+            FormField(label='Name', field_key='name', field_type='text',
+                      is_required=True, placeholder='Enter your name',
+                      sort_order=100, form_id=form.id),
+            FormField(label='Phone', field_key='phone', field_type='phone',
+                      is_required=True, placeholder='Enter phone number',
+                      help_text='Your information will be kept strictly confidential',
+                      sort_order=90, form_id=form.id),
+            FormField(label='Email', field_key='email', field_type='email',
+                      is_required=False, placeholder='Enter email',
+                      sort_order=80, form_id=form.id),
+            FormField(label='Message', field_key='content', field_type='textarea',
+                      is_required=True, placeholder='Enter your message',
+                      sort_order=70, form_id=form.id),
+        ]
+        db.session.add_all(fields)
+        db.session.commit()
+        return
+
     # 在线留言表单（两套行业演示数据共用同一条表单）
     form = Form(
         name='在线留言',

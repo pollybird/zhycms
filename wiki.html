@@ -99,6 +99,14 @@
   <a href="#pd-nav" class="sub">前台导航贡献</a>
   <a href="#pd-lifecycle" class="sub">上传/下载/卸载</a>
   <a href="#pd-test" class="sub">自测清单</a>
+  <a href="#pd-i18n" class="sub">&#9733; 17. 插件国际化（v2.3）</a>
+  <a href="#pd-i18n-1" class="sub2">17.1 目录结构</a>
+  <a href="#pd-i18n-2" class="sub2">17.2 模板 _p() 函数</a>
+  <a href="#pd-i18n-3" class="sub2">17.3 Python 层 plugin._()</a>
+  <a href="#pd-i18n-4" class="sub2">17.4 提取/编译命令</a>
+  <a href="#pd-i18n-5" class="sub2">17.5 实战 .po 示例</a>
+  <a href="#pd-i18n-6" class="sub2">17.6 演示数据国际化</a>
+  <a href="#pd-i18n-7" class="sub2">17.7 检查清单</a>
   <a href="#theme-mgr" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十七、主题管理（v2.2）</a>
   <a href="#i18n" style="background:#ecfdf5;color:#065f46;font-weight:600;">&#9733; 十八、国际化（v2.3）</a>
   <a href="#i18n-config" class="sub">后台配置与语言切换</a>
@@ -136,7 +144,7 @@
   <li><b>SEO 优化 / 碎片管理 / 图片上传 / 验证码登录 / 首次初始化引导</b>。</li>
   <li><span class="tag">v2.0</span> <b>企业级能力</b>：RBAC 角色权限、审计日志、内容工作流与版本还原、数据库备份恢复、登录防暴破、上传内容安全校验、伪静态与页面缓存。</li>
   <li><span class="tag">v2.2</span> <b>插件优先架构</b>：轮播图、产品展示、友情链接均以官方内置插件提供，可随时启停；<code>friend_links()</code> 模板函数一行调用。</li>
-  <li><span class="tag">v2.3</span> <b>国际化与统计插件</b>：Flask-Babel 中英文自由切换（默认关闭）；官方内置统计代码插件（百度统计/GA4/站长工具/自定义代码，<code>analytics_head()</code>/<code>analytics_body()</code> 自动注入）；自定义表单转为官方内置插件。</li>
+  <li><span class="tag">v2.3</span> <b>国际化与统计插件</b>：Flask-Babel 中英文自由切换（默认关闭）；<code>default_en</code> / <code>manufacturing_en</code> 两套英文主题模板（含全英文演示数据）；官方内置统计代码插件（百度统计/GA4/站长工具/自定义代码，<code>analytics_head()</code>/<code>analytics_body()</code> 自动注入）；自定义表单转为官方内置插件；插件独立翻译域（<code>_p()</code> / <code>plugin._()</code>）。</li>
 </ul>
 </section>
 
@@ -148,10 +156,12 @@
 &#9474;   &#9500;&#9472;&#9472; frontend/           # 前台模块（路由与视图）
 &#9474;   &#9474;   &#9492;&#9472;&#9472; templates/
 &#9474;   &#9474;       &#9492;&#9472;&#9472; themes/     # &#9733; 前台主题模板目录
-&#9474;   &#9474;           &#9500;&#9472;&#9472; default/        # 通用聚合主题
-&#9474;   &#9474;           &#9500;&#9472;&#9472; blue/           # 通用聚合主题（蓝色）
-&#9474;   &#9474;           &#9500;&#9472;&#9472; manufacturing/  # 制造业行业专用主题（产品置顶）
-&#9474;   &#9474;           &#9492;&#9472;&#9472; service/        # 服务业行业专用主题（公司介绍置顶）
+&#9474;   &#9474;           &#9500;&#9472;&#9472; default/            # 通用聚合主题
+&#9474;   &#9474;           &#9500;&#9472;&#9472; default_en/         # 通用聚合主题英文版（v2.3）
+&#9474;   &#9474;           &#9500;&#9472;&#9472; blue/               # 通用聚合主题（蓝色）
+&#9474;   &#9474;           &#9500;&#9472;&#9472; manufacturing/      # 制造业行业专用主题（产品置顶）
+&#9474;   &#9474;           &#9500;&#9472;&#9472; manufacturing_en/   # 制造业行业专用主题英文版（v2.3）
+&#9474;   &#9474;           &#9492;&#9472;&#9472; service/            # 服务业行业专用主题（公司介绍置顶）
 &#9474;   &#9500;&#9472;&#9472; models/             # 数据模型
 &#9474;   &#9474;   &#9500;&#9472;&#9472; user.py / rbac.py     # 用户与角色权限（v2.0）
 &#9474;   &#9474;   &#9500;&#9472;&#9472; audit.py              # 审计日志（v2.0）
@@ -214,7 +224,7 @@ python run.py</code></pre>
 <ul>
   <li><b>管理员账号</b>（至少 3 个字符）与<b>密码</b>（至少 6 个字符，需二次确认）</li>
   <li><b>数据库类型</b>：MySQL / PostgreSQL（生产推荐）/ SQLite（仅开发/测试，见下）</li>
-  <li><b>演示数据</b>：不生成 / 制造业 / 服务业</li>
+  <li><b>演示数据</b>：不生成 / 制造业 / 服务业 / Manufacturing (EN) / English Default</li>
 </ul>
 <p>提交后系统会创建管理员、写入默认设置，并按选择生成演示数据，随后跳转登录页。</p>
 
@@ -275,6 +285,8 @@ gunicorn -w 4 -b 0.0.0.0:5000 "run:app"</code></pre>
   <tr><td>不生成</td><td>仅创建管理员，空站点</td><td>保持 <code>default</code></td></tr>
   <tr><td>制造业</td><td>精密机械制造企业示例：关于我们、产品中心、新闻中心、联系我们等栏目 + 文章 + 碎片 + 友情链接 + 演示图片</td><td><code>manufacturing</code>（产品置顶）</td></tr>
   <tr><td>服务业</td><td>企业管理咨询公司示例：关于我们、服务项目、行业动态、客户案例、联系我们等栏目 + 文章 + 碎片 + 友情链接 + 演示图片</td><td><code>service</code>（公司介绍置顶）</td></tr>
+  <tr><td><b>Manufacturing (EN)</b><br><span style="color:#666;">v2.3 新增</span></td><td>英文制造业示例：全英文栏目（About Us / Products / News / Contact Us）、英文文章、产品（High-Precision Spindle 等 6 个含规格参数）、轮播图（Modern Production Workshop 等）、友情链接（Ministry of Industry and IT 等）、在线留言表单（Name / Phone / Email / Message）；同时自动启用 i18n 并设默认语种为 <code>en</code></td><td><code>manufacturing_en</code>（产品置顶，<code>&lt;html lang="en"&gt;</code>）</td></tr>
+  <tr><td><b>English Default</b><br><span style="color:#666;">v2.3 新增</span></td><td>英文默认主题空白站，仅启用 i18n 并设默认语种为 <code>en</code>，不生成演示数据</td><td><code>default_en</code>（<code>&lt;html lang="en"&gt;</code>）</td></tr>
 </table>
 <ul>
   <li>演示数据由 <code>app/utils/bootstrap.py</code> 的 <code>generate_demo_data(industry)</code> 生成。</li>
@@ -755,7 +767,7 @@ sudo apt install -y libmagic1        # Debian/Ubuntu
 </section>
 
 <section id="plugin-dev">
-<h2>十六、插件开发指南（v2.2）——以「招聘管理」插件为样板</h2>
+<h2>十六、插件开发指南（v2.2 / v2.3）——以「招聘管理」插件为样板</h2>
 <p>本章以 <code>plugins/recruit</code>（招聘管理插件）为<b>完整实战样板</b>，从需求拆解 → 模型 → 后台 → 前台 → 文件上传 → 导航贡献 → 生命周期，走完一个插件从零到发布的全部环节。该插件 <code>builtin: false</code>（非官方内置），你可以在后台「插件管理」中<b>下载它的源码 zip 包</b>对照学习，也可以上传/卸载它反复实验。</p>
 <div class="note">对照样板：<code>plugins/banner</code>（最简：模板函数型）、<code>plugins/product</code>（完整：栏目归属 + API）、<code>plugins/recruit</code>（本章主线：独立路由 + 表单 + 文件上传 + 截止时间门控）。</div>
 
@@ -1289,6 +1301,139 @@ return send_file(path, as_attachment=True,
   <li>后台模板脚本块是 <code>{% block js %}</code>；子模板定义父模板不存在的块名会被静默丢弃（无报错）。</li>
   <li>业务规则（如截止时间判断）收口在模型方法，前后台共用，避免散落的时间比较。</li>
 </ul>
+
+<h3 id="pd-i18n">&#9733; 17. 插件国际化（v2.3 新增）</h3>
+<p>v2.3 起，插件可拥有<b>独立翻译域</b>——每个插件在自己的 <code>translations/</code> 目录下维护 <code>.po</code> / <code>.mo</code> 翻译文件，与核心翻译互不干扰。插件打包下载 / 上传时译文随目录携带，无需额外操作。以 <code>product</code> 插件为例，展示从零给插件添加国际化的完整流程。</p>
+
+<h4 id="pd-i18n-1">17.1 目录结构</h4>
+<p>在插件目录下新建标准 translations 目录（与核心 <code>app/translations/</code> 同结构）即可启用独立翻译域，<b>无需额外注册</b>——核心启动时自动发现并加载：</p>
+<pre><code>plugins/product/
+  &#9500;&#9472;&#9472; __init__.py               # 继承 PluginBase
+  &#9500;&#9472;&#9472; admin.py                  # 后台路由（模板用 _p()）
+  &#9500;&#9472;&#9472; frontend_routes.py         # 前台路由（Python 层用 self._()）
+  &#9500;&#9472;&#9472; templates/product/
+  &#9472;   &#9500;&#9472;&#9472; product_detail.html   # &#123;&#123; _p('product', '上一个产品') &#125;&#125;
+  &#9472;   &#9492;&#9472;&#9472; product_list.html     # &#123;&#123; _p('product', '产品列表') &#125;&#125;
+  &#9500;&#9472;&#9472; translations/             # &#9733; 独立翻译域（核心自动发现）
+  &#9472;   &#9500;&#9472;&#9472; messages.pot        # 本插件 msgid 模板（提取生成）
+  &#9472;   &#9492;&#9472;&#9472; en/LC_MESSAGES/
+  &#9472;       &#9500;&#9472;&#9472; messages.po    # 英文翻译源文件（入库）
+  &#9472;       &#9492;&#9472;&#9472; messages.mo    # 编译产物（不入库，部署时编译）</code></pre>
+
+<h4 id="pd-i18n-2">17.2 模板层：_p() 函数</h4>
+<p>插件模板中所有需要翻译的字符串用 <code>_p()</code> 标记，第一个参数为插件 slug，第二个为原文（中文）：</p>
+<pre><code>&lt;!-- plugins/product/templates/product/product_detail.html --&gt;
+&lt;a href="..."&gt;&#123;&#123; _p('product', '上一个产品') &#125;&#125;&lt;/a&gt;
+&lt;a href="..."&gt;&#123;&#123; _p('product', '下一个产品') &#125;&#125;&lt;/a&gt;
+&lt;h3&gt;&#123;&#123; _p('product', '最新产品') &#125;&#125;&lt;/h3&gt;
+
+&lt;!-- 条件翻译 --&gt;
+&#123;% if not related_products %&#125;
+  &lt;p&gt;&#123;&#123; _p('product', '暂无其他产品') &#125;&#125;&lt;/p&gt;
+&#123;% endif %&#125;</code></pre>
+<div class="note"><b>核心机制</b>：<code>_p(slug, message)</code> 是核心注册的 Jinja 全局函数。当 locale 为 <code>zh</code>（默认语言）时直接返回原文；当 locale 为 <code>en</code> 时从插件 <code>translations/en/LC_MESSAGES/messages.mo</code> 查找翻译。插件未启用或翻译域不存在时同样回退原文，<b>不会抛异常</b>。</div>
+
+<h4 id="pd-i18n-3">17.3 Python 层：PluginBase._() 方法</h4>
+<p>插件 Python 代码（视图函数、模型方法等）中需要翻译时，使用 <code>PluginBase</code> 基类提供的便捷方法：</p>
+<pre><code># plugins/product/frontend_routes.py
+from . import plugin  # 本插件实例
+
+@frontend_bp.route('/column/<slug>/product/<int:pid>')
+def product_detail(slug, pid):
+    p = Product.query.get_or_404(pid)
+    # Python 层翻译：plugin._('原文') 等价于 _p('product', '原文')
+    title = plugin._('产品详情')
+    return render_template('product/product_detail.html', product=p, page_title=title)</code></pre>
+<div class="note"><b>注意</b>：Python 层的 <code>self._()</code> 方法在 <code>PluginBase</code> 中实现，内部通过 <code>babel.support.gettext</code> + 插件独立翻译域实现。与模板的 <code>_p()</code> 共用同一个 <code>.mo</code> 文件，保持一致。</div>
+
+<h4 id="pd-i18n-4">17.4 提取、更新与编译</h4>
+<p>插件翻译文件的提取 / 更新 / 编译命令与核心相同，但需要指定插件的 <code>translations</code> 目录：</p>
+<pre><code># 1. 提取插件模板中的可翻译字符串
+pybabel extract -F babel.cfg \
+  -o plugins/product/translations/messages.pot \
+  plugins/product/
+
+# 2. 初始化新语种（首次添加英文翻译时）
+pybabel init -i plugins/product/translations/messages.pot \
+  -d plugins/product/translations -l en
+
+# 3. 更新已有 .po（模板新增字符串后）
+pybabel update -i plugins/product/translations/messages.pot \
+  -d plugins/product/translations
+
+# 4. 编译 .po → .mo（部署前必做）
+pybabel compile -d plugins/product/translations</code></pre>
+<div class="warn"><b>重要</b>：<code>.mo</code> 文件已在 <code>.gitignore</code> 中排除，<b>不会入库</b>。部署时必须执行 <code>pybabel compile</code> 编译，否则插件翻译不生效。推荐在部署脚本中加入批量编译：<code>find plugins/ -path '*/translations' -exec pybabel compile -d {} \;</code></div>
+
+<h4 id="pd-i18n-5">17.5 实战：为 product 插件添加英文翻译</h4>
+<p>以 <code>plugins/product/translations/en/LC_MESSAGES/messages.po</code> 为例，展示完整翻译条目格式：</p>
+<pre><code>msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+
+msgid "上一个产品"
+msgstr "Previous product"
+
+msgid "下一个产品"
+msgstr "Next product"
+
+msgid "最新产品"
+msgstr "Latest products"
+
+msgid "暂无其他产品"
+msgstr "No other products"
+
+msgid "首页"
+msgstr "Home"
+
+msgid "产品列表"
+msgstr "Product List"
+
+msgid "产品相册"
+msgstr "Product Gallery"
+
+msgid "规格参数"
+msgstr "Specifications"
+
+msgid "保存产品"
+msgstr "Save Product"</code></pre>
+<p>编译后 <code>messages.mo</code> 自动生成。当前台 locale 为 <code>en</code> 时，这些条目自动替换模板中的中文原文。</p>
+
+<h4 id="pd-i18n-6">17.6 演示数据国际化</h4>
+<p>插件的 <code>generate(industry)</code> 钩子通过 <code>industry</code> 参数区分语言。例如 <code>product</code> 插件同时支持 <code>manufacturing</code>（中文）和 <code>manufacturing_en</code>（英文）：</p>
+<pre><code># plugins/product/demo.py
+def generate(industry):
+    # ... 清理旧数据 ...
+
+    if industry == 'manufacturing_en':
+        # 英文产品数据
+        _generate(parts, 'High-Precision Spindle ZX-100',
+                  'High-precision spindle for CNC machine tools...',
+                  '&lt;p&gt;Features...&lt;/p&gt;',
+                  [img1, img2, img3],
+                  _demo_specs_en('ZX-100', '7.5 kW', '38CrMoAl'), 100, now)
+        # ... 更多英文产品 ...
+    else:
+        # 中文产品数据（制造业默认）
+        _generate(parts, '高精度主轴 ZX-100',
+                  '高精度主轴，用于数控机床的核心部件...',
+                  '&lt;p&gt;产品特点...&lt;/p&gt;',
+                  [img1, img2, img3],
+                  _demo_specs('ZX-100', '7.5 kW', '38CrMoAlA 氮化钢'), 100, now)
+
+    db.session.commit()</code></pre>
+<div class="note">各官方插件（banner / product / friend_link / form）均已支持 <code>manufacturing_en</code> 参数，初始化向导选择英文制造业演示数据时自动调用对应钩子生成英文内容。</div>
+
+<h4 id="pd-i18n-7">17.7 检查清单</h4>
+<ul>
+  <li>插件 <code>translations/</code> 目录与核心同结构，核心启动时自动发现，无需注册。</li>
+  <li>模板用 <code>_p('slug', '原文')</code>，Python 层用 <code>plugin._('原文')</code>。</li>
+  <li>locale 为 <code>zh</code> 或翻译不存在时回退原文，<b>不会抛异常</b>。</li>
+  <li><code>.po</code> 入库，<code>.mo</code> 不入库——部署前执行 <code>pybabel compile -d plugins/&lt;slug&gt;/translations</code>。</li>
+  <li>演示数据钩子通过 <code>industry</code> 参数区分中英文，新语种仅需追加分支。</li>
+  <li>插件打包下载时 translations 目录一并打包，在其他站点上传后译文随插件携带。</li>
+</ul>
 </section>
 
 <section id="theme-mgr">
@@ -1301,7 +1446,7 @@ return send_file(path, as_attachment=True,
   <li><b>使用中</b>（绿色高亮）：当前启用主题，行内提示「已是当前使用中」。</li>
   <li><b>未启用</b>：可一键启用。</li>
   <li><b>模板不完整</b>（标红）：缺失必备模板，操作按钮灰显，悬停提示缺失明细与补齐指引。</li>
-  <li>官方内置主题带「官方内置」徽标（manifest <code>builtin:true</code>，共 default/blue/manufacturing/service 四套）。</li>
+  <li>官方内置主题带「官方内置」徽标（manifest <code>builtin:true</code>，共 default/default_en/blue/manufacturing/manufacturing_en/service 六套）。</li>
 </ul>
 
 <h3 id="tm-upload">2. 上传主题</h3>
@@ -1386,6 +1531,7 @@ pybabel init -i app/translations/messages.pot -d app/translations -l ja</code></
 
 <h3 id="i18n-plugin">&#9733; 插件国际化实现方式（v2.3 新增独立翻译域）</h3>
 <p>每个插件拥有<b>独立翻译域</b>（domain 均为 <code>messages</code>，但各自存放于自己的 translations 目录），插件下载/上传打包时其译文随目录携带，与核心翻译互不干扰。</p>
+<div class="note"><b>完整教程</b>：从零给插件添加国际化的分步实战指南（目录结构 → 模板 <code>_p()</code> → Python <code>plugin._()</code> → 提取/编译命令 → <code>.po</code> 实战示例 → 演示数据国际化 → 检查清单），见 <a href="#pd-i18n">第十六章 §17 插件国际化</a>。以下为核心机制速览。</div>
 
 <h4 id="i18n-plugin-1">1. 目录结构与 <code>get_i18n_dir()</code> 钩子</h4>
 <p>在插件目录下新建标准 translations 目录（与核心同结构）即可启用独立翻译域，无需额外注册：</p>
