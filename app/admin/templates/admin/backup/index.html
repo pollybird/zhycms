@@ -159,9 +159,9 @@
           </td>
           <td>
             <div class="btn-group btn-group-sm">
-              <a href="{{ url_for('admin.backup_download', name=b.filename) }}" class="btn btn-default"><i class="fas fa-download"></i> {{ _('下载') }}</a>
-              <button type="button" class="btn btn-warning" onclick="confirm_restore('{{ b.filename }}')"><i class="fas fa-undo"></i> {{ _('恢复') }}</button>
-              <form method="post" action="{{ url_for('admin.backup_delete', name=b.filename) }}" class="d-inline" onsubmit="return confirm('{{ _('确认删除该备份？') }}');">
+              <a href="{{ url_for('admin.backup_download', bid=b.id) }}" class="btn btn-default"><i class="fas fa-download"></i> {{ _('下载') }}</a>
+              <button type="button" class="btn btn-warning" data-bid="{{ b.id }}" data-filename="{{ b.filename }}" onclick="confirm_restore(this)"><i class="fas fa-undo"></i> {{ _('恢复') }}</button>
+              <form method="post" action="{{ url_for('admin.backup_delete', bid=b.id) }}" class="d-inline" onsubmit="return confirm('{{ _('确认删除该备份？') }}');">
                 <button class="btn btn-danger"><i class="fas fa-trash"></i></button>
               </form>
             </div>
@@ -225,9 +225,12 @@
     const name = e.target.files[0]?.name || '{{ _('请选择 zip 备份包') }}';
     $(this).next('.custom-file-label').text(name);
   });
-  function confirm_restore(filename){
+  function confirm_restore(btn){
+    var bid = $(btn).data('bid');
+    var filename = $(btn).data('filename');
     $('#restore-name').text(filename);
-    $('#restore-local-form').attr('action', '{{ url_for("admin.backup_restore_local", name="__NAME__") }}'.replace('__NAME__', filename));
+    var baseUrl = '{{ url_for("admin.backup_restore", bid=0) }}';
+    $('#restore-local-form').attr('action', baseUrl.replace('/0/', '/' + bid + '/'));
     $('#restore-local-modal').modal('show');
   }
 </script>
