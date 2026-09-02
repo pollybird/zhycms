@@ -285,10 +285,57 @@ def setting_backup_save():
 @admin_bp.route('/monitor')
 @permission_required('system:backup')
 def monitor_index():
-    """系统监控页：CPU/内存/磁盘/数据库连接。历史 endpoint=admin.backup_monitor 已被别名
-    兼容（admin.monitor_index 为当前正名）。"""
+    """系统监控页：服务器/磁盘/数据库状态。"""
+    import platform, sys as _sys, time as _time, os as _os
+    from ..config import BASE_DIR
     stats = system_monitor_stats()
-    return render_template('admin/backup/monitor.html', stats=stats)
+
+    # 服务器信息
+    sys_info = {
+        'os': f"{platform.system()} {platform.release()}",
+        'python': platform.python_version(),
+        'timezone': getattr(_os, 'environ', {}).get('TZ', 'UTC'),
+        'requests': getattr(_sys, '_zhy_request_count', 0),
+        'server_software': _os.environ.get('SERVER_SOFTWARE', '-'),
+        'wsgi': getattr(_sys, 'WSGI_SERVER', '-'),
+        'pid': _os.getpid(),
+    }
+
+    # 运行时长
+    uptime = stats.get('uptime_seconds', 0)
+    runtime = type('Runtime', (), {
+        'days': int(uptime // 86400),
+        'hours': int((uptime % 86400) // 3600),
+        'minutes': int((uptime % 3600) // 60),
+    })()
+
+    # 磁盘信息
+    disk_info = {
+        'project_path': BASE_DIR,
+        'total': f"{stats.get('disk_total_gb', 0)} GB",
+        'used': f"{stats.get('disk_used_gb', 0)} GB",
+        'free': f"{stats.get('disk_free_gb', 0)} GB",
+        'percent': stats.get('disk_used_pct', 0),
+    }
+
+    # 数据库信息
+    from ..utils.backup_utils import _db_type_and_path
+    try:
+        db_type, db_name = _db_type_and_path()[:2]
+    except Exception:
+        db_type, db_name = 'unknown', '-'
+    db_info = {
+        'driver': db_type,
+        'name': db_name,
+        'size': f"{stats.get('db_size_mb', 0)} MB",
+        'ok': stats.get('db_alive', False),
+    }
+
+    from ..models.setting import CMS_VERSION
+    return render_template('admin/backup/monitor.html', stats=stats,
+                           sys_info=sys_info, runtime=runtime,
+                           disk_info=disk_info, db_info=db_info,
+                           cms_version=CMS_VERSION)
 
 
 @admin_bp.route('/api/monitor')
