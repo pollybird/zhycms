@@ -63,9 +63,8 @@
 
   <div class="col-md-6">
     <div class="card">
-      <div class="card-header"><h3 class="card-title">{{ _('PHP/站点环境？') }}</h3></div>
+      <div class="card-header"><h3 class="card-title">{{ _('运行环境') }}</h3></div>
       <div class="card-body">
-        <p class="text-muted">{{ _('本系统基于 Python + Flask 构建，无需 PHP 环境。') }}</p>
         <dl class="row mb-0">
           <dt class="col-4">{{ _('服务器软件') }}</dt><dd class="col-8">{{ sys_info.server_software or _('未知') }}</dd>
           <dt class="col-4">WSGI</dt><dd class="col-8">{{ sys_info.wsgi or '-' }}</dd>
