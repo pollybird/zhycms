@@ -457,13 +457,9 @@ def set_locale():
     """
     lang = request.args.get('lang')
     next_url = request.args.get('next') or request.referrer or '/'
-    # i18n 开启时按配置的可用语种校验；关闭时允许已知语种（zh/en/ja/ko）
-    if Setting.get('i18n_enable') == '1':
-        available = [c.strip() for c in
-                     (Setting.get('i18n_available_locales') or 'zh').split(',')
-                     if c.strip()]
-    else:
-        available = ['zh', 'en', 'ja', 'ko']
+    available = [c.strip() for c in
+                 (Setting.get('i18n_available_locales') or 'zh').split(',')
+                 if c.strip()]
     if lang and lang in available:
         session['locale'] = lang
     return redirect(next_url)

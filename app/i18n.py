@@ -201,21 +201,6 @@ def _p(slug, message):
 def select_locale():
     """Babel locale 选择器（每请求首调一次，结果缓存于 g）。"""
     from .models.setting import Setting
-
-    # 已知的语种（核心 .mo 始终存在的语种），用于校验 ?lang= / session
-    _known = {'zh', 'en', 'ja', 'ko'}
-
-    # 1. URL ?lang=xx（始终生效，即使 i18n 关闭，也允许手动切换；写回 session）
-    lang = request.args.get('lang')
-    if lang and lang in _known:
-        session['locale'] = lang
-        return lang
-
-    # 2. session（始终生效，让 ?lang= 设置的语种跨页面保持）
-    lang = session.get('locale')
-    if lang and lang in _known:
-        return lang
-
     # 关闭态：全站按默认语种渲染，不读 .mo，行为同 v2.2.0
     if Setting.get('i18n_enable') != '1':
         return Setting.get('i18n_default_locale') or 'zh'
@@ -225,6 +210,16 @@ def select_locale():
                  if c.strip()]
     if not available:
         return Setting.get('i18n_default_locale') or 'zh'
+
+    # 1. URL ?lang=xx（一次性，写回 session）
+    lang = request.args.get('lang')
+    if lang and lang in available:
+        session['locale'] = lang
+        return lang
+    # 2. session
+    lang = session.get('locale')
+    if lang and lang in available:
+        return lang
     # 3. cookie
     lang = request.cookies.get('locale')
     if lang and lang in available:
@@ -238,18 +233,13 @@ def select_locale():
 
 
 def available_locales():
-    """返回 [{code, label, active}] 供切换器渲染。
-
-    i18n 关闭时仍返回已知语种（zh/en），让用户在后台/安装向导
-    手动切换语言；i18n 开启时按后台配置的可用语种列表渲染。
-    """
+    """返回 [{code, label, active}] 供切换器渲染；i18n 关闭时返回 []。"""
     from .models.setting import Setting
-    if Setting.get('i18n_enable') == '1':
-        codes = [c.strip() for c in
-                 (Setting.get('i18n_available_locales') or 'zh').split(',')
-                 if c.strip()]
-    else:
-        codes = ['zh', 'en']
+    if Setting.get('i18n_enable') != '1':
+        return []
+    codes = [c.strip() for c in
+             (Setting.get('i18n_available_locales') or 'zh').split(',')
+             if c.strip()]
     cur = current_locale()
     return [{'code': c,
              'label': _translate_label(_LOCALE_LABEL_PLAIN.get(c, c), c),

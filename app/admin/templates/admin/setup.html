@@ -34,14 +34,15 @@
 </head>
 <body class="hold-transition login-page">
 <div class="setup-box">
-  {# 语言切换（setup 未登录页面，直接用 ?lang= 参数，select_locale 始终处理） #}
-  {% set _langs = [('zh', '中文'), ('en', 'English')] %}
-  {% set _cur = current_locale() %}
+  {# 语言切换（未登录页面，直接用 ?lang= 参数，select_locale 会写入 session） #}
+  {% set _locales = available_locales() %}
+  {% if _locales %}
   <div class="text-right mb-2">
-    {% for code, label in _langs %}
-    <a href="?lang={{ code }}" class="btn btn-sm {{ 'btn-primary' if _cur == code else 'btn-light' }}"><i class="fas fa-language"></i> {{ label }}</a>
+    {% for loc in _locales %}
+    <a href="?lang={{ loc.code }}" class="btn btn-sm {{ 'btn-primary' if loc.active else 'btn-light' }}"><i class="fas fa-language"></i> {{ loc.label }}</a>
     {% endfor %}
   </div>
+  {% endif %}
 
   <div class="setup-logo text-center mb-3">
     <a href="#"><b>{{ _('钟毓企业网站CMS') }}</b></a>
