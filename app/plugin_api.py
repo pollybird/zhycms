@@ -22,6 +22,7 @@ __init__.py（定义 PluginBase 子类并实例化为模块级变量 `plugin`）
 """
 
 import os
+import importlib
 
 
 class PluginBase:
@@ -57,8 +58,8 @@ class PluginBase:
         三者生效。翻译不命中时 fallback 到原文（中文）。
         """
         try:
-            base = os.path.dirname(os.path.abspath(__import__(
-                type(self).__module__).__file__))
+            mod = importlib.import_module(type(self).__module__)
+            base = os.path.dirname(os.path.abspath(mod.__file__))
         except Exception:
             base = os.path.dirname(os.path.abspath(__file__))
         return os.path.join(base, 'translations')

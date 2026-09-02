@@ -174,8 +174,10 @@ def plugin_gettext(slug, message):
     t = _get_plugin_t(slug, locale_str)
     if t is None:
         return message
-    from babel.support import NullTranslations
-    if isinstance(t, NullTranslations) or not hasattr(t, 'gettext'):
+    # 注意：babel.support.Translations 继承自 NullTranslations，
+    # 不能用 isinstance(t, NullTranslations) 做有效性判断——真翻译也会被误判为无效。
+    # 改为检查 t.catalog（加载了 MO 后必有 _messages 属性）或 has gettext 即可
+    if not hasattr(t, 'gettext'):
         return message
     got = t.gettext(message)
     return got if got is not None else message
