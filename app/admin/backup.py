@@ -331,11 +331,10 @@ def monitor_index():
         'ok': stats.get('db_alive', False),
     }
 
-    from ..models.setting import CMS_VERSION
     return render_template('admin/backup/monitor.html', stats=stats,
                            sys_info=sys_info, runtime=runtime,
                            disk_info=disk_info, db_info=db_info,
-                           cms_version=CMS_VERSION)
+                           cms_version=Setting.CMS_VERSION)
 
 
 @admin_bp.route('/api/monitor')
