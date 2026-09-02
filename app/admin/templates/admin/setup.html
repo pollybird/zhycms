@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ _('系统初始化') }} - ZHYCMS</title>
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='adminlte/css/bootstrap.min.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='adminlte/css/all.min.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='adminlte/css/adminlte.min.css') }}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
   <style>
     body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     body.login-page {
@@ -234,7 +233,7 @@
     </div>
   </div>
 </div>
-<script src="{{ url_for('static', filename='adminlte/js/jquery.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
 <script>
 (function () {
   var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432 };
