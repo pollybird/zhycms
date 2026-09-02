@@ -2,272 +2,284 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ _('系统初始化') }} - ZHYCMS</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='adminlte/css/bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='adminlte/css/all.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='adminlte/css/adminlte.min.css') }}">
   <style>
-    body{background:#f4f6f9;}
-    .setup-wrap{max-width:980px;margin:40px auto;padding:0 20px;}
-    .brand{text-align:center;margin-bottom:20px;}
-    .brand h1{font-size:28px;font-weight:bold;color:#495057;}
-    .brand small{color:#868e96;}
-    .section-card{margin-bottom:20px;}
-    .plugin-card.active{border:2px solid #28a745;background:#f8fff9;}
-    .plugin-label{cursor:pointer;}
-    .install-progress{display:none;}
+    body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    body.login-page {
+      display: block;
+      min-height: 100vh;
+      height: auto;
+      overflow-y: auto;
+      padding: 40px 15px;
+    }
+    .setup-box { width: 560px; max-width: 100%; margin: 0 auto; }
+    .setup-logo a { color: #495057; }
+    .setup-card-body { border-radius: 4px; }
+    .step-indicator {
+      display: inline-block;
+      width: 28px; height: 28px;
+      line-height: 28px;
+      border-radius: 50%;
+      background: #007bff;
+      color: #fff;
+      text-align: center;
+      font-weight: bold;
+      margin-right: 8px;
+    }
   </style>
 </head>
-<body>
-  <div class="setup-wrap">
-    <div class="brand">
-      <h1><i class="fas fa-rocket text-primary"></i> {{ _('ZHYCMS 系统初始化') }}</h1>
-      <small>{{ _('首次运行，请按提示完成系统初始配置（仅首次安装时显示）') }}</small>
-    </div>
+<body class="hold-transition login-page">
+<div class="setup-box">
+  <div class="setup-logo text-center mb-3">
+    <a href="#"><b>{{ _('钟毓企业网站CMS') }}</b></a>
+  </div>
+  <div class="card">
+    <div class="card-body setup-card-body">
+      <p class="login-box-msg">
+        <span class="step-indicator">1</span>{{ _('系统初始化') }}
+      </p>
 
-    {# 错误/提示区域 #}
-    {% if error %}
-    <div class="alert alert-danger alert-dismissible fade show">
-      <i class="fas fa-exclamation-circle"></i> {{ error }}
-      <button class="close" data-dismiss="alert">&times;</button>
-    </div>
-    {% endif %}
-    {% if info %}
-    <div class="alert alert-info alert-dismissible fade show">
-      <i class="fas fa-info-circle"></i> {{ info }}
-      <button class="close" data-dismiss="alert">&times;</button>
-    </div>
-    {% endif %}
-
-    <form method="post" id="setup-form">
-      {# 管理员账号 #}
-      <div class="card section-card">
-        <div class="card-header bg-primary text-white"><h3 class="card-title"><i class="fas fa-user-shield"></i> {{ _('管理员账号') }}</h3></div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-4">
-              <div class="form-group">
-                <label class="required-mark">{{ _('账号') }}</label>
-                <input type="text" name="username" class="form-control" pattern="[a-zA-Z0-9_]+" minlength="3" value="{{ username or 'admin' }}" required>
-                <small class="form-text text-muted">{{ _('字母、数字、下划线，3 位以上') }}</small>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                <label class="required-mark">{{ _('密码') }}</label>
-                <input type="password" name="password" class="form-control" minlength="6" required>
-                <small class="form-text text-muted">{{ _('至少 6 位，建议包含字母、数字和符号') }}</small>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                <label class="required-mark">{{ _('确认密码') }}</label>
-                <input type="password" name="password_confirm" class="form-control" minlength="6" required>
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                <label>{{ _('显示名称') }}</label>
-                <input type="text" name="nickname" class="form-control" value="{{ nickname or _('超级管理员') }}">
-              </div>
-            </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                <label>{{ _('联系邮箱') }}</label>
-                <input type="email" name="admin_email" class="form-control" value="">
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> {{ _('首次使用，请设置管理员账号与密码。') }}
       </div>
 
-      {# 数据库 #}
-      <div class="card section-card">
-        <div class="card-header bg-info text-white"><h3 class="card-title"><i class="fas fa-database"></i> {{ _('数据库配置') }}</h3></div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-4">
-              <div class="form-group">
-                <label class="required-mark">{{ _('数据库类型') }}</label>
-                <select name="db_type" id="db-type" class="form-control">
-                  <option value="sqlite">{{ _('SQLite（推荐：无需额外服务，一键安装）') }}</option>
-                  <option value="mysql">{{ _('MySQL / MariaDB（推荐生产环境使用）') }}</option>
-                  <option value="postgresql">{{ _('PostgreSQL（适用于企业级部署）') }}</option>
-                </select>
-              </div>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, msg in messages %}
+            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible">
+              <button type="button" class="close" data-dismiss="alert">&times;</button>
+              {{ msg }}
             </div>
-            <div class="col-md-4">
-              <div class="form-group">
-                <label class="required-mark">{{ _('数据库名') }}</label>
-                <input type="text" name="db_name" id="db-name" class="form-control" value="{{ db_name or 'zhycms' }}">
-                <small class="form-text text-muted sqlite-hint">{{ _('SQLite：填写文件名（相对 %(instance_dir)s 目录），无需账号密码', instance_dir='instance/') }}</small>
-              </div>
-            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="post" autocomplete="off">
+        {# ========== 管理员账号 ========== #}
+        <div class="form-group">
+          <label>{{ _('管理员账号') }} <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <input type="text" name="username" class="form-control" placeholder="{{ _('至少 3 个字符') }}" value="{{ username or '' }}" required minlength="3" autofocus>
+            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-user"></span></div></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>{{ _('管理员昵称') }}</label>
+          <input type="text" name="nickname" class="form-control" placeholder="{{ _('显示在后台，如：超级管理员') }}" value="{{ nickname or '' }}">
+        </div>
+
+        <div class="form-group">
+          <label>{{ _('登录密码') }} <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <input type="password" name="password" class="form-control" placeholder="{{ _('至少 6 个字符') }}" required minlength="6">
+            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-lock"></span></div></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>{{ _('确认密码') }} <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <input type="password" name="password_confirm" class="form-control" placeholder="{{ _('再次输入密码') }}" required minlength="6">
+            <div class="input-group-append"><div class="input-group-text"><span class="fas fa-lock"></span></div></div>
+          </div>
+        </div>
+
+        <hr>
+
+        {# ========== 数据库类型 ========== #}
+        <div class="form-group">
+          <label><strong>{{ _('数据库类型') }}</strong></label>
+          <small class="text-muted d-block mb-2">
+            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
+          </small>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="db_mysql" name="db_type" value="mysql" {{ 'checked' if db_type == 'mysql' else '' }}>
+            <label for="db_mysql">
+              <strong>MySQL</strong> <span class="badge badge-success">{{ _('生产推荐') }}</span>
+              <small class="text-muted d-block">{{ _('生产环境首选（5.7+），需已创建目标数据库（建议字符集 utf8mb4）') }}</small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="db_pg" name="db_type" value="postgresql" {{ 'checked' if db_type == 'postgresql' else '' }}>
+            <label for="db_pg">
+              <strong>PostgreSQL</strong> <span class="badge badge-success">{{ _('生产推荐') }}</span>
+              <small class="text-muted d-block">{{ _('生产环境可选（12+），性能强大，需已创建目标数据库') }}</small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="db_sqlite" name="db_type" value="sqlite" {{ 'checked' if (db_type or 'sqlite') == 'sqlite' else '' }}>
+            <label for="db_sqlite">
+              <strong>SQLite</strong> <span class="badge badge-secondary">{{ _('仅开发/测试') }}</span>
+              <small class="text-muted d-block">{{ _('默认，开箱即用（instance/zhycms.db）；不支持并发写入，不要用于生产环境') }}</small>
+            </label>
           </div>
 
-          <div id="mysql-pg-block" style="display:none;">
+          <div id="db-conn-fields" style="display:none;">
             <div class="row">
-              <div class="col-md-3">
-                <div class="form-group">
-                  <label class="required-mark">{{ _('主机') }}</label>
-                  <input type="text" name="db_host" class="form-control" value="{{ db_host or '127.0.0.1' }}">
-                </div>
+              <div class="col-8">
+                <label>{{ _('主机') }} <span class="text-danger">*</span></label>
+                <input type="text" name="db_host" class="form-control" placeholder="127.0.0.1" value="{{ db_host or '' }}">
               </div>
-              <div class="col-md-2">
-                <div class="form-group">
-                  <label>{{ _('端口') }}</label>
-                  <input type="number" name="db_port" id="db-port" class="form-control" value="{{ db_port or '' }}" placeholder="{{ _('默认端口') }}">
-                </div>
-              </div>
-              <div class="col-md-3">
-                <div class="form-group">
-                  <label class="required-mark">{{ _('账号') }}</label>
-                  <input type="text" name="db_user" class="form-control" value="{{ db_user or '' }}" placeholder="root">
-                </div>
-              </div>
-              <div class="col-md-4">
-                <div class="form-group">
-                  <label>{{ _('密码') }}</label>
-                  <input type="password" name="db_password" class="form-control" value="">
-                </div>
+              <div class="col-4">
+                <label>{{ _('端口') }}</label>
+                <input type="text" name="db_port" class="form-control" placeholder="{{ _('默认端口') }}" value="{{ db_port or '' }}">
               </div>
             </div>
-            <p class="text-muted small">{{ _('注意：请先手动创建空数据库（数据库名需与上方一致），该用户需要具有完全读写权限。') }}</p>
-          </div>
-        </div>
-      </div>
-
-      {# 站点信息 #}
-      <div class="card section-card">
-        <div class="card-header bg-success text-white"><h3 class="card-title"><i class="fas fa-globe"></i> {{ _('站点信息') }}</h3></div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>{{ _('站点名称') }}</label>
-                <input type="text" name="site_name" class="form-control" value="{{ site_name or _('钟毓企业网站 CMS') }}">
-              </div>
+            <div class="form-group mt-2">
+              <label>{{ _('数据库名') }} <span class="text-danger">*</span></label>
+              <input type="text" name="db_name" class="form-control" placeholder="{{ _('需提前创建，如 zhycms') }}" value="{{ db_name or '' }}">
             </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>{{ _('后台名称') }}</label>
-                <input type="text" name="cms_name" class="form-control" value="{{ cms_name or _('钟毓 CMS 管理中心') }}">
+            <div class="row">
+              <div class="col-6">
+                <label>{{ _('用户名') }} <span class="text-danger">*</span></label>
+                <input type="text" name="db_user" class="form-control" placeholder="{{ _('数据库账号') }}" value="{{ db_user or '' }}">
+              </div>
+              <div class="col-6">
+                <label>{{ _('密码') }}</label>
+                <input type="password" name="db_password" class="form-control" placeholder="{{ _('数据库密码') }}" autocomplete="new-password">
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {# 演示数据 #}
-      <div class="card section-card">
-        <div class="card-header bg-warning"><h3 class="card-title"><i class="fas fa-flask"></i> {{ _('演示数据') }} <small class="text-muted">{{ _('（勾选后将生成示例栏目和文章，方便体验）') }}</small></h3></div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-4">
-              <label class="plugin-label d-block p-3 border rounded plugin-card active">
-                <input type="checkbox" name="demo_data" value="column" class="demo-check" checked>
-                <strong>{{ _('演示栏目（推荐）') }}</strong>
-                <small class="d-block text-muted">{{ _('创建"关于我们、产品中心、新闻资讯、联系我们"等典型企业网站栏目结构') }}</small>
-              </label>
-            </div>
-            <div class="col-md-4">
-              <label class="plugin-label d-block p-3 border rounded plugin-card">
-                <input type="checkbox" name="demo_data" value="article" class="demo-check">
-                <strong>{{ _('演示文章') }}</strong>
-                <small class="d-block text-muted">{{ _('在新闻资讯等列表栏目中生成若干示例文章，用于预览列表与详情页效果') }}</small>
-              </label>
-            </div>
-            <div class="col-md-4">
-              <label class="plugin-label d-block p-3 border rounded plugin-card">
-                <input type="checkbox" name="demo_data" value="fragment" class="demo-check">
-                <strong>{{ _('演示碎片') }}</strong>
-                <small class="d-block text-muted">{{ _('创建通用地址、电话、二维码、版权信息等前台常用碎片字段与分组') }}</small>
-              </label>
-            </div>
+        <hr>
+
+        {# ========== 演示数据（行业模板） ========== #}
+        <div class="form-group">
+          <label><strong>{{ _('演示数据') }}</strong></label>
+          <small class="text-muted d-block mb-2">
+            {{ _('选择要生成的演示数据，便于查看运行效果。所有公司名称均为虚构，仅供参考。') }}
+          </small>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="demo_none" name="demo_type" value="none" {{ 'checked' if demo_type == 'none' else '' }}>
+            <label for="demo_none">
+              {{ _('不生成演示数据') }}
+              <small class="text-muted d-block">{{ _('创建空白站点，所有栏目、内容、碎片、表单均为空') }}</small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="demo_mfg" name="demo_type" value="manufacturing" {{ 'checked' if (demo_type or 'manufacturing') == 'manufacturing' else '' }}>
+            <label for="demo_mfg">
+              <strong>{{ _('制造业演示数据') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('虚拟企业「瑞精工有限公司」：关于我们 / 新闻中心 / 产品中心（精密零部件、自动化设备）/ 服务支持 / 联系我们') }}
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block">
+            <input type="radio" id="demo_svc" name="demo_type" value="service" {{ 'checked' if demo_type == 'service' else '' }}>
+            <label for="demo_svc">
+              <strong>{{ _('服务业演示数据') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('虚拟企业「云业咨询管理有限公司」：关于我们 / 新闻动态 / 服务项目（战略咨询、人力资源、企业培训）/ 客户案例 / 联系我们') }}
+              </small>
+            </label>
           </div>
         </div>
-      </div>
 
-      {# 功能插件 #}
-      <div class="card section-card">
-        <div class="card-header bg-purple text-white"><h3 class="card-title"><i class="fas fa-puzzle-piece"></i> {{ _('功能插件') }} <small class="text-white-50">{{ _('（可选插件，安装后也可在后台插件管理中开启/关闭）') }}</small></h3></div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-4">
-              <label class="plugin-label d-block p-3 border rounded plugin-card">
-                <input type="checkbox" name="plugins" value="form_submit" class="plugin-check">
-                <strong>{{ _('表单提交') }}</strong>
-                <small class="d-block text-muted">{{ _('前台联系表单/留言收集，后台"表单提交"菜单统一管理，可与联系我们栏目配合使用') }}</small>
-              </label>
-            </div>
-            <div class="col-md-4">
-              <label class="plugin-label d-block p-3 border rounded plugin-card">
-                <input type="checkbox" name="plugins" value="site_link" class="plugin-check">
-                <strong>{{ _('友情链接') }}</strong>
-                <small class="d-block text-muted">{{ _('后台管理友情链接，提供前台挂件/API，常用于网站底部合作单位、推荐站点等展示') }}</small>
-              </label>
-            </div>
-            <div class="col-md-4">
-              <label class="plugin-label d-block p-3 border rounded plugin-card">
-                <input type="checkbox" name="plugins" value="tags" class="plugin-check">
-                <strong>{{ _('标签系统') }}</strong>
-                <small class="d-block text-muted">{{ _('为文章添加标签，支持标签云、同标签相关文章、按标签聚合列表等功能') }}</small>
-              </label>
-            </div>
+        <hr>
+
+        {# ========== 功能插件 ========== #}
+        <div class="form-group">
+          <label><strong>{{ _('功能插件') }}</strong></label>
+          <small class="text-muted d-block mb-2">
+            {{ _('勾选要启用的官方插件，初始化后可在「后台 → 插件管理」随时启用/停用。') }}<br>
+            {{ _('选择行业演示数据时，轮播图、友情链接（选制造业另含产品展示）会自动启用，无需勾选。') }}
+          </small>
+          <div class="icheck-primary d-block mb-2">
+            <input type="checkbox" id="plug_banner" name="plugins" value="banner" {{ 'checked' if 'banner' in (plugins or []) else '' }}>
+            <label for="plug_banner">
+              <strong>{{ _('轮播图') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('首页屏幕/广告位分组管理，模板 banner_items() 一行调用；初始化轮播数据由本插件生成（不再使用碎片）') }}
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block">
+            <input type="checkbox" id="plug_product" name="plugins" value="product" {{ 'checked' if 'product' in (plugins or []) else '' }}>
+            <label for="plug_product">
+              <strong>{{ _('产品展示') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('产品多图相册与规格参数表，区别普通文章，适合制造业企业；演示数据含产品示例（仅制造业）') }}
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block">
+            <input type="checkbox" id="plug_friend_link" name="plugins" value="friend_link" {{ 'checked' if 'friend_link' in (plugins or []) else '' }}>
+            <label for="plug_friend_link">
+              <strong>{{ _('友情链接') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('站点友情链接管理，前台模板 friend_links() 一行调用；演示数据含 3 条示例链接') }}
+              </small>
+            </label>
           </div>
         </div>
-      </div>
 
-      {# 确认安装 #}
-      <div class="text-center mb-5">
-        <button type="submit" id="submit-btn" class="btn btn-primary btn-lg px-5"><i class="fas fa-magic"></i> {{ _('确认安装并完成初始化') }}</button>
-        <div class="install-progress my-3">
-          <div class="spinner-border text-primary" role="status"></div>
-          <span class="ml-2">{{ _('正在创建数据库、管理员账号、安装演示数据与插件，大约需要 10-30 秒…') }}</span>
+        <div class="row">
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-check"></i> {{ _('开始初始化') }}</button>
+          </div>
         </div>
-      </div>
-    </form>
+      </form>
 
-    <div class="text-center text-muted small pb-5">
-      {{ _('钟毓企业网站CMS · 版权所有：泰州姜堰钟毓信息技术有限公司') }}
+      <p class="mt-3 mb-0 text-muted text-center" style="font-size:12px;">
+        {{ _('钟毓企业网站CMS · 版权所有：泰州姜堰钟毓信息技术有限公司') }}
+      </p>
     </div>
   </div>
+</div>
+<script src="{{ url_for('static', filename='adminlte/js/jquery.min.js') }}"></script>
+<script>
+(function () {
+  var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432 };
+  var fields = document.getElementById('db-conn-fields');
+  var required = ['db_host', 'db_name', 'db_user'];
+  var portInput = document.querySelector('input[name="db_port"]');
 
-  <script src="{{ url_for('static', filename='adminlte/js/jquery.min.js') }}"></script>
-  <script src="{{ url_for('static', filename='adminlte/js/bootstrap.bundle.min.js') }}"></script>
-  <script>
-    // 数据库类型切换
-    function toggle_db(){
-      const t = $('#db-type').val();
-      const isSqlite = t === 'sqlite';
-      $('#mysql-pg-block').toggle(!isSqlite);
-      $('.sqlite-hint').toggle(isSqlite);
-      if (t === 'mysql') $('#db-port').attr('placeholder', '3306');
-      else if (t === 'postgresql') $('#db-port').attr('placeholder', '5432');
-      else $('#db-port').attr('placeholder', '{{ _('默认端口') }}');
-    }
-    $('#db-type').on('change', toggle_db);
-    toggle_db();
+  function currentType() {
+    var checked = document.querySelector('input[name="db_type"]:checked');
+    return checked ? checked.value : 'sqlite';
+  }
 
-    // 插件卡片点击高亮
-    $('.plugin-check, .demo-check').on('change', function(){
-      $(this).closest('.plugin-card').toggleClass('active', this.checked);
-    }).trigger('change');
-
-    // 提交时显示进度，避免重复提交
-    $('#setup-form').on('submit', function(e){
-      if ($('#submit-btn').prop('disabled')) { e.preventDefault(); return; }
-      const pw1 = $('input[name=password]').val();
-      const pw2 = $('input[name=password_confirm]').val();
-      if (pw1 !== pw2) {
-        e.preventDefault();
-        alert('{{ _('两次输入的管理员密码不一致') }}');
-        return;
-      }
-      $('#submit-btn').prop('disabled', true);
-      $('.install-progress').show();
+  function apply() {
+    var type = currentType();
+    var needConn = (type === 'mysql' || type === 'postgresql');
+    fields.style.display = needConn ? 'block' : 'none';
+    required.forEach(function (name) {
+      var el = document.querySelector('input[name="' + name + '"]');
+      if (el) { if (needConn) { el.setAttribute('required', 'required'); } else { el.removeAttribute('required'); } }
     });
-  </script>
+    if (needConn && portInput && !portInput.value) {
+      portInput.value = DEFAULT_PORTS[type];
+    }
+    if (!needConn && portInput) {
+      var isDefault = String(portInput.value) === String(DEFAULT_PORTS.mysql)
+        || String(portInput.value) === String(DEFAULT_PORTS.postgresql);
+      if (isDefault) { portInput.value = ''; }
+    }
+  }
+
+  document.querySelectorAll('input[name="db_type"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      var type = currentType();
+      if (portInput && (type === 'mysql' || type === 'postgresql')) {
+        var other = type === 'mysql' ? DEFAULT_PORTS.postgresql : DEFAULT_PORTS.mysql;
+        if (!portInput.value || String(portInput.value) === String(other)) {
+          portInput.value = DEFAULT_PORTS[type];
+        }
+      }
+      apply();
+    });
+  });
+
+  apply();
+})();
+</script>
 </body>
 </html>
