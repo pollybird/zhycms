@@ -74,7 +74,7 @@
           <div class="card-header"><h3 class="card-title">{{ _('立即备份') }}</h3></div>
           <div class="card-body">
             <p class="text-muted small">{{ _('将当前数据库 + 上传文件完整打包备份到 %(dir)s 目录', dir='backups/') }}</p>
-            <form method="post" action="{{ url_for('admin.backup_create') }}">
+            <form method="post" action="{{ url_for('admin.backup_manual') }}">
               <button class="btn btn-success"><i class="fas fa-plus-circle"></i> {{ _('创建备份') }}</button>
             </form>
           </div>
