@@ -1,0 +1,99 @@
+# ============================================================
+# zhycms Docker Compose
+# 用法：
+#   MySQL:      docker compose --profile mysql up -d
+#   PostgreSQL: docker compose --profile postgres up -d
+#   + 搜索:     追加 --profile search
+# ============================================================
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        # 国内构建可在 .env 中设置：
+        #   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+        #   APT_MIRROR=mirrors.tuna.tsinghua.edu.cn
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        APT_MIRROR: ${APT_MIRROR:-}
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      ZHYCMS_ENV: production
+      ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+    volumes:
+      - ./instance:/app/instance
+      - ./app/static/uploads:/app/app/static/uploads
+    profiles: ["mysql", "postgres"]
+
+  # ---- MySQL ----
+  app-mysql:
+    extends: app
+    environment:
+      ZHYCMS_DB_URI: mysql+pymysql://zhycms:${MYSQL_PASSWORD:-zhycms}@db-mysql:3306/zhycms?charset=utf8mb4
+    depends_on:
+      db-mysql:
+        condition: service_healthy
+    profiles: ["mysql"]
+
+  db-mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: zhycms
+      MYSQL_USER: zhycms
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-zhycms}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ["mysql"]
+
+  # ---- PostgreSQL ----
+  app-pg:
+    extends: app
+    environment:
+      ZHYCMS_DB_URI: postgresql+psycopg2://zhycms:${POSTGRES_PASSWORD:-zhycms}@db-pg:5432/zhycms
+    depends_on:
+      db-pg:
+        condition: service_healthy
+    profiles: ["postgres"]
+
+  db-pg:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zhycms
+      POSTGRES_USER: zhycms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zhycms}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhycms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ["postgres"]
+
+  # ---- Meilisearch（可选）----
+  meilisearch:
+    image: getmeili/meilisearch:v1.8
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
+    volumes:
+      - meili_data:/meili_data
+    ports:
+      - "7700:7700"
+    profiles: ["search"]
+
+volumes:
+  mysql_data:
+  pg_data:
+  meili_data:

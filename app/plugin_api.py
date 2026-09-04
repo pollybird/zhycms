@@ -45,6 +45,48 @@ class PluginBase:
 
     # ---- 代码钩子 ----
 
+    # ---- 数据库迁移（v2.4） ----
+
+    def get_migration_files(self):
+        """返回插件迁移文件列表（绝对路径）。
+
+        插件可在 ``migrations/versions/`` 目录下放置 Alembic 迁移脚本。
+        核心启动时自动发现并合并到 ``version_locations``，使插件
+        schema 变更也纳入 Alembic 统一管理。
+
+        无迁移文件的插件返回空列表（默认），仍由 ``db.create_all()``
+        兜底建表。
+        """
+        try:
+            mod = importlib.import_module(type(self).__module__)
+            base = os.path.dirname(os.path.abspath(mod.__file__))
+        except Exception:
+            return []
+        versions_dir = os.path.join(base, 'migrations', 'versions')
+        if not os.path.isdir(versions_dir):
+            return []
+        return [os.path.join(versions_dir, f)
+                for f in sorted(os.listdir(versions_dir))
+                if f.endswith('.py') and not f.startswith('__')]
+
+    # ---- 存储驱动（v2.4） ----
+
+    def get_storage_drivers(self):
+        """返回插件贡献的存储驱动类列表（app.utils.storage.StorageDriver 子类）。
+
+        核心启动时自动注册进存储驱动注册表；插件禁用后其驱动不再被
+        选中（get_driver 回退本地）。官方 oss_storage 插件使用本钩子
+        注册阿里云 OSS / 腾讯云 COS / 七牛云驱动。
+        """
+        return []
+
+    def on_disabled(self):
+        """插件被禁用后的回调（运行时 Setting 门控，无需重启）。
+
+        插件可在此回收外部资源配置（如把依赖该插件的全局设置重置为安全
+        默认值）。异常不影响禁用流程本身。
+        """
+
     # ---- 国际化（v2.3） ----
 
     def get_i18n_dir(self):

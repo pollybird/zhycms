@@ -155,7 +155,9 @@ def backup_restore_upload():
     if not any(name.endswith(ext) for ext in allowed):
         flash(_gettext('仅支持 .sql.gz / .json.gz / .gz / .sql / .json 备份文件'), 'danger')
         return redirect(url_for('admin.backup_index'))
-    rel, url, err = save_upload_file(f, sub_dir='backup_temp', allowed_exts=['gz', 'sql', 'json'])
+    # 备份恢复文件必须留本地磁盘（恢复逻辑直接读本地路径），强制 local 驱动
+    rel, url, err = save_upload_file(f, sub_dir='backup_temp', allowed_exts=['gz', 'sql', 'json'],
+                                     storage_scope='local')
     if err:
         flash(_gettext('文件保存失败：{0}').format(err), 'danger')
         return redirect(url_for('admin.backup_index'))

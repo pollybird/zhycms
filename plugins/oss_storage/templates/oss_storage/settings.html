@@ -1,0 +1,214 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _p('oss_storage', '对象存储配置') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('oss_storage', '对象存储配置') }}{% endblock %}
+{% set active_menu = 'oss-storage' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">{{ _p('oss_storage', '插件') }}</li>
+<li class="breadcrumb-item active">{{ _p('oss_storage', '对象存储') }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('admin.oss_storage_index') }}">
+  <input type="hidden" name="action" value="save">
+
+  {# ---------- 驱动选择 ---------- #}
+  <div class="card card-outline card-primary">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-hdd"></i> {{ _p('oss_storage', '存储驱动') }}</h3></div>
+    <div class="card-body">
+      <div class="form-group mb-0">
+        <div class="icheck-primary d-block mb-2">
+          <input type="radio" name="storage_driver" id="drv-local" value="local" {{ 'checked' if current_driver == 'local' }}>
+          <label for="drv-local"><i class="fas fa-server"></i> {{ _p('oss_storage', '本地磁盘存储（默认，文件保存在服务器 app/static/uploads/）') }}</label>
+        </div>
+        <div class="icheck-primary d-block mb-2">
+          <input type="radio" name="storage_driver" id="drv-aliyun" value="aliyun" {{ 'checked' if current_driver == 'aliyun' }}>
+          <label for="drv-aliyun"><i class="fas fa-cloud"></i> {{ _p('oss_storage', '阿里云 OSS') }}</label>
+        </div>
+        <div class="icheck-primary d-block mb-2">
+          <input type="radio" name="storage_driver" id="drv-tencent" value="tencent" {{ 'checked' if current_driver == 'tencent' }}>
+          <label for="drv-tencent"><i class="fas fa-cloud"></i> {{ _p('oss_storage', '腾讯云 COS') }}</label>
+        </div>
+        <div class="icheck-primary d-block">
+          <input type="radio" name="storage_driver" id="drv-qiniu" value="qiniu" {{ 'checked' if current_driver == 'qiniu' }}>
+          <label for="drv-qiniu"><i class="fas fa-cloud"></i> {{ _p('oss_storage', '七牛云 Kodo') }}</label>
+        </div>
+      </div>
+      <div class="alert alert-info mb-0 mt-3">
+        <small>{{ _p('oss_storage', '切换到云端前请先填写对应厂商凭证并保存，系统会自动进行连接测试；测试失败将保持本地存储。建议使用云厂商 RAM 子账号，仅授予目标 Bucket 读写权限。') }}</small>
+      </div>
+    </div>
+  </div>
+
+  {# ---------- 三家凭证 ---------- #}
+  <div class="row">
+    {# 阿里云 #}
+    <div class="col-md-4">
+      <div class="card card-outline card-orange">
+        <div class="card-header"><h3 class="card-title"><i class="fab fa-alipay"></i> {{ _p('oss_storage', '阿里云 OSS') }}</h3></div>
+        <div class="card-body">
+          {% set sdk = sdk_status | selectattr('driver','equalto','aliyun') | first %}
+          {% if not sdk.installed %}
+          <div class="alert alert-warning py-2">
+            <small><i class="fas fa-exclamation-triangle"></i>
+              {{ _p('oss_storage', 'SDK 未安装：') }}<br>
+              <code>pip install {{ sdk.pip }} -i https://pypi.tuna.tsinghua.edu.cn/simple</code>
+            </small>
+          </div>
+          {% else %}
+          <div class="alert alert-success py-1"><small><i class="fas fa-check-circle"></i> oss2 {{ _p('oss_storage', '已安装') }}</small></div>
+          {% endif %}
+          <div class="form-group">
+            <label>AccessKey ID</label>
+            <input type="text" name="oss_aliyun_access_key_id" class="form-control form-control-sm" value="{{ settings.oss_aliyun_access_key_id or '' }}">
+          </div>
+          <div class="form-group">
+            <label>AccessKey Secret</label>
+            <input type="password" name="oss_aliyun_access_key_secret" class="form-control form-control-sm" placeholder="{{ _p('oss_storage', '留空表示不修改') }}" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('oss_storage', 'Endpoint（地域节点）') }}</label>
+            <input type="text" name="oss_aliyun_endpoint" class="form-control form-control-sm" placeholder="oss-cn-hangzhou.aliyuncs.com" value="{{ settings.oss_aliyun_endpoint or '' }}">
+          </div>
+          <div class="form-group">
+            <label>Bucket</label>
+            <input type="text" name="oss_aliyun_bucket" class="form-control form-control-sm" value="{{ settings.oss_aliyun_bucket or '' }}">
+          </div>
+          <div class="form-group mb-0">
+            <label>{{ _p('oss_storage', 'CDN / 绑定域名（可空）') }}</label>
+            <input type="text" name="oss_aliyun_cdn_domain" class="form-control form-control-sm" placeholder="https://cdn.example.com" value="{{ settings.oss_aliyun_cdn_domain or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# 腾讯云 #}
+    <div class="col-md-4">
+      <div class="card card-outline card-info">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-comment-dots"></i> {{ _p('oss_storage', '腾讯云 COS') }}</h3></div>
+        <div class="card-body">
+          {% set sdk = sdk_status | selectattr('driver','equalto','tencent') | first %}
+          {% if not sdk.installed %}
+          <div class="alert alert-warning py-2">
+            <small><i class="fas fa-exclamation-triangle"></i>
+              {{ _p('oss_storage', 'SDK 未安装：') }}<br>
+              <code>pip install {{ sdk.pip }} -i https://pypi.tuna.tsinghua.edu.cn/simple</code>
+            </small>
+          </div>
+          {% else %}
+          <div class="alert alert-success py-1"><small><i class="fas fa-check-circle"></i> cos-python-sdk-v5 {{ _p('oss_storage', '已安装') }}</small></div>
+          {% endif %}
+          <div class="form-group">
+            <label>SecretId</label>
+            <input type="text" name="oss_tencent_secret_id" class="form-control form-control-sm" value="{{ settings.oss_tencent_secret_id or '' }}">
+          </div>
+          <div class="form-group">
+            <label>SecretKey</label>
+            <input type="password" name="oss_tencent_secret_key" class="form-control form-control-sm" placeholder="{{ _p('oss_storage', '留空表示不修改') }}" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('oss_storage', '地域 Region') }}</label>
+            <input type="text" name="oss_tencent_region" class="form-control form-control-sm" placeholder="ap-shanghai" value="{{ settings.oss_tencent_region or '' }}">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('oss_storage', 'Bucket（含 APPID 后缀）') }}</label>
+            <input type="text" name="oss_tencent_bucket" class="form-control form-control-sm" placeholder="zhycms-1250000000" value="{{ settings.oss_tencent_bucket or '' }}">
+          </div>
+          <div class="form-group mb-0">
+            <label>{{ _p('oss_storage', 'CDN / 绑定域名（可空）') }}</label>
+            <input type="text" name="oss_tencent_cdn_domain" class="form-control form-control-sm" placeholder="https://cdn.example.com" value="{{ settings.oss_tencent_cdn_domain or '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# 七牛云 #}
+    <div class="col-md-4">
+      <div class="card card-outline card-success">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-cloud-upload-alt"></i> {{ _p('oss_storage', '七牛云 Kodo') }}</h3></div>
+        <div class="card-body">
+          {% set sdk = sdk_status | selectattr('driver','equalto','qiniu') | first %}
+          {% if not sdk.installed %}
+          <div class="alert alert-warning py-2">
+            <small><i class="fas fa-exclamation-triangle"></i>
+              {{ _p('oss_storage', 'SDK 未安装：') }}<br>
+              <code>pip install {{ sdk.pip }} -i https://pypi.tuna.tsinghua.edu.cn/simple</code>
+            </small>
+          </div>
+          {% else %}
+          <div class="alert alert-success py-1"><small><i class="fas fa-check-circle"></i> qiniu {{ _p('oss_storage', '已安装') }}</small></div>
+          {% endif %}
+          <div class="form-group">
+            <label>AccessKey</label>
+            <input type="text" name="oss_qiniu_access_key" class="form-control form-control-sm" value="{{ settings.oss_qiniu_access_key or '' }}">
+          </div>
+          <div class="form-group">
+            <label>SecretKey</label>
+            <input type="password" name="oss_qiniu_secret_key" class="form-control form-control-sm" placeholder="{{ _p('oss_storage', '留空表示不修改') }}" autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('oss_storage', '空间名称 Bucket') }}</label>
+            <input type="text" name="oss_qiniu_bucket" class="form-control form-control-sm" value="{{ settings.oss_qiniu_bucket or '' }}">
+          </div>
+          <div class="form-group mb-0">
+            <label>{{ _p('oss_storage', '绑定 CDN 域名（必填）') }}</label>
+            <input type="text" name="oss_qiniu_cdn_domain" class="form-control form-control-sm" placeholder="https://cdn.example.com" value="{{ settings.oss_qiniu_cdn_domain or '' }}">
+            <small class="form-text text-muted">{{ _p('oss_storage', '七牛对象存储无默认下载域名，必须配置绑定域名。') }}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-outline card-primary">
+    <div class="card-footer">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _p('oss_storage', '保存配置并切换驱动') }}</button>
+    </div>
+  </div>
+</form>
+
+{# ---------- 连接测试 ---------- #}
+<form method="post" action="{{ url_for('admin.oss_storage_test') }}" class="mb-3">
+  <div class="card card-outline card-secondary">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-stethoscope"></i> {{ _p('oss_storage', '连接测试') }}</h3></div>
+    <div class="card-body d-flex align-items-center">
+      <select name="driver" class="form-control form-control-sm" style="width:auto;">
+        <option value="aliyun">{{ _p('oss_storage', '阿里云 OSS') }}</option>
+        <option value="tencent">{{ _p('oss_storage', '腾讯云 COS') }}</option>
+        <option value="qiniu">{{ _p('oss_storage', '七牛云 Kodo') }}</option>
+      </select>
+      <button type="submit" class="btn btn-outline-secondary btn-sm ml-2"><i class="fas fa-plug"></i> {{ _p('oss_storage', '测试连接（需先保存凭证）') }}</button>
+    </div>
+  </div>
+</form>
+
+{# ---------- 一键迁移 ---------- #}
+<form method="post" action="{{ url_for('admin.oss_storage_index') }}">
+  <div class="card card-outline card-warning">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-dolly"></i> {{ _p('oss_storage', '本地文件迁移到云端') }}</h3></div>
+    <div class="card-body">
+      {% if migrate_plan %}
+      <div class="alert alert-info">
+        {{ _p('oss_storage', '预览结果：待迁移文件 {0} 个（其中本地磁盘存在 {1} 个、缺失 {2} 个），内容中待改写 URL {3} 处。')
+           .format(migrate_plan.files_total, migrate_plan.files_on_disk, migrate_plan.files_missing, migrate_plan.url_hits) }}
+        {% if migrate_plan.missing_names %}
+        <br><small>{{ _p('oss_storage', '缺失文件示例：') }}{{ migrate_plan.missing_names | join('、') }}</small>
+        {% endif %}
+      </div>
+      {% endif %}
+      <p class="text-muted small mb-2">
+        {{ _p('oss_storage', '把历史上传的本地文件批量上传到当前云端驱动，并把文章正文/封面、碎片、自定义字段、站点 Logo 等内容中的 /static/uploads/ 链接改写为云域名。') }}
+        <br>{{ _p('oss_storage', '迁移幂等可重复执行（已上传文件自动跳过）；本地文件保留不删；演示图片（uploads/demo/）不迁移。') }}
+      </p>
+      <button type="submit" name="action" value="migrate_preview" class="btn btn-outline-warning btn-sm">
+        <i class="fas fa-search"></i> {{ _p('oss_storage', '1. 预览（dry-run）') }}
+      </button>
+      <button type="submit" name="action" value="migrate_run" class="btn btn-warning btn-sm"
+              data-confirm="{{ _p('oss_storage', '确认开始迁移？迁移过程中请勿关闭页面，中断后可重新执行。') }}"
+              onclick="return confirm(this.getAttribute('data-confirm'))">
+        <i class="fas fa-play"></i> {{ _p('oss_storage', '2. 执行迁移') }}
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}

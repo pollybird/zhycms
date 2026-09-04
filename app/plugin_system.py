@@ -178,12 +178,59 @@ def _register_instance(app, rec):
     except ImportError:
         pass
 
+    # 5) v2.4.0 存储驱动（oss_storage 插件注册云端 OSS 驱动）
+    try:
+        from .utils import storage as _storage
+        for drv_cls in (inst.get_storage_drivers() or []):
+            _storage.register_driver(drv_cls)
+    except Exception as e:
+        app.logger.warning('插件 %s 存储驱动注册失败： %s', rec.slug, e)
 
-def discover_and_load(app):
+
+def _import_plugin_models_recursive(base_module):
+    """把插件包内的模型模块导入 metadata（仅用于 db.create_all()
+    兜底建表，不做注册）。失败不影响启动，由 enable_plugin 再兜底。"""
+    import pkgutil
+    try:
+        pkg_path = base_module.__path__
+    except AttributeError:
+        return
+    for _finder, modname, ispkg in pkgutil.walk_packages(pkg_path, prefix=f'{base_module.__name__}.'):
+        if ispkg or not modname.endswith('.models'):
+            continue
+        try:
+            importlib.import_module(modname)
+        except Exception:
+            pass
+
+
+def discover_and_load(app, import_models_only=False):
     """入口：扫描并导入全部插件，注册各钩子。在 create_app 中调用（须在
-    register_blueprint(admin_bp) 之前、api 蓝本导入之后）。"""
+    register_blueprint(admin_bp) 之前、api 蓝本导入之后）。
+
+    v2.4.0 兼容旧插件 db.create_all()：启动期 **先** 导入所有插件模型
+    进入 ``db.metadata``，再 ``db.create_all()`` 建表；**之后** 才在
+    ``enable_plugin()`` 再次执行 db.create_all() 幂等兜底；同时 Alembic
+    迁移执行时也能看到插件模型表，避免 metadata 与 schema 不一致导致
+    下一次 ``autogenerate`` 误报 DROP。
+
+    :param import_models_only: 仅扫描并导入插件模型（建表/metadata 对齐
+        用，不注册任何运行期钩子），用于启动期 pre-seed 场景。
+    """
     discover()
     for rec in list(_registry):
+        if import_models_only:
+            # 仅导入插件包（触发顶层 import）并递归导入 models 子模块
+            try:
+                module = importlib.import_module(f'plugins.{rec.slug}')
+                rec.module = module
+            except Exception as e:
+                rec.error = f'{type(e).__name__}: {e}'
+                app.logger.warning('插件 %s 预加载模型失败（不影响启动）： %s',
+                                   rec.slug, e)
+                continue
+            _import_plugin_models_recursive(module)
+            continue
         if rec.loaded:
             continue
         try:
@@ -284,10 +331,20 @@ def enable_plugin(slug):
 
 
 def disable_plugin(slug):
-    """禁用插件：仅移出启用清单（不删表、不清数据、不回收权限绑定）。"""
+    """禁用插件：仅移出启用清单（不删表、不清数据、不回收权限绑定）。
+
+    禁用后调用插件 ``on_disabled()`` 回调（如 oss_storage 会把存储驱动
+    重置为本地，防止新上传指向已不可用的云端配置）；回调异常不影响禁用。
+    """
     slugs = enabled_slugs()
     slugs.discard(slug)
     set_enabled_slugs(slugs)
+    rec = _by_slug.get(slug)
+    if rec is not None and rec.instance is not None:
+        try:
+            rec.instance.on_disabled()
+        except Exception:
+            pass
 
 
 def remove_record(slug):

@@ -1,0 +1,42 @@
+# 版本控制
+.git
+.gitignore
+
+# Python 缓存
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+
+# 运行时数据（volume 挂载）
+instance/
+app/static/uploads/*
+!app/static/uploads/demo/
+
+# IDE / 工具
+.trae/
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 编译产物（Dockerfile 中编译）
+app/translations/*/LC_MESSAGES/*.mo
+plugins/*/translations/*/LC_MESSAGES/*.mo
+
+# 文档（体积大，Docker 不需要）
+wiki.html
+*.md
+DESIGN-*.md
+UPGRADE.md
+
+# Docker 自身
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 其他
+*.db
+*.log
+node_modules/

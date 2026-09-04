@@ -24,6 +24,23 @@ from .workflow import (
 from .backup import BackupRecord, TRIGGER_MANUAL, TRIGGER_SCHEDULED
 from .upload import UploadedFile
 
+# v2.4.0: search_index 表由迁移 0002 创建；为避免 Alembic 下一次 autogenerate
+# 把它误报为 DROP，需要有一个对应的 ORM 模型声明在 db.metadata 中「锚定」。
+# 模型层故意不使用它，避免和业务耦合。
+from app.extensions import db as _db
+if 'search_index' not in _db.metadata.tables:
+    class SearchIndex(_db.Model):
+        __tablename__ = 'search_index'
+        __table_args__ = {'extend_existing': True}
+        article_id = _db.Column(_db.Integer, primary_key=True, nullable=False)
+        indexed_at = _db.Column(
+            _db.DateTime, nullable=False,
+            server_default=_db.text('CURRENT_TIMESTAMP'),
+        )
+        content_hash = _db.Column(_db.String(64), nullable=True)
+        _db.Index('ix_search_index_indexed_at', indexed_at)
+    del SearchIndex
+
 __all__ = [
     'User', 'LoginLog',
     'Column', 'ColumnField', 'ColumnFieldValue',

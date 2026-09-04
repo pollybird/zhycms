@@ -502,6 +502,60 @@ def setting_i18n():
                            available=available)
 
 
+# ============ 搜索设置（v2.4.0）============
+
+@admin_bp.route('/settings/search', methods=['GET', 'POST'])
+@permission_required('system:settings')
+def setting_search():
+    """全文搜索：引擎选择、Meilisearch 配置、索引重建。"""
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        if action == 'rebuild':
+            # 重建索引
+            from ..utils.search import rebuild_all as _rebuild
+            indexed, errors = _rebuild()
+            flash(_gettext('索引重建完成：成功 %(n)d 篇，失败 %(e)d 篇',
+                           n=indexed, e=errors), 'success')
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'search', 'action': 'rebuild_index',
+                       'indexed': indexed, 'errors': errors})
+            return redirect(url_for('admin.setting_search'))
+        changed = {}
+        val = (request.form.get('search_engine') or 'whoosh').strip()
+        if val not in ('whoosh', 'meilisearch', 'sql'):
+            val = 'whoosh'
+        if Setting.get('search_engine') != val:
+            Setting.set('search_engine', val)
+            changed['search_engine'] = val
+        for key in ('search_meili_url', 'search_meili_key'):
+            val = (request.form.get(key) or '').strip()
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        for key in ('search_index_on_save', 'search_highlight'):
+            val = _onoff(key)
+            if Setting.get(key) != val:
+                Setting.set(key, val)
+                changed[key] = val
+        val = str(max(1, _int_safe('search_results_per_page', default=20)))
+        if Setting.get('search_results_per_page') != val:
+            Setting.set('search_results_per_page', val)
+            changed['search_results_per_page'] = val
+        db.session.commit()
+        clear_content_cache()
+        flash(_gettext('搜索配置已保存'), 'success')
+        if changed:
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'search', 'changed': changed})
+        return redirect(url_for('admin.setting_search'))
+    settings = Setting.get_dict()
+    # 健康检查
+    from ..utils.search import health as _health
+    ok, message = _health()
+    return render_template('admin/setting/search.html',
+                           settings=settings, health_ok=ok, health_msg=message)
+
+
 # ============ 个人资料 / 密码 ============
 
 @admin_bp.route('/profile', methods=['GET', 'POST'])

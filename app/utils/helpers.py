@@ -253,9 +253,17 @@ def audit_log(op_type, module, target_id=None, target_name=None, detail=None):
 # ============================================================
 
 def clear_content_cache(column_id=None, article_id=None):
-    """内容新增/修改/删除/发布后，清除前台首页、栏目页、文章页相关缓存。"""
+    """内容新增/修改/删除/发布后，清除前台首页、栏目页、文章页相关缓存，
+    并触发搜索索引更新（v2.4.0）。"""
     from ..extensions import cache
     from ..models.setting import Setting
+    # v2.4.0：搜索索引更新（独立于缓存开关）
+    if article_id:
+        try:
+            from ..utils.search import reindex_article
+            reindex_article(article_id)
+        except Exception:
+            current_app.logger.exception('reindex_article failed')
     if Setting.get('cache_enable') != 'on':
         return
     keys = []
@@ -313,6 +321,19 @@ def register_template_filters(app):
             return ''
         text = str(value)
         return text[:length] + '...' if len(text) > length else text
+
+    @app.template_filter('highlight')
+    def highlight_filter(value, keyword=''):
+        """高亮搜索关键词：将匹配部分包裹在 <mark> 标签中。"""
+        if not value or not keyword:
+            return value or ''
+        import re as _re
+        # 转义正则特殊字符
+        pattern = _re.escape(keyword)
+        return _re.sub(
+            pattern, f'<mark>{keyword}</mark>', str(value),
+            flags=_re.IGNORECASE
+        )
 
     @app.template_filter('audit_detail')
     def audit_detail(value, maps=None, compact=False):

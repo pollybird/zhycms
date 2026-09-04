@@ -1,8 +1,11 @@
-"""文件上传（模块6 升级）：
+"""文件上传（模块6 升级 / v2.4 接入存储驱动层）：
 - 后缀 + MIME 双重校验
 - 单文件最大尺寸（后台配置 upload_single_max_size_mb）
 - 图片自动压缩（Pillow）+ 生成缩略图
 - 基于内容 SHA-256 自动去重（重复文件直接复用已有 URL，引用计数 +1）
+- v2.4：文件发布走存储抽象层（app/utils/storage.py），支持本地磁盘与
+  云端对象存储（阿里云 OSS / 腾讯云 COS / 七牛云，由 oss_storage 插件注册）；
+  校验/压缩/缩略图仍在本地临时文件上完成，发布后云驱动自动清理本地副本。
 """
 import os
 import io
@@ -13,6 +16,9 @@ from datetime import datetime
 from flask import current_app, url_for
 
 from ..extensions import db
+from .storage import (
+    LocalStorageDriver, get_driver, StorageError,
+)
 
 
 IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
@@ -169,8 +175,37 @@ def _compress_and_thumb(src_path, ext, quality=80, thumb_width=300):
         return None, None, None
 
 
-def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None):
-    """保存上传文件（升级版）：返回 (相对路径, 文件URL, 错误信息)。"""
+def _file_still_exists(dup):
+    """去重复用前确认文件在其归属存储上仍存在（本地查磁盘，云端查对象）。
+
+    云端校验异常或插件禁用时信任历史记录（CDN URL 仍可访问），不阻断复用。
+    """
+    from . import storage as _storage
+    key = dup.stored_name or ''
+    if not key:
+        return False
+    storage_name = getattr(dup, 'storage', None) or 'local'
+    try:
+        if storage_name == 'local':
+            return LocalStorageDriver().exists(key)
+        if _storage._cloud_plugin_enabled():
+            try:
+                return get_driver(storage_name).exists(key)
+            except Exception:
+                return True
+        return True
+    except Exception:
+        return True
+
+
+def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
+                     storage_scope='auto'):
+    """保存上传文件（升级版）：返回 (相对路径/对象key, 文件URL, 错误信息)。
+
+    storage_scope:
+      - 'auto'（默认）：使用当前存储驱动（后台配置，可为云端 OSS）
+      - 'local'：强制本地磁盘（备份恢复等必须留本地的场景使用）
+    """
     from ..models.setting import Setting
     from ..models.upload import UploadedFile
     from ..models.user import User as _U  # noqa 仅保证模型可导入
@@ -232,14 +267,14 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None)
     content_hash = _sha256_of_stream(file_storage.stream) if Setting.get('upload_enable_dedup') == 'on' else ''
     if content_hash:
         dup = UploadedFile.find_by_hash(content_hash)
-        if dup and os.path.exists(os.path.join(current_app.config['UPLOAD_FOLDER'], os.path.relpath(dup.stored_name, 'uploads/') if dup.stored_name.startswith('uploads/') else dup.stored_name)):
-            # 复用已有文件：引用计数+1，返回原 URL
+        if dup and _file_still_exists(dup):
+            # 复用已有文件：引用计数+1，返回原 URL（云端文件 URL 不随驱动切换失效）
             try:
                 dup.ref_count = (dup.ref_count or 0) + 1
                 db.session.commit()
             except Exception:
                 db.session.rollback()
-            # stored_name 存的是相对 static 的路径如 uploads/... 直接用
+            # stored_name 存的是相对 static 的路径/对象 key，如 uploads/... 直接用
             return dup.stored_name, dup.url, None
 
     # 5. 按日期分子目录，UUID 命名保存
@@ -252,9 +287,8 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None)
     save_path = os.path.join(save_dir, new_name)
     file_storage.save(save_path)
 
-    # 6. 图片压缩 + 缩略图（模块6）
+    # 6. 图片压缩 + 缩略图（模块6；本地临时文件上处理）
     compressed_size = 0
-    thumb_url = None
     thumb_rel = None
     width = height = None
     kind = 'image' if ext in IMAGE_EXTS else ('document' if ext in ('pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt') else 'file')
@@ -270,7 +304,7 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None)
         do_thumb = Setting.get('upload_image_thumb_enable') == 'on'
         res = _compress_and_thumb(save_path, ext, quality=q, thumb_width=tw if do_thumb else None)
         compressed_size = res[0] or os.path.getsize(save_path)
-        thumb_url, thumb_rel = res[1], res[2]
+        thumb_rel = res[2]  # res[1] 是本地 URL，发布后按驱动重新生成
         try:
             from PIL import Image as _Image
             with _Image.open(save_path) as _img:
@@ -278,13 +312,44 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None)
         except Exception:
             pass
 
-    # 7. 写入 UploadedFile 索引
+    # 7. 发布到存储驱动（本地 no-op；云驱动上传，失败显式报错不静默回退）
     rel_path = f'uploads/{sub_dir}/{date_dir}/{new_name}'.replace('//', '/')
-    file_url = url_for('static', filename=rel_path)
+    thumb_abs = os.path.join(save_dir, f'thumb_{new_name}') if thumb_rel else None
+    driver = LocalStorageDriver() if storage_scope == 'local' else get_driver()
+    try:
+        file_url = driver.save(save_path, rel_path)
+        thumb_url = None
+        if thumb_rel:
+            try:
+                thumb_url = driver.save(thumb_abs, thumb_rel)
+            except StorageError as e:
+                # 缩略图发布失败不阻断主文件
+                current_app.logger.warning('缩略图发布失败（不影响主文件）： %s', e)
+                thumb_rel, thumb_abs = None, None
+    except StorageError as e:
+        for p in (save_path, thumb_abs):
+            try:
+                if p and os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+        return None, None, f'文件存储失败：{e}'
+
+    # 云驱动发布成功后清理本地临时副本（本地驱动保留原位）
+    if not driver.keeps_local_copy:
+        for p in (save_path, thumb_abs):
+            try:
+                if p and os.path.exists(p):
+                    os.remove(p)
+            except OSError:
+                pass
+
+    # 8. 写入 UploadedFile 索引
     try:
         u = UploadedFile(
             original_name=original_name,
             stored_name=rel_path,
+            storage=driver.name,
             url=file_url,
             file_size=size,
             compressed_size=compressed_size or size,

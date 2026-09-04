@@ -28,7 +28,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '2.3.0'
+    CMS_VERSION = '2.4.0'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -117,6 +117,31 @@ class Setting(db.Model):
         'i18n_enable': '0',                  # 1=启用 / 0=关闭（默认关闭，全站中文）
         'i18n_default_locale': 'zh',         # 默认语种（zh 中文 / en 英文）
         'i18n_available_locales': 'zh',      # 可用语种清单，逗号分隔，如 zh,en
+
+        # ===== v2.4.0：全文搜索 =====
+        'search_engine': 'whoosh',             # whoosh / meilisearch / sql
+        'search_meili_url': '',                # Meilisearch 服务地址
+        'search_meili_key': '',                # Meilisearch API Key
+        'search_index_on_save': 'on',          # on=文章保存时自动索引
+        'search_results_per_page': '20',       # 每页搜索结果数
+        'search_highlight': 'on',              # on=高亮匹配关键词
+
+        # ===== v2.4.0：对象存储（oss_storage 插件，键值存储零迁移）=====
+        'storage_driver': 'local',             # local / aliyun / tencent / qiniu
+        'oss_aliyun_access_key_id': '',        # 阿里云 AccessKey ID
+        'oss_aliyun_access_key_secret': '',    # 阿里云 AccessKey Secret
+        'oss_aliyun_endpoint': '',             # 如 oss-cn-hangzhou.aliyuncs.com
+        'oss_aliyun_bucket': '',               # Bucket 名称
+        'oss_aliyun_cdn_domain': '',           # 绑定 CDN 域名（可空，用默认域名）
+        'oss_tencent_secret_id': '',           # 腾讯云 SecretId
+        'oss_tencent_secret_key': '',          # 腾讯云 SecretKey
+        'oss_tencent_region': '',              # 如 ap-shanghai
+        'oss_tencent_bucket': '',              # Bucket 名称（含 APPID 后缀）
+        'oss_tencent_cdn_domain': '',          # 绑定 CDN 域名（可空）
+        'oss_qiniu_access_key': '',            # 七牛 AccessKey
+        'oss_qiniu_secret_key': '',            # 七牛 SecretKey
+        'oss_qiniu_bucket': '',                # 空间名
+        'oss_qiniu_cdn_domain': '',            # 七牛绑定域名（必填）
     }
 
     @classmethod

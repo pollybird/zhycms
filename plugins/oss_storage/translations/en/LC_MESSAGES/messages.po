@@ -1,0 +1,148 @@
+# Chinese (Simplified) to English translations for oss_storage plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: zhycms oss_storage 1.0.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-03 00:00+0800\n"
+"PO-Revision-Date: 2026-09-03 00:00+0800\n"
+"Last-Translator: ZhyCMS Team\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "对象存储"
+msgstr "Object Storage"
+
+msgid "插件"
+msgstr "Plugins"
+
+msgid "对象存储配置"
+msgstr "Object Storage Settings"
+
+msgid "阿里云 OSS / 腾讯云 COS / 七牛云 Kodo 云端对象存储支持，本地与云端一键切换，支持历史文件批量迁移云端；v2.4.0 内置插件"
+msgstr ""
+"Cloud object storage for Alibaba Cloud OSS / Tencent Cloud COS / Qiniu Kodo, "
+"with one-click switching between local and cloud and batch migration of "
+"existing files; built-in plugin since v2.4.0"
+
+msgid "存储驱动"
+msgstr "Storage Driver"
+
+msgid "本地磁盘存储（默认，文件保存在服务器 app/static/uploads/）"
+msgstr "Local disk storage (default; files stored on the server under app/static/uploads/)"
+
+msgid "阿里云 OSS"
+msgstr "Alibaba Cloud OSS"
+
+msgid "腾讯云 COS"
+msgstr "Tencent Cloud COS"
+
+msgid "七牛云 Kodo"
+msgstr "Qiniu Kodo"
+
+msgid "切换到云端前请先填写对应厂商凭证并保存，系统会自动进行连接测试；测试失败将保持本地存储。建议使用云厂商 RAM 子账号，仅授予目标 Bucket 读写权限。"
+msgstr ""
+"Fill in the provider credentials and save before switching to cloud; a "
+"connection test runs automatically and storage stays local if it fails. "
+"We recommend using a cloud RAM sub-account with read/write access to the "
+"target Bucket only."
+
+msgid "SDK 未安装："
+msgstr "SDK not installed: "
+
+msgid "已安装"
+msgstr "installed"
+
+msgid "留空表示不修改"
+msgstr "Leave blank to keep unchanged"
+
+msgid "Endpoint（地域节点）"
+msgstr "Endpoint (region node)"
+
+msgid "CDN / 绑定域名（可空）"
+msgstr "CDN / bound domain (optional)"
+
+msgid "地域 Region"
+msgstr "Region"
+
+msgid "Bucket（含 APPID 后缀）"
+msgstr "Bucket (including APPID suffix)"
+
+msgid "绑定 CDN 域名（必填）"
+msgstr "Bound CDN domain (required)"
+
+msgid "七牛对象存储无默认下载域名，必须配置绑定域名。"
+msgstr "Qiniu object storage has no default download domain; a bound domain is required."
+
+msgid "空间名称 Bucket"
+msgstr "Bucket name"
+
+msgid "保存配置并切换驱动"
+msgstr "Save settings and switch driver"
+
+msgid "连接测试"
+msgstr "Connection Test"
+
+msgid "测试连接（需先保存凭证）"
+msgstr "Test connection (save credentials first)"
+
+msgid "本地文件迁移到云端"
+msgstr "Migrate Local Files to Cloud"
+
+msgid "预览结果：待迁移文件 {0} 个（其中本地磁盘存在 {1} 个、缺失 {2} 个），内容中待改写 URL {3} 处。"
+msgstr ""
+"Preview: {0} files to migrate ({1} present on local disk, {2} missing); "
+"{3} URLs in content to rewrite."
+
+msgid "缺失文件示例："
+msgstr "Missing files (sample): "
+
+msgid "把历史上传的本地文件批量上传到当前云端驱动，并把文章正文/封面、碎片、自定义字段、站点 Logo 等内容中的 /static/uploads/ 链接改写为云域名。"
+msgstr ""
+"Batch-upload previously uploaded local files to the current cloud driver, "
+"and rewrite /static/uploads/ links in article content/covers, fragments, "
+"custom fields and site logo to the cloud domain."
+
+msgid "迁移幂等可重复执行（已上传文件自动跳过）；本地文件保留不删；演示图片（uploads/demo/）不迁移。"
+msgstr ""
+"Migration is idempotent and re-runnable (uploaded files are skipped); local "
+"files are kept and not deleted; demo images (uploads/demo/) are not migrated."
+
+msgid "1. 预览（dry-run）"
+msgstr "1. Preview (dry-run)"
+
+msgid "2. 执行迁移"
+msgstr "2. Run migration"
+
+msgid "确认开始迁移？迁移过程中请勿关闭页面，中断后可重新执行。"
+msgstr "Start migration? Do not close the page during migration; it can be re-run if interrupted."
+
+msgid "对象存储配置已保存，当前存储驱动：{0}"
+msgstr "Object storage settings saved. Current storage driver: {0}"
+
+msgid "未检测到改动"
+msgstr "No changes detected"
+
+msgid "凭证已保存，但切换到云端驱动失败（已保持本地存储）：{0}"
+msgstr "Credentials saved, but switching to the cloud driver failed (storage remains local): {0}"
+
+msgid "请选择要测试的云厂商"
+msgstr "Please select a cloud provider to test"
+
+msgid "当前为本地存储驱动，请先在上方选择并保存云端驱动后再迁移"
+msgstr "Current driver is local storage. Select and save a cloud driver above before migrating."
+
+msgid "云端连接失败，迁移已中止：{0}"
+msgstr "Cloud connection failed; migration aborted: {0}"
+
+msgid "迁移中断（已上传 {0} 个文件，可修复后重新执行，已上传文件自动跳过）：{1}"
+msgstr ""
+"Migration interrupted ({0} files uploaded; fix the issue and re-run — "
+"uploaded files are skipped automatically): {1}"
+
+msgid "迁移完成：上传 {0} 个文件（跳过 {1} 个本地缺失），改写 {2} 处内容 URL。本地文件已保留，确认无误后可手工清理 uploads/ 下的日期目录（demo 目录勿删）"
+msgstr ""
+"Migration complete: {0} files uploaded ({1} missing locally skipped), {2} "
+"content URLs rewritten. Local files are kept; after verification you may "
+"manually clean the date directories under uploads/ (do not delete the demo directory)."

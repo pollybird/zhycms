@@ -1,0 +1,91 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('搜索设置') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('搜索设置') }}{% endblock %}
+{% set active_menu = 'setting_search' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">{{ _('系统设置') }}</li>
+<li class="breadcrumb-item active">{{ _('搜索设置') }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <div class="card card-outline card-primary">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-search"></i> {{ _('搜索引擎') }}</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label>{{ _('搜索引擎类型') }}</label>
+        <select name="search_engine" class="form-control">
+          <option value="whoosh" {{ 'selected' if settings.search_engine == 'whoosh' }}>{{ _('Whoosh（纯 Python，内置，支持中文分词）') }}</option>
+          <option value="meilisearch" {{ 'selected' if settings.search_engine == 'meilisearch' }}>{{ _('Meilisearch（需外部服务，高性能）') }}</option>
+          <option value="sql" {{ 'selected' if settings.search_engine == 'sql' }}>{{ _('SQL LIKE（兼容性最高，无中文分词）') }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="icheck-primary">
+          <input type="checkbox" name="search_index_on_save" value="on" id="ios" {{ 'checked' if settings.search_index_on_save == 'on' }}>
+          <label for="ios">{{ _('文章保存时自动索引（关闭则需手动重建）') }}</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="icheck-primary">
+          <input type="checkbox" name="search_highlight" value="on" id="ihl" {{ 'checked' if settings.search_highlight == 'on' }}>
+          <label for="ihl">{{ _('高亮搜索关键词') }}</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>{{ _('每页搜索结果数') }}</label>
+        <input type="number" name="search_results_per_page" class="form-control" style="max-width:120px;"
+               value="{{ settings.search_results_per_page or 20 }}" min="1" max="100">
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-outline card-info" id="meili-card" style="{{ '' if settings.search_engine == 'meilisearch' else 'display:none;' }}">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-server"></i> {{ _('Meilisearch 配置') }}</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label>{{ _('服务地址') }}</label>
+        <input type="text" name="search_meili_url" class="form-control"
+               value="{{ settings.search_meili_url or '' }}" placeholder="http://127.0.0.1:7700">
+      </div>
+      <div class="form-group">
+        <label>{{ _('API Key') }}</label>
+        <input type="text" name="search_meili_key" class="form-control"
+               value="{{ settings.search_meili_key or '' }}" placeholder="">
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-outline card-success">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-heartbeat"></i> {{ _('健康检查') }}</h3></div>
+    <div class="card-body">
+      <p>
+        {% if health_ok %}
+        <span class="badge badge-success">{{ _('正常') }}</span>
+        {% else %}
+        <span class="badge badge-danger">{{ _('异常') }}</span>
+        {% endif %}
+        {{ health_msg }}
+      </p>
+    </div>
+    <div class="card-footer">
+      <button type="submit" name="action" value="rebuild" class="btn btn-warning"
+              onclick="return confirm('{{ _('确定重建全部索引？文章数量多时可能耗时较长。') }}');">
+        <i class="fas fa-sync"></i> {{ _('重建索引') }}
+      </button>
+    </div>
+  </div>
+
+  <div class="card-footer">
+    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存配置') }}</button>
+  </div>
+</form>
+
+<script>
+// 切换 Meilisearch 配置区显隐
+document.querySelector('select[name="search_engine"]').addEventListener('change', function() {
+  document.getElementById('meili-card').style.display = this.value === 'meilisearch' ? '' : 'none';
+});
+</script>
+{% endblock %}

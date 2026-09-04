@@ -478,18 +478,23 @@ def theme_asset(slug, filename):
 
 @frontend_bp.route('/search')
 def search():
-    """全站搜索（仅已发布文章）。"""
+    """全站搜索（全文搜索 + 中文分词）。"""
     keyword = (request.args.get('q') or '').strip()
+    page = max(int(request.args.get('page', 1)), 1)
+    per_page = int(Setting.get('search_results_per_page', '20'))
     results = []
+    total = 0
     if keyword:
-        results = Article.query.filter(
-            Article.is_deleted == False,
-            Article.status == STATUS_PUBLISHED,
-            Article.title.like(f'%{keyword}%')
-        ).order_by(Article.published_at.desc()).limit(50).all()
-    # 默认 ALT 注入对搜索摘要页无副作用
+        from ..utils.search import search_articles
+        results, total = search_articles(keyword, page=page, per_page=per_page)
+    # 为每个结果生成 URL
+    for r in results:
+        if r.get('column_slug') and r.get('id'):
+            r['url'] = url_for('frontend.article_detail',
+                               slug=r['column_slug'], aid=r['id'])
     return render_template(
         theme_template('search'), keyword=keyword, results=results,
+        total=total, page=page, per_page=per_page,
         nav=_build_nav(), seo=_seo()
     )
 
@@ -629,3 +634,14 @@ def page_not_found(e):
 def server_error(e):
     return render_template(theme_template('500'), nav=_build_nav(),
                            seo=_seo()), 500
+
+
+# v2.4.0：Docker 健康检查端点（豁免初始化拦截）
+@frontend_bp.route('/healthz')
+def healthz():
+    from sqlalchemy import text
+    try:
+        db.session.execute(text('SELECT 1'))
+        return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
+    except Exception:
+        return '{"status":"error"}', 503, {'Content-Type': 'application/json'}

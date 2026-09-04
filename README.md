@@ -4,11 +4,15 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v2.3.0**（在 v2.2 插件优先架构之上新增国际化（中英文切换）、英文主题模板、第三方统计代码插件，并将自定义表单转为官方内置插件，详见 [v2.3.0 更新内容](#v230-更新内容)；历史版本见 [v2.2.0 更新内容](#v220-更新内容)、[v2.1.1 更新内容](#v211-更新内容)、[v2.1.0 更新内容](#v210-更新内容) 与 [v2.0 更新亮点](#v20-更新亮点)）。**从 v1.1 升级请先阅读 [UPGRADE.md 升级迁移指南](UPGRADE.md) 并执行 `scripts/upgrade_v2.py`。**
+**当前版本：v2.4.0**（在 v2.3 国际化基础之上新增 Alembic 数据库迁移框架、Whoosh 全文搜索引擎、Docker 容器化部署，详见 [v2.4.0 更新内容](#v240-更新内容)；历史版本见 [v2.3.0 更新内容](#v230-更新内容)、[v2.2.0 更新内容](#v220-更新内容)、[v2.1.1 更新内容](#v211-更新内容)、[v2.1.0 更新内容](#v210-更新内容) 与 [v2.0 更新亮点](#v20-更新亮点)）。**从 v1.1 升级请先阅读 [UPGRADE.md 升级迁移指南](UPGRADE.md) 并执行 `scripts/upgrade_v2.py`。**
 
 ## 特性一览
 
 - **多主题模板系统**：前台模板按主题组织，后台一键切换。内置 `default`、`blue` 通用聚合主题，`manufacturing`（制造业）、`service`（服务业）两套行业专用主题，以及 `default_en`、`manufacturing_en` 两套英文主题（v2.3）。
+- **数据库迁移（Alembic，v2.4）**：Flask-Migrate 管理 schema 版本，`flask db upgrade/downgrade` 支持回滚；旧站升级自动 stamp baseline，插件可自带迁移脚本。
+- **全文搜索（v2.4）**：Whoosh + jieba 中文分词（默认），支持标题+正文+摘要搜索和关键词高亮；可选 Meilisearch 后端；SQL LIKE 自动回退。
+- **Docker 部署（v2.4）**：多阶段构建 Dockerfile + docker-compose（MySQL / PostgreSQL profiles），`docker compose --profile mysql up -d` 一键启动。
+- **对象存储 OSS（v2.4，官方内置插件）**：`oss_storage` 插件支持阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，后台「对象存储」页一键切换云端存储；云 SDK 可选安装，**默认本地存储零行为变化**；内置本地历史文件一键迁移到云端（含文章正文/封面等链接自动改写为云域名）。
 - **主题管理**（v2.2）：后台独立管理页支持上传主题压缩包（自动校验必备模板与安全性）、一键启用即时生效、打包下载跨站复用、验证码确认删除；主题缺失模板自动兜底 default，杜绝前台空白。
 - **演示数据一键生成**：初始化时可选择「制造业」或「服务业」示例，自动生成配套栏目、文章、碎片与演示图片，并切换到对应行业主题；v2.3 新增英文制造业演示数据（`manufacturing_en`）和英文默认主题（`default_en`）选项，生成全英文栏目/文章/产品/轮播/友链/表单内容并自动配置 i18n 为英文。
 - **CMS 标识与企业标识分离**：后台 CMS 名称/版权固定不可改，前台网站名称/版权可独立配置。
@@ -16,7 +20,7 @@
 - **自定义字段**：栏目和文章支持自定义字段（文本/富文本/图片/文件/URL/数字等）。
 - **表单收集**：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，提交数据可导出；v2.0 支持提交后邮件/企业微信实时通知；v2.3 起由核心功能转为官方内置插件（老站数据无缝保留）。
 - **国际化**（v2.3）：基于 Flask-Babel 的中英文自由切换，前台 + 后台全站生效；后台可视化配置默认语种与可用语种，URL 参数/会话/Cookie/Accept-Language 多级切换；默认关闭、不影响现有站点，新增语种仅需追加翻译目录并编译。
-- **插件机制**（v2.2）：`plugins/<slug>/` 目录零侵入扩展，启停即时生效、无需重启、禁用即隐身，内置轮播图、产品展示、友情链接、自定义表单、统计代码五个官方插件作为开发样板。
+- **插件机制**（v2.2）：`plugins/<slug>/` 目录零侵入扩展，启停即时生效、无需重启、禁用即隐身，内置轮播图、产品展示、友情链接、自定义表单、统计代码、对象存储六个官方插件作为开发样板。
 - **第三方统计代码**（v2.3，官方内置插件）：后台直接粘贴百度统计 / Google Analytics 4 / 站长工具或自定义代码，前台 `analytics_head()/analytics_body()` 自动注入，保存即生效、仅注入前台页面。
 - **REST 内容 API**（v2.2）：`/api/v1/` 暴露栏目/文章/轮播/产品只读端点，统一响应包、鉴权开关、CORS、缓存，适合小程序/Headless CMS 消费。
 - **SEO 优化**：每个栏目、文章可单独设置 SEO 标题/关键词/描述；v2.0 新增伪静态、sitemap/robots 自定义、页面缓存、图片默认 ALT。
@@ -64,6 +68,28 @@ v2.3.0（2026-09-02）围绕「国际化 + 统计插件 + 表单插件化 + 英�
 ### Upgrade Note
 
 v2.2.x → v2.3.0：仅覆盖代码即可。自定义表单已并入官方插件体系，升级后首次启动会**自动启用表单插件一次**，旧 `forms`/`form_submissions` 等表数据、提交记录、历史审计日志与通知配置无缝保留（后台路径 `/forms`、前台地址 `/form/<slug>` 不变），之后可在「插件管理」随时禁用；统计代码插件可在「插件管理」一键启用，国际化默认关闭，可在「系统设置 → 国际化」开启。
+
+## v2.4.0 更新内容
+
+v2.4.0（2026-09-04）围绕「Alembic 迁移 + 全文搜索 + Docker 容器化 + 对象存储 OSS」迭代。v2.3.x 覆盖代码升级后首次启动自动 stamp baseline + 执行增量迁移，无需手动操作；全文搜索默认 Whoosh + jieba，SQL LIKE 自动回退；Docker 支持 MySQL / PostgreSQL 一键部署；新增官方内置 `oss_storage` 插件支持阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，默认本地存储、零行为变化。
+
+### Added
+
+- **Alembic 数据库迁移框架（Flask-Migrate）**：引入 Flask-Migrate 封装 Alembic；`create_app()` 启动时自动检测旧库并 stamp baseline，仅执行增量迁移；插件迁移钩子 `get_migration_files()` 支持插件自带迁移脚本。
+- **全文搜索引擎（Whoosh + jieba + Meilisearch 可选）**：默认 Whoosh + jieba 中文分词，索引标题+正文+摘要+栏目名；文章保存/删除时自动更新索引（通过 `clear_content_cache` 钩子）；SQL LIKE 自动回退；后台新增「搜索设置」页面；6 套主题搜索模板支持分页和高亮。
+- **Docker 容器化**：多阶段构建 Dockerfile（`python:3.12-slim`，非 root 用户，gunicorn）；docker-compose 提供 MySQL / PostgreSQL 两个 profile；entrypoint.sh 自动迁移；`/healthz` 健康检查端点；`wsgi.py` 生产入口。
+- **对象存储 OSS 插件（oss_storage，官方内置）**：核心存储抽象层 `app/utils/storage.py`（驱动协议 + 注册表），插件提供阿里云 OSS / 腾讯云 COS / 七牛云 Kodo 三家云驱动（云 SDK 可选安装、懒加载）；后台「对象存储」配置页（凭证管理、连接测试、驱动切换）；本地历史文件一键迁移云端并自动改写内容中的文件链接；`uploaded_files.storage` 列记录文件归属；禁用插件自动回退本地驱动。
+
+### Changed
+
+- `clear_content_cache` 扩展：搜索索引更新独立于缓存开关。
+- 前台 `/search` 路由改用 `search_articles()` 替代 SQL LIKE。
+- 上传入口 `save_upload_file()` 改为走存储驱动（默认本地驱动，行为不变），新增 `storage_scope` 参数。
+- `Setting.CMS_VERSION` 更新为 `2.4.0`。
+
+### Upgrade Note
+
+v2.3.x → v2.4.0：仅覆盖代码 + `pip install -r requirements.txt` 即可。首次启动自动 stamp Alembic baseline 并执行增量迁移（`0002` 建 `search_index` 表、`0003` 插入搜索设置默认值、`0004` 给 `uploaded_files` 加 `storage` 列并写入存储设置），无需手动操作。全文搜索默认 Whoosh（零外部依赖），首次使用需在后台「搜索设置」点击「重建索引」按钮初始化索引；未索引前搜索自动回退 SQL LIKE，不影响可用性。**文件存储默认仍为本地磁盘，oss_storage 插件升级后自动启用但不配置凭证不会产生任何云端调用**；需要上云时在后台「系统设置 → 对象存储」配置并 `pip install` 对应云 SDK（阿里云 `oss2` / 腾讯云 `cos-python-sdk-v5` / 七牛云 `qiniu`，均为可选依赖）。Docker 部署见 `docker/.env.example`。
 
 ## v2.2.0 更新内容
 
@@ -198,8 +224,9 @@ cd zhycms
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# 安装依赖
-pip install -r requirements.txt
+# 安装依赖（国内网络建议使用镜像源加速）
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 或阿里云镜像：-i https://mirrors.aliyun.com/pypi/simple
 
 # 启动开发服务器
 python run.py
@@ -214,6 +241,24 @@ ZHYCMS_ENV=production ZHYCMS_SECRET_KEY=your-secret python run.py
 # 或使用 gunicorn
 gunicorn -w 4 -b 0.0.0.0:5000 "run:app"
 ```
+
+### Docker 部署（v2.4）
+
+```bash
+# 1. 配置环境变量
+cp docker/.env.example .env
+# 编辑 .env 修改密钥和数据库密码
+
+# 2. 启动（MySQL）
+docker compose --profile mysql up -d
+
+# 或启动（PostgreSQL）
+docker compose --profile postgres up -d
+
+# 3. 访问 http://localhost:5000 完成初始化
+```
+
+容器启动时自动执行数据库迁移和翻译编译，`instance/` 和 `app/static/uploads/` 通过 volume 持久化。
 
 ## v1.1 → v2.0 升级指南
 
@@ -262,7 +307,8 @@ zhycms/
 │   ├── translations/       # 国际化翻译文件（v2.3，en/LC_MESSAGES/messages.po）
 │   ├── i18n.py             # 国际化：locale 选择器与切换辅助（v2.3）
 │   ├── utils/              # 工具模块
-│   │   ├── uploads.py / notify_utils.py    # 上传安全 / 消息通知通用传输层（v2.3 解耦）
+│   │   ├── uploads.py / notify_utils.py    # 上传安全（走存储驱动，v2.4）/ 消息通知通用传输层（v2.3 解耦）
+│   │   ├── storage.py                # 存储抽象层：驱动协议/本地驱动/注册表（v2.4）
 │   │   ├── backup_utils.py / admin_prefix.py / ip_locator.py
 │   │   └── themes.py / captcha.py / pack.py / bootstrap.py ...
 │   ├── static/             # 静态资源 (uploads/, admin/)
@@ -276,11 +322,24 @@ zhycms/
 │   ├── product/            # 官方内置产品展示插件
 │   ├── friend_link/        # 官方内置友情链接插件（v2.2.0 起由核心功能转为插件）
 │   ├── form/               # 官方内置自定义表单插件（v2.3.0 起由核心功能转为插件）
-│   └── analytics/          # 官方内置统计代码插件（v2.3）
+│   ├── analytics/          # 官方内置统计代码插件（v2.3）
+│   └── oss_storage/        # 官方内置对象存储插件：阿里云OSS/腾讯云COS/七牛云（v2.4）
 ├── babel.cfg               # pybabel 提取配置（v2.3）
 ├── instance/               # 实例数据（数据库、配置等）
-├── requirements.txt
-└── run.py                  # 启动入口
+├── migrations/             # Alembic 数据库迁移脚本（v2.4）
+│   ├── alembic.ini         # Alembic 配置
+│   ├── env.py              # 迁移环境（render_as_batch=True 兼容 SQLite）
+│   └── versions/           # 版本脚本（0001 baseline / 0002 search_index 表 / 0003 搜索设置 / 0004 storage 列）
+├── docker/                 # Docker 部署辅助文件（v2.4）
+│   ├── entrypoint.sh       # 启动入口（自动迁移 + 还原演示图片 + gunicorn）
+│   └── .env.example        # 环境变量模板（密钥、数据库密码）
+├── Dockerfile              # 多阶段构建镜像（python:3.12-slim，非 root 用户）
+├── docker-compose.yml      # MySQL / PostgreSQL profiles 编排
+├── .dockerignore           # Docker 构建排除清单
+├── requirements.txt        # 核心依赖
+├── requirements-prod.txt   # 生产依赖（gunicorn + gevent，v2.4）
+├── wsgi.py                 # 生产 WSGI 入口（v2.4）
+└── run.py                  # 开发模式启动入口
 ```
 
 ## 核心功能详解
@@ -308,6 +367,48 @@ zhycms/
 - **删除主题**：物理删除主题目录，需在警告弹窗中输入图形验证码确认；内置主题与启用中的主题不可删除。
 - **下载主题**：一键打包为 zip（单目录形态，含 css/js/images/fonts 全部静态资源），可在其他站点直接上传复用。
 - **安全兜底**：当前启用主题目录被误删或模板不全时，前台自动回退 `default` 主题，不会白屏。
+
+### 数据库迁移（Alembic，v2.4）
+
+zhycms 自 v2.4.0 起引入 **Flask-Migrate（封装 Alembic）** 统一管理数据库 schema 版本，支持升级、回滚与多数据库兼容：
+
+- **旧站自动升级**：v2.3.x 及更早的站点覆盖代码后首次启动，应用工厂自动检测旧库（存在 `users`/`articles` 等核心表但无 `alembic_version` 表）并 **stamp baseline**（标记为 `0001`），仅执行增量迁移，**无需手动操作**。
+- **CLI 命令**：`flask db upgrade`（升级到最新）、`flask db downgrade -1`（回滚一版）、`flask db stamp <revision>`（标记版本）、`flask db current`（查看当前版本）、`flask db history`（查看迁移历史）。
+- **版本脚本**：`migrations/versions/` 下 `0001` 为 v2.3.0 完整 schema 基线，`0002` 新增 `search_index` 元数据表，`0003` 幂等插入 6 个搜索设置默认值。
+- **插件迁移钩子**：插件可通过 `PluginBase.get_migration_files()` 返回 `plugins/<slug>/migrations/versions/` 下的脚本路径，核心自动合并到 Alembic `version_locations`，插件 schema 变更纳入统一管理；无迁移文件的插件仍由 `db.create_all()` 兜底建表。
+- **SQLite 兼容**：`render_as_batch=True` 启用 batch 模式，绕过 SQLite 不支持 `ALTER TABLE` 修改列的限制，本地开发与生产数据库行为一致。
+
+### 全文搜索（v2.4）
+
+zhycms 自 v2.4.0 起内置全文搜索引擎，前台 `/search` 路由优先走索引，故障时自动回退 SQL LIKE：
+
+- **默认引擎 Whoosh + jieba**：Whoosh 是纯 Python 搜索引擎（零外部依赖），结合 jieba 中文分词索引文章 **标题 + 正文（去 HTML 标签）+ 摘要 + 栏目名**，支持相关度排序与关键词高亮；索引文件存放在 `instance/search_index/`。
+- **可选 Meilisearch 后端**：大型站点可在后台「搜索设置」切换为 Meilisearch（需独立运行实例，通过 URL + API Key 连接）。
+- **自动索引更新**：文章保存/删除时通过 `clear_content_cache` 钩子触发索引更新，**独立于缓存开关**（缓存关闭时索引仍正常更新）。
+- **SQL LIKE 自动回退**：Whoosh 索引损坏或异常时，`search_articles()` 捕获异常自动降级为 SQL LIKE 模糊查询，搜索不中断、零报错。
+- **后台「搜索设置」页**（系统设置子菜单，权限 `system:settings`）：引擎选择（Whoosh / Meilisearch / SQL LIKE）、Meilisearch 配置、健康检查、一键重建索引、索引状态统计。
+- **6 套主题搜索模板**：支持分页、关键词高亮（`|highlight(keyword)` 过滤器）；首次使用需在「搜索设置」点击「重建索引」初始化，未索引前自动回退 SQL LIKE。
+
+### Docker 容器化部署（v2.4）
+
+zhycms 自 v2.4.0 起提供开箱即用的 Docker 部署方案，支持 MySQL / PostgreSQL 两种数据库 profile：
+
+- **多阶段构建 Dockerfile**：builder 阶段编译依赖（含 `build-essential`、`libmagic-dev`、`libpq-dev`、`default-libmysqlclient-dev`），runtime 阶段基于 `python:3.12-slim` 仅携带运行时库，**非 root 用户运行**（uid 1000），gunicorn WSGI 服务（默认 4 worker）。
+- **docker-compose 编排**：`--profile mysql` 或 `--profile postgres` 选择数据库；可选 `--profile search` 挂载 Meilisearch；`instance/` 和 `app/static/uploads/` 通过 named volume 持久化。
+- **entrypoint.sh 自动化**：容器启动时自动执行 `flask db upgrade` 数据库迁移、从镜像内置 `demo` 目录恢复演示图片到 volume 挂载的 uploads 目录（解决 volume 遮盖问题）、编译 i18n 翻译、最后启动 gunicorn。
+- **健康检查端点**：`GET /healthz` 返回数据库 ping 状态与 JSON 响应，豁免初始化拦截，供 docker compose `healthcheck` 与负载均衡探针使用。
+- **环境变量**：见 `docker/.env.example`，含 `ZHYCMS_SECRET_KEY`、`ZHYCMS_DB_URI`、`MYSQL_PASSWORD`、`POSTGRES_PASSWORD` 等。
+
+### 对象存储 OSS（v2.4，官方内置插件）
+
+zhycms 自 v2.4.0 起通过官方内置插件 `oss_storage` 支持云端对象存储。核心内置**存储抽象层**（[app/utils/storage.py](app/utils/storage.py)）：所有上传（文章配图、栏目图、碎片图片、自定义字段文件等）统一经过 `save_upload_file()` 入口，先在本地完成安全校验、图片压缩、缩略图生成，再发布到当前存储驱动；**默认本地驱动，行为与旧版完全一致**。
+
+- **支持的云厂商**：阿里云 OSS（`oss2`）、腾讯云 COS（`cos-python-sdk-v5`）、七牛云 Kodo（`qiniu`）。云 SDK 为**可选依赖**、运行时懒加载，不进核心 requirements；未安装时后台配置页直接显示对应的 `pip install` 指引。
+- **后台「系统设置 → 对象存储」**（权限 `oss_storage:manage`）：存储驱动单选（本地 / 阿里云 / 腾讯云 / 七牛云）、各家凭证表单（密钥留空表示不修改）、连接测试（保存/切换驱动前自动健康检查，失败回退本地并提示）、SDK 安装状态检测。
+- **文件归属记录**：`uploaded_files.storage` 列标记每个文件存于哪个驱动；切换驱动或更换云厂商后，历史文件 URL 不受影响，新上传文件走新驱动。
+- **一键迁移**：配置页「本地文件迁移到云端」提供 dry-run 预览（待传文件数、磁盘缺失数、内容引用链接数）与一键执行——逐个上传（云端已存在自动跳过，**可中断重入**），上传成功后把文章正文/封面、历史版本、碎片、栏目/文章自定义字段、站点设置（Logo 等）中的 `/static/uploads/` 链接批量改写为云域名（`REPLACE()` 跨 MySQL/PostgreSQL/SQLite 通用）。本地原文件保留不删，演示图片（`uploads/demo/`）不迁移。
+- **安全设计**：云端上传失败显式报错、不静默回退本地；在插件管理页**禁用插件会自动把存储驱动重置为本地**；备份恢复上传的文件强制留本地磁盘（不进云端）；凭证建议使用云厂商 RAM 子账号（仅授予目标 Bucket 的读写权限）。
+- 插件钩子：`PluginBase.get_storage_drivers()` 注册存储驱动、`on_disabled()` 提供禁用回调；插件中英文双语（独立翻译域 `oss_storage`）。
 
 ### CMS 标识与网站标识
 

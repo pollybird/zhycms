@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_caching import Cache
 from flask_babel import Babel, lazy_gettext
+from flask_migrate import Migrate
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -15,6 +16,9 @@ cache = Cache()
 # v2.3.0：国际化（Flask-Babel）。init_app 时传入 locale_selector；默认关闭
 # （i18n_enable=0）时 localeselector 直接返回默认中文，全站渲染与 v2.2.0 一致
 babel = Babel()
+
+# v2.4.0：数据库迁移（Flask-Migrate / Alembic）
+migrate = Migrate()
 
 # 调度器（APScheduler）在 app/__init__.py 中延迟初始化，避免与多进程环境冲突
 _scheduler_instance = {'scheduler': None}

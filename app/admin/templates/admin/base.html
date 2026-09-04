@@ -269,6 +269,11 @@
                   <i class="far fa-circle nav-icon"></i><p>{{ _('国际化') }}</p>
                 </a>
               </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_search') }}" class="nav-link {{ 'active' if active_menu == 'setting_search' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('搜索设置') }}</p>
+                </a>
+              </li>
               {% endif %}
             </ul>
           </li>

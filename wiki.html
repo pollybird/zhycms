@@ -117,12 +117,30 @@
   <a href="#i18n-plugin-3" class="sub2">3. Python 层 plugin._('原文')</a>
   <a href="#i18n-plugin-4" class="sub2">4. 提取 / 更新 / 编译命令</a>
   <a href="#i18n-plugin-5" class="sub2">5. 运行时懒加载与 zh 回退</a>
+  <a href="#alembic" style="background:#eff6ff;color:#1e40af;font-weight:600;">&#9733; 十九、数据库迁移（v2.4）</a>
+  <a href="#alembic-auto" class="sub">自动迁移与 baseline</a>
+  <a href="#alembic-cli" class="sub">CLI 命令</a>
+  <a href="#alembic-plugin" class="sub">插件迁移钩子</a>
+  <a href="#search" style="background:#eff6ff;color:#1e40af;font-weight:600;">&#9733; 二十、全文搜索（v2.4）</a>
+  <a href="#search-backend" class="sub">三种后端</a>
+  <a href="#search-config" class="sub">后台搜索设置</a>
+  <a href="#search-rebuild" class="sub">重建索引</a>
+  <a href="#docker" style="background:#eff6ff;color:#1e40af;font-weight:600;">&#9733; 二十一、Docker 容器化部署（v2.4）</a>
+  <a href="#docker-quick" class="sub">快速启动</a>
+  <a href="#docker-compose" class="sub">compose 配置</a>
+  <a href="#docker-env" class="sub">环境变量</a>
+  <a href="#docker-health" class="sub">健康检查</a>
+  <a href="#oss" style="background:#eff6ff;color:#1e40af;font-weight:600;">&#9733; 二十二、对象存储 OSS（v2.4）</a>
+  <a href="#oss-arch" class="sub">架构：核心抽象层 + 插件驱动</a>
+  <a href="#oss-config" class="sub">配置步骤（三家凭证）</a>
+  <a href="#oss-migrate" class="sub">本地文件一键迁移</a>
+  <a href="#oss-security" class="sub">安全与注意事项</a>
 </nav>
 
 <main>
 <header class="hero">
-  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.3.0</span></h1>
-  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>REST 内容 API</b> · <b>插件机制与开发指引</b> · <b>主题管理</b> · <b>国际化</b> · <b>v1.1&rarr;v2.0 升级迁移</b></p>
+  <h1>zhycms 使用手册 <span class="tag" style="font-size:15px;">v2.4.0</span></h1>
+  <p>基于 Flask 的轻量级企业网站 CMS &mdash; 目录结构 · 安装初始化 · 部署 · 权限与安全 · 备份运维 · 消息通知 · SEO 性能 · 模板制作教程 · <b>REST 内容 API</b> · <b>插件机制与开发指引</b> · <b>主题管理</b> · <b>国际化</b> · <b>数据库迁移（Alembic）</b> · <b>全文搜索</b> · <b>Docker 容器化部署</b> · <b>对象存储 OSS</b> · <b>v1.1&rarr;v2.0 升级迁移</b></p>
 </header>
 
 <section id="intro">
@@ -742,6 +760,7 @@ sudo apt install -y libmagic1        # Debian/Ubuntu
     <tr><td>friend_link</td><td>友情链接</td><td>站点友链管理（v2.2.0 起由核心功能转为内置插件，老站数据无缝保留）</td><td><code>friend_links()</code> 模板函数；后台 <code>/&lt;admin&gt;/friend-links</code>（路径与核心版一致）</td></tr>
     <tr><td>form</td><td>自定义表单</td><td>可视化表单设计与提交收集（v2.3.0 起由核心功能转为内置插件，表名/路由/设置键/审计模块代码不变，老站数据无缝保留）</td><td>后台 <code>/&lt;admin&gt;/forms</code>；前台提交 <code>/form/&lt;slug&gt;</code>；权限 <code>form:view</code> / <code>form:manage</code>；老站升级自动启用一次</td></tr>
     <tr><td>analytics</td><td>统计代码</td><td>百度统计 / Google Analytics 4 / 站长工具 / 自定义代码嵌入（v2.3 新增）</td><td>后台 <code>/&lt;admin&gt;/analytics</code> 配置页；前台模板 <code>&#123;&#123; analytics_head()|safe &#125;&#125;</code> / <code>&#123;&#123; analytics_body()|safe &#125;&#125;</code>（4 套内置主题已接入）；仅注入前台页面</td></tr>
+    <tr><td>oss_storage</td><td>对象存储</td><td>阿里云 OSS / 腾讯云 COS / 七牛云 Kodo 云存储与本地一键切换（v2.4 新增）；云 SDK 可选懒加载，默认本地零行为变化</td><td>后台 <code>/&lt;admin&gt;/oss-storage</code> 配置页（凭证/连接测试/一键迁移）；钩子 <code>get_storage_drivers()</code> / <code>on_disabled()</code>；权限 <code>oss_storage:manage</code>；详见<b>第二十二章</b></td></tr>
   </tbody>
 </table>
 <div class="note">社区示例插件 <b>recruit（招聘管理）</b>（<code>builtin: false</code>）作为插件开发的完整实战样板：岗位 CRUD、招聘截止时间门控、简历上传（word/excel/pdf）、前台导航贡献与伪静态详情页——完整开发教程见<b>第十六章</b>，也可在插件管理页下载其源码包对照学习。</div>
@@ -1641,6 +1660,238 @@ pybabel compile -f -d plugins/my_plugin/translations -l en
   <li><b>locale 大小写/区域</b>：<code>en_US</code> 先查 <code>en_US/</code> 再退 <code>en/</code>；<code>en</code> 再退 <code>en_*</code> 目录。</li>
 </ul>
 <div class="warn"><b>部署提醒：</b>由于 <code>.gitignore</code> 排除了所有 <code>*.mo</code>（方便开发），<b>部署/打包 zip 上传插件前，必须对每个插件 translations 目录执行一次 <code>pybabel compile -f -d plugins/&lt;slug&gt;/translations -l &lt;lang&gt;</code></b>；否则站点后台英文下插件页仍然显示中文。</div>
+</section>
+
+<section id="alembic">
+<h2>十九、数据库迁移（Alembic，v2.4）</h2>
+<p>zhycms v2.4.0 引入 <b>Flask-Migrate（封装 Alembic）</b> 统一管理数据库 schema 版本。它取代了早期版本依赖 <code>db.create_all()</code> 建表的方式，支持<b>版本化升级/回滚</b>、<b>多数据库兼容</b>（SQLite/MySQL/PostgreSQL）、<b>插件迁移脚本</b>接入统一版本链。</p>
+
+<h3 id="alembic-auto">1. 旧站自动迁移与 baseline</h3>
+<p><b>核心目标：旧站覆盖代码升级零手动操作。</b>应用工厂 <code>create_app()</code> 启动时按以下顺序自动处理：</p>
+<ol>
+  <li><b>检测旧库</b>：若数据库中存在核心表（<code>users</code>、<code>articles</code> 等）但<b>不存在 <code>alembic_version</code> 表</b>，判定为旧站升级。</li>
+  <li><b>stamp baseline</b>：执行 <code>flask db stamp head</code>，将当前 schema 标记为 <code>0001</code>（对应 v2.3.0 完整 schema 基线），不再重复执行 DDL。</li>
+  <li><b>增量迁移</b>：执行 <code>flask db upgrade</code>，依次跑 <code>0002</code>（新建 <code>search_index</code> 元数据表）→ <code>0003</code>（幂等插入 6 个搜索设置默认值，已存在的键跳过）。</li>
+  <li><b>新装站点</b>：初始化向导完成后首次启动同样执行 stamp + upgrade，把 <code>db.create_all()</code> 建出的表纳入 Alembic 版本管理。</li>
+</ol>
+<p>迁移日志以 <code>INFO</code> 级别写入应用日志，迁移失败时启动中止并打印详细错误，避免「带病上线」。</p>
+<div class="note"><b>无需手动操作</b>：v2.3.x → v2.4.0 升级<b>仅覆盖代码 + 装依赖即可</b>，首次启动自动完成迁移；从 v1.1/v2.0/v2.1.x 升级请先按 <a href="#upgrade">第十三章</a> 运行 <code>scripts/upgrade_v2.py</code> 完成 v2.0 结构迁移，再覆盖到 v2.4.0 代码，首次启动会自动 stamp baseline。</div>
+
+<h3 id="alembic-cli">2. CLI 命令</h3>
+<p>应用工厂已注册 <code>FLASK_APP</code> 上下文，可直接使用 <code>flask db</code> 命令族：</p>
+<pre><code># 升级到最新版本
+flask db upgrade
+
+# 回滚一版
+flask db downgrade -1
+
+# 查看当前版本
+flask db current
+
+# 查看迁移历史
+flask db history
+
+# 标记当前数据库为某版本（不执行迁移脚本）
+flask db stamp &lt;revision&gt;
+
+# 新建一个迁移脚本（开发新版本时用）
+flask db migrate -m "新增 xxx 表"</code></pre>
+<div class="warn"><b>生产环境慎用 downgrade</b>：回滚会修改表结构，建议先备份。SQLite batch 模式下回滚会重建整表，大表可能耗时较长。</div>
+
+<h3 id="alembic-plugin">3. 插件迁移钩子（get_migration_files）</h3>
+<p>插件可通过 <code>PluginBase.get_migration_files()</code> 返回自身 <code>migrations/versions/</code> 下的迁移脚本路径，核心自动合并到 Alembic <code>version_locations</code>，插件 schema 变更纳入统一版本链管理：</p>
+<pre><code>from app.plugin_api import PluginBase
+
+class MyPlugin(PluginBase):
+    slug = 'my_plugin'
+
+    def get_migration_files(self):
+        '''返回插件自带的 Alembic 迁移脚本路径列表'''
+        import os
+        from pathlib import Path
+        mig_dir = Path(self.get_plugin_dir()) / 'migrations' / 'versions'
+        if not mig_dir.is_dir():
+            return []
+        # 返回 .py 文件绝对路径（Alembic 会按 revision 链排序）
+        return sorted(str(p) for p in mig_dir.glob('*.py') if not p.name.startswith('__'))</code></pre>
+<ul>
+  <li><b>version_locations 合并</b>：核心 <code>migrations/versions/</code> + 各启用插件的 <code>migrations/versions/</code> 会被自动合并，<code>flask db upgrade</code> 一次性跑完。</li>
+  <li><b>无迁移文件的插件</b>：仍由 <code>db.create_all()</code> 兜底建表，不影响运行；迁移钩子仅用于<b>表结构变更</b>场景（加列、改类型、加索引等）。</li>
+  <li><b>revision 命名</b>：建议插件迁移脚本以 <code>YYYYMMDDHHMM_plugin_slug_xxx.py</code> 命名，<code>revision</code> 用 <code>plugin_slug_xxx</code>，<code>down_revision</code> 指向上一个版本或核心 baseline。</li>
+  <li><b>v2.4.0 启动期提前建表</b>：<code>create_app()</code> 在 <code>db.create_all()</code> 之前会扫描所有插件并递归导入其 <code>models.py</code> 模块进入 <code>db.metadata</code>，核心表 + 插件模型表一次性补齐（见 <code>discover_and_load(app, import_models_only=True)</code>）。旧插件即使<strong>还没有迁移脚本</strong>，启动后也会把表建好，后续再补脚本不会冲突。</li>
+  <li><b>旧插件如何切换到 Alembic</b>：
+    <ol>
+      <li>首次建议仍然保留 <code>db.create_all()</code> 兜底（<code>enable_plugin</code> 内已有），同时创建 <code>plugins/&lt;slug&gt;/migrations/versions/</code> 目录。</li>
+      <li>第一个迁移脚本使用「幂等模式」：<code>if not engine.has_table('table_name'): op.create_table(...)</code>；或先检查「升级前目标表已存在则 pass」，避免在已建表的站点上重复 DDL。</li>
+      <li>之后再把 <code>get_migration_files()</code> 返回该目录下的脚本；后续每次加列、加索引用 Alembic 脚本管理。</li>
+    </ol>
+  </li>
+</ul>
+<div class="note"><b>banner / product / friend_link / form / analytics 等 v2.2 / v2.3 老插件</b>：目前仍沿用 v2.2 以来的 <code>db.create_all()</code> 建表方式，v2.4.0 已在启动期自动纳入 metadata，运行期、<code>flask db autogenerate</code> 元数据均保持一致。需要迁移这五家时，按上条流程逐插件补 <code>migrations/versions/</code> 即可，不需要修改核心。</div>
+</section>
+
+<section id="search">
+<h2>二十、全文搜索（v2.4）</h2>
+<p>zhycms v2.4.0 内置全文搜索引擎，前台 <code>/search</code> 路由优先走索引，故障时自动回退 SQL LIKE。默认 <b>Whoosh + jieba 中文分词</b>（纯 Python，零外部依赖），可选 <b>Meilisearch</b> 后端（大型站点），SQL LIKE 作为兜底。</p>
+
+<h3 id="search-backend">1. 三种后端对比</h3>
+<table>
+  <thead><tr><th>后端</th><th>依赖</th><th>性能</th><th>适用场景</th><th>是否默认</th></tr></thead>
+  <tbody>
+    <tr><td><b>Whoosh + jieba</b></td><td>纯 Python（pip 装包）</td><td>中小站点足够</td><td>默认推荐，零外部服务</td><td>✅ 默认</td></tr>
+    <tr><td><b>Meilisearch</b></td><td>独立进程 + HTTP API</td><td>高性能、高并发</td><td>文章数 > 5 万的大型站点</td><td>可选</td></tr>
+    <tr><td><b>SQL LIKE</b></td><td>无（数据库自带）</td><td>低（全表扫描）</td><td>索引未建或后端故障的兜底</td><td>自动回退</td></tr>
+  </tbody>
+</table>
+
+<h3 id="search-config">2. 后台「搜索设置」页</h3>
+<p>位于 <b>系统设置 → 搜索设置</b>（权限 <code>system:settings</code>），提供：</p>
+<ul>
+  <li><b>引擎选择</b>：Whoosh / Meilisearch / SQL LIKE 三选一，切换后即时生效。</li>
+  <li><b>Meilisearch 配置</b>：URL + API Key + 索引名，切换到 Meilisearch 时必填。</li>
+  <li><b>健康检查</b>：点击按钮检测当前后端连通性与索引状态。</li>
+  <li><b>一键重建索引</b>：遍历全部已发布文章写入索引，进度条显示。</li>
+  <li><b>索引统计</b>：显示已索引文章数、索引文件大小、最近更新时间。</li>
+</ul>
+
+<h3 id="search-rebuild">3. 重建索引与自动更新</h3>
+<p><b>索引初始化</b>：升级到 v2.4.0 后，未建索引前前台 <code>/search</code> 自动走 SQL LIKE，<b>不影响搜索可用性</b>。如需启用 Whoosh 全文索引获得更好性能与相关度排序，进入「搜索设置」点击「重建索引」即可。</p>
+<p><b>自动索引更新</b>：文章保存/删除时通过 <code>clear_content_cache</code> 钩子触发索引更新，<b>独立于缓存开关</b>（缓存关闭时索引仍正常更新）。索引字段：</p>
+<ul>
+  <li><code>title</code>：文章标题（分词权重最高）</li>
+  <li><code>content</code>：正文（自动去除 HTML 标签后分词）</li>
+  <li><code>summary</code>：文章摘要</li>
+  <li><code>column_name</code>：所属栏目名</li>
+</ul>
+<p><b>SQL LIKE 自动回退</b>：<code>search_articles()</code> 捕获 Whoosh/Meilisearch 异常后自动降级为 SQL LIKE 模糊查询，搜索不中断、零报错。索引文件存放在 <code>instance/search_index/</code>。</p>
+<div class="note"><b>6 套主题搜索模板</b>均已适配：支持分页、关键词高亮（<code>|highlight(keyword)</code> 过滤器）。自定义主题需在 <code>search.html</code> 中使用 <code>{{ r.title|highlight(keyword)|safe }}</code> 输出高亮标题。</div>
+</section>
+
+<section id="docker">
+<h2>二十一、Docker 容器化部署（v2.4）</h2>
+<p>zhycms v2.4.0 提供开箱即用的 Docker 部署方案，支持 <b>MySQL / PostgreSQL</b> 两种数据库 profile，多阶段构建减小镜像体积，非 root 用户运行增强安全性。</p>
+
+<h3 id="docker-quick">1. 快速启动</h3>
+<pre><code># 1. 配置环境变量
+cp docker/.env.example .env
+# 编辑 .env 修改 ZHYCMS_SECRET_KEY 和数据库密码
+
+# 2. 启动（MySQL，推荐生产）
+docker compose --profile mysql up -d
+
+# 或启动（PostgreSQL）
+docker compose --profile postgres up -d
+
+# 可选：同时挂载 Meilisearch 搜索后端
+docker compose --profile mysql --profile search up -d
+
+# 3. 查看日志
+docker compose logs -f app-mysql
+
+# 4. 访问 http://localhost:5000 完成初始化向导</code></pre>
+
+<div class="note"><b>国内网络加速</b>：构建/部署涉及三层下载，<code>docker/.env.example</code> 已内置完整说明——
+<ol>
+  <li><b>基础镜像拉取</b>（python:3.12-slim / mysql:8.4 等，由 Docker 守护进程完成，.env 无法控制）：为 daemon 配置 <code>registry-mirrors</code>（如 <code>https://docker.m.daocloud.io</code>，改 <code>/etc/docker/daemon.json</code> 后重启 docker），或手动 <code>docker pull docker.m.daocloud.io/library/&lt;镜像&gt;</code> 后 <code>docker tag</code> 回原名。</li>
+  <li><b>构建期 apt 系统包</b>：.env 中 <code>APT_MIRROR=mirrors.tuna.tsinghua.edu.cn</code>（默认已启用）。</li>
+  <li><b>构建期 pip Python 包</b>：.env 中 <code>PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple</code>（默认已启用）。</li>
+</ol>
+后两项在 <code>docker compose build</code> 时作为 <code>--build-arg</code> 传入 Dockerfile；海外构建注释掉即走官方源。修改后需 <code>docker compose build</code> 或 <code>up --build</code> 重新构建。</div>
+
+<h3 id="docker-compose">2. compose 配置要点</h3>
+<ul>
+  <li><b>多阶段构建 Dockerfile</b>：builder 阶段编译依赖（含 <code>build-essential</code>、<code>libmagic-dev</code>、<code>libpq-dev</code>、<code>default-libmysqlclient-dev</code>），runtime 阶段基于 <code>python:3.12-slim</code> 仅携带运行时库（<code>libmagic1</code>、<code>libpq5</code>、<code>default-mysql-client</code>），镜像体积更小。</li>
+  <li><b>非 root 用户运行</b>：创建 <code>zhycms</code> 用户（uid 1000），<code>instance/</code> 和 <code>app/static/uploads/</code> 目录权限归属该用户，增强安全性。</li>
+  <li><b>profile 隔离</b>：<code>app-mysql</code> + <code>db-mysql</code> 与 <code>app-postgres</code> + <code>db-postgres</code> 是独立服务对，<code>depends_on.healthcheck</code> 保证数据库就绪后再启动应用。</li>
+  <li><b>volume 持久化</b>：<code>instance_data</code>（数据库文件、配置、搜索索引、备份）、<code>upload_data</code>（用户上传文件）、<code>mysql_data</code> / <code>postgres_data</code>（数据库数据）均为 named volume，容器重建不丢数据。</li>
+</ul>
+
+<h3 id="docker-env">3. 环境变量</h3>
+<p>见 <code>docker/.env.example</code>，核心变量：</p>
+<table>
+  <thead><tr><th>变量</th><th>说明</th><th>必填</th></tr></thead>
+  <tbody>
+    <tr><td><code>ZHYCMS_SECRET_KEY</code></td><td>Flask 会话密钥，生产环境务必修改</td><td>✅</td></tr>
+    <tr><td><code>ZHYCMS_DB_URI</code></td><td>数据库连接 URI（compose 中已按 profile 自动注入）</td><td>✅</td></tr>
+    <tr><td><code>ZHYCMS_ENV</code></td><td><code>production</code> / <code>development</code>，默认 production</td><td>❌</td></tr>
+    <tr><td><code>MYSQL_PASSWORD</code></td><td>MySQL 应用密码（compose 中拼接到 URI）</td><td>MySQL profile</td></tr>
+    <tr><td><code>POSTGRES_PASSWORD</code></td><td>PostgreSQL 应用密码</td><td>PostgreSQL profile</td></tr>
+    <tr><td><code>APT_MIRROR</code></td><td><b>构建参数</b>：构建期 apt 镜像源（如 <code>mirrors.tuna.tsinghua.edu.cn</code>），留空走官方源；修改后需重新 build</td><td>❌</td></tr>
+    <tr><td><code>PIP_INDEX_URL</code></td><td><b>构建参数</b>：构建期 pip 镜像源（如清华 PyPI），默认官方 pypi.org；修改后需重新 build</td><td>❌</td></tr>
+  </tbody>
+</table>
+
+<h3 id="docker-health">4. entrypoint.sh 与健康检查</h3>
+<p>容器启动时 <code>docker/entrypoint.sh</code> 自动执行：</p>
+<ol>
+  <li><b>数据库迁移</b>：<code>flask db upgrade</code>（旧库自动 stamp baseline + 增量迁移）。</li>
+  <li><b>恢复演示图片</b>：从镜像内置的 <code>app/static/uploads/demo/</code> 拷贝到 volume 挂载的 uploads 目录，解决 volume 遮盖问题。</li>
+  <li><b>编译 i18n 翻译</b>：<code>pybabel compile -d app/translations</code>（若 .mo 不存在则编译）。</li>
+  <li><b>启动 gunicorn</b>：<code>gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app</code>（生产入口 <code>wsgi.py</code>）。</li>
+</ol>
+<p><b>健康检查端点</b>：<code>GET /healthz</code> 返回 <code>{"status":"ok","db":"ok"}</code> 或 <code>{"status":"error","db":"down"}</code>，<b>豁免初始化拦截</b>，供 docker compose <code>healthcheck</code> 与负载均衡探针使用：</p>
+<pre><code>healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:5000/healthz"]
+  interval: 30s
+  timeout: 5s
+  retries: 3</code></pre>
+<div class="note"><b>裸机部署无需迁移到 Docker</b>：v2.4.0 代码在裸机环境同样正常运行，Docker 仅作为可选的部署方案。现有裸机站点升级 v2.4.0 按 <a href="UPGRADE.md">UPGRADE.md</a> 覆盖代码 + 装依赖即可。</div>
+</section>
+
+<section id="oss">
+<h2>二十二、对象存储 OSS（v2.4）</h2>
+<p>v2.4.0 新增官方内置插件 <code>oss_storage</code>，支持<b>阿里云 OSS / 腾讯云 COS / 七牛云 Kodo</b> 三家云对象存储，实现本地磁盘与云端存储一键切换。<b>默认本地存储、零行为变化</b>：升级后插件自动启用但不配置凭证不会产生任何云端调用，不上云的站点无需任何操作。</p>
+
+<h3 id="oss-arch">1. 架构：核心抽象层 + 插件驱动</h3>
+<ul>
+  <li><b>核心存储抽象层</b> <code>app/utils/storage.py</code>：定义 <code>StorageDriver</code> 驱动协议（<code>save / save_bytes / delete / exists / public_url / health_check</code>）、本地驱动 <code>LocalStorageDriver</code> 与驱动注册表；核心上传唯一入口 <code>save_upload_file()</code> 先在本地临时文件完成安全校验、图片压缩、缩略图生成，再发布到当前驱动。</li>
+  <li><b>云驱动在插件中</b> <code>plugins/oss_storage/drivers/</code>：<code>aliyun.py</code>（oss2）、<code>tencent.py</code>（cos-python-sdk-v5）、<code>qiniu.py</code>（qiniu）。云 SDK 为<b>可选依赖、运行时懒加载</b>，不进核心 requirements；未安装时配置页直接给出 <code>pip install</code> 指引（含国内镜像命令）。</li>
+  <li><b>文件归属记录</b>：<code>uploaded_files.storage</code> 列（迁移 <code>0004</code> 自动添加，默认 <code>local</code>）标记每个文件存于哪个驱动；切换驱动或更换云厂商后历史文件 URL 不受影响，新上传文件走新驱动。</li>
+  <li><b>插件钩子</b>：<code>PluginBase.get_storage_drivers()</code> 返回插件提供的驱动列表由核心注册；<code>PluginBase.on_disabled()</code> 禁用回调——禁用 oss_storage 插件时自动把 <code>storage_driver</code> 重置为 <code>local</code>。</li>
+</ul>
+
+<h3 id="oss-config">2. 配置步骤（三家凭证）</h3>
+<pre><code># 按云厂商安装对应 SDK（可选依赖，国内镜像加速）
+pip install oss2 -i https://pypi.tuna.tsinghua.edu.cn/simple                 # 阿里云 OSS
+pip install cos-python-sdk-v5 -i https://pypi.tuna.tsinghua.edu.cn/simple   # 腾讯云 COS
+pip install qiniu -i https://pypi.tuna.tsinghua.edu.cn/simple               # 七牛云 Kodo</code></pre>
+<ol>
+  <li>在云厂商控制台创建 Bucket（地域就近选择；访问权限按业务选公共读或私有 + CDN 回源）。</li>
+  <li>在 <b>RAM / 访问管理</b> 创建<b>子账号</b>，仅授予目标 Bucket 的读写权限（<b>切勿使用主账号 AK</b>）。</li>
+  <li>后台进入 <b>系统设置 &rarr; 对象存储</b>（权限 <code>oss_storage:manage</code>），选择驱动并填写凭证：</li>
+</ol>
+<table>
+  <thead><tr><th>驱动</th><th>必填项</th><th>访问域名</th></tr></thead>
+  <tbody>
+    <tr><td>阿里云 OSS</td><td>AccessKey ID、AccessKey Secret、Endpoint（如 <code>oss-cn-hangzhou.aliyuncs.com</code>）、Bucket</td><td>默认 <code>https://&lt;bucket&gt;.&lt;endpoint&gt;/&lt;key&gt;</code>；可填 CDN 域名覆盖</td></tr>
+    <tr><td>腾讯云 COS</td><td>SecretId、SecretKey、Region（如 <code>ap-guangzhou</code>）、Bucket</td><td>默认 <code>https://&lt;bucket&gt;.cos.&lt;region&gt;.myqcloud.com/&lt;key&gt;</code>；可填 CDN 域名</td></tr>
+    <tr><td>七牛云 Kodo</td><td>AccessKey、SecretKey、Bucket、<b>CDN 绑定域名（必填）</b></td><td><code>https://&lt;cdn-domain&gt;/&lt;key&gt;</code>（七牛默认下载域名 30 天过期，必须绑定自有域名）</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>密钥字段<b>留空表示不修改</b>，已保存的密钥不会回显到页面。</li>
+  <li>点击「连接测试」可随时验证凭证；<b>切换/保存驱动前自动健康检查，失败回退本地并提示</b>，不会出现切到云端却无法上传的状态。</li>
+</ul>
+
+<h3 id="oss-migrate">3. 本地文件一键迁移到云端</h3>
+<p>配置页底部提供「本地文件迁移」区：</p>
+<ol>
+  <li><b>预览（dry-run）</b>：统计待迁移文件总数、磁盘存在/缺失数、内容中引用 <code>/static/uploads/</code> 链接的命中数，不写任何数据。</li>
+  <li><b>一键执行</b>：逐文件上传到当前云驱动——云端已存在的文件<b>自动跳过</b>（可中断、可重复执行）；上传成功后更新文件记录的 <code>storage</code> 归属与 URL，并把<b>文章正文/封面、历史版本、碎片、栏目/文章自定义字段、站点设置（Logo 等）</b>中的本地链接批量改写为云域名（<code>REPLACE()</code> 函数，MySQL / PostgreSQL / SQLite 通用）。</li>
+  <li><b>本地原文件保留不删</b>，确认线上正常后可自行清理；<code>uploads/demo/</code> 演示图片不迁移。</li>
+</ol>
+<div class="note"><b>建议</b>：迁移前先在后台「备份恢复」做一次数据库备份；大文件量站点建议在低峰期执行。</div>
+
+<h3 id="oss-security">4. 安全与注意事项</h3>
+<ul>
+  <li><b>显式失败不静默回退</b>：云端上传失败时返回明确错误，不会悄悄写回本地磁盘，避免文件归属混乱。</li>
+  <li><b>禁用即回本地</b>：插件管理页禁用 oss_storage 后存储驱动自动重置为本地（历史云端文件 URL 不受影响）。</li>
+  <li><b>备份强制本地</b>：备份恢复功能上传的备份包始终存本地磁盘（<code>storage_scope='local'</code>），不进云端。</li>
+  <li><b>凭证安全</b>：凭证存数据库 settings 表（不写入任何仓库文件）；务必使用云厂商 RAM 子账号最小权限；建议生产环境同时启用 CDN 域名与 HTTPS。</li>
+  <li><b>Docker 装 SDK</b>：官方镜像默认不含云 SDK，可基于官方镜像自行构建：<pre><code>FROM zhycms:latest
+RUN pip install oss2 -i https://pypi.tuna.tsinghua.edu.cn/simple</code></pre></li>
+  <li><b>插件双语</b>：配置页中英文双语（独立翻译域 <code>oss_storage</code>），跟随后台语言设置切换。</li>
+</ul>
 </section>
 
 <footer>

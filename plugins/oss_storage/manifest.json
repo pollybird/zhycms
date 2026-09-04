@@ -1,0 +1,9 @@
+{
+  "slug": "oss_storage",
+  "name": "对象存储",
+  "version": "1.0.0",
+  "description": "阿里云 OSS / 腾讯云 COS / 七牛云 Kodo 云端对象存储支持，本地与云端一键切换，支持历史文件批量迁移云端；v2.4.0 内置插件",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "min_core_version": "2.4.0"
+}

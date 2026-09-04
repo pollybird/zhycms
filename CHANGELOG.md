@@ -5,6 +5,49 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.4.0] - 2026-09-04
+
+**Alembic 迁移 + 全文搜索 + Docker 容器化 + 对象存储 OSS**版本。v2.3.x 覆盖代码升级后首次启动自动 stamp baseline + 执行增量迁移，无需手动操作；全文搜索默认使用 Whoosh + jieba 中文分词，SQL LIKE 自动回退；Docker 支持 MySQL / PostgreSQL 一键部署；新增官方内置 `oss_storage` 插件，支持阿里云 OSS / 腾讯云 COS / 七牛云 Kodo 云端对象存储与本地存储一键切换（默认本地，零行为变化）。
+
+### Added
+
+- **Alembic 数据库迁移框架（Flask-Migrate）**：
+  - 引入 Flask-Migrate（封装 Alembic），提供 `flask db upgrade/downgrade/stamp` CLI；`create_app()` 启动时自动检测旧库（v2.3.0 及更早）并 stamp baseline，仅执行增量迁移，旧站零手动操作。
+  - 基线迁移 `0001` 标记 v2.3.0 完整 schema；`0002` 新增 `search_index` 元数据表；`0003` 幂等插入 6 个搜索设置默认值。
+  - 插件迁移钩子：`PluginBase.get_migration_files()` 返回插件 `migrations/versions/` 下的迁移脚本路径，核心自动合并到 Alembic `version_locations`，插件 schema 变更纳入统一管理；无迁移文件的插件仍由 `db.create_all()` 兜底建表。
+  - `render_as_batch=True` 启用 SQLite batch 模式，兼容 SQLite 表结构变更限制。
+- **全文搜索引擎（Whoosh + jieba + Meilisearch 可选）**：
+  - 默认使用 Whoosh（纯 Python）+ jieba 中文分词，索引标题 + 正文（去 HTML）+ 摘要 + 栏目名，支持相关度排序；索引存 `instance/search_index/`，文章保存/删除时通过 `clear_content_cache` 钩子自动更新。
+  - 可选 Meilisearch 后端（大型站点），通过后台搜索设置页切换引擎。
+  - SQL LIKE 自动回退：Whoosh 故障时自动降级为 SQL LIKE，搜索不中断。
+  - 后台新增「搜索设置」页面（系统设置子菜单）：引擎选择、Meilisearch 配置、健康检查、一键重建索引。
+  - 6 套主题搜索模板更新：支持分页、关键词高亮（`|highlight(keyword)` 过滤器）。
+- **Docker 容器化**：
+  - 多阶段构建 `Dockerfile`（builder + runtime），基于 `python:3.12-slim`，非 root 用户运行，gunicorn WSGI 服务。
+  - `docker-compose.yml` 提供 `--profile mysql` 和 `--profile postgres` 两个数据库选项，可选 `--profile search` 挂载 Meilisearch。
+  - `docker/entrypoint.sh` 自动执行数据库迁移、恢复演示图片（volume 挂载遮盖时）、启动 gunicorn。
+  - 新增 `/healthz` 健康检查端点（DB ping + JSON 响应），豁免初始化拦截。
+  - `wsgi.py` 生产入口，`requirements-prod.txt` 含 gunicorn + gevent。
+  - `docker/.env.example` 环境变量模板。
+- **对象存储 OSS 插件 `oss_storage`（官方内置）**：
+  - 核心新增存储抽象层 `app/utils/storage.py`（`StorageDriver` 协议 + 本地驱动 + 驱动注册表 + 三类显式异常），上传唯一入口 `save_upload_file()` 改为先本地处理（校验/压缩/缩略图）再发布到当前驱动；**默认本地存储，行为与旧版完全一致**。
+  - 插件内置三家云驱动：**阿里云 OSS**（oss2）、**腾讯云 COS**（cos-python-sdk-v5）、**七牛云 Kodo**（qiniu）；云 SDK 可选依赖懒加载，未安装时配置页给出 `pip install` 安装指引；新插件钩子 `PluginBase.get_storage_drivers()` 注册驱动、`on_disabled()` 禁用回调。
+  - `uploaded_files` 表新增 `storage` 列（迁移 `0004`，默认 local）记录每个文件的存储归属，切换驱动/换厂商后旧文件 URL 不失效。
+  - 后台「对象存储」配置页（系统设置子菜单，权限 `oss_storage:manage`）：驱动切换（切换前自动连接测试，失败回退本地）、凭证管理（密钥留空不修改）、连接测试、SDK 安装状态检测。
+  - **一键迁移工具**：本地历史文件批量上传云端（dry-run 预览 + 幂等可重入，已传文件自动跳过），并把文章正文/封面、碎片、自定义字段、站点 Logo 等内容中的 `/static/uploads/` 链接自动改写为云域名；本地文件保留不删，演示图片不迁移。
+  - 安全：云驱动上传失败显式报错不静默回退本地；禁用插件自动重置为本地驱动；备份恢复文件强制留本地磁盘；凭证建议使用云厂商 RAM 子账号最小权限；插件中英文双语（独立翻译域）。
+
+### Changed
+
+- `clear_content_cache` 扩展：文章保存/删除时触发搜索索引更新（独立于缓存开关，缓存关闭时索引仍正常更新）。
+- 前台 `/search` 路由改用 `search_articles()` 替代 SQL LIKE，返回分页结果集 `(items, total)`。
+- 上传入口 `save_upload_file()` 新增 `storage_scope` 参数（`auto`/`local`），备份恢复路由强制 `local`。
+- `Setting.DEFAULTS` 新增 6 个搜索设置键 + 15 个对象存储配置键；`Setting.CMS_VERSION` 更新为 `2.4.0`。
+
+### Fixed
+
+- 无。
+
 ## [2.3.0] - 2026-09-02
 
 **国际化 + 统计插件 + 表单插件化 + 英文主题**版本。**无数据库结构变更，v2.2.x 直接覆盖代码即可升级**；自定义表单由核心转为内置插件（表名/路由/设置键/审计模块代码不变，老站数据无缝保留），国际化默认关闭、不改变现有站点行为。

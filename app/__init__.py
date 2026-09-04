@@ -6,7 +6,7 @@ from flask import Flask, redirect, url_for, request, g
 from flask_login import current_user
 
 from .config import config
-from .extensions import db, login_manager, cache, set_scheduler, babel
+from .extensions import db, login_manager, cache, set_scheduler, babel, migrate
 from .i18n import select_locale, available_locales, current_locale, _p
 
 
@@ -298,6 +298,43 @@ def _setup_scheduler(app):
 
 
 # ============================================================
+# v2.4.0：Alembic 迁移 bootstrap
+# ============================================================
+
+def _alembic_bootstrap(app):
+    """在 create_app 的 app_context 内调用。
+    检测数据库状态，执行 stamp 或 upgrade：
+    - 新装（无核心表）：db.create_all() 已建表 → stamp baseline
+    - 旧库（有核心表无 alembic_version）：stamp baseline → upgrade 增量
+    - 已管理（有 alembic_version）：upgrade 增量
+    """
+    from sqlalchemy import inspect as sqla_inspect
+    from flask_migrate import upgrade as flask_upgrade, stamp as flask_stamp
+
+    engine = db.engine
+    insp = sqla_inspect(engine)
+
+    has_alembic = insp.has_table('alembic_version')
+    has_users = insp.has_table('users')
+    has_articles = insp.has_table('articles')
+
+    if not has_users or not has_articles:
+        # 全新安装：db.create_all() 已建全部表，仅 stamp baseline
+        flask_stamp(directory='migrations', revision='0001')
+        app.logger.info('[Alembic] 新装 stamp baseline 0001')
+    elif not has_alembic:
+        # v2.3.0 及更早旧库：stamp baseline 后执行增量
+        flask_stamp(directory='migrations', revision='0001')
+        app.logger.info('[Alembic] 旧库 stamp baseline 0001（v2.3.0 兼容）')
+        flask_upgrade(directory='migrations')
+        app.logger.info('[Alembic] 增量迁移完成')
+    else:
+        # 已纳入 Alembic 管理：执行增量
+        flask_upgrade(directory='migrations')
+        app.logger.info('[Alembic] 增量迁移完成')
+
+
+# ============================================================
 # 主入口
 # ============================================================
 
@@ -314,6 +351,7 @@ def create_app(config_name=None):
 
     # 初始化扩展
     db.init_app(app)
+    migrate.init_app(app, db, render_as_batch=True)
     login_manager.init_app(app)
     cache.init_app(app, config={
         'CACHE_TYPE': app.config.get('CACHE_TYPE', 'SimpleCache'),
@@ -419,9 +457,35 @@ def create_app(config_name=None):
     app.jinja_env.globals['_p'] = _p
 
     # 初始化数据库表结构
+    #
+    # v2.4.0 兼容旧插件 db.create_all()：
+    #   早期插件（banner/product/friend_link/form 等）在 v2.2/v2.3 时代通过
+    #   enable_plugin() 调用 db.create_all() 建自己的模型表，启动期
+    #   create_all 并没有把插件模型纳入 db.metadata。
+    #   兼容策略：
+    #     1) 先 discover_and_load(import_models_only=True)，把所有插件包的
+    #        models.py 导入 db.metadata（仅导入模型，不做蓝图/路由注册）。
+    #     2) 再 db.create_all()：核心表 + 插件模型表一次性补齐，Alembic
+    #        bootstrap 之前 schema 已成型，不会出现「运行到一半某插件表
+    #        不存在」的情况。
+    #     3) 后续标准的 discover_and_load 注册蓝图、后台菜单等钩子——
+    #        已导入的插件模块会被 Python import 缓存，不会重复导入。
+    #     4) enable_plugin() 和 admin 初始化向导内的 db.create_all()
+    #        仍保留作为二次兜底，对已经存在的表完全幂等。
     with app.app_context():
         from . import models  # noqa: F401  保证模型被导入
+        from .plugin_system import discover_and_load
+        discover_and_load(app, import_models_only=True)
         db.create_all()
+
+        # ===== v2.4.0：Alembic 迁移 bootstrap =====
+        # 新装：db.create_all() 已建全部表，stamp baseline
+        # 旧库（v2.3.0 及更早）：检测已有核心表但无 alembic_version 表 → stamp
+        # 然后执行增量迁移（0002 search_index 表、0003 搜索设置种子等）
+        try:
+            _alembic_bootstrap(app)
+        except Exception as e:
+            app.logger.warning('Alembic bootstrap 跳过（非致命）: %s', e)
 
         # ===== 幂等：初始化 RBAC 预设角色与权限 =====
         try:
@@ -470,6 +534,21 @@ def create_app(config_name=None):
         except Exception:
             db.session.rollback()
 
+        # ===== v2.4：oss_storage 对象存储插件一次性自动启用 =====
+        # 启用后存储驱动仍为本地（storage_driver=local），不配置凭证不产生
+        # 任何云端调用；仅为后台增加「对象存储」配置菜单。禁用插件会自动把
+        # 存储驱动重置回本地。
+        try:
+            from .models.setting import Setting
+            from .plugin_system import enable_plugin
+            if (User.query.filter_by(is_deleted=False).first() is not None
+                    and not Setting.get('oss_storage_plugin_seeded')):
+                enable_plugin('oss_storage')
+                Setting.set('oss_storage_plugin_seeded', '1')
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     # 未初始化拦截：后台与前台除初始化页外，都跳转
     @app.before_request
     def _check_initialized():
@@ -479,7 +558,7 @@ def create_app(config_name=None):
         if request.endpoint in (
             'admin_auth.setup', 'admin_auth.captcha', 'static',
             'frontend.favicon', 'frontend.robots', 'frontend.sitemap',
-            'frontend.captcha',
+            'frontend.captcha', 'frontend.healthz',
         ):
             return
 

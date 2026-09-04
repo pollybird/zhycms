@@ -1,6 +1,123 @@
 # zhycms 升级迁移指南
 
-本文件包含各版本升级迁移指引。**v2.2.x → v2.3.0 无需数据库迁移，直接覆盖代码即可**；运行 v1.1（及更早 1.x）版本的站点升级到 v2.0 涉及大量结构变更，请完整阅读本文后半部分后再操作。
+本文件包含各版本升级迁移指引。**v2.3.x → v2.4.0 自动执行 Alembic 迁移，覆盖代码 + 装依赖即可**；运行 v1.1（及更早 1.x）版本的站点升级到 v2.0 涉及大量结构变更，请完整阅读本文后半部分后再操作。
+
+---
+
+## v2.3.x → v2.4.0 升级（2026-09-04）
+
+v2.4.0 引入 **Alembic 数据库迁移框架**、**全文搜索引擎**、**Docker 容器化**、**对象存储 OSS 插件** 四大能力。**旧站覆盖代码后首次启动自动 stamp baseline 并执行增量迁移，无需手动运行任何脚本**；全文搜索默认 Whoosh（零外部依赖），首次使用前自动回退 SQL LIKE 保证可用性；**文件存储默认仍为本地磁盘，对象存储插件升级后自动启用但不配凭证不产生任何云端调用，零行为变化**。
+
+### 一、升级步骤
+
+```bash
+# 0. 备份站点目录与数据库（常规操作，建议保留）
+# 1. 停服并更新代码到 v2.4.0
+git fetch && git checkout v2.4.0    # 或下载 v2.4.0 发布包覆盖
+
+# 2. 更新依赖（新增 Flask-Migrate、Whoosh、jieba；生产环境另装 requirements-prod.txt）
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 生产部署（Docker/gunicorn）还需：
+pip install -r requirements-prod.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 3. 启动服务（首次启动自动完成 Alembic 迁移，无需手动操作）
+.venv/bin/python run.py
+# 或 gunicorn -w 4 -b 0.0.0.0:5000 "wsgi:app"
+```
+
+> 若从 v1.1/v2.0/v2.1.x 升级到 v2.4.0：先按本文后半部分运行 `scripts/upgrade_v2.py` 完成 v2.0 结构迁移，再覆盖到 v2.4.0 代码；首次启动同样会自动 stamp Alembic baseline。
+
+### 二、自动迁移说明
+
+应用工厂 `create_app()` 启动时按以下顺序自动处理数据库 schema：
+
+1. **检测旧库**：若数据库中存在核心表（`users`、`articles` 等）但**不存在 `alembic_version` 表**，判定为旧站升级，自动执行 `flask db stamp head`（标记 baseline 为 `0001`，对应 v2.3.0 完整 schema）。
+2. **执行增量迁移**：`flask db upgrade` 依次执行 `0002`（新建 `search_index` 元数据表）、`0003`（幂等插入 6 个搜索设置默认值，已存在的键跳过，兼容 MySQL 不支持 `INSERT OR IGNORE` 语法）、`0004`（给 `uploaded_files` 增加 `storage` 列并幂等写入 `storage_driver=local` 设置，默认值 `local` 保证历史文件归属正确）。
+3. **新装站点**：初始化向导完成后首次启动会执行 `flask db stamp head` + `flask db upgrade`，把 `db.create_all()` 建出的表纳入 Alembic 版本管理。
+
+迁移日志会写入应用日志（`INFO` 级别），迁移失败时启动中止并打印详细错误。
+
+### 三、行为变化与兼容性
+
+| 项目 | v2.3.x | v2.4.0 | 升级影响 |
+| --- | --- | --- | --- |
+| 数据库结构 | 由 `db.create_all()` 建 | 由 Alembic 迁移管理 | **自动迁移**，无需手动操作 |
+| 前台 `/search` 路由 | SQL LIKE 模糊查询 | 优先 Whoosh 索引，故障回退 SQL LIKE | 未建索引前自动回退，不影响可用性 |
+| 文章保存/删除 | 仅清缓存 | 同时更新搜索索引 | 索引更新独立于缓存开关 |
+| 文件上传存储 | 直接写本地磁盘 | 走存储抽象层，默认本地驱动 | **本地行为不变**；切云端才产生云调用 |
+| 官方插件 | 5 个 | 6 个（新增 `oss_storage`，自动启用一次） | 仅增加后台菜单，不配置不产生云端调用 |
+| `CMS_VERSION` | `2.3.0` | `2.4.0` | 后台页脚版本号自动更新 |
+| 新增依赖 | — | `Flask-Migrate`、`Whoosh`、`jieba` | `pip install -r requirements.txt` 即可 |
+| 云 SDK（可选） | — | `oss2` / `cos-python-sdk-v5` / `qiniu` | **仅使用对应云存储时才需安装**，不装不影响任何现有功能 |
+| 生产部署 | gunicorn 可选 | gunicorn + gevent（`requirements-prod.txt`） | 仅 Docker/生产部署需要，开发环境可选 |
+
+### 四、全文搜索初始化
+
+升级后前台 `/search` 在未建索引前自动走 SQL LIKE，**不影响搜索可用性**。如需启用 Whoosh 全文索引获得更好性能与相关度排序：
+
+1. 进入后台 **系统设置 → 搜索设置**（权限 `system:settings`）。
+2. 确认引擎选择为 `whoosh`（默认），点击 **「重建索引」** 按钮，系统会遍历全部已发布文章写入 `instance/search_index/` 索引。
+3. 重建完成后，前台搜索结果按相关度排序，并支持关键词高亮（6 套主题搜索模板已内置 `|highlight(keyword)` 过滤器）。
+
+> 大型站点（文章数 > 10000）重建索引可能耗时较长，建议在低峰期执行；也可切换为 Meilisearch 后端获得更高性能。
+
+### 五、对象存储（可选）
+
+v2.4.0 新增官方内置插件 `oss_storage`，支持**阿里云 OSS / 腾讯云 COS / 七牛云 Kodo**。升级后插件自动启用一次，但存储驱动保持 `local`（本地磁盘），**不配凭证不会产生任何云端调用**，不上云的站点无需任何操作。
+
+如需切换到云端对象存储：
+
+```bash
+# 1. 安装对应云厂商 SDK（按需安装，均为可选依赖）
+pip install oss2 -i https://pypi.tuna.tsinghua.edu.cn/simple                          # 阿里云 OSS
+pip install cos-python-sdk-v5 -i https://pypi.tuna.tsinghua.edu.cn/simple            # 腾讯云 COS
+pip install qiniu -i https://pypi.tuna.tsinghua.edu.cn/simple                        # 七牛云 Kodo
+```
+
+2. 在云厂商控制台创建 Bucket（建议设为**私有读写 + CDN 回源**或公共读，地域就近选择），并在 **RAM / 访问管理**中创建**子账号**，仅授予目标 Bucket 的读写权限（不要使用主账号 AK）。
+3. 进入后台 **系统设置 → 对象存储**（权限 `oss_storage:manage`），选择云厂商、填写 Endpoint / Region / Bucket / AK / SK（七牛还需绑定 CDN 域名），点击「连接测试」通过后保存。
+4. 切换驱动后**新上传的文件**直接入云；历史本地文件可在同一页面点击「本地文件迁移到云端」：先预览（待传文件数、磁盘缺失数、内容引用链接数），再一键执行——文件逐个上传（已存在自动跳过，可中断重入），文章正文/封面、碎片、自定义字段、站点 Logo 等内容中的 `/static/uploads/` 链接自动改写为云域名。**本地原文件保留不删**，确认无问题后可自行清理。
+
+注意事项：
+
+- **禁用插件**会自动把存储驱动重置回本地（后续上传回到本地磁盘，历史云端文件 URL 不受影响）。
+- **备份恢复**功能上传的备份包强制存本地磁盘，不进云端。
+- Docker 部署如需云 SDK，可基于官方镜像自行构建：在 Dockerfile 中追加 `RUN pip install oss2`（或其他两家 SDK）。
+
+### 六、Docker 部署（可选）
+
+v2.4.0 新增 Docker 容器化部署方案，适合新站点或迁移到容器环境：
+
+```bash
+# 1. 配置环境变量
+cp docker/.env.example .env
+# 编辑 .env 修改 ZHYCMS_SECRET_KEY 和数据库密码
+
+# 2. 启动（MySQL，推荐生产）
+docker compose --profile mysql up -d
+
+# 或启动（PostgreSQL）
+docker compose --profile postgres up -d
+
+# 3. 访问 http://localhost:5000 完成初始化向导
+```
+
+容器启动时 entrypoint.sh 自动执行：数据库迁移（`flask db upgrade`）→ 恢复演示图片 → 编译 i18n 翻译 → 启动 gunicorn。`/healthz` 端点供 docker compose healthcheck 与负载均衡探针使用。
+
+> 现有裸机部署的站点无需迁移到 Docker，v2.4.0 代码在裸机环境同样正常运行。
+
+### 七、升级后验证清单
+
+- [ ] 应用启动日志中出现 `Alembic` 迁移信息（`stamp` 或 `upgrade`），无报错
+- [ ] 后台页脚显示版本号 `2.4.0`
+- [ ] 前台 `/search` 搜索功能正常（未建索引前走 SQL LIKE，建索引后走 Whoosh）
+- [ ] 文章保存/删除后再次搜索能命中最新内容（索引自动更新）
+- [ ] 后台「系统设置 → 搜索设置」页可访问，点击「重建索引」后索引统计正常
+- [ ] 上传文章配图/附件正常、图片可访问（本地存储行为与升级前一致）
+- [ ] 后台「系统设置 → 对象存储」页可访问，驱动显示为「本地存储」
+- [ ] （可选）切换云端驱动：配置凭证 → 连接测试通过 → 保存 → 新上传文件 URL 为云域名
+- [ ] （可选）Docker 部署：`docker compose --profile mysql up -d` 后 `curl http://localhost:5000/healthz` 返回 `{"status":"ok"}`
+- [ ] （可选）`flask db current` 显示当前版本为最新 revision（`0004`）
 
 ---
 

@@ -10,7 +10,9 @@ class UploadedFile(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     original_name = db.Column(db.String(255))        # 原始文件名
-    stored_name = db.Column(db.String(255), nullable=False)  # 存储相对路径，如 uploads/article/20260101/uuid.jpg
+    stored_name = db.Column(db.String(255), nullable=False)  # 存储相对路径/对象 key，如 uploads/article/20260101/uuid.jpg
+    storage = db.Column(db.String(16), nullable=False, default='local',
+                        server_default='local')       # 存储归属：local / aliyun / tencent / qiniu（v2.4）
     url = db.Column(db.String(512))                   # 可访问 URL
     file_size = db.Column(db.Integer, default=0)      # 原始大小（字节）
     compressed_size = db.Column(db.Integer, default=0)  # 压缩后大小（字节，0=未压缩）
