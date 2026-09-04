@@ -1,219 +1,103 @@
-
-
 # ZhyCMS
 
-一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化等能力，适合搭建企业官网、资讯门户、产品展示站等。
+一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v2.4.0**（在 v2.3 国际化基础之上新增 Alembic 数据库迁移框架、Whoosh 全文搜索引擎、Docker 容器化部署，详见 [v2.4.0 更新内容](#v240-更新内容)；历史版本见 [v2.3.0 更新内容](#v230-更新内容)、[v2.2.0 更新内容](#v220-更新内容)、[v2.1.1 更新内容](#v211-更新内容)、[v2.1.0 更新内容](#v210-更新内容) 与 [v2.0 更新亮点](#v20-更新亮点)）。**从 v1.1 升级请先阅读 [UPGRADE.md 升级迁移指南](UPGRADE.md) 并执行 `scripts/upgrade_v2.py`。**
+**当前版本：v2.4.0**
 
-## 特性一览
+---
 
-- **多主题模板系统**：前台模板按主题组织，后台一键切换。内置 `default`、`blue` 通用聚合主题，`manufacturing`（制造业）、`service`（服务业）两套行业专用主题，以及 `default_en`、`manufacturing_en` 两套英文主题（v2.3）。
-- **数据库迁移（Alembic，v2.4）**：Flask-Migrate 管理 schema 版本，`flask db upgrade/downgrade` 支持回滚；旧站升级自动 stamp baseline，插件可自带迁移脚本。
-- **全文搜索（v2.4）**：Whoosh + jieba 中文分词（默认），支持标题+正文+摘要搜索和关键词高亮；可选 Meilisearch 后端；SQL LIKE 自动回退。
-- **Docker 部署（v2.4）**：多阶段构建 Dockerfile + docker-compose（MySQL / PostgreSQL profiles），`docker compose --profile mysql up -d` 一键启动。
-- **对象存储 OSS（v2.4，官方内置插件）**：`oss_storage` 插件支持阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，后台「对象存储」页一键切换云端存储；云 SDK 可选安装，**默认本地存储零行为变化**；内置本地历史文件一键迁移到云端（含文章正文/封面等链接自动改写为云域名）。
-- **主题管理**（v2.2）：后台独立管理页支持上传主题压缩包（自动校验必备模板与安全性）、一键启用即时生效、打包下载跨站复用、验证码确认删除；主题缺失模板自动兜底 default，杜绝前台空白。
-- **演示数据一键生成**：初始化时可选择「制造业」或「服务业」示例，自动生成配套栏目、文章、碎片与演示图片，并切换到对应行业主题；v2.3 新增英文制造业演示数据（`manufacturing_en`）和英文默认主题（`default_en`）选项，生成全英文栏目/文章/产品/轮播/友链/表单内容并自动配置 i18n 为英文。
-- **CMS 标识与企业标识分离**：后台 CMS 名称/版权固定不可改，前台网站名称/版权可独立配置。
-- **栏目级模板选择**：每个栏目可指定独立的列表页/内容页/单页模板，未指定自动回退默认。
-- **自定义字段**：栏目和文章支持自定义字段（文本/富文本/图片/文件/URL/数字等）。
-- **表单收集**：可视化表单设计，支持文本/手机/邮箱/单选/多选/文件上传，提交数据可导出；v2.0 支持提交后邮件/企业微信实时通知；v2.3 起由核心功能转为官方内置插件（老站数据无缝保留）。
-- **国际化**（v2.3）：基于 Flask-Babel 的中英文自由切换，前台 + 后台全站生效；后台可视化配置默认语种与可用语种，URL 参数/会话/Cookie/Accept-Language 多级切换；默认关闭、不影响现有站点，新增语种仅需追加翻译目录并编译。
-- **插件机制**（v2.2）：`plugins/<slug>/` 目录零侵入扩展，启停即时生效、无需重启、禁用即隐身，内置轮播图、产品展示、友情链接、自定义表单、统计代码、对象存储六个官方插件作为开发样板。
-- **第三方统计代码**（v2.3，官方内置插件）：后台直接粘贴百度统计 / Google Analytics 4 / 站长工具或自定义代码，前台 `analytics_head()/analytics_body()` 自动注入，保存即生效、仅注入前台页面。
-- **REST 内容 API**（v2.2）：`/api/v1/` 暴露栏目/文章/轮播/产品只读端点，统一响应包、鉴权开关、CORS、缓存，适合小程序/Headless CMS 消费。
-- **SEO 优化**：每个栏目、文章可单独设置 SEO 标题/关键词/描述；v2.0 新增伪静态、sitemap/robots 自定义、页面缓存、图片默认 ALT。
-- **安全加固**：支持自定义后台路由前缀（如 `manage-x8y2`），v2.0 起**修改后即时生效无需重启**；登录防暴破锁定、图形验证码、异地登录提醒、RBAC 权限、审计日志、上传内容安全校验。
+## 目录
 
-## v2.3.0 更新内容
+- [简介](#简介)
+- [核心特性](#核心特性)
+- [版本速览](#版本速览)
+- [快速开始](#快速开始)
+  - [环境要求](#环境要求)
+  - [本地开发](#本地开发)
+  - [Docker 部署](#docker-部署)
+  - [生产部署](#生产部署)
+- [目录结构](#目录结构)
+- [核心功能详解](#核心功能详解)
+  - [主题系统](#主题系统)
+  - [插件机制](#插件机制)
+  - [国际化](#国际化)
+  - [数据库迁移](#数据库迁移)
+  - [全文搜索](#全文搜索)
+  - [对象存储](#对象存储)
+  - [安全体系](#安全体系)
+  - [SEO 与性能](#seo-与性能)
+  - [内容工作流](#内容工作流)
+  - [审计日志](#审计日志)
+- [升级指南](#升级指南)
+- [参与贡献](#参与贡献)
+- [许可证](#许可证)
 
-v2.3.0（2026-09-02）围绕「国际化 + 统计插件 + 表单插件化 + 英文主题」迭代，**无数据库结构变更，v2.2.x 直接覆盖代码即可升级**；国际化默认关闭、不改变现有站点行为；自定义表单由核心转为内置插件（表名/路由/设置键/审计模块代码不变，老站数据无缝保留）。
+---
 
-### Added
+## 简介
 
-- **国际化（i18n，Flask-Babel）**：
-  - 中英文自由切换，前台 + 后台全站生效；新增语种仅需追加翻译目录并编译（`pybabel init/update/compile`），无需改代码。
-  - Locale 选择优先级：URL `?lang=xx`（一次性，写回 session）→ session → cookie → `Accept-Language` 自动匹配 → 默认语种 `zh` 兜底。
-  - 后台「系统设置 → 国际化」可视化配置页（权限 `system:settings`）：总开关、默认语种、可用语种清单，改动写入审计。
-  - 后台顶栏与前台主题 `base.html` 语言切换器（`available_locales()` / `current_locale()` 全局函数）；未启用时切换器自动隐藏。
-  - 核心界面文案（后台基础模板 + 4 套主题 `base.html`）已标记 `_()`，英文翻译见 `app/translations/en/LC_MESSAGES/messages.po`（`.mo` 编译产物不入库，部署前执行 `pybabel compile -d app/translations`）。
-  - 默认关闭（`i18n_enable=0`）：关闭时全站按中文渲染，与 v2.2.0 行为完全一致；内容数据（栏目名/文章标题等动态数据）不在翻译范围，仅界面文案国际化。
-  - **插件独立翻译域**（v2.3 完整支持）：每个插件可在 `plugins/<slug>/translations/<lang>/LC_MESSAGES/messages.po` 自带译文；模板使用 `{{ _p('<slug>', '原文') }}`，Python 层使用 `self._('原文')`；启停不影响核心译文，独立打包上传插件时译文随目录携带。完整实现与命令见 [wiki.html → 十八、国际化 → 插件国际化实现方式](wiki.html#i18n-plugin) 章节。
-  - **英文主题模板**（v2.3 新增 2 套官方内置主题）：`default_en`（经典默认英文版）与 `manufacturing_en`（制造业英文版），全部模板硬编码文案已英文化；初始化向导新增 `manufacturing_en` 和 `default_en` 两个演示数据选项，选择英文制造业演示数据时自动启用全部插件并生成全英文演示数据，同时自动配置 i18n 为英文 locale。
-- **统计代码插件 `analytics`（官方内置）**：
-  - 后台「插件管理」独立配置页（权限 `analytics:manage`）：百度统计 / Google Analytics 4 / 站长工具（cnzz、51la 等）/ 自定义 head 与 body 代码，直接粘贴官方代码片段，保存即生效、无需重启。
-  - 前台注入采用「插件 Jinja 全局函数 + 主题注入点」模式：主题 `base.html` 的 `</head>` 前调用 `{{ analytics_head()|safe }}`、`</body>` 前调用 `{{ analytics_body()|safe }}`，4 套内置主题均已接入；禁用插件时函数返回空串、模板零报错。
-  - 仅注入前台页面，不注入后台管理页（避免后台流量污染统计）；设置存 Setting 键值（`analytics_*`），不建表、零迁移；操作写入审计（module=`analytics`）。
+ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、主题驱动」为架构理念，在保持轻量的同时覆盖企业建站的核心需求：
 
-### Changed
+- 前台：多主题切换、栏目级模板选择、伪静态、全文搜索、多语言
+- 后台：RBAC 权限、内容工作流、审计日志、备份恢复、表单收集
+- 扩展：插件零侵入扩展、REST API、对象存储、统计代码
 
-- **自定义表单插件化（`form`，官方内置，v2.3.0 起由核心功能转为插件）**：
-  - 新增 `plugins/form/`，后台路由挂核心 `admin_bp`，路径与端点名与核心版完全一致（`/<admin>/forms`）；前台提交地址 `/form/<slug>` 不变。
-  - **迁移四原则**（沿用 v2.2.0 友情链接迁移）：表名不变（`forms`/`form_fields`/`form_submissions`/`form_submission_values`）、审计模块代码不变（`form`/`form_submission`）、后台路由路径不变、通知设置键不变——旧表单数据、提交记录、历史审计日志、邮件/企业微信通知配置全部无缝保留。
-  - 权限点改为插件自有 `form:view`/`form:manage`；提交通知复用核心通用传输层 `app/utils/notify_utils.py`（发送实现保留在核心）。
-  - 核心移除：`app/models/form.py`、`app/admin/form.py`、前台表单提交视图、后台侧边栏固定「自定义表单」菜单项；演示数据内置表单改由插件 `generate_demo_data` 钩子生成。
-  - **老站升级自动迁移**：v2.2.x 升级后首次启动自动启用表单插件一次（`form_plugin_migrated` Setting 标记），无需手工操作。
-- `notify_utils.py` 解耦为通用传输层：发送实现（SMTP 邮件/企业微信 Webhook）保留核心，业务触发移至插件，供各插件复用。
-- 仪表盘「自定义表单统计」卡片随插件门控懒加载，禁用插件后自动隐藏。
+---
 
-### Fixed
+## 核心特性
 
-- 统计插件管理页模板路径：插件注册前台蓝图（即使无前台路由）将自身 `templates/` 目录加入 Jinja 搜索路径，杜绝 `TemplateNotFound`。
-- 表单插件后台菜单图标改用 Font Awesome 5 solid 图标（`fas` 前缀），并移除核心模板中硬编码的重复菜单。
-- `.gitignore` 修复：演示图片目录 `uploads/demo/` 无法入库（安装后图片 404），改为 `uploads/*` + `!uploads/demo/` 排除规则，15 张演示图片随仓库分发。
-- 产品插件 `.po` 英文翻译全量补全（85 条），修复产品详情页 `上一个产品` / `下一个产品` 等界面文案在英文 locale 下仍显示中文。
-- 后台多个路由名修正（`monitor_page` → `monitor_index` 等）；setup 页面静态资源恢复 CDN 引用；`CMS_VERSION` 改用类属性访问。
+| 特性 | 说明 | 版本 |
+|------|------|------|
+| **多主题模板系统** | 前台模板按主题组织，后台一键切换；内置 6 套主题（含 2 套英文主题） | v1.0 |
+| **主题管理** | 上传/启用/删除/打包下载主题压缩包，缺失模板自动兜底 | v2.2 |
+| **插件机制** | `plugins/<slug>/` 零侵入扩展，启停即时生效、无需重启 | v2.2 |
+| **国际化（i18n）** | Flask-Babel 中英文自由切换，插件独立翻译域 | v2.3 |
+| **数据库迁移** | Flask-Migrate（Alembic）管理 schema 版本，支持回滚 | v2.4 |
+| **全文搜索** | 默认 Whoosh + jieba 中文分词，可选 Meilisearch | v2.4 |
+| **对象存储 OSS** | 阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，一键迁移本地文件上云 | v2.4 |
+| **Docker 部署** | 多阶段构建 + docker-compose，MySQL/PostgreSQL 一键启动 | v2.4 |
+| **REST API** | `/api/v1/` 只读端点，Token 鉴权 + CORS，适合小程序/Headless | v2.2 |
+| **RBAC 权限** | 角色/权限点两级模型，菜单与按钮级授权，栏目级内容粒度 | v2.0 |
+| **内容工作流** | 草稿 → 待审核 → 已发布/已驳回，版本快照与对比还原 | v2.0 |
+| **审计日志** | 登录、配置变更、内容 CRUD 等全量留痕，支持多维度检索 | v2.0 |
+| **SEO 优化** | 伪静态、sitemap、robots.txt、页面缓存、图片默认 ALT | v2.0 |
+| **表单收集** | 可视化表单设计，提交后邮件/企业微信实时通知 | v2.0 |
+| **备份恢复** | MySQL/PostgreSQL/JSON 三种方式，一键备份与恢复 | v2.0 |
 
-### Upgrade Note
+---
 
-v2.2.x → v2.3.0：仅覆盖代码即可。自定义表单已并入官方插件体系，升级后首次启动会**自动启用表单插件一次**，旧 `forms`/`form_submissions` 等表数据、提交记录、历史审计日志与通知配置无缝保留（后台路径 `/forms`、前台地址 `/form/<slug>` 不变），之后可在「插件管理」随时禁用；统计代码插件可在「插件管理」一键启用，国际化默认关闭，可在「系统设置 → 国际化」开启。
+## 版本速览
 
-## v2.4.0 更新内容
+### v2.4.0（2026-09-04）
+- **新增**：Alembic 数据库迁移、Whoosh 全文搜索、Docker 容器化、对象存储 OSS 插件
+- **改进**：存储抽象层、搜索索引自动更新、健康检查端点 `/healthz`
 
-v2.4.0（2026-09-04）围绕「Alembic 迁移 + 全文搜索 + Docker 容器化 + 对象存储 OSS」迭代。v2.3.x 覆盖代码升级后首次启动自动 stamp baseline + 执行增量迁移，无需手动操作；全文搜索默认 Whoosh + jieba，SQL LIKE 自动回退；Docker 支持 MySQL / PostgreSQL 一键部署；新增官方内置 `oss_storage` 插件支持阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，默认本地存储、零行为变化。
+### v2.3.0（2026-09-02）
+- **新增**：国际化（Flask-Babel）、统计代码插件、英文主题模板
+- **改进**：自定义表单插件化、插件独立翻译域
 
-### Added
+### v2.2.0（2026-08-31）
+- **新增**：插件优先架构、主题管理机制、轮播图/产品展示/友情链接插件、REST API
 
-- **Alembic 数据库迁移框架（Flask-Migrate）**：引入 Flask-Migrate 封装 Alembic；`create_app()` 启动时自动检测旧库并 stamp baseline，仅执行增量迁移；插件迁移钩子 `get_migration_files()` 支持插件自带迁移脚本。
-- **全文搜索引擎（Whoosh + jieba + Meilisearch 可选）**：默认 Whoosh + jieba 中文分词，索引标题+正文+摘要+栏目名；文章保存/删除时自动更新索引（通过 `clear_content_cache` 钩子）；SQL LIKE 自动回退；后台新增「搜索设置」页面；6 套主题搜索模板支持分页和高亮。
-- **Docker 容器化**：多阶段构建 Dockerfile（`python:3.12-slim`，非 root 用户，gunicorn）；docker-compose 提供 MySQL / PostgreSQL 两个 profile；entrypoint.sh 自动迁移；`/healthz` 健康检查端点；`wsgi.py` 生产入口。
-- **对象存储 OSS 插件（oss_storage，官方内置）**：核心存储抽象层 `app/utils/storage.py`（驱动协议 + 注册表），插件提供阿里云 OSS / 腾讯云 COS / 七牛云 Kodo 三家云驱动（云 SDK 可选安装、懒加载）；后台「对象存储」配置页（凭证管理、连接测试、驱动切换）；本地历史文件一键迁移云端并自动改写内容中的文件链接；`uploaded_files.storage` 列记录文件归属；禁用插件自动回退本地驱动。
+### v2.1.x（2026-08-30）
+- **改进**：环境变量前缀统一、项目治理文件、审计日志人性化、伪静态分页
 
-### Changed
+### v2.0（2026-08-29）
+- **新增**：RBAC 权限、审计日志、内容工作流、备份恢复、登录安全加固、上传安全、表单通知、SEO 高级设置
 
-- `clear_content_cache` 扩展：搜索索引更新独立于缓存开关。
-- 前台 `/search` 路由改用 `search_articles()` 替代 SQL LIKE。
-- 上传入口 `save_upload_file()` 改为走存储驱动（默认本地驱动，行为不变），新增 `storage_scope` 参数。
-- `Setting.CMS_VERSION` 更新为 `2.4.0`。
+> 完整变更历史见 [CHANGELOG.md](./CHANGELOG.md)。
 
-### Upgrade Note
-
-v2.3.x → v2.4.0：仅覆盖代码 + `pip install -r requirements.txt` 即可。首次启动自动 stamp Alembic baseline 并执行增量迁移（`0002` 建 `search_index` 表、`0003` 插入搜索设置默认值、`0004` 给 `uploaded_files` 加 `storage` 列并写入存储设置），无需手动操作。全文搜索默认 Whoosh（零外部依赖），首次使用需在后台「搜索设置」点击「重建索引」按钮初始化索引；未索引前搜索自动回退 SQL LIKE，不影响可用性。**文件存储默认仍为本地磁盘，oss_storage 插件升级后自动启用但不配置凭证不会产生任何云端调用**；需要上云时在后台「系统设置 → 对象存储」配置并 `pip install` 对应云 SDK（阿里云 `oss2` / 腾讯云 `cos-python-sdk-v5` / 七牛云 `qiniu`，均为可选依赖）。Docker 部署见 `docker/.env.example`。
-
-## v2.2.0 更新内容
-
-v2.2.0（2026-08-31）为**插件优先架构**大版本，**无数据库结构变更，v2.1.x 直接覆盖代码即可升级**；插件模型表随 `db.create_all()` 自动补齐（无列变更），插件启停仅改 Setting 值、无需重启。
-
-### Added
-
-- **主题管理机制（Theme Manager）**：
-  - 新增后台「主题管理」页（系统设置子菜单，权限 `system:settings`）：列表展示名称/版本/作者/说明/模板数/产品列表支持徽标/状态（使用中·绿色高亮 / 未启用 / 模板不完整·标红含缺失模板明细）。
-  - 主题压缩包上传（`.zip / .tar.gz / .tgz`）：8 步校验——扩展名白名单、压缩包完整性、路径穿越双重拦截（预检 + `_safe_join`）、符号链接静默跳过、manifest 合法性 + slug 格式正则、必备模板全量存在、形态 A（单目录）/ B（平铺）自动归一化、内置主题禁止覆盖 + 同名自定义主题先删后传；全程使用临时目录，任何失败不写入 `themes/`，finally 彻底清理。
-  - 一键启用：启用前强检必备模板（`index/list/article/page/base/404/500.html` + manifest `template_required` 额外声明），缺失拒绝并给出补齐指引；启用动作写入审计；前台即时切换、无需重启。
-  - 主题兜底：`get_active_theme()` 引用的主题目录不存在或模板不全时自动回退 `default`，杜绝前台空白页。
-- **主题静态资源目录（css / js / images / fonts）**：每套主题目录下新增 `css/`、`js/`、`images/`、`fonts/` 独立目录，`base.html` 中的内联 `<style>` 全部移至 `css/style.css`；新增前台资源路由 `GET /themes/<主题>/css|js|images|fonts/*`（slug 正则 + 仅放行四个资源子目录 + 路径穿越拦截 + 缓存头），样式、脚本、图片、字体随主题目录分发、打包下载一并带走。
-- **插件压缩包上传**：后台「插件管理」支持直接上传开发好的插件压缩包（`.zip / .tar.gz / .tgz`）解压至 `plugins/`；8 层顺序校验（扩展名白名单 → 压缩包完整性 → 路径穿越拦截 → 符号链接处理 → 插件根识别 → 必备文件 `manifest.json`/`__init__.py` → manifest 合法性 → 目标目录存在性），非法包整体拒绝；成功后写入上传审计。
-- **插件 / 主题打包下载**：两个管理页操作列新增「下载」按钮，将插件/主题目录打包为 zip（单目录形态，与上传校验完全兼容）下载；下载包可在其他站点直接重新上传复用；下载动作写入导出审计（含版本/文件数/大小）。
-- **插件 / 主题卸载删除（危险操作二次确认）**：
-  - 列表操作列新增「卸载 / 删除」按钮：内置（灰显提示原因）、启用中（灰显要求先禁用/切换）不可操作；其余点击后弹出红色警告模态框，告知后果并要求输入图形验证码确认（验证码一次性消费防重放，独立于登录验证码，图片点击可刷新）。
-  - 卸载即物理删除 `plugins/<slug>/`（或 `themes/<slug>/`）目录：slug 正则校验防穿越 → 内置拒绝 → 启用中拒绝 → 删除 → 审计。
-  - 插件卸载同步移除运行期注册表并清理模块缓存：菜单/列表/sitemap/审计聚合立即消失，同进程重新上传同名包即可恢复；**数据表与数据保留**。
-- **插件机制（Plugin First Architecture）**：
-  - 插件目录 `plugins/<slug>/` + `manifest.json` 元数据 + `PluginBase` 基类，零侵入不修改核心源码即可扩展后台页面、前台路由/模板函数、数据表、只读 API 端点、后台菜单、sitemap URL、演示数据钩子、审计模块筛选。
-  - 运行时以 `site_settings.enabled_plugins` 门控，启用插件会自动种子权限点、给预设角色补授权、`db.create_all()` 兜底建表；禁用插件仅移出清单、不删表不清数据、核心零迁移、前端即隐身。
-  - 后台「插件管理」页查看所有已发现插件、启停切换、导入错误标红；插件菜单自动拼到侧边栏、启用+有权限才显示。
-  - 初始化向导新增「功能插件」步骤，默认勾选**轮播图 + 产品展示 + 友情链接**（可取消）；选择行业演示数据时**轮播图、友情链接**自动启用（选制造业另含**产品展示**，产品页依赖该插件）。
-- **轮播图插件（banner，官方内置）**：
-  - 分组（`home-hero`、`side-ad`…）+ 排序 + 链接 + 开关 + 封面；后台独立管理页、表单收集式校验、审计留痕。
-  - 模板一行调用 `banner_items('home-hero')`，`banner/hero_carousel.html` partial 直接 include，四套主题首页自动集成；禁用插件 fallback 为空列表、页面零报错。
-  - REST 只读端点 `GET /api/v1/banners/<slug>`，启用守卫 + API 统一缓存。
-  - 制造业/服务业演示数据各生成 3 张首页大图（复用演示图路径）。
-- **产品展示插件（product，官方内置）**：
-  - 产品模型归属**栏目树**（复用栏目授权/伪静态/SEO/缓存），字段：标题、摘要、富文本详情、**相册**（排序/拖拽编辑）、**规格参数**（分组 JSON，UI 编辑）、封面兜底相册第一张、独立 SEO 三字段。
-  - 后台产品管理页：按栏目筛选/关键词/状态、分页、批量启用禁用删除、行内创建编辑；相册/规格编辑器支持拖拽与增删；权限与文章共用 `content:create/edit/delete/batch` + 自有 `product:manage` 聚合。
-  - 前台：动态详情 `/column/<slug>/product/<id>` 与伪静态 `/product-<id>.html` 两套路由；4 套主题新增 `list_product.html` 栏目列表模板；制造业主题首页自动切换 `product_latest()` 优先展示、文章兜底。
-  - REST API：`GET /api/v1/columns/<slug>/products`（分页+关键词）、`GET /api/v1/products/<id>`（详情+上一条/下一条）。
-  - 制造业演示数据：产品中心 2 个子栏目各 3 个产品（共 6 个），附相册与规格参数；服务业幂等无产品，栏目模板回退默认。
-  - sitemap 自动收录 2000 条以内启用产品（更新频率/优先级沿用文章规则）。
-- **友情链接插件（friend_link，官方内置，v2.2.0 起由核心功能转为插件）**：
-  - 名称/URL/LOGO/排序/打开方式/启停/软删除，后台管理页、批量操作与审计留痕；权限点 `friend_link:manage`（沿用核心时代策略，仅超级管理员默认可管理，可自行授权其他角色）。
-  - 后台路由路径与核心版一致（`/<admin>/friend-links`）；模板一行调用 `friend_links()`，未启用返回空列表、主题区块自动隐藏。
-  - 迁移兼容：表名/审计模块代码与核心版一致，旧站数据与历史审计日志无缝保留；升级后首次启动自动启用一次，之后可随时禁用。
-  - 制造业/服务业演示数据各 3 条示例链接。
-- **REST 内容 API（核心）**：
-  - 蓝本 `api_bp`，前缀 `/api/v1`；统一响应 `{code, message, data, meta}`；`api_cache` 装饰器 + 独立缓存键 `api:{key}:{slug}`；关闭 API 或禁用插件一律返回 404，不暴露存在性。
-  - 核心端点：`GET /columns`（导航+启用栏目树）、`GET /columns/<slug>`、`GET /columns/<slug>/articles`（分页）、`GET /articles/<id>`（含上一条/下一条）。
-  - 鉴权：`api_enable` 总开关、`api_token` 非空时要求请求头 `X-API-Token`。
-  - CORS：`api_cors_origins` 配置（`*` 或逗号分隔域名）；后端通过 `after_request` 响应头注入，无 flask-cors 依赖。
-  - 后台「系统设置 → 内容 API」页完整可视化配置，改动写入审计日志。
-- **sitemap 聚合**：启用插件贡献的 URL 通过 `collect_sitemap_urls()` 自动拼入 `sitemap.xml`，无需改核心视图。
-- **审计模块聚合**：启用插件的 `audit_modules`（如 `product→产品管理`）自动进入审计页筛选下拉与列表徽标翻译。
-
-### Changed
-
-- **初始化向导新增「功能插件」步骤**：默认勾选轮播图 + 产品展示 + 友情链接（可取消）；选择行业演示数据时轮播图、友情链接自动启用（制造业另含产品展示），轮播数据由 banner 插件生成、不再使用碎片。
-- **网站设置页前台主题设置项迁移**：移除原主题下拉框，替换为引导卡片（展示当前启用主题并链接到「主题管理」）；主题切换、上传、删除统一在「主题管理」完成。
-- **制造业主题首页**：产品插件启用时优先展示 `product_latest()` 卡片，否则回退原文章列表；主题侧栏/列表页 `list_product.html` 适配 4 套主题。
-- **模板 Jinja 全局**：插件 `get_jinja_globals()` 注册的函数统一由核心包裹「启用守卫」，未启用时返回 `get_jinja_fallbacks()` 声明的默认值（`banner_items`→空列表），避免模板因禁用插件抛 UndefinedError。
-
-### Fixed
-
-- 后台插件/主题管理页脚本块误用 `{% block scripts %}`（父模板不存在该块）导致整个页面脚本未输出，「卸载 / 删除」确认弹窗点击无反应；统一修正为 `{% block js %}`。
-
-### Upgrade Note
-
-v2.1.x → v2.2.0：仅覆盖代码即可。友情链接已并入官方插件体系，升级后首次启动会**自动启用友情链接插件一次**，旧 `friend_links` 表数据与历史审计日志无缝保留（后台路径 `/friend-links` 不变），之后可在「插件管理」随时禁用；其余官方插件可在「插件管理」一键启用，插件数据表会在下次请求时由 `db.create_all()` 自动创建。
-
-v2.1.1（2026-08-30）为配置与治理完善版本，**无数据库结构变更，v2.1.0 直接覆盖代码即可升级**：
-
-### Changed
-
-- **环境变量前缀统一为 `ZHYCMS_`**（与项目名一致）：`ZHYCMS_ENV`、`ZHYCMS_SECRET_KEY`、`ZHYCMS_DB_URI`。旧前缀 `ZHOCMS_*`（历史拼写差异）仍被识别作为兼容回退，将在未来主版本移除；部署脚本/systemd 配置建议改用新前缀。
-- **初始化向导数据库选项重排**：MySQL/PostgreSQL（生产推荐徽标）置顶，SQLite 标注「仅开发/测试」；顶部新增 SQLite 并发写入风险提示。
-
-### Added
-
-- **项目治理文件**：`CONTRIBUTING.md`（贡献指南）、`CODE_OF_CONDUCT.md`（行为准则）、`SECURITY.md`（安全策略）、`CHANGELOG.md`（变更日志）。
-- **README 生产数据库提示**：环境要求明确标注「SQLite 仅用于开发/测试，生产环境请使用 MySQL 5.7+ 或 PostgreSQL 12+」。
-
-### Improved
-
-- **仪表盘「最近操作审计」详情人性化**：与审计日志页共用同一套中文化过滤器（`audit_detail` 紧凑模式），原始 JSON 变为「IP 地址：…；登录城市：…；异地登录：否」等单行中文摘要（最多 3 项、超长截断），ID 自动显示为角色/栏目名称。
-
-## v2.1.0 更新内容
-
-v2.1.0（2026-08-29）为 v2.0 的体验优化与缺陷修复版本，**无数据库结构变更，v2.0 直接覆盖代码即可升级**：
-
-### 修复
-
-- **后台用户列表不显示**：v2.0 中添加用户后列表恒显示「暂无用户」（模板取值字段错误），已修复；同时列表角色展示改用预加载数据，消除逐行查询（N+1）
-- **后台菜单按权限隐藏**：当前角色无权访问的菜单项现在直接隐藏（此前显示但点击后报 403）；内容编辑等角色可正常进入栏目列表页浏览，新增/删除等敏感操作仍受权限校验
-- **审计日志记录健壮性**：定时任务、命令行脚本等无请求上下文场景下写审计不再因 `request`/`current_user` 访问异常而**静默丢失**
-- **升级迁移脚本缺陷**：`scripts/upgrade_v2.py` 修复两处回填问题——SQL 优先级缺括号导致隐藏文章可能被误置为「已发布」；`ALTER ADD COLUMN DEFAULT` 立即填充默认值导致 `is_enabled` 映射失效（现以 `schema_migrations` 版本记录保证幂等且不覆盖运行期数据）
-
-### 优化
-
-- **审计日志详情人性化**：详情从原始 JSON 改为中文可读描述——键名/配置项/操作类型全量中文翻译、状态与开关值语义化（`published`→已发布、`on`→开启）、`(旧值, 新值)` 与 `changed` 嵌套结构渲染为「旧值 → 新值」变更对照、角色/栏目 ID 自动显示名称、超长值截断、全程 HTML 转义防 XSS
-- **伪静态列表分页**：开启伪静态后列表分页使用 `/{slug}-{页码}.html` 格式（如 `/company-news-2.html`），新增 `frontend_pager_url` 模板助手，内置 4 套主题 8 个列表模板分页链接全部适配；第 1 页自动规范化到 `/{slug}.html`，旧动态 URL `?page=` 向后兼容
-- **版本号集中管理**：新增 `Setting.CMS_VERSION` 常量并注入全模板（`{{ cms_version }}`），后台页脚版本随之一处维护
-- **文案修正**：后台安全页移除 v1.1 遗留的「修改后需重启服务才能生效」提示，统一为 v2.0 起「保存后即时生效，无需重启」
-
-## v2.0 更新亮点
-
-v2.0 围绕「企业级安全、可控、可运维」完成八大模块升级：
-
-| 模块 | 能力 |
-| --- | --- |
-| **RBAC 权限体系** | 角色/权限点两级模型，后台菜单与操作按钮级授权；用户可绑定多角色，权限取并集；内容粒度授权（栏目级文章管理权限） |
-| **审计日志** | 登录/登出、配置变更、内容 CRUD、备份恢复等关键操作全量留痕，支持按模块/操作人/时间范围检索 |
-| **内容工作流** | 草稿 → 提交审核 → 发布 → 驳回回退全流程；文章版本自动保存，支持版本对比与一键还原 |
-| **备份恢复** | MySQL（mysqldump + gzip）/ PostgreSQL / JSON 三种方式，后台一键备份、下载、恢复、删除；恢复前自动释放连接池避免锁表 |
-| **登录安全加固** | 连续失败 N 次自动锁定账号（次数/时长可配置，默认 5 次/10 分钟）；图形验证码；异地 IP 登录提醒横幅 |
-| **上传安全与图片优化** | 后缀 + MIME 双重校验拦截伪装脚本；SHA-256 内容去重（引用计数）；图片自动压缩 + 缩略图生成；上传文件统一索引管理 |
-| **表单消息通知** | 表单提交实时推送：SMTP 邮件（HTML 模板、多收件人）+ 企业微信机器人 Webhook（支持 @ 手机号），双渠道开关独立可控 |
-| **SEO 与站点性能** | 伪静态（`/{slug}.html`、`/{slug}-{页码}.html`、`/article-{id}.html`）；sitemap.xml 更新频率/优先级可配置；robots.txt 后台可视化编辑；首页/栏目/文章独立 TTL 页面缓存；图片默认 ALT 自动注入 |
+---
 
 ## 快速开始
 
 ### 环境要求
 
 - Python 3.9+
-- 数据库：SQLite（默认，**仅用于开发/测试**）或 **MySQL 5.7+ / PostgreSQL 12+（生产推荐）**
+- 数据库：**MySQL 5.7+** 或 **PostgreSQL 12+**（生产推荐）
+- SQLite 仅用于开发/测试（不支持并发写入）
 
-> ⚠️ **SQLite 不支持并发写入，生产环境容易锁表**。正式站点请务必在初始化向导中选择 MySQL 或 PostgreSQL（需提前创建好目标数据库，MySQL 建议字符集 `utf8mb4`）。
-
-### 安装与运行
+### 本地开发
 
 ```bash
 # 克隆代码
@@ -224,25 +108,16 @@ cd zhycms
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# 安装依赖（国内网络建议使用镜像源加速）
+# 安装依赖（国内建议用镜像源）
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-# 或阿里云镜像：-i https://mirrors.aliyun.com/pypi/simple
 
 # 启动开发服务器
 python run.py
 ```
 
-浏览器访问 [http://127.0.0.1:5000](http://127.0.0.1:5000)，首次访问会自动跳转到 `/admin/setup` 初始化向导。
+浏览器访问 http://127.0.0.1:5000，首次访问自动跳转到 `/admin/setup` 初始化向导。
 
-### 生产部署
-
-```bash
-ZHYCMS_ENV=production ZHYCMS_SECRET_KEY=your-secret python run.py
-# 或使用 gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 "run:app"
-```
-
-### Docker 部署（v2.4）
+### Docker 部署
 
 ```bash
 # 1. 配置环境变量
@@ -258,297 +133,182 @@ docker compose --profile postgres up -d
 # 3. 访问 http://localhost:5000 完成初始化
 ```
 
-容器启动时自动执行数据库迁移和翻译编译，`instance/` 和 `app/static/uploads/` 通过 volume 持久化。
+容器启动时自动执行数据库迁移、编译 i18n 翻译并启动 gunicorn。`instance/` 和上传目录通过 volume 持久化。
 
-## v1.1 → v2.0 升级指南
-
-正在运行 v1.1 及更早 1.x 版本的站点升级前，请务必阅读完整的 **[UPGRADE.md 升级迁移指南](UPGRADE.md)**。要点速览：
+### 生产部署
 
 ```bash
-# 0. 备份站点目录与数据库（必做）
-# 1. 停服并更新代码到 v2.0
-git fetch && git checkout v2.0
+# 方式一：直接运行
+ZHYCMS_ENV=production ZHYCMS_SECRET_KEY=your-secret python run.py
 
-# 2. 更新依赖（新增 Flask-Caching/APScheduler/requests/python-magic，
-#    Linux 需补系统库 libmagic）
-pip install -r requirements.txt
+# 方式二：gunicorn（推荐）
+gunicorn -w 4 -b 0.0.0.0:5000 "run:app"
 
-# 3. 执行数据库迁移（幂等脚本，可重复运行）
-.venv/bin/python scripts/upgrade_v2.py
-
-# 4. 启动服务，按 UPGRADE.md 的验证清单逐项核对
+# 方式三：Docker（见上文）
 ```
 
-升级涉及**新建 9 张表、旧表补 12 列、文章状态机数据回填**。注意：仅启动程序无法完成迁移——`db.create_all()` 不会给旧表加列，且跳过数据回填会导致原本隐藏的文章被错误公开。升级完成后请第一时间到 **用户权限 → 用户列表** 审查超管标志（v1.1 所有用户默认是超级管理员）。
+> 生产环境请务必使用 MySQL/PostgreSQL，并设置强密钥。
+
+---
 
 ## 目录结构
 
 ```
 zhycms/
 ├── app/
-│   ├── admin/              # 后台模块（栏目、文章、设置、用户、角色、审计、
-│   │                       #   备份、插件管理、主题管理、内容 API、国际化等；表单已迁至插件）
+│   ├── admin/              # 后台模块（栏目、文章、用户、角色、审计、备份、设置等）
 │   ├── frontend/           # 前台模块
 │   │   └── templates/
-│   │       └── themes/     # 前台主题模板目录（含 css/js/images/fonts 资源子目录）
-│   │           ├── default/        # 通用聚合主题
-│   │           ├── default_en/     # 通用聚合主题英文版（v2.3）
-│   │           ├── blue/           # 通用聚合主题（蓝色）
-│   │           ├── manufacturing/  # 制造业专用主题
-│   │           ├── manufacturing_en/ # 制造业专用主题英文版（v2.3）
-│   │           └── service/        # 服务业专用主题
-│   ├── models/             # 数据模型
-│   │   ├── user.py / rbac.py       # 用户与角色权限（v2.0）
-│   │   ├── audit.py                # 审计日志（v2.0）
-│   │   ├── workflow.py             # 内容工作流与版本（v2.0）
-│   │   ├── backup.py               # 备份记录（v2.0）
-│   │   ├── upload.py               # 上传文件索引（v2.0）
-│   │   └── article.py / column.py / setting.py ...  # 表单模型已迁至插件（v2.3）
-│   ├── translations/       # 国际化翻译文件（v2.3，en/LC_MESSAGES/messages.po）
-│   ├── i18n.py             # 国际化：locale 选择器与切换辅助（v2.3）
-│   ├── utils/              # 工具模块
-│   │   ├── uploads.py / notify_utils.py    # 上传安全（走存储驱动，v2.4）/ 消息通知通用传输层（v2.3 解耦）
-│   │   ├── storage.py                # 存储抽象层：驱动协议/本地驱动/注册表（v2.4）
-│   │   ├── backup_utils.py / admin_prefix.py / ip_locator.py
-│   │   └── themes.py / captcha.py / pack.py / bootstrap.py ...
-│   ├── static/             # 静态资源 (uploads/, admin/)
+│   │       └── themes/     # 前台主题目录（含 css/js/images/fonts）
+│   ├── models/             # 数据模型（用户、RBAC、审计、工作流、备份、上传等）
+│   ├── translations/       # 国际化翻译文件
+│   ├── utils/              # 工具模块（上传、通知、备份、存储、主题等）
+│   ├── static/             # 静态资源
 │   ├── __init__.py         # 应用工厂
 │   ├── config.py           # 配置
-│   ├── plugin_system.py    # 插件运行时：发现/加载/启停门控（v2.2）
-│   ├── plugin_api.py       # PluginBase 插件基类（v2.2）
-│   └── extensions.py       # 扩展初始化（含 Flask-Babel，v2.3）
-├── plugins/                # 插件目录（v2.2）
-│   ├── banner/             # 官方内置轮播图插件
-│   ├── product/            # 官方内置产品展示插件
-│   ├── friend_link/        # 官方内置友情链接插件（v2.2.0 起由核心功能转为插件）
-│   ├── form/               # 官方内置自定义表单插件（v2.3.0 起由核心功能转为插件）
-│   ├── analytics/          # 官方内置统计代码插件（v2.3）
-│   └── oss_storage/        # 官方内置对象存储插件：阿里云OSS/腾讯云COS/七牛云（v2.4）
-├── babel.cfg               # pybabel 提取配置（v2.3）
-├── instance/               # 实例数据（数据库、配置等）
-├── migrations/             # Alembic 数据库迁移脚本（v2.4）
-│   ├── alembic.ini         # Alembic 配置
-│   ├── env.py              # 迁移环境（render_as_batch=True 兼容 SQLite）
-│   └── versions/           # 版本脚本（0001 baseline / 0002 search_index 表 / 0003 搜索设置 / 0004 storage 列）
-├── docker/                 # Docker 部署辅助文件（v2.4）
-│   ├── entrypoint.sh       # 启动入口（自动迁移 + 还原演示图片 + gunicorn）
-│   └── .env.example        # 环境变量模板（密钥、数据库密码）
-├── Dockerfile              # 多阶段构建镜像（python:3.12-slim，非 root 用户）
-├── docker-compose.yml      # MySQL / PostgreSQL profiles 编排
-├── .dockerignore           # Docker 构建排除清单
+│   ├── plugin_system.py    # 插件运行时
+│   ├── plugin_api.py       # PluginBase 基类
+│   └── extensions.py       # 扩展初始化
+├── plugins/                # 插件目录
+│   ├── banner/             # 轮播图插件
+│   ├── product/            # 产品展示插件
+│   ├── friend_link/        # 友情链接插件
+│   ├── form/               # 自定义表单插件
+│   ├── analytics/          # 统计代码插件
+│   └── oss_storage/        # 对象存储插件
+├── migrations/             # Alembic 数据库迁移脚本
+├── docker/                 # Docker 部署辅助文件
+├── instance/               # 实例数据（数据库、配置、备份、索引等）
 ├── requirements.txt        # 核心依赖
-├── requirements-prod.txt   # 生产依赖（gunicorn + gevent，v2.4）
-├── wsgi.py                 # 生产 WSGI 入口（v2.4）
-└── run.py                  # 开发模式启动入口
+├── requirements-prod.txt   # 生产依赖（gunicorn + gevent）
+├── Dockerfile              # 多阶段构建镜像
+├── docker-compose.yml      # 编排文件
+├── wsgi.py                 # 生产 WSGI 入口
+├── run.py                  # 开发启动入口
+└── babel.cfg               # pybabel 提取配置
 ```
+
+---
 
 ## 核心功能详解
 
-### 演示数据与行业主题
+### 主题系统
 
-首次访问初始化向导除设置管理员外，可选择生成演示数据：
+- **多主题组织**：前台模板按主题目录存放，后台一键切换，即时生效
+- **主题管理**：支持上传 `.zip/.tar.gz/.tgz` 压缩包，8 步安全校验后解压；支持打包下载跨站复用
+- **栏目级模板**：每个栏目可独立指定列表页/内容页/单页模板
+- **安全兜底**：启用主题缺失必备模板时自动回退 `default` 主题，杜绝白屏
+- **静态资源隔离**：每套主题独立拥有 `css/js/images/fonts` 子目录
 
-| 选项 | 生成内容 | 自动切换主题 |
-| --- | --- | --- |
-| 不生成 | 空站点 | 保持 `default` |
-| 制造业 | 机械制造示例：产品中心、新闻中心等 | `manufacturing` |
-| 服务业 | 咨询公司示例：服务项目、客户案例等 | `service` |
-| Manufacturing (EN) | 英文制造业示例：全英文栏目/文章/产品/轮播/友链/表单 | `manufacturing_en` |
-| English Default | 英文默认主题空白站 | `default_en` |
+### 插件机制
 
-演示数据位于 `app/utils/bootstrap.py`，生成前会自动清理旧数据；友情链接等插件演示数据由各插件通过 `generate_demo_data` 钩子自行清理重建（仅启用时生成）。
+- **零侵入扩展**：`plugins/<slug>/` 目录 + `manifest.json` + `PluginBase` 基类
+- **运行时门控**：以 `site_settings.enabled_plugins` 控制启停，禁用即隐身、不删数据
+- **能力扩展**：可扩展后台页面、前台路由/模板函数、数据表、REST API、sitemap、审计模块、演示数据钩子
+- **官方内置插件**：轮播图、产品展示、友情链接、自定义表单、统计代码、对象存储
 
-### 主题管理（v2.2）
+### 国际化
 
-**系统设置 → 主题管理** 中统一管理前台主题（权限 `system:settings`）：
+- **Flask-Babel 全站覆盖**：前台 + 后台界面文案支持中英文切换
+- **多级 Locale 选择**：URL 参数 → Session → Cookie → Accept-Language → 默认语种
+- **插件独立翻译域**：每个插件可在 `plugins/<slug>/translations/` 自带译文
+- **默认关闭**：不影响现有站点，开启后即时生效
+- **英文主题**：内置 `default_en`、`manufacturing_en` 两套英文主题模板
 
-- **上传主题**：支持 `.zip / .tar.gz / .tgz` 压缩包，校验 manifest 合法性、必备模板（`index/list/article/page/base/404/500.html`）与安全性（路径穿越拦截、符号链接跳过、内置主题保护），全部通过才解压到 `themes/` 目录；支持单目录与平铺两种压缩包形态。
-- **启用主题**：即时生效无需重启；缺失必备模板的主题拒绝启用并提示补齐明细。
-- **删除主题**：物理删除主题目录，需在警告弹窗中输入图形验证码确认；内置主题与启用中的主题不可删除。
-- **下载主题**：一键打包为 zip（单目录形态，含 css/js/images/fonts 全部静态资源），可在其他站点直接上传复用。
-- **安全兜底**：当前启用主题目录被误删或模板不全时，前台自动回退 `default` 主题，不会白屏。
+### 数据库迁移
 
-### 数据库迁移（Alembic，v2.4）
+- **Flask-Migrate（Alembic）**：统一管理 schema 版本，支持 `upgrade/downgrade`
+- **旧站自动升级**：v2.3.x 及更早站点覆盖代码后首次启动自动 stamp baseline，仅执行增量迁移
+- **插件迁移支持**：插件可通过 `get_migration_files()` 自带迁移脚本，纳入 Alembic 统一管理
+- **SQLite 兼容**：`render_as_batch=True` 绕过 SQLite ALTER TABLE 限制
 
-zhycms 自 v2.4.0 起引入 **Flask-Migrate（封装 Alembic）** 统一管理数据库 schema 版本，支持升级、回滚与多数据库兼容：
+### 全文搜索
 
-- **旧站自动升级**：v2.3.x 及更早的站点覆盖代码后首次启动，应用工厂自动检测旧库（存在 `users`/`articles` 等核心表但无 `alembic_version` 表）并 **stamp baseline**（标记为 `0001`），仅执行增量迁移，**无需手动操作**。
-- **CLI 命令**：`flask db upgrade`（升级到最新）、`flask db downgrade -1`（回滚一版）、`flask db stamp <revision>`（标记版本）、`flask db current`（查看当前版本）、`flask db history`（查看迁移历史）。
-- **版本脚本**：`migrations/versions/` 下 `0001` 为 v2.3.0 完整 schema 基线，`0002` 新增 `search_index` 元数据表，`0003` 幂等插入 6 个搜索设置默认值。
-- **插件迁移钩子**：插件可通过 `PluginBase.get_migration_files()` 返回 `plugins/<slug>/migrations/versions/` 下的脚本路径，核心自动合并到 Alembic `version_locations`，插件 schema 变更纳入统一管理；无迁移文件的插件仍由 `db.create_all()` 兜底建表。
-- **SQLite 兼容**：`render_as_batch=True` 启用 batch 模式，绕过 SQLite 不支持 `ALTER TABLE` 修改列的限制，本地开发与生产数据库行为一致。
+- **默认引擎**：Whoosh（纯 Python，零外部依赖）+ jieba 中文分词
+- **可选后端**：Meilisearch（大型站点推荐）
+- **索引范围**：标题 + 正文（去 HTML）+ 摘要 + 栏目名
+- **自动更新**：文章保存/删除时通过钩子自动更新索引
+- **故障回退**：Whoosh 异常时自动降级为 SQL LIKE 查询，搜索不中断
+- **高亮与分页**：6 套主题搜索模板均支持关键词高亮和分页
 
-### 全文搜索（v2.4）
+### 对象存储
 
-zhycms 自 v2.4.0 起内置全文搜索引擎，前台 `/search` 路由优先走索引，故障时自动回退 SQL LIKE：
+- **存储抽象层**：`app/utils/storage.py` 统一驱动协议，所有上传走同一入口
+- **支持厂商**：阿里云 OSS、腾讯云 COS、七牛云 Kodo（SDK 可选安装、懒加载）
+- **默认本地**：未配置时行为与旧版完全一致，零侵入
+- **一键迁移**：本地历史文件批量上传云端，自动改写文章正文/封面等链接为云域名
+- **安全设计**：上传失败显式报错、禁用插件自动回退本地、备份文件强制留本地
 
-- **默认引擎 Whoosh + jieba**：Whoosh 是纯 Python 搜索引擎（零外部依赖），结合 jieba 中文分词索引文章 **标题 + 正文（去 HTML 标签）+ 摘要 + 栏目名**，支持相关度排序与关键词高亮；索引文件存放在 `instance/search_index/`。
-- **可选 Meilisearch 后端**：大型站点可在后台「搜索设置」切换为 Meilisearch（需独立运行实例，通过 URL + API Key 连接）。
-- **自动索引更新**：文章保存/删除时通过 `clear_content_cache` 钩子触发索引更新，**独立于缓存开关**（缓存关闭时索引仍正常更新）。
-- **SQL LIKE 自动回退**：Whoosh 索引损坏或异常时，`search_articles()` 捕获异常自动降级为 SQL LIKE 模糊查询，搜索不中断、零报错。
-- **后台「搜索设置」页**（系统设置子菜单，权限 `system:settings`）：引擎选择（Whoosh / Meilisearch / SQL LIKE）、Meilisearch 配置、健康检查、一键重建索引、索引状态统计。
-- **6 套主题搜索模板**：支持分页、关键词高亮（`|highlight(keyword)` 过滤器）；首次使用需在「搜索设置」点击「重建索引」初始化，未索引前自动回退 SQL LIKE。
+### 安全体系
 
-### Docker 容器化部署（v2.4）
+| 层面 | 措施 |
+|------|------|
+| **访问控制** | 自定义后台路由前缀（即时生效）、RBAC 权限、栏目级内容授权 |
+| **登录安全** | 连续失败锁定、图形验证码、异地 IP 登录提醒 |
+| **上传安全** | 后缀白名单 + MIME 双重校验、SHA-256 内容去重、图片自动压缩 |
+| **输入安全** | 路径穿越拦截、审计日志详情 HTML 转义防 XSS |
+| **运维安全** | 审计日志全量留痕、备份恢复前自动释放连接池 |
 
-zhycms 自 v2.4.0 起提供开箱即用的 Docker 部署方案，支持 MySQL / PostgreSQL 两种数据库 profile：
+### SEO 与性能
 
-- **多阶段构建 Dockerfile**：builder 阶段编译依赖（含 `build-essential`、`libmagic-dev`、`libpq-dev`、`default-libmysqlclient-dev`），runtime 阶段基于 `python:3.12-slim` 仅携带运行时库，**非 root 用户运行**（uid 1000），gunicorn WSGI 服务（默认 4 worker）。
-- **docker-compose 编排**：`--profile mysql` 或 `--profile postgres` 选择数据库；可选 `--profile search` 挂载 Meilisearch；`instance/` 和 `app/static/uploads/` 通过 named volume 持久化。
-- **entrypoint.sh 自动化**：容器启动时自动执行 `flask db upgrade` 数据库迁移、从镜像内置 `demo` 目录恢复演示图片到 volume 挂载的 uploads 目录（解决 volume 遮盖问题）、编译 i18n 翻译、最后启动 gunicorn。
-- **健康检查端点**：`GET /healthz` 返回数据库 ping 状态与 JSON 响应，豁免初始化拦截，供 docker compose `healthcheck` 与负载均衡探针使用。
-- **环境变量**：见 `docker/.env.example`，含 `ZHYCMS_SECRET_KEY`、`ZHYCMS_DB_URI`、`MYSQL_PASSWORD`、`POSTGRES_PASSWORD` 等。
+- **伪静态**：`/{slug}.html`、`/{slug}-{page}.html`、`/article-{id}.html`
+- **Sitemap**：栏目与文章独立配置更新频率/优先级，插件 URL 自动聚合
+- **Robots.txt**：后台可视化编辑，支持追加自定义规则
+- **页面缓存**：Flask-Caching，首页/栏目/文章独立 TTL，内容变更自动清理
+- **图片优化**：自动压缩、缩略图生成、默认 ALT 注入
 
-### 对象存储 OSS（v2.4，官方内置插件）
+### 内容工作流
 
-zhycms 自 v2.4.0 起通过官方内置插件 `oss_storage` 支持云端对象存储。核心内置**存储抽象层**（[app/utils/storage.py](app/utils/storage.py)）：所有上传（文章配图、栏目图、碎片图片、自定义字段文件等）统一经过 `save_upload_file()` 入口，先在本地完成安全校验、图片压缩、缩略图生成，再发布到当前存储驱动；**默认本地驱动，行为与旧版完全一致**。
+- **状态流转**：草稿 → 待审核 → 已发布 / 已驳回
+- **版本管理**：每次保存自动生成快照，支持对比差异与一键还原
+- **权限分离**：无发布权限的作者提交后进入审核队列，编辑审核后发布
 
-- **支持的云厂商**：阿里云 OSS（`oss2`）、腾讯云 COS（`cos-python-sdk-v5`）、七牛云 Kodo（`qiniu`）。云 SDK 为**可选依赖**、运行时懒加载，不进核心 requirements；未安装时后台配置页直接显示对应的 `pip install` 指引。
-- **后台「系统设置 → 对象存储」**（权限 `oss_storage:manage`）：存储驱动单选（本地 / 阿里云 / 腾讯云 / 七牛云）、各家凭证表单（密钥留空表示不修改）、连接测试（保存/切换驱动前自动健康检查，失败回退本地并提示）、SDK 安装状态检测。
-- **文件归属记录**：`uploaded_files.storage` 列标记每个文件存于哪个驱动；切换驱动或更换云厂商后，历史文件 URL 不受影响，新上传文件走新驱动。
-- **一键迁移**：配置页「本地文件迁移到云端」提供 dry-run 预览（待传文件数、磁盘缺失数、内容引用链接数）与一键执行——逐个上传（云端已存在自动跳过，**可中断重入**），上传成功后把文章正文/封面、历史版本、碎片、栏目/文章自定义字段、站点设置（Logo 等）中的 `/static/uploads/` 链接批量改写为云域名（`REPLACE()` 跨 MySQL/PostgreSQL/SQLite 通用）。本地原文件保留不删，演示图片（`uploads/demo/`）不迁移。
-- **安全设计**：云端上传失败显式报错、不静默回退本地；在插件管理页**禁用插件会自动把存储驱动重置为本地**；备份恢复上传的文件强制留本地磁盘（不进云端）；凭证建议使用云厂商 RAM 子账号（仅授予目标 Bucket 的读写权限）。
-- 插件钩子：`PluginBase.get_storage_drivers()` 注册存储驱动、`on_disabled()` 提供禁用回调；插件中英文双语（独立翻译域 `oss_storage`）。
+### 审计日志
 
-### CMS 标识与网站标识
+- **覆盖范围**：登录/登出、配置变更、内容 CRUD、备份恢复、权限调整、插件/主题操作
+- **检索维度**：按模块、操作类型、操作人、时间范围筛选
+- **详情人性化**：键名/配置项中文翻译、状态语义化、变更对照（旧值 → 新值）、ID 自动显示名称
 
-系统严格区分「CMS 自身标识」与「前台企业标识」：
+---
 
-| 概念 | 用途 | 可否修改 |
-| --- | --- | --- |
-| **CMS 名称** | 后台顶栏/登录页 | ❌ 固定为 `钟毓企业网站CMS` |
-| **网站名称** | 前台导航/首页 | ✅ 系统设置中可改 |
+## 升级指南
 
-### 后台安全（自定义后台路由）
+### v2.3.x → v2.4.0
 
-后台默认挂载在 `/admin`。为提升安全性，可在 **系统设置 → 后台安全** 中将路由改为任意自定义值（如 `manage-x8y2`）。
+仅覆盖代码 + `pip install -r requirements.txt` 即可。首次启动自动 stamp Alembic baseline 并执行增量迁移，无需手动操作。
 
-**v2.0 起修改后即时生效，无需重启服务**；历史前缀自动失效（旧地址返回 404）。忘记路由可删除 `instance/admin_config.json` 恢复默认。
+- 全文搜索默认 Whoosh，首次使用需在后台「搜索设置」点击「重建索引」
+- 对象存储插件升级后自动启用，不配置凭证不产生云端调用
 
-### 登录安全（v2.0）
+### v2.2.x → v2.3.0
 
-- 连续输错密码达到阈值（默认 5 次）自动锁定账号，锁定期内正确密码也会被拒绝；锁定时长（默认 10 分钟）与失败次数均可在 **系统设置 → 登录安全** 中调整，到期自动解锁。
-- 登录页配备图形验证码，验证码错误不累计失败次数。
-- 检测到与上次登录不同的异地 IP 时，登录成功后顶部展示一次性安全提醒横幅（可在设置中关闭）。
+仅覆盖代码即可。自定义表单已并入插件体系，升级后首次启动自动启用表单插件一次，旧数据与审计日志无缝保留。
 
-### 备份与恢复（v2.0）
+### v1.1 → v2.0+
 
-**系统设置 → 备份恢复** 中可一键备份当前数据库：
+1. 备份站点目录与数据库（**必做**）
+2. 停服并更新代码：`git fetch && git checkout v2.4.0`
+3. 更新依赖：`pip install -r requirements.txt`
+4. 执行迁移：`.venv/bin/python scripts/upgrade_v2.py`（v1.1 专用）
+5. 启动服务，按 [UPGRADE.md](./UPGRADE.md) 逐项核对
 
-| 方式 | 说明 |
-| --- | --- |
-| MySQL 逻辑备份 | 调用 `mysqldump` 导出全库结构 + 数据，gzip 压缩存放于 `instance/backups/` |
-| PostgreSQL | 调用 `pg_dump`，同样 gzip 压缩 |
-| JSON 备份 | 与数据库类型无关的通用格式，适合小站迁移 |
+> 升级涉及新建表、补列、数据回填，**仅启动程序无法完成迁移**。
 
-支持下载到本地、从备份文件一键恢复（恢复前自动提交并释放数据库连接池，避免锁表）、删除过期备份。
-
-### 表单消息通知（v2.0）
-
-**系统设置 → 消息通知** 中配置后，前台表单每收到一条提交都会实时推送：
-
-- **邮件通知**：填写 SMTP 服务器/端口/SSL/账号/密码、发件人显示名与地址、收件人列表（逗号分隔多个），正文为 HTML 表格，含表单名、提交时间、访客 IP、来源页面与全部字段值。
-- **企业微信通知**：填写机器人 Webhook 地址即可，支持配置 @ 的手机号列表。
-- 两个渠道均有独立开关，且受「全局通知开关」总控；关闭时静默跳过，不影响表单正常提交。
-
-### SEO 与站点性能（v2.0）
-
-**系统设置 → SEO 高级设置** 中可配置：
-
-- **伪静态**：开启后前台自动支持 `/{栏目slug}.html`、`/{栏目slug}-{页码}.html`、`/article-{文章id}.html`；页面中的栏目/文章/分页链接同步输出为伪静态格式；关闭后立即恢复动态 URL，旧伪静态地址返回 404。
-- **sitemap.xml**：栏目页与文章页的更新频率（changefreq）与优先级（priority）独立配置。
-- **robots.txt**：内置默认规则（屏蔽后台与表单地址、声明 Sitemap），支持追加自定义 Disallow 规则。
-- **页面缓存**：基于 Flask-Caching，首页/栏目列表页/文章详情页可分别设置 TTL（默认 3600/1800/7200 秒）；内容变更后自动清理对应缓存。
-- **图片默认 ALT**：设置后前台渲染时自动为缺失或空 `alt` 的图片填充默认值（已设置 alt 的图片保留原值），另有后台工具页可批量排查全站图片 ALT 情况。
-
-### 上传安全与图片优化（v2.0）
-
-**系统设置 → 上传安全** 中可配置，全部默认开启：
-
-- 后缀白名单 + MIME 头部双重校验：伪装成图片的 PHP/Shell/可执行文件直接拒绝。
-- SHA-256 内容去重：相同内容文件只存一份，多处引用自动计数。
-- 图片自动压缩（质量可调，默认 80）与缩略图生成（宽度可调，默认 300px），显著降低磁盘与带宽占用。
-- 单文件大小上限可配置（默认 10MB）。
-
-### 用户、角色与权限（v2.0）
-
-**系统设置 → 用户与角色** 中管理：
-
-- 内置超级管理员（不受权限限制）；可创建自定义角色并勾选权限点（后台菜单可见性 + 操作按钮级授权，如文章发布、备份恢复、配置修改等）。
-- 一个用户可绑定多个角色，权限取并集；未授权的菜单不可见、接口返回 403。
-- 支持内容粒度授权：可按栏目授予文章管理权限。
-
-### 审计日志（v2.0）
-
-后台所有关键操作（登录/登出、配置变更、内容增删改、备份恢复、权限调整等）自动记录操作人、IP、时间与详情；**系统设置 → 审计日志** 支持按模块、操作类型、操作人与时间范围检索。
-
-### 内容工作流（v2.0）
-
-文章支持 **草稿 → 待审核 → 已发布 / 已驳回** 状态流转：无发布权限的作者提交后进入待审核，由有权限的编辑审核通过后发布或驳回（需填写驳回原因）；文章每次保存自动生成版本快照，可在版本历史中对比差异并一键还原。
-
-## 模板制作指南
-
-zhycms 前台采用 **多主题 + 栏目级模板** 的双层机制。
-
-### 1. 主题目录结构
-
-主题位于 `app/frontend/templates/themes/<主题名>/`。
-
-```
-themes/<主题名>/
-├── manifest.json   # 主题元数据（name/slug/version/description/author，
-│                   #   builtin 标记官方内置；template_required 可声明额外必备模板）
-├── base.html       # 基础布局（必须提供 title/css/content/js block）
-├── index.html      # 首页
-├── list.html       # 列表页默认模板
-├── article.html    # 文章详情页默认模板
-├── page.html       # 单页默认模板
-├── 404.html / 500.html   # 错误页
-├── css/            # 主题样式（v2.2 起内置主题样式外置于此）
-│   └── style.css
-├── js/             # 主题脚本目录（可选）
-├── images/         # 主题静态图片目录（可选：背景图、图标、示例图等）
-└── fonts/          # 主题字体文件目录（可选：woff/woff2/ttf 等）
-```
-
-样式、脚本、图片、字体通过全局变量 `current_theme` 引用主题内资源：
-
-```jinja
-<link rel="stylesheet" href="{{ url_for('frontend.theme_asset', slug=current_theme, filename='css/style.css') }}">
-```
-
-必备模板为 `index/list/article/page/base/404/500.html` 7 个（manifest `template_required` 可追加声明）——主题上传与启用前都会强制检查，缺失时拒绝启用并给出补齐指引。
-
-主题的新建、上传、启用、删除、打包下载统一在后台 **系统设置 → 主题管理** 完成（详见 [wiki.html](wiki.html) 主题管理章节）。
-
-### 2. 模板继承
-
-所有页面必须通过 `{% extends theme_base %}` 继承当前主题的 `base.html`。
-
-### 3. 栏目级备选模板
-
-在主题目录下创建 `list_xxx.html` 或 `article_xxx.html`，后台栏目编辑时即可选择该模板作为备选。
-
-### 4. 伪静态与分页链接（v2.0）
-
-v2.0 起全局注入 `frontend_pager_url(column, page)` 助手：伪静态开启时自动输出 `/{slug}-{页码}.html`，关闭时输出 `/column/{slug}?page=N`。**自定义列表模板的分页链接请统一使用该助手**，避免写死动态 URL：
-
-```jinja
-<a href="{{ frontend_pager_url(column, pagination.prev_num or 1) }}">&laquo; 上一页</a>
-{% for p in pagination.iter_pages() %}
-  <a href="{{ frontend_pager_url(column, p) }}">{{ p }}</a>
-{% endfor %}
-<a href="{{ frontend_pager_url(column, pagination.next_num or pagination.page) }}">下一页 &raquo;</a>
-```
-
-伪静态开启时文章详情建议直接使用 `/{文章id}.html` 或保留原有 `url_for('frontend.article_detail', ...)`（前台会自动识别）。
-
-> 模板制作详情请参考 [app/utils/bootstrap.py](app/utils/bootstrap.py) 及 [app/utils/themes.py](app/utils/themes.py)。完整使用手册请浏览器打开 [wiki.html](wiki.html)。
+---
 
 ## 参与贡献
 
-欢迎报告问题与提交 PR，请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)（环境搭建/开发规范/提交规范）。变更历史见 [CHANGELOG.md](CHANGELOG.md)，社区规范见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)，漏洞报告请勿使用公开 Issue，详见 [SECURITY.md](SECURITY.md)。
+欢迎报告问题与提交 PR！
+
+- 请先阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)（环境搭建/开发规范/提交规范）
+- 变更历史见 [CHANGELOG.md](./CHANGELOG.md)
+- 社区规范见 [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- 漏洞报告请勿使用公开 Issue，详见 [SECURITY.md](./SECURITY.md)
+
+---
 
 ## 许可证
 
-本项目基于 [Apache License 2.0](LICENSE) 开源。
+本项目基于 [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0) 开源。
+
+Copyright 2026 泰州姜堰钟毓信息技术有限公司
