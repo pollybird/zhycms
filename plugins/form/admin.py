@@ -325,9 +325,17 @@ def form_export(fid):
     ws = wb.active
     ws.title = '表单数据'
 
+    def _sanitize_excel(v):
+        """安全修复（v2.4.1）：CSV/Formula Injection（CWE-1236）。
+        对以 = + - @ 或制表符/回车开头的字符串前置单引号，使 Excel 当文本处理。
+        """
+        if isinstance(v, str) and v and v[0] in ('=', '+', '-', '@', '\t', '\r'):
+            return "'" + v
+        return v
+
     headers = ['ID', '提交时间', 'IP', '已读']
     for f in fields:
-        headers.append(f.label)
+        headers.append(_sanitize_excel(f.label))
     ws.append(headers)
 
     for sub in subs:
@@ -336,9 +344,9 @@ def form_export(fid):
             val = sub.get_value(f.id)
             if f.field_type == 'file' and val:
                 # 文件字段记录 URL
-                row.append(val)
+                row.append(_sanitize_excel(val))
             else:
-                row.append(val or '')
+                row.append(_sanitize_excel(val or ''))
         ws.append(row)
 
     # 设置列宽

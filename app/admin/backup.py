@@ -16,7 +16,6 @@ from ..utils.helpers import permission_required, audit_log
 from ..utils.backup_utils import (
     create_backup, restore_backup, system_monitor_stats, run_scheduled_backup,
 )
-from ..utils.uploads import save_upload_file
 from ..models.audit import (
     OP_BACKUP_CREATE, OP_BACKUP_RESTORE, OP_DELETE, OP_EXPORT, MODULE_BACKUP, OP_UPDATE,
 )
@@ -149,29 +148,21 @@ def backup_restore_upload():
     if not confirm:
         flash(_gettext('请先勾选「我已清楚：恢复将覆盖现有数据库」再操作'), 'warning')
         return redirect(url_for('admin.backup_index'))
-    # 保存到 backups 临时目录
+    # 安全修复（v2.4.1）：备份恢复文件直接落盘到 BACKUP_FOLDER（非 Web 可访问目录），
+    # 不再经 save_upload_file 写入 app/static/uploads，避免在 Web 根目录残留可被
+    # 匿名下载的全库备份副本（CWE-552）。仅做后缀白名单 + UUID 命名 + 用完即删。
     name = f.filename.lower()
     allowed = ('.sql.gz', '.json.gz', '.gz', '.sql', '.json')
     if not any(name.endswith(ext) for ext in allowed):
         flash(_gettext('仅支持 .sql.gz / .json.gz / .gz / .sql / .json 备份文件'), 'danger')
         return redirect(url_for('admin.backup_index'))
-    # 备份恢复文件必须留本地磁盘（恢复逻辑直接读本地路径），强制 local 驱动
-    rel, url, err = save_upload_file(f, sub_dir='backup_temp', allowed_exts=['gz', 'sql', 'json'],
-                                     storage_scope='local')
-    if err:
-        flash(_gettext('文件保存失败：{0}').format(err), 'danger')
-        return redirect(url_for('admin.backup_index'))
-    abs_path = os.path.join(current_app.config.get('UPLOAD_FOLDER') or
-                            os.path.join(os.path.dirname(os.path.dirname(current_app.instance_path)),
-                                         'app', 'static', 'uploads'),
-                            'backup_temp', rel.split('/')[-1]) if not os.path.isabs(rel) else rel
-    # save_upload_file 返回的 rel 是相对 URL，我们需要实际文件路径：简单处理——在备份目录中直接落一份副本
     import uuid
     backup_dir = current_app.config.get('BACKUP_FOLDER') or os.path.join(
         current_app.instance_path, 'backups'
     )
     os.makedirs(backup_dir, exist_ok=True)
-    temp_name = f'uploaded_{datetime.now().strftime("%Y%m%d_%H%M%S")}_{uuid.uuid4().hex[:6]}.{name.rsplit(".", 1)[-1]}'
+    ext = 'gz' if name.endswith('.gz') else name.rsplit('.', 1)[-1]
+    temp_name = f'uploaded_{datetime.now().strftime("%Y%m%d_%H%M%S")}_{uuid.uuid4().hex[:6]}.{ext}'
     temp_path = os.path.join(backup_dir, temp_name)
     f.seek(0)
     with open(temp_path, 'wb') as out:
@@ -190,7 +181,7 @@ def backup_restore_upload():
         current_app.logger.exception('upload restore failed')
         flash(_gettext('恢复异常：{0}').format(e), 'danger')
     finally:
-        # 清理临时文件
+        # 清理临时文件（无论成功失败）
         try:
             if os.path.isfile(temp_path):
                 os.remove(temp_path)

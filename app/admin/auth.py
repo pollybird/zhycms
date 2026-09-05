@@ -293,8 +293,13 @@ def login():
         audit_log(OP_LOGIN, MODULE_USER, target_id=user.id, target_name=username,
                   detail={'ip': ip, 'city': city, 'abnormal': abnormal})
 
-        next_url = request.args.get('next')
-        if not next_url or not next_url.startswith('/'):
+        # 安全修复（v2.4.1）：拒绝协议相对 URL（如 //evil.com），
+        # 只允许站内相对路径，杜绝开放重定向钓鱼
+        next_url = request.args.get('next') or ''
+        if (not next_url
+                or not next_url.startswith('/')
+                or next_url.startswith('//')
+                or next_url.startswith('/\\')):
             next_url = url_for('admin.dashboard')
         return redirect(next_url)
 

@@ -4,8 +4,9 @@
 
 | 版本 | 支持状态 | 说明 |
 | --- | --- | --- |
-| 2.1.x | ✅ 完整支持 | 当前发布线，安全修复优先发布于此 |
-| 2.0.x | ⚠️ 仅严重漏洞 | 建议升级至 2.1.x（覆盖代码即可，无数据库变更） |
+| 2.4.x | ✅ 完整支持 | 当前发布线，安全修复优先发布于此 |
+| 2.3.x | ⚠️ 仅严重漏洞 | 建议升级至 2.4.x（覆盖代码 + 装依赖，首次启动自动迁移） |
+| 2.0.x ~ 2.2.x | ⚠️ 仅严重漏洞 | 建议升级至 2.4.x |
 | 1.x 及更早 | ❌ 不再支持 | 自 v2.0 起包含登录安全加固/上传校验/RBAC 等安全模块，请尽快升级 |
 
 ## 报告漏洞
@@ -37,13 +38,21 @@
 - **后台入口**：地址前缀可自定义（默认 `/admin`），保存后即时生效、旧地址立即 404；配置文件 `instance/admin_config.json` 权限 600。
 - **上传安全**：MIME + 后缀双重校验，危险内容硬匹配（`<?php` / `#!` / ELF 头）直接拒绝；图片后缀强制内容为 `image/*`；SHA-256 内容去重。
 - **审计日志**：后台操作全留痕，详情渲染全程 HTML 转义。
-- **会话**：Flask 签名 Cookie；**生产环境必须设置强随机的 `ZHYCMS_SECRET_KEY` 环境变量**（前缀为 ZHYCMS_，与项目名一致；旧前缀 ZHOCMS_ 仅兼容保留）。
+- **会话密钥（v2.4.1 修复 CWE-798）**：不再使用源码中硬编码的默认密钥。优先级为 环境变量 `ZHYCMS_SECRET_KEY` > `instance/secret_key` 持久化文件 > 首次启动自动生成 `secrets.token_hex(32)` 并落盘（权限 600）。**部署时仍强烈建议显式设置 `ZHYCMS_SECRET_KEY` 环境变量**（旧前缀 `ZHOCMS_SECRET_KEY` 仅兼容保留）。
+- **会话 Cookie**：显式设置 `SameSite=Lax`；生产环境（`ProductionConfig`）启用 `Secure`，仅通过 HTTPS 传输。
+- **重定向校验**：登录与语种切换的 `next` 参数仅允许站内相对路径，拒绝协议相对 URL（`//evil.com`），杜绝开放重定向钓鱼。
+- **输出转义**：搜索高亮过滤器先对原文与关键词做 HTML 转义再包裹 `<mark>`，杜绝存储型 XSS。
+- **数据导出**：表单导出 Excel 对公式注入字符（`= + - @` 等）前置单引号转义（CWE-1236）。
+- **备份恢复**：上传的备份文件直接落盘到 `instance/backups`（非 Web 可访问目录），恢复完成后立即删除，不残留可被匿名下载的副本（CWE-552）。
+- **安全响应头**：全站 `after_request` 统一注入 `X-Frame-Options: SAMEORIGIN`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Content-Security-Policy`（含 `frame-ancestors 'self'`）。
+- **调试模式**：`run.py` 的 `debug` 跟随配置类，不再硬编码 `True`；生产环境使用 `ZHYCMS_ENV=production` 或 gunicorn 启动。
 - **权限**：RBAC 逐接口校验（视图装饰器 + 菜单逐项过滤），栏目级授权优先于全局角色。
 
 ## 安全配置基线（部署方自查）
 
-1. `ZHYCMS_SECRET_KEY` 必须设置为随机长字符串（`python -c "import secrets; print(secrets.token_urlsafe(48))"`）；
-2. 以 `ZHYCMS_ENV=production` 或 gunicorn 运行（关闭 DEBUG）；
-3. 数据库账号遵循最小权限原则，`instance/` 整目录权限 600/700；
-4. 前置 Nginx 反代并启用 HTTPS，托管 `app/static/` 静态资源；
-5. 定期在后台「备份运维」导出备份，并验证 `instance/backups/` 的磁盘余量。
+1. **会话密钥**：生产环境显式设置 `ZHYCMS_SECRET_KEY` 为随机长字符串（`python -c "import secrets; print(secrets.token_hex(32))"`）；未设置时首次启动会自动生成并写入 `instance/secret_key`（权限 600），需妥善备份该文件（丢失会导致所有会话失效）。
+2. **运行模式**：以 `ZHYCMS_ENV=production` 或 gunicorn（`wsgi:app`）运行，确保 `DEBUG=False`，避免暴露 Werkzeug 调试器。
+3. **HTTPS**：前置 Nginx 反代并启用 HTTPS，会话 Cookie `Secure` 属性才能生效；反向代理负责剥离 `Server` 响应头。
+4. **文件权限**：数据库账号遵循最小权限原则；`instance/` 整目录权限收敛为 600/700（含 `secret_key`、`db_config.json`、`backups/`）。
+5. **备份**：定期在后台「备份运维」导出备份，验证 `instance/backups/` 的磁盘余量；恢复上传的备份文件不会残留 Web 目录。
+6. **密钥轮换**：升级 v2.4.1 后若此前使用过默认硬编码密钥，请立即轮换 `ZHYCMS_SECRET_KEY`（或删除 `instance/secret_key` 让系统重新生成），旧会话会失效需重新登录。

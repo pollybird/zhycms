@@ -324,16 +324,25 @@ def register_template_filters(app):
 
     @app.template_filter('highlight')
     def highlight_filter(value, keyword=''):
-        """高亮搜索关键词：将匹配部分包裹在 <mark> 标签中。"""
+        """高亮搜索关键词：将匹配部分包裹在 <mark> 标签中。
+
+        安全修复（v2.4.1）：先对原文与关键词做 HTML 转义，再仅对转义后的
+        匹配文本包裹 <mark>，杜绝存储型 XSS（文章标题/摘要中的 HTML/JS
+        此前因 |safe 直接渲染而被执行）。
+        """
+        from markupsafe import escape, Markup
         if not value or not keyword:
             return value or ''
         import re as _re
-        # 转义正则特殊字符
-        pattern = _re.escape(keyword)
-        return _re.sub(
-            pattern, f'<mark>{keyword}</mark>', str(value),
+        safe_value = escape(str(value))
+        safe_keyword = escape(str(keyword))
+        # 在已转义文本上做正则匹配（关键词经 escape 后可能含实体如 &lt;）
+        pattern = _re.escape(str(safe_keyword))
+        result = _re.sub(
+            pattern, f'<mark>{safe_keyword}</mark>', str(safe_value),
             flags=_re.IGNORECASE
         )
+        return Markup(result)
 
     @app.template_filter('audit_detail')
     def audit_detail(value, maps=None, compact=False):

@@ -582,6 +582,22 @@ def create_app(config_name=None):
         # 新前缀未注册规则：在此一次性补上
         _register_dynamic_admin_rules(app, target_prefix=target)
 
+    # 安全响应头基线（v2.4.1）：全站统一注入，防点击劫持/MIME 嗅探/外带 Referrer
+    @app.after_request
+    def _set_security_headers(response):
+        response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        # 简洁 CSP：默认同源；内联脚本/样式允许（AdminLTE/Jinja 渲染需要，
+        # XSS 防护主要靠服务端转义）；图片允许 data: 与 https:（云存储/CDN）
+        response.headers.setdefault(
+            'Content-Security-Policy',
+            "default-src 'self'; script-src 'self' 'unsafe-inline';"
+            " style-src 'self' 'unsafe-inline';"
+            " img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'self'"
+        )
+        return response
+
     # 调度器初始化（模块4 自动备份 + 清理）
     with app.app_context():
         try:

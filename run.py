@@ -3,12 +3,15 @@
 开发模式：
     python run.py
 
-生产模式：
+生产模式（推荐使用 gunicorn，见 wsgi.py）：
     ZHYCMS_ENV=production python run.py
+
+安全修复（v2.4.1）：debug 不再硬编码为 True，跟随当前配置类，
+避免生产环境误开启 Werkzeug 调试器（CWE-489）。
 """
 from app import create_app
 
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=app.config.get('DEBUG', False))

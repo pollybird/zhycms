@@ -456,7 +456,12 @@ def set_locale():
     任何已登录后台用户均可切换自己的语种（非 system:settings 权限）。
     """
     lang = request.args.get('lang')
-    next_url = request.args.get('next') or request.referrer or '/'
+    next_url = request.args.get('next') or '/'
+    # 安全修复（v2.4.1）：仅允许站内相对路径，防开放重定向
+    if (not next_url.startswith('/')
+            or next_url.startswith('//')
+            or next_url.startswith('/\\')):
+        next_url = '/'
     available = [c.strip() for c in
                  (Setting.get('i18n_available_locales') or 'zh').split(',')
                  if c.strip()]

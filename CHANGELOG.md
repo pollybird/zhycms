@@ -5,6 +5,25 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.4.1] - 2026-09-05
+
+**安全修复版本**。针对 v2.4.0 安全审计发现的 8 项问题进行修复，**无功能变更、无数据库结构变更**，v2.4.0 站点直接覆盖代码即可升级。
+
+### Security
+
+- **【严重】修复硬编码默认 SECRET_KEY 导致的会话伪造漏洞（CWE-798）**：移除 `app/config.py` 中的硬编码回退密钥，改为环境变量 > `instance/secret_key` 持久化文件 > 首次启动自动生成 `secrets.token_hex(32)` 并落盘（权限 600）。存量部署首次启动会自动生成新密钥并使旧会话失效（需重新登录），攻击者无法再通过公开源码中的默认密钥离线伪造管理员会话。
+- **【高危】修复搜索结果页存储型 XSS（CWE-79）**：`highlight` 过滤器先对标题/摘要原文与关键词做 `markupsafe.escape`，再仅对转义后的匹配文本包裹 `<mark>` 标签，杜绝文章标题中的 HTML/JS 在搜索页执行。
+- **【中危】修复登录与语种切换的开放重定向漏洞（CWE-601）**：`/admin/login` 与 `/admin/set-locale` 的 `next` 参数拒绝协议相对 URL（`//evil.com`、`/\evil.com`），仅允许站内相对路径。
+- **【中危】修复 `run.py` 硬编码 `debug=True`（CWE-489）**：`debug` 取值跟随当前配置类（`app.config['DEBUG']`），生产环境（`ZHYCMS_ENV=production`）不再误开启 Werkzeug 调试器；文档明确生产环境推荐使用 gunicorn（`wsgi:app`）启动。
+- **【中危】显式设置会话 Cookie `SameSite=Lax`**：在 `Config` 中显式声明 `SESSION_COOKIE_SAMESITE='Lax'`，生产环境 `ProductionConfig` 启用 `SESSION_COOKIE_SECURE=True`，不再依赖浏览器默认行为。
+- **【低危】修复备份恢复上传在 Web 可访问目录残留副本（CWE-552）**：`/admin/backups/restore-upload` 不再经 `save_upload_file` 写入 `app/static/uploads`，改为直接落盘到 `instance/backups`（非 Web 目录），恢复完成后立即删除，全库备份不再可被匿名下载。
+- **【低危】修复表单导出 Excel 公式注入（CWE-1236）**：`plugins/form` 导出 xlsx 时对以 `=`、`+`、`-`、`@`、制表符、回车开头的字符串前置单引号转义，访客提交的恶意公式不再在管理员打开 Excel 时执行。
+- **【低危】补齐安全响应头基线**：全站 `after_request` 统一注入 `X-Frame-Options: SAMEORIGIN`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、`Content-Security-Policy`（含 `frame-ancestors 'self'`），防点击劫持、MIME 嗅探与 Referrer 外带。
+
+### Changed
+
+- 版本号 `CMS_VERSION` 由 `2.4.0` 升级为 `2.4.1`。
+
 ## [2.4.0] - 2026-09-04
 
 **Alembic 迁移 + 全文搜索 + Docker 容器化 + 对象存储 OSS**版本。v2.3.x 覆盖代码升级后首次启动自动 stamp baseline + 执行增量迁移，无需手动操作；全文搜索默认使用 Whoosh + jieba 中文分词，SQL LIKE 自动回退；Docker 支持 MySQL / PostgreSQL 一键部署；新增官方内置 `oss_storage` 插件，支持阿里云 OSS / 腾讯云 COS / 七牛云 Kodo 云端对象存储与本地存储一键切换（默认本地，零行为变化）。

@@ -1,7 +1,44 @@
 import os
+import secrets
 from datetime import timedelta
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+
+
+def _resolve_secret_key():
+    """解析 SECRET_KEY。
+
+    优先级：环境变量 ``ZHYCMS_SECRET_KEY``（兼容旧前缀 ``ZHOCMS_SECRET_KEY``）
+    > ``instance/secret_key`` 持久化文件 > 首次启动自动生成随机密钥并落盘。
+
+    安全修复（v2.4.1）：不再回退到源码中硬编码的默认密钥（CWE-798）。
+    Flask 会话为客户端签名 Cookie，硬编码密钥会导致可离线伪造管理员会话。
+    随机密钥持久化在 ``instance/secret_key``（权限 600，该目录已 gitignore）。
+    存量部署首次启动会自动生成新密钥并使旧会话失效（需重新登录）。
+    """
+    env_key = os.environ.get('ZHYCMS_SECRET_KEY') or os.environ.get('ZHOCMS_SECRET_KEY')
+    if env_key:
+        return env_key
+    key_path = os.path.join(BASE_DIR, 'instance', 'secret_key')
+    try:
+        if os.path.exists(key_path):
+            with open(key_path, 'r', encoding='utf-8') as f:
+                key = f.read().strip()
+            if key:
+                return key
+    except OSError:
+        pass
+    # 生成随机密钥并持久化
+    key = secrets.token_hex(32)
+    try:
+        os.makedirs(os.path.dirname(key_path), exist_ok=True)
+        with open(key_path, 'w', encoding='utf-8') as f:
+            f.write(key)
+        os.chmod(key_path, 0o600)
+    except OSError:
+        # 无法落盘时也使用本次随机密钥（至少不使用硬编码值），仅影响重启后会话失效
+        pass
+    return key
 
 
 def _resolve_database_uri():
@@ -28,10 +65,12 @@ def _resolve_database_uri():
 
 
 class Config:
-    # 基础配置（SECRET_KEY 兼容读取旧前缀 ZHOCMS_SECRET_KEY）
-    SECRET_KEY = (os.environ.get('ZHYCMS_SECRET_KEY')
-                  or os.environ.get('ZHOCMS_SECRET_KEY')
-                  or 'zhycms-default-secret-key-change-in-production')
+    # 基础配置（SECRET_KEY：环境变量 > instance/secret_key 持久化 > 首次启动生成）
+    SECRET_KEY = _resolve_secret_key()
+
+    # 会话安全（v2.4.1）：显式 SameSite，HTTPS 下启用 Secure（生产环境由反向代理
+    # 或 ZHYCMS_ENV=production 触发 ProductionConfig 中的 SESSION_COOKIE_SECURE）
+    SESSION_COOKIE_SAMESITE = 'Lax'
 
     # 数据库 URI：ZHYCMS_DB_URI > instance/db_config.json > 默认 SQLite
     SQLALCHEMY_DATABASE_URI = _resolve_database_uri()
@@ -78,6 +117,8 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     ENV = 'production'
+    # HTTPS 部署时会话 Cookie 仅通过 HTTPS 传输，防明文窃取
+    SESSION_COOKIE_SECURE = True
 
 
 config = {
