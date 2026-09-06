@@ -7,7 +7,7 @@
 
 ## [2.4.2] - 2026-09-06
 
-**安全加固版本**，针对 v2.4.1 安全复检报告的遗留建议进行纵深防御加固，**无功能变更、无数据库结构变更**，覆盖代码即可升级。
+**安全加固 + 部署修复版本**，针对 v2.4.1 安全复检报告的遗留建议进行纵深防御加固，并修复 Docker 部署链路中的多项问题，**无功能变更、无数据库结构变更**，覆盖代码即可升级。
 
 ### Security
 
@@ -17,10 +17,19 @@
 ### Fixed
 
 - **修复维护模式（站点关闭）页面 500 错误**：`check_site_status` 渲染关站模板时未传入 `seo` 变量，而主题 `base.html` 的 meta keywords 依赖该变量，导致开启维护模式后所有前台页面报 `UndefinedError`；现补传 `seo=_seo()`，维护模式恢复正常（HTTP 503 关站页）。
+- **修复 Docker 部署 worker 启动失败**：`requirements.txt` 新增 `cryptography` 依赖，解决 PyMySQL 连接 MySQL 8+（`caching_sha2_password` 认证）时 worker boot 失败；`entrypoint.sh` 以 root 修正挂载目录属主后经 `gosu` 降权运行，并增加数据库就绪等待逻辑；`Dockerfile` 安装 `gosu`、CMD 改为 shell 形式使 `GUNICORN_WORKERS` 环境变量生效。
+- **修复 CSP 拦截 CDN 静态资源**：后台（AdminLTE/FontAwesome/jQuery/icheck-bootstrap）与 6 套前台主题（Bootstrap/FontAwesome）引用的 jsdelivr CDN 资源被 v2.4.1 引入的 CSP（`script/style-src 'self'`）拦截，新增 `app/static/vendor/` 本地化全部静态资源，9 个模板共 36 处外链改为 `url_for('static')` 本地引用，CSP 保持严格 `'self'` 不放宽。
+- **修复 Docker 初始化向导填 localhost 连库失败**：检测到 `ZHYCMS_DB_URI` 环境变量时，初始化向导隐藏数据库配置区（提示已由部署环境统一配置），POST 完全忽略数据库相关表单字段，直接使用启动时已连通的引擎创建管理员，避免用户误填 `localhost` 导致 `Connection refused`。
+- **修复 install.sh 自定义数据库密码不生效**：MySQL/PostgreSQL 仅在首次初始化空数据卷时应用密码，已有数据卷重跑脚本换新密码不会同步到数据库，install.sh 检测到已有数据卷时提供「沿用旧密码 / 清空重建」选择，启动后主动校验数据库凭据并给出明确指引。
+
+### Added
+
+- **Docker 一键安装/卸载脚本**：`docker/install.sh` 交互式完成数据库选择、密钥生成、镜像加速、Meilisearch 可选、端口与 Worker 配置，自动生成 `.env` 并构建启动；`docker/uninstall.sh` 清理容器、卷、镜像与配置。`docker-compose.yml` 改用 YAML 锚点替代 `extends` 以兼容 Compose v2，支持自定义端口 `WEB_PORT`。
 
 ### Changed
 
 - 版本号 `CMS_VERSION` 由 `2.4.1` 升级为 `2.4.2`。
+- install.sh 中 PostgreSQL 的定位描述由「轻量替代」修正为「高并发性能更强」。
 
 ## [2.4.1] - 2026-09-05
 
