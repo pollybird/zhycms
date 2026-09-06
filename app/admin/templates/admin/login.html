@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>{{ _('登录') }} - {{ cms_name }} {{ _('管理后台') }}</title>
   <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2.0/dist/css/adminlte.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/adminlte/3.2.0/css/adminlte.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/5.15.4/css/all.min.css') }}">
   <style>
     body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
     .login-box { width: 380px; }
@@ -59,7 +59,7 @@
     </div>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.4/dist/jquery.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/jquery/3.6.4/jquery.min.js') }}"></script>
 <script>
   $('#captcha-img').on('click', function(){
     this.src = "{{ url_for('admin_auth.captcha') }}?t=" + Date.now();
