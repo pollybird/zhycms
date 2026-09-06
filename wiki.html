@@ -204,6 +204,11 @@
 ├── instance/               # 实例数据（数据库、配置、备份等）
 ├── requirements.txt
 ├── Dockerfile / docker-compose.yml
+├── docker/
+│   ├── install.sh           # 一键安装脚本
+│   ├── uninstall.sh         # 卸载脚本
+│   ├── entrypoint.sh        # 容器入口
+│   └── .env.example         # 环境变量模板
 ├── wsgi.py / run.py
 └── wiki.html               # 本手册</code></pre>
 <div class="note"><code>instance/</code> 存放数据库、配置、备份等敏感数据，已在 <code>.gitignore</code> 中排除，切勿提交到版本库。</div>
@@ -263,6 +268,9 @@ python -m gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app</code></pre>
 <div class="warn">生产环境务必设置 <code>ZHYCMS_SECRET_KEY</code>；建议前置 Nginx 反向代理并托管静态资源。</div>
 
 <h3 id="deploy-docker">Docker 部署 <span class="tag tag-new">v2.4</span></h3>
+<p>一键安装（推荐，自动生成密钥与密码、配置镜像加速）：</p>
+<pre><code>bash docker/install.sh</code></pre>
+<p>或手动配置：</p>
 <pre><code>cp docker/.env.example .env
 # 编辑 .env 修改密钥和数据库密码
 
@@ -273,7 +281,7 @@ docker compose --profile mysql up -d
 docker compose --profile postgres up -d
 
 # 访问 http://localhost:5000 完成初始化</code></pre>
-<p>容器启动时自动执行：数据库迁移 → 恢复演示图片 → 编译 i18n → 启动 gunicorn。<code>instance/</code> 和上传目录通过 volume 持久化。</p>
+<p>容器启动时自动执行：数据库迁移 → 恢复演示图片 → 编译 i18n → 启动 gunicorn。<code>instance/</code> 和上传目录通过 volume 持久化。卸载运行 <code>bash docker/uninstall.sh</code>。</p>
 
 <h3 id="deploy-env">环境变量</h3>
 <table>
@@ -1055,7 +1063,15 @@ flask db migrate -m "xxx" # 新建迁移脚本（开发用）</code></pre>
 <section id="docker">
 <h2>Docker 容器化部署 <span class="tag tag-new">v2.4</span></h2>
 
-<h3>快速启动</h3>
+<h3>一键安装（推荐）</h3>
+<p>项目提供交互式安装脚本，只需一条命令，按提示选择数据库、自动生成密钥，无需手动编辑任何文件：</p>
+<pre><code>bash docker/install.sh</code></pre>
+<p>脚本会引导你完成 5 步：选择数据库（MySQL/PostgreSQL）→ 自动生成安全密钥与密码 → 国内镜像加速（可选）→ Meilisearch 搜索引擎（可选）→ 端口与 Worker 数量。配置确认后自动生成 <code>.env</code>、拉取基础镜像、构建并启动服务。</p>
+
+<div class="note">脚本自动生成的 <code>.env</code> 包含随机密钥和密码，安全可靠。卸载时运行 <code>bash docker/uninstall.sh</code>，可选择保留或删除数据。</div>
+
+<h3>手动配置（进阶）</h3>
+<p>如需完全手动控制，可直接编辑配置文件：</p>
 <pre><code>cp docker/.env.example .env
 # 编辑 .env 修改密钥和数据库密码
 

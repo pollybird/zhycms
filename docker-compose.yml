@@ -6,32 +6,30 @@
 #   + 搜索:     追加 --profile search
 # ============================================================
 
-services:
-  app:
-    build:
-      context: .
-      args:
-        # 国内构建可在 .env 中设置：
-        #   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
-        #   APT_MIRROR=mirrors.tuna.tsinghua.edu.cn
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-        APT_MIRROR: ${APT_MIRROR:-}
-    restart: unless-stopped
-    ports:
-      - "5000:5000"
-    environment:
-      ZHYCMS_ENV: production
-      ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
-      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
-    volumes:
-      - ./instance:/app/instance
-      - ./app/static/uploads:/app/app/static/uploads
-    profiles: ["mysql", "postgres"]
+# ---- 公共配置锚点（YAML 锚点，不依赖 compose extends） ----
+x-app-base: &app-base
+  build:
+    context: .
+    args:
+      PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+      APT_MIRROR: ${APT_MIRROR:-}
+  restart: unless-stopped
+  ports:
+    - "${WEB_PORT:-5000}:5000"
+  environment: &app-env
+    ZHYCMS_ENV: production
+    ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
+    GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+  volumes:
+    - ./instance:/app/instance
+    - ./app/static/uploads:/app/app/static/uploads
 
-  # ---- MySQL ----
+services:
+  # ---- MySQL 方案 ----
   app-mysql:
-    extends: app
+    <<: *app-base
     environment:
+      <<: *app-env
       ZHYCMS_DB_URI: mysql+pymysql://zhycms:${MYSQL_PASSWORD:-zhycms}@db-mysql:3306/zhycms?charset=utf8mb4
     depends_on:
       db-mysql:
@@ -55,10 +53,11 @@ services:
       retries: 5
     profiles: ["mysql"]
 
-  # ---- PostgreSQL ----
+  # ---- PostgreSQL 方案 ----
   app-pg:
-    extends: app
+    <<: *app-base
     environment:
+      <<: *app-env
       ZHYCMS_DB_URI: postgresql+psycopg2://zhycms:${POSTGRES_PASSWORD:-zhycms}@db-pg:5432/zhycms
     depends_on:
       db-pg:
