@@ -5,6 +5,7 @@
 - 锁定时拒绝登录，日志标记 result=locked
 - 登录成功后，对比上次登录城市/IP，若异常则在 session 中放 flash 供下次 dashboard 提醒
 """
+import os
 from datetime import datetime
 
 from flask import (
@@ -47,6 +48,26 @@ def _is_initialized():
     return User.query.filter_by(is_deleted=False).first() is not None
 
 
+def _db_managed_by_env():
+    """数据库是否由环境变量托管（Docker Compose 通过 ZHYCMS_DB_URI 注入）。
+
+    托管时初始化向导不展示、不处理数据库连接配置：容器网络内数据库主机为
+    compose 服务名（如 db-mysql），若允许向导填写，用户按直觉填 localhost
+    会连到应用容器自身，导致 connection refused。
+    """
+    return bool(os.environ.get('ZHYCMS_DB_URI') or os.environ.get('ZHOCMS_DB_URI'))
+
+
+def _current_db_label():
+    """当前生效引擎的数据库类型显示名。"""
+    uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
+    if uri.startswith('mysql'):
+        return 'MySQL'
+    if uri.startswith('postgresql'):
+        return 'PostgreSQL'
+    return 'SQLite'
+
+
 # 向导可勾选的官方插件（与 plugins/ 目录一一对应；第三方插件请在插件管理页启用）
 SETUP_PLUGINS = ('banner', 'product', 'friend_link', 'form')
 
@@ -78,6 +99,8 @@ def setup():
 
     if request.method == 'POST':
         ctx = _form_ctx(request)
+        ctx['db_managed'] = _db_managed_by_env()
+        ctx['db_current_label'] = _current_db_label()
         username = ctx['username']
         password = request.form.get('password') or ''
         password_confirm = request.form.get('password_confirm') or ''
@@ -99,7 +122,12 @@ def setup():
             flash(_gettext('两次输入的密码不一致'), 'danger')
             return render_template('admin/setup.html', **ctx)
 
-        if db_type in ('mysql', 'postgresql'):
+        if ctx['db_managed']:
+            # 数据库由环境变量托管（Docker Compose 部署）：
+            # 直接使用启动时已连通的引擎，表结构由启动迁移保证，
+            # 向导不接收任何连接参数（忽略表单中的 db_type/主机等字段）
+            pass
+        elif db_type in ('mysql', 'postgresql'):
             host = ctx['db_host']
             port = ctx['db_port'] or str(DEFAULT_PORTS[db_type])
             name = ctx['db_name']
@@ -202,7 +230,12 @@ def setup():
         return redirect(url_for('admin_auth.login'))
 
     # 默认勾选官方轮播图 + 产品插件（可取消；选择行业演示数据时会自动补齐联动插件）
-    return render_template('admin/setup.html', plugins=list(SETUP_PLUGINS))
+    return render_template(
+        'admin/setup.html',
+        plugins=list(SETUP_PLUGINS),
+        db_managed=_db_managed_by_env(),
+        db_current_label=_current_db_label(),
+    )
 
 
 # ============================================================

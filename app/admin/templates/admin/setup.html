@@ -102,6 +102,15 @@
         <hr>
 
         {# ========== 数据库类型 ========== #}
+        {% if db_managed %}
+        <div class="form-group">
+          <label><strong>{{ _('数据库类型') }}</strong></label>
+          <div class="alert alert-info mb-0">
+            <i class="fas fa-database"></i>
+            {{ _('数据库连接已由部署环境统一配置（%(dbtype)s），无需在此填写。', dbtype=db_current_label or '') }}
+          </div>
+        </div>
+        {% else %}
         <div class="form-group">
           <label><strong>{{ _('数据库类型') }}</strong></label>
           <small class="text-muted d-block mb-2">
@@ -156,6 +165,7 @@
             </div>
           </div>
         </div>
+        {% endif %}
 
         <hr>
 
@@ -272,6 +282,8 @@
 (function () {
   var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432 };
   var fields = document.getElementById('db-conn-fields');
+  // 环境变量托管数据库时（Docker 部署）页面无数据库配置区，直接跳过
+  if (!fields) { return; }
   var required = ['db_host', 'db_name', 'db_user'];
   var portInput = document.querySelector('input[name="db_port"]');
 
