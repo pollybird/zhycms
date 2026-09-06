@@ -105,7 +105,7 @@ echo ""
 # ============================================================
 echo -e "${GREEN}━━━ 步骤 1/5：选择数据库 ━━━${NC}"
 echo "  1) MySQL 8.4（推荐，功能最全）"
-echo "  2) PostgreSQL 16（轻量替代）"
+echo "  2) PostgreSQL 16（高并发性能更强）"
 echo ""
 prompt "请选择 [1-2]" DB_CHOICE
 DB_CHOICE="${DB_CHOICE:-1}"
