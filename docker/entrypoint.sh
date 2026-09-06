@@ -41,6 +41,13 @@ while True:
         if time.time() > deadline:
             print('[entrypoint] ERROR: database not reachable after 60s: {}'.format(exc), file=sys.stderr)
             sys.exit(1)
+        if 'Access denied' in str(exc):
+            # 认证失败是确定性错误，重试无意义：数据卷由旧密码初始化，与当前密码不匹配
+            print('[entrypoint] ERROR: database auth failed (Access denied).', file=sys.stderr)
+            print('[entrypoint] The data volume was initialized with a different password.', file=sys.stderr)
+            print('[entrypoint] Fix A: rerun install.sh, choose "reuse existing data" and enter the old password.', file=sys.stderr)
+            print('[entrypoint] Fix B (data loss): docker compose --profile mysql down -v, then reinstall.', file=sys.stderr)
+            sys.exit(1)
         print('[entrypoint] Waiting for database... (attempt {})'.format(attempt))
         time.sleep(2)
 PYEOF

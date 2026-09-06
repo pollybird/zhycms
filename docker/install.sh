@@ -135,21 +135,61 @@ else
 fi
 echo ""
 
+# 已有数据卷检测：MySQL/PostgreSQL 仅在首次初始化空数据卷时应用密码，
+# 若数据卷已存在（此前部署过），新密码不会同步到数据库，会导致 Access denied
+EXISTING_VOL=""
+case "$DB_PROFILE" in
+    mysql)    EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_mysql_data$' | head -1 || true) ;;
+    postgres) EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_pg_data$' | head -1 || true) ;;
+esac
+
+REUSE_DB=false
+if [ -n "$EXISTING_VOL" ]; then
+    warn "检测到已有数据库数据卷：$EXISTING_VOL"
+    echo "  数据库仅在首次初始化空数据卷时应用密码，"
+    echo "  若该数据卷由其它密码初始化，输入新密码将无法登录（Access denied）。"
+    echo ""
+    echo "  1) 沿用已有数据（输入此前初始化时的密码）"
+    echo "  2) 删除数据卷重新初始化（数据库数据将全部清空！）"
+    prompt "请选择 [1-2]" VOL_CHOICE
+    VOL_CHOICE="${VOL_CHOICE:-1}"
+    if [ "$VOL_CHOICE" = "2" ] && confirm "确认删除数据卷 $EXISTING_VOL？数据不可恢复！" "n"; then
+        info "停止容器并删除数据卷..."
+        "${COMPOSE_CMD[@]}" --profile "$DB_PROFILE" down -v 2>/dev/null || true
+        info "数据卷已删除，将使用新密码全新初始化"
+    else
+        REUSE_DB=true
+        [ "$VOL_CHOICE" = "2" ] && warn "已取消删除，将沿用已有数据"
+    fi
+fi
+echo ""
+
 # 数据库密码
-DEFAULT_DB_PASS=$(gen_random)
-echo "  数据库密码自动生成："
-echo "  ${DEFAULT_DB_PASS:0:8}...${DEFAULT_DB_PASS: -8}"
-if confirm "使用此自动生成的密码？" "y"; then
-    DB_PASSWORD="$DEFAULT_DB_PASS"
-else
-    # 密码会拼入数据库连接 URI，特殊字符（@ / : # 等）会破坏连接
+if [ "$REUSE_DB" = "true" ]; then
+    # 沿用已有数据卷：必须输入库内当前生效的密码，否则应用连接失败
     while true; do
-        prompt "  请输入自定义密码（仅字母数字）" DB_PASSWORD
+        prompt "  请输入该数据库当前生效的密码（仅字母数字）" DB_PASSWORD
         if [[ "$DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
             break
         fi
-        warn "密码含特殊字符，会导致数据库连接失败，请仅使用字母数字"
+        warn "密码含特殊字符，请仅使用字母数字"
     done
+else
+    DEFAULT_DB_PASS=$(gen_random)
+    echo "  数据库密码自动生成："
+    echo "  ${DEFAULT_DB_PASS:0:8}...${DEFAULT_DB_PASS: -8}"
+    if confirm "使用此自动生成的密码？" "y"; then
+        DB_PASSWORD="$DEFAULT_DB_PASS"
+    else
+        # 密码会拼入数据库连接 URI，特殊字符（@ / : # 等）会破坏连接
+        while true; do
+            prompt "  请输入自定义密码（仅字母数字）" DB_PASSWORD
+            if [[ "$DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
+                break
+            fi
+            warn "密码含特殊字符，会导致数据库连接失败，请仅使用字母数字"
+        done
+    fi
 fi
 
 MYSQL_ROOT_PASSWORD=$(gen_random)
@@ -374,6 +414,36 @@ echo ""
 # ============================================================
 info "启动服务..."
 "${COMPOSE_CMD[@]}" $COMPOSE_PROFILES up -d 2>&1 | tail -10
+echo ""
+
+# 数据库凭据校验（数据卷由旧密码初始化时快速给出明确指引，而非等应用超时）
+info "校验数据库连接..."
+CREDS_OK=false
+for _ in $(seq 1 30); do
+    if [ "$DB_PROFILE" = "mysql" ]; then
+        if "${COMPOSE_CMD[@]}" --profile mysql exec -T db-mysql mysql -uzhycms "-p${MYSQL_PASSWORD}" -e "SELECT 1" &>/dev/null; then
+            CREDS_OK=true
+            break
+        fi
+    else
+        if "${COMPOSE_CMD[@]}" --profile postgres exec -T db-pg env PGPASSWORD="${POSTGRES_PASSWORD}" psql -U zhycms -d zhycms -tAc "SELECT 1" &>/dev/null; then
+            CREDS_OK=true
+            break
+        fi
+    fi
+    sleep 2
+done
+
+if [ "$CREDS_OK" = "true" ]; then
+    info "数据库连接验证通过 ✓"
+else
+    error "数据库密码验证失败（Access denied）"
+    echo "  原因：数据卷由旧密码初始化，当前 .env 中的密码无法登录。"
+    echo "  处理方式二选一："
+    echo "    A. 保留数据：重跑安装脚本，选择「沿用已有数据」并输入旧密码"
+    echo "    B. 清空重建（数据丢失）：${COMPOSE_CMD[*]} --profile $DB_PROFILE down -v"
+    exit 1
+fi
 echo ""
 
 # 等待健康检查
