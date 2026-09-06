@@ -5,6 +5,23 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.4.2] - 2026-09-06
+
+**安全加固版本**，针对 v2.4.1 安全复检报告的遗留建议进行纵深防御加固，**无功能变更、无数据库结构变更**，覆盖代码即可升级。
+
+### Security
+
+- **CSRF 纵深防御 —— Origin/Referer 同源校验**：v2.4.1 仅显式启用 `SameSite=Lax`（对现代浏览器有效），本次在 `before_request` 增加同源校验钩子：所有 Cookie 鉴权的 POST/PUT/PATCH/DELETE 请求必须携带与本站一致的 `Origin`（或 `Referer`）头，跨站来源直接 403；REST API（`/api/`，X-API-Token 鉴权不依赖 Cookie）豁免；无 Origin/Referer 的非浏览器客户端（curl/SDK）放行。覆盖旧浏览器（不识别 SameSite）与同站子域名攻击场景。
+- **纯文本字段移除 `|safe`（存储型 XSS 防御加固）**：6 套主题的 `footer_copyright`（页脚版权）、`site_close_reason`（关站提示）、表单插件 `form.description`（表单说明）以及招聘插件 `job.description`（岗位描述）均为后台纯文本录入（普通 input/textarea，非富文本），此前模板以 `|safe` 输出存在 XSS 隐患，共 19 处改为自动转义。富文本字段（文章正文、单页内容、richtext 自定义字段、统计代码）保持原样，属 CMS 富文本设计范畴。
+
+### Fixed
+
+- **修复维护模式（站点关闭）页面 500 错误**：`check_site_status` 渲染关站模板时未传入 `seo` 变量，而主题 `base.html` 的 meta keywords 依赖该变量，导致开启维护模式后所有前台页面报 `UndefinedError`；现补传 `seo=_seo()`，维护模式恢复正常（HTTP 503 关站页）。
+
+### Changed
+
+- 版本号 `CMS_VERSION` 由 `2.4.1` 升级为 `2.4.2`。
+
 ## [2.4.1] - 2026-09-05
 
 **安全修复版本**。针对 v2.4.0 安全审计发现的 8 项问题进行修复，**无功能变更、无数据库结构变更**，v2.4.0 站点直接覆盖代码即可升级。

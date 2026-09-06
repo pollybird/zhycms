@@ -179,7 +179,7 @@ def check_site_status():
         # 站点根文件（favicon/robots/sitemap）不受维护模式影响，保证收录与图标正常
         if request.endpoint in ('frontend.favicon', 'frontend.robots', 'frontend.sitemap'):
             return
-        return render_template(theme_template('closed')), 503
+        return render_template(theme_template('closed'), seo=_seo()), 503
 
 
 def _home_column_articles(slug, limit=8):

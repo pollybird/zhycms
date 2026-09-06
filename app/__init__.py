@@ -1,8 +1,9 @@
 import os
 import re
 from datetime import datetime
+from urllib.parse import urlparse
 
-from flask import Flask, redirect, url_for, request, g
+from flask import Flask, redirect, url_for, request, g, abort
 from flask_login import current_user
 
 from .config import config
@@ -548,6 +549,25 @@ def create_app(config_name=None):
                 db.session.commit()
         except Exception:
             db.session.rollback()
+
+    # CSRF 纵深防御（v2.4.2）：对 Cookie 鉴权的状态变更请求做 Origin/Referer 同源校验。
+    # SameSite=Lax 已挡住现代浏览器跨站 POST，此钩子额外覆盖旧浏览器（不识别 SameSite）
+    # 与同站子域名场景。浏览器发起跨站 POST 时必然携带 Origin，攻击者无法伪造去除。
+    @app.before_request
+    def _csrf_same_origin_check():
+        if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+            return
+        # REST 内容 API 使用 X-API-Token 头鉴权（不依赖 Cookie），无 CSRF 风险，豁免
+        if request.path.startswith('/api/'):
+            return
+        source = request.headers.get('Origin') or request.referrer
+        # 非浏览器客户端（curl/SDK/脚本）无 Origin/Referer：放行，
+        # 此类请求无法被跨站页面诱导发起，且已有 SameSite=Lax 兜底
+        if not source:
+            return
+        source_host = (urlparse(source).netloc or '').lower()
+        if source_host and source_host != (request.host or '').lower():
+            abort(403, description='跨站请求被拒绝（CSRF origin check failed）')
 
     # 未初始化拦截：后台与前台除初始化页外，都跳转
     @app.before_request
