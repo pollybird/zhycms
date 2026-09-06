@@ -47,9 +47,9 @@ RUN if [ -n "$APT_MIRROR" ]; then \
       done; \
     fi
 
-# 安装运行时系统依赖
+# 安装运行时系统依赖（gosu：entrypoint 以 root 修正挂载目录属主后降权到 uid 1000）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libmagic1 libpq5 default-mysql-client \
+    libmagic1 libpq5 default-mysql-client gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制虚拟环境
@@ -80,10 +80,10 @@ RUN python -m babel.messages.frontend compile -d app/translations || true \
 
 EXPOSE 5000
 
-USER zhycms
-
+# 容器以 root 启动，entrypoint.sh 修正挂载目录属主后通过 gosu 降权到 uid 1000 运行应用
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/healthz').read()" || exit 1
 
 ENTRYPOINT ["./docker/entrypoint.sh"]
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "--timeout", "120", "wsgi:app"]
+# 通过 shell 形式支持 GUNICORN_WORKERS 环境变量（compose / .env 可调）
+CMD ["sh", "-c", "exec gunicorn -w ${GUNICORN_WORKERS:-4} -b 0.0.0.0:5000 --timeout 120 wsgi:app"]

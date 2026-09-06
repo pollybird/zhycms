@@ -142,7 +142,14 @@ echo "  ${DEFAULT_DB_PASS:0:8}...${DEFAULT_DB_PASS: -8}"
 if confirm "使用此自动生成的密码？" "y"; then
     DB_PASSWORD="$DEFAULT_DB_PASS"
 else
-    prompt "  请输入自定义密码" DB_PASSWORD
+    # 密码会拼入数据库连接 URI，特殊字符（@ / : # 等）会破坏连接
+    while true; do
+        prompt "  请输入自定义密码（仅字母数字）" DB_PASSWORD
+        if [[ "$DB_PASSWORD" =~ ^[A-Za-z0-9]+$ ]]; then
+            break
+        fi
+        warn "密码含特殊字符，会导致数据库连接失败，请仅使用字母数字"
+    done
 fi
 
 MYSQL_ROOT_PASSWORD=$(gen_random)
@@ -250,6 +257,32 @@ PIP_INDEX_URL=${PIP_INDEX_URL}
 EOF
 
 info ".env 已生成：$ENV_FILE"
+echo ""
+
+# ============================================================
+# 宿主机数据目录准备（容器内应用以 uid 1000 运行）
+# ============================================================
+info "准备数据目录..."
+mkdir -p "$PROJECT_DIR/instance" "$PROJECT_DIR/app/static/uploads"
+
+fix_ownership() {
+    local dir="$1"
+    local owner
+    owner=$(stat -c %u "$dir" 2>/dev/null || echo "?")
+    [ "$owner" = "1000" ] && return 0
+    if [ "$(id -u)" = "0" ]; then
+        chown -R 1000:1000 "$dir" && info "  已修正属主: $dir → 1000:1000"
+    elif sudo -n chown -R 1000:1000 "$dir" 2>/dev/null; then
+        info "  已通过 sudo 修正属主: $dir → 1000:1000"
+    else
+        warn "  $dir 属主为 uid $owner，容器内进程 (uid 1000) 可能无权写入"
+        echo "    如启动失败请执行: sudo chown -R 1000:1000 $dir"
+    fi
+}
+
+fix_ownership "$PROJECT_DIR/instance"
+fix_ownership "$PROJECT_DIR/app/static/uploads"
+info "数据目录就绪"
 echo ""
 
 # ============================================================

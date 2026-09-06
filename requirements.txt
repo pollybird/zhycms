@@ -14,6 +14,8 @@ mammoth>=1.12.1
 email-validator>=2.1.1
 Pillow>=10.3.0
 PyMySQL>=1.1.1
+# PyMySQL 连接 MySQL 8+（默认 caching_sha2_password 认证）必需
+cryptography>=42.0
 psycopg2-binary>=2.9.9
 requests>=2.31.0
 python-magic>=0.4.27
