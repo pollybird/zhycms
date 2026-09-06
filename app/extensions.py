@@ -3,6 +3,7 @@ from flask_login import LoginManager
 from flask_caching import Cache
 from flask_babel import Babel, lazy_gettext
 from flask_migrate import Migrate
+from flask_session import Session
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -12,6 +13,9 @@ login_manager.login_message_category = 'warning'
 
 # 模块8：全站缓存（默认用 SimpleCache，生产环境可在 config 切 Redis/Filesystem）
 cache = Cache()
+
+# v2.5.0：服务端 Session（仅当 REDIS_URL 配置时在 create_app 中 init_app，否则保持 Flask 默认 Cookie Session）
+server_session = Session()
 
 # v2.3.0：国际化（Flask-Babel）。init_app 时传入 locale_selector；默认关闭
 # （i18n_enable=0）时 localeselector 直接返回默认中文，全站渲染与 v2.2.0 一致

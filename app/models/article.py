@@ -43,6 +43,11 @@ class Article(db.Model):
         'ArticleFieldValue', backref='article',
         cascade='all, delete-orphan', lazy='joined'
     )
+    # v2.5.0：多语言翻译（非默认语言的 title/summary/content/seo_* 存于此）
+    translations = db.relationship(
+        'ArticleTranslation', backref='article',
+        cascade='all, delete-orphan', lazy='selectin'
+    )
 
     # 外键关联的用户对象（避免与 creator 等同名冲突，用外键字段+显式 relationship）
     reviewer = db.relationship('User', foreign_keys=[reviewed_by])
@@ -97,4 +102,31 @@ class ArticleFieldValue(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('article_id', 'field_id', name='uq_article_field_value'),
+    )
+
+
+class ArticleTranslation(db.Model):
+    """文章多语言翻译（v2.5.0）。
+
+    主表 articles 存默认语言内容；非默认语言的 title/summary/content/seo_*
+    存于此表。查不到对应 locale 的翻译时 fallback 到主表默认语言字段。
+    """
+    __tablename__ = 'article_translations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey('articles.id', ondelete='CASCADE'), nullable=False, index=True)
+    locale = db.Column(db.String(10), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    summary = db.Column(db.Text)
+    content = db.Column(db.Text)
+    seo_title = db.Column(db.String(255))
+    seo_keywords = db.Column(db.String(255))
+    seo_description = db.Column(db.String(500))
+
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('article_id', 'locale', name='uq_article_locale'),
+        db.Index('ix_article_trans_locale', 'locale'),
     )

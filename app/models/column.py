@@ -56,6 +56,11 @@ class Column(db.Model):
         'ColumnField', backref='column', lazy='dynamic',
         cascade='all, delete-orphan'
     )
+    # v2.5.0：多语言翻译（非默认语言的 name/summary/page_content/seo_* 存于此）
+    translations = db.relationship(
+        'ColumnTranslation', backref='column',
+        cascade='all, delete-orphan', lazy='selectin'
+    )
 
     @property
     def is_parent(self):
@@ -164,3 +169,31 @@ class ColumnFieldValue(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     __table_args__ = (db.UniqueConstraint('column_id', 'field_id', name='uq_column_field_value'),)
+
+
+class ColumnTranslation(db.Model):
+    """栏目多语言翻译（v2.5.0）。
+
+    主表 columns 存默认语言内容；非默认语言的 name/summary/page_content/seo_*
+    存于此表。查不到对应 locale 的翻译时 fallback 到主表默认语言字段。
+    slug 不翻译，保持 URL 稳定。
+    """
+    __tablename__ = 'column_translations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    column_id = db.Column(db.Integer, db.ForeignKey('columns.id', ondelete='CASCADE'), nullable=False, index=True)
+    locale = db.Column(db.String(10), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    summary = db.Column(db.Text)
+    page_content = db.Column(db.Text)
+    seo_title = db.Column(db.String(255))
+    seo_keywords = db.Column(db.String(255))
+    seo_description = db.Column(db.String(500))
+
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('column_id', 'locale', name='uq_column_locale'),
+        db.Index('ix_column_trans_locale', 'locale'),
+    )

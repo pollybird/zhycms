@@ -74,6 +74,12 @@ def _try_cache(key, ttl_setting_key, default_ttl=600):
             cache_key = f'frontend/{key}/' + '/'.join(
                 [str(v) for v in args] + [f'{k}={v}' for k, v in sorted(kwargs.items())]
             ) + request.query_string.decode('utf-8', errors='ignore')
+            # v2.5.0：缓存键包含当前 locale，避免不同语言命中同一缓存
+            try:
+                from ..i18n import select_locale
+                cache_key += '|loc=' + select_locale()
+            except Exception:
+                pass
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:
@@ -417,6 +423,8 @@ def article_detail(slug, aid):
         render_article.content = _inject_default_alt(article.content)
     if render_article.summary:
         render_article.summary = _inject_default_alt(article.summary)
+    # v2.5.0：浅拷贝不复制 ORM 关系，需手动带上 translations 供 t() 多语言取值
+    render_article.translations = article.translations
 
     tpl = get_column_template(col, 'detail')
     return render_template(

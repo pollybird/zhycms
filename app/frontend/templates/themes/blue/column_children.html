@@ -1,18 +1,18 @@
 {% extends theme_base %}
-{% block title %}{{ column.name }}{% endblock %}
+{% block title %}{{ t(column, 'name') }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
-    <li class="breadcrumb-item active">{{ column.name }}</li>
+    <li class="breadcrumb-item active">{{ t(column, 'name') }}</li>
   </ol>
 </nav>
 
 <div class="row">
   <div class="col-md-12">
-    <h1>{{ column.name }}</h1>
-    {% if column.summary %}<p class="text-muted">{{ column.summary }}</p>{% endif %}
+    <h1>{{ t(column, 'name') }}</h1>
+    {% if t(column, 'summary') %}<p class="text-muted">{{ t(column, 'summary') }}</p>{% endif %}
 
     {# 父栏目自定义字段（可用于列表页头部展示） #}
     {% for fv in column.field_values %}

@@ -68,6 +68,9 @@ class Config:
     # 基础配置（SECRET_KEY：环境变量 > instance/secret_key 持久化 > 首次启动生成）
     SECRET_KEY = _resolve_secret_key()
 
+    # v2.5.0：Redis URL（可选）。有值则启用 Redis 缓存 + 服务端 Session，无则回退 SimpleCache + Cookie Session
+    REDIS_URL = os.environ.get('REDIS_URL', '')
+
     # 会话安全（v2.4.1）：显式 SameSite，HTTPS 下启用 Secure（生产环境由反向代理
     # 或 ZHYCMS_ENV=production 触发 ProductionConfig 中的 SESSION_COOKIE_SECURE）
     SESSION_COOKIE_SAMESITE = 'Lax'
@@ -85,6 +88,13 @@ class Config:
     # 会话
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
     SESSION_COOKIE_HTTPONLY = True
+    # v2.5.0：有 REDIS_URL 时 Session 存入 Redis（多实例共享登录态），否则保持默认 Cookie Session
+    if REDIS_URL:
+        SESSION_TYPE = 'redis'
+        SESSION_PERMANENT = True
+        SESSION_USE_SIGNER = True
+        SESSION_KEY_PREFIX = 'zhycms:sess:'
+        # SESSION_REDIS 在 create_app 中用 redis.from_url(REDIS_URL) 延迟初始化，避免 import 阶段建连接
 
     # 分页
     DEFAULT_PAGE_SIZE = 10
@@ -92,10 +102,17 @@ class Config:
     # 后台每页显示条数
     ADMIN_PAGE_SIZE = 15
 
-    # 模块8：Flask-Caching 配置（默认 SimpleCache，单进程够用；生产可切 filesystem / redis）
-    CACHE_TYPE = 'SimpleCache'
-    CACHE_DEFAULT_TIMEOUT = 3600
-    CACHE_DIR = os.path.join(BASE_DIR, 'instance', 'cache')
+    # 模块8：Flask-Caching 配置
+    # v2.5.0：有 REDIS_URL 时切 RedisCache（多实例共享缓存），否则 SimpleCache（单机零依赖）
+    if REDIS_URL:
+        CACHE_TYPE = 'RedisCache'
+        CACHE_REDIS_URL = REDIS_URL
+        CACHE_KEY_PREFIX = 'zhycms:'
+        CACHE_DEFAULT_TIMEOUT = 3600
+    else:
+        CACHE_TYPE = 'SimpleCache'
+        CACHE_DEFAULT_TIMEOUT = 3600
+        CACHE_DIR = os.path.join(BASE_DIR, 'instance', 'cache')
 
     # 图片缩略图与压缩临时目录
     IMAGE_TEMP_DIR = os.path.join(BASE_DIR, 'instance', 'image_cache')
@@ -105,7 +122,10 @@ class Config:
         os.makedirs(os.path.join(BASE_DIR, 'instance'), exist_ok=True)
         os.makedirs(os.path.join(BASE_DIR, 'app', 'static', 'uploads'), exist_ok=True)
         os.makedirs(os.path.join(BASE_DIR, 'instance', 'backups'), exist_ok=True)
-        os.makedirs(Config.CACHE_DIR, exist_ok=True)
+        # SimpleCache 模式需要缓存目录，Redis 模式无 CACHE_DIR
+        cache_dir = getattr(Config, 'CACHE_DIR', None)
+        if cache_dir:
+            os.makedirs(cache_dir, exist_ok=True)
         os.makedirs(Config.IMAGE_TEMP_DIR, exist_ok=True)
 
 

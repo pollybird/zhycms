@@ -33,6 +33,12 @@ class Fragment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
+    # v2.5.0：多语言翻译（非默认语言的 name/value 存于此）
+    translations = db.relationship(
+        'FragmentTranslation', backref='fragment',
+        cascade='all, delete-orphan', lazy='selectin'
+    )
+
     @classmethod
     def get_dict(cls):
         """返回 {slug: value} 用于模板调用。"""
@@ -46,3 +52,27 @@ class Fragment(db.Model):
                 'value': frag.value or '',
             }
         return result
+
+
+class FragmentTranslation(db.Model):
+    """碎片多语言翻译（v2.5.0）。
+
+    主表 fragments 存默认语言的 name/value；非默认语言存于此表。
+    value 为多类型字段（text/textarea/richtext/image/url/number/file），
+    翻译表直接存文本值。
+    """
+    __tablename__ = 'fragment_translations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    fragment_id = db.Column(db.Integer, db.ForeignKey('fragments.id', ondelete='CASCADE'), nullable=False, index=True)
+    locale = db.Column(db.String(10), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    value = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('fragment_id', 'locale', name='uq_fragment_locale'),
+        db.Index('ix_fragment_trans_locale', 'locale'),
+    )

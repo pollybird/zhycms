@@ -7,7 +7,7 @@ from flask import Flask, redirect, url_for, request, g, abort
 from flask_login import current_user
 
 from .config import config
-from .extensions import db, login_manager, cache, set_scheduler, babel, migrate
+from .extensions import db, login_manager, cache, set_scheduler, babel, migrate, server_session
 from .i18n import select_locale, available_locales, current_locale, _p
 
 
@@ -354,11 +354,22 @@ def create_app(config_name=None):
     db.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
     login_manager.init_app(app)
+
+    # 缓存：v2.5.0 支持 Redis 后端（CACHE_REDIS_URL 等由 config 注入）
     cache.init_app(app, config={
         'CACHE_TYPE': app.config.get('CACHE_TYPE', 'SimpleCache'),
         'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 3600),
         'CACHE_DIR': app.config.get('CACHE_DIR'),
+        'CACHE_REDIS_URL': app.config.get('CACHE_REDIS_URL'),
+        'CACHE_KEY_PREFIX': app.config.get('CACHE_KEY_PREFIX', 'zhycms:'),
     })
+
+    # v2.5.0 服务端 Session：仅当 REDIS_URL 配置时启用，否则保持 Flask 默认 Cookie Session
+    if app.config.get('REDIS_URL'):
+        import redis as _redis
+        app.config['SESSION_REDIS'] = _redis.from_url(
+            app.config['REDIS_URL'], decode_responses=False)
+        server_session.init_app(app)
 
     # v2.3.0 国际化：初始化 Babel 并注册 locale 选择器
     # （须在 db 之后：selector 内读 Setting；在蓝图注册之前）
@@ -456,6 +467,10 @@ def create_app(config_name=None):
     app.jinja_env.globals['available_locales'] = available_locales
     app.jinja_env.globals['current_locale'] = current_locale
     app.jinja_env.globals['_p'] = _p
+
+    # v2.5.0 内容级多语言：t(obj, field) 取翻译字段，无翻译 fallback 默认语言
+    from .utils.i18n_content import t as i18n_t
+    app.jinja_env.globals['t'] = i18n_t
 
     # 初始化数据库表结构
     #

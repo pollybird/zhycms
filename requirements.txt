@@ -22,3 +22,6 @@ python-magic>=0.4.27
 # v2.4.0：全文搜索（Whoosh + jieba 中文分词）
 Whoosh>=2.7.4,<3.0
 jieba>=0.42.1
+# v2.5.0：Redis 缓存后端 + 服务端 Session（多实例部署必需；未配置 REDIS_URL 时自动回退）
+redis>=5.0,<6.0
+Flask-Session>=0.8,<1.0

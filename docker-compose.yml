@@ -4,6 +4,7 @@
 #   MySQL:      docker compose --profile mysql up -d
 #   PostgreSQL: docker compose --profile postgres up -d
 #   + 搜索:     追加 --profile search
+#   + Redis:    追加 --profile redis（缓存与 Session 走 Redis，支持多实例）
 # ============================================================
 
 # ---- 公共配置锚点（YAML 锚点，不依赖 compose extends） ----
@@ -20,6 +21,7 @@ x-app-base: &app-base
     ZHYCMS_ENV: production
     ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
     GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+    REDIS_URL: ${REDIS_URL:-}
   volumes:
     - ./instance:/app/instance
     - ./app/static/uploads:/app/app/static/uploads
@@ -92,7 +94,22 @@ services:
       - "7700:7700"
     profiles: ["search"]
 
+  # ---- Redis（可选，缓存与 Session 后端）----
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles: ["redis"]
+
 volumes:
   mysql_data:
   pg_data:
   meili_data:
+  redis_data:

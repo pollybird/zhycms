@@ -18,7 +18,8 @@ from flask_login import current_user
 
 from ..extensions import db
 from ..models.column import Column, ColumnField
-from ..models.article import Article, ArticleFieldValue
+from ..models.article import Article, ArticleFieldValue, ArticleTranslation
+from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..models.workflow import (
     STATUS_DRAFT, STATUS_REVIEW, STATUS_PUBLISHED, STATUS_ARCHIVED,
     STATUS_CHOICES, ArticleVersion,
@@ -132,6 +133,8 @@ def article_create(cid):
         'admin/article/form.html',
         column=col, article=None, fields=fields,
         status_choices=STATUS_CHOICES, default_status=STATUS_DRAFT,
+        trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
+        default_locale=get_default_locale(),
     )
 
 
@@ -161,6 +164,8 @@ def article_edit(cid, aid):
         column=col, article=article, fields=fields,
         status_choices=STATUS_CHOICES, versions=versions,
         default_status=article.status,
+        trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
+        default_locale=get_default_locale(),
     )
 
 
@@ -279,6 +284,9 @@ def _save_article(article, column, fields):
             v = ArticleFieldValue(article_id=article.id, field_id=f.id, value=value)
             db.session.add(v)
 
+    # v2.5.0：保存各语种翻译（非默认语言）
+    _save_article_translations(article)
+
     try:
         db.session.commit()
     except Exception:
@@ -312,6 +320,38 @@ def _save_article(article, column, fields):
         audit_log(OP_UPDATE, MODULE_ARTICLE, article.id, article.title,
                   {'column_id': column.id, 'status': article.status})
     return article
+
+
+def _save_article_translations(article):
+    """保存文章各语种翻译（v2.5.0）。
+
+    表单字段命名：{field}_{locale}，如 title_en / content_en。
+    非默认语言且标题非空 → upsert 翻译记录；标题为空 → 删除该翻译（fallback 默认语言）。
+    """
+    default_locale = get_default_locale()
+    locales = [l for l in get_available_locales() if l != default_locale]
+    if not locales:
+        return
+
+    # 已有翻译记录（按 locale 索引）
+    existing = {tr.locale: tr for tr in article.translations}
+
+    trans_fields = ('title', 'summary', 'content', 'seo_title', 'seo_keywords', 'seo_description')
+    for loc in locales:
+        tr_title = (request.form.get(f'title_{loc}') or '').strip()
+        if not tr_title:
+            # 空标题：删除该翻译（fallback 默认语言）
+            if loc in existing:
+                db.session.delete(existing[loc])
+            continue
+        tr = existing.get(loc)
+        if tr is None:
+            tr = ArticleTranslation(article_id=article.id, locale=loc)
+            db.session.add(tr)
+        tr.title = tr_title
+        for fld in trans_fields[1:]:
+            setattr(tr, fld, (request.form.get(f'{fld}_{loc}') or '').strip()
+                    if fld != 'content' else (request.form.get(f'{fld}_{loc}') or ''))
 
 
 # ============================================================

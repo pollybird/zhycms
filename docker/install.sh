@@ -221,7 +221,7 @@ echo ""
 # ============================================================
 # 步骤 4：Meilisearch 搜索引擎
 # ============================================================
-echo -e "${GREEN}━━━ 步骤 4/5：搜索引擎（可选）━━━${NC}"
+echo -e "${GREEN}━━━ 步骤 4/6：搜索引擎（可选）━━━${NC}"
 echo "  Meilisearch 提供全文搜索（比默认的 Whoosh 更快）。"
 echo "  不启用则使用内置 Whoosh 引擎，功能完整。"
 echo ""
@@ -236,9 +236,27 @@ fi
 echo ""
 
 # ============================================================
-# 步骤 5：端口与 Worker
+# 步骤 5：Redis 缓存与 Session（可选）
 # ============================================================
-echo -e "${GREEN}━━━ 步骤 5/5：运行参数 ━━━${NC}"
+echo -e "${GREEN}━━━ 步骤 5/6：Redis 缓存与 Session（可选）━━━${NC}"
+echo "  启用 Redis 后，页面缓存与登录 Session 存入 Redis，支持多实例负载均衡。"
+echo "  不启用则使用内置 SimpleCache + Cookie Session（单机部署零依赖）。"
+echo ""
+if confirm "是否启用 Redis？" "n"; then
+    USE_REDIS="yes"
+    REDIS_URL="redis://redis:6379/0"
+    info "Redis 已配置（将自动启动 redis 容器）"
+else
+    USE_REDIS="no"
+    REDIS_URL=""
+    info "使用内置 SimpleCache + Cookie Session"
+fi
+echo ""
+
+# ============================================================
+# 步骤 6：端口与 Worker
+# ============================================================
+echo -e "${GREEN}━━━ 步骤 6/6：运行参数 ━━━${NC}"
 prompt_default "  Web 端口" "5000" WEB_PORT
 prompt_default "  Gunicorn Worker 数量" "4" GUNICORN_WORKERS
 echo ""
@@ -255,6 +273,7 @@ echo "  应用密钥：        ${SECRET_KEY:0:8}...（已隐藏）"
 echo "  数据库密码：      ${DB_PASSWORD:0:4}****（已隐藏）"
 echo "  镜像加速：        ${USE_MIRROR}"
 echo "  Meilisearch：     ${USE_MEILI}"
+echo "  Redis：           ${USE_REDIS}"
 echo "  Web 端口：        $WEB_PORT"
 echo "  Worker 数量：     $GUNICORN_WORKERS"
 echo ""
@@ -290,6 +309,9 @@ GUNICORN_WORKERS=${GUNICORN_WORKERS}
 
 # Meilisearch
 MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
+
+# Redis（可选，启用后缓存与 Session 走 Redis）
+REDIS_URL=${REDIS_URL}
 
 # 镜像源加速
 APT_MIRROR=${APT_MIRROR}
@@ -399,6 +421,7 @@ cd "$PROJECT_DIR"
 
 COMPOSE_PROFILES="--profile ${DB_PROFILE}"
 [ "$USE_MEILI" = "yes" ] && COMPOSE_PROFILES="$COMPOSE_PROFILES --profile search"
+[ "$USE_REDIS" = "yes" ] && COMPOSE_PROFILES="$COMPOSE_PROFILES --profile redis"
 
 # 构建时覆盖端口（通过 --build-arg 不需要改端口，端口在 compose 层）
 if ! "${COMPOSE_CMD[@]}" $COMPOSE_PROFILES build --build-arg APT_MIRROR="${APT_MIRROR}" --build-arg PIP_INDEX_URL="${PIP_INDEX_URL}" 2>&1 | tee /tmp/zhycms_build.log; then

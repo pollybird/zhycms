@@ -8,7 +8,8 @@ from flask import (
 
 from flask_babel import gettext as _gettext
 from ..extensions import db
-from ..models.column import Column, ColumnField, ColumnFieldValue
+from ..models.column import Column, ColumnField, ColumnFieldValue, ColumnTranslation
+from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..utils.helpers import permission_required, audit_log, clear_content_cache
 from ..utils.themes import list_theme_templates, TEMPLATE_CATEGORIES
 from ..utils.uploads import save_upload_file
@@ -149,6 +150,8 @@ def column_edit(cid):
         column=col, parents=parents, field_types=FIELD_TYPES,
         parent_options=_build_tree_with_depth(parents),
         template_options=_template_options(),
+        trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
+        default_locale=get_default_locale(),
     )
 
 
@@ -231,7 +234,10 @@ def _save_column(column):
 
     _save_fields(column)
 
-    # 单页栏目：保存字段“值”到 ColumnFieldValue（列表栏目的字段值在文章里录入）
+    # v2.5.0：保存各语种翻译（非默认语言）
+    _save_column_translations(column)
+
+    # 单页栏目：保存字段"值"到 ColumnFieldValue（列表栏目的字段值在文章里录入）
     if col_type == 'page':
         db.session.flush()  # 确保新字段已有 id
         if _save_page_field_values(column) is None:
@@ -244,6 +250,35 @@ def _save_column(column):
     audit_log(OP_CREATE if is_new else OP_UPDATE, MODULE_COLUMN, column.id, column.name,
               {'slug': column.slug, 'type': column.type, 'parent_id': column.parent_id})
     return column
+
+
+def _save_column_translations(column):
+    """保存栏目各语种翻译（v2.5.0）。
+
+    表单字段命名：{field}_{locale}，如 name_en / page_content_en。
+    非默认语言且名称非空 → upsert 翻译记录；名称为空 → 删除该翻译。
+    """
+    default_locale = get_default_locale()
+    locales = [l for l in get_available_locales() if l != default_locale]
+    if not locales:
+        return
+
+    existing = {tr.locale: tr for tr in column.translations}
+    trans_fields = ('name', 'summary', 'page_content', 'seo_title', 'seo_keywords', 'seo_description')
+
+    for loc in locales:
+        tr_name = (request.form.get(f'name_{loc}') or '').strip()
+        if not tr_name:
+            if loc in existing:
+                db.session.delete(existing[loc])
+            continue
+        tr = existing.get(loc)
+        if tr is None:
+            tr = ColumnTranslation(column_id=column.id, locale=loc)
+            db.session.add(tr)
+        tr.name = tr_name
+        for fld in trans_fields[1:]:
+            setattr(tr, fld, (request.form.get(f'{fld}_{loc}') or '').strip())
 
 
 def _save_page_field_values(column):

@@ -294,6 +294,55 @@
         </div>
       </div>
 
+      {% if trans_locales %}
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-language"></i> {{ _('多语言版本') }}</h3>
+          <small class="text-muted ml-2">{{ _('留空则前台回退显示默认语言（%(loc)s）内容', loc=default_locale) }}</small>
+        </div>
+        <div class="card-body">
+          <ul class="nav nav-tabs" id="i18n-tabs" role="tablist">
+            {% for loc in trans_locales %}
+            <li class="nav-item">
+              <a class="nav-link {% if loop.first %}active{% endif %}" data-toggle="pill" href="#i18n-{{ loc }}" role="tab">{{ loc|upper }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+          <div class="tab-content pt-3">
+            {% for loc in trans_locales %}
+            {% set tr = column.translations|selectattr('locale', 'equalto', loc)|list|first if column else none %}
+            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="i18n-{{ loc }}" role="tabpanel">
+              <div class="form-group">
+                <label>{{ _('栏目名称') }} ({{ loc|upper }})</label>
+                <input type="text" name="name_{{ loc }}" class="form-control" value="{{ tr.name if tr else '' }}">
+              </div>
+              <div class="form-group">
+                <label>{{ _('栏目描述') }} ({{ loc|upper }})</label>
+                <textarea name="summary_{{ loc }}" rows="2" class="form-control">{{ tr.summary if tr else '' }}</textarea>
+              </div>
+              <div class="form-group">
+                <label>{{ _('单页内容') }} ({{ loc|upper }})</label>
+                <textarea name="page_content_{{ loc }}" rows="8" class="form-control">{{ tr.page_content if tr else '' }}</textarea>
+              </div>
+              <div class="form-group">
+                <label>SEO {{ _('标题') }} ({{ loc|upper }})</label>
+                <input type="text" name="seo_title_{{ loc }}" class="form-control" value="{{ tr.seo_title if tr else '' }}">
+              </div>
+              <div class="form-group">
+                <label>SEO {{ _('关键词') }} ({{ loc|upper }})</label>
+                <input type="text" name="seo_keywords_{{ loc }}" class="form-control" value="{{ tr.seo_keywords if tr else '' }}">
+              </div>
+              <div class="form-group">
+                <label>SEO {{ _('描述') }} ({{ loc|upper }})</label>
+                <textarea name="seo_description_{{ loc }}" rows="2" class="form-control">{{ tr.seo_description if tr else '' }}</textarea>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="card">
         <div class="card-body">
           <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存栏目') }}</button>

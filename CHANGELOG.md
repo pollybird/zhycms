@@ -5,6 +5,41 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.5.0] - 2026-09-06
+
+**内容级多语言（i18n 2.0）+ Redis 缓存与 Session**，企业出海刚需版本。无破坏性变更，覆盖代码 + 执行迁移即可升级。
+
+### Added
+
+- **内容级多语言（i18n 2.0）**：文章/栏目/碎片支持多语言版本存储。
+  - 新增 `article_translations`、`column_translations`、`fragment_translations` 三张翻译关联表（Alembic 迁移 `0005`）。
+  - 主表保留默认语言字段（冗余），翻译表存非默认语言；查不到翻译时 fallback 默认语言。
+  - 前台模板新增 Jinja 全局 `t(obj, field)`，6 套主题共 44 个模板的内容字段已接入。
+  - 后台文章/栏目/碎片编辑页新增「多语言版本」Tab，按语种切换录入翻译。
+  - `slug` 不随语言变化，URL 保持稳定；语言切换沿用 `?lang=xx` + session 机制。
+  - 页面缓存键加入 locale，不同语言互不串扰。
+- **Redis 缓存后端 + 服务端 Session**：
+  - 配置 `REDIS_URL` 环境变量后，Flask-Caching 切 RedisCache、Flask-Session 存 Redis，支撑多实例负载均衡。
+  - 未配置 `REDIS_URL` 时自动回退 SimpleCache + Cookie Session，单机部署零依赖。
+  - `docker-compose.yml` 新增可选 `redis` profile（redis:7-alpine + 256MB LRU），`install.sh` 新增 Redis 交互选项。
+
+### Changed
+
+- 版本号 `CMS_VERSION` 由 `2.4.2` 升级为 `2.5.0`。
+- `requirements.txt` 新增 `redis>=5.0,<6.0`、`Flask-Session>=0.8,<1.0`。
+
+### Fixed
+
+- 修复前台文章详情页浅拷贝对象丢失 `translations` 关系导致多语言翻译无法渲染的问题。
+- 修复 `t_field` 依赖 babel 缓存 locale 导致 `?lang=` 切换不生效的问题，改为直接调用 `select_locale()`。
+
+### 升级说明
+
+- v2.4.x 站点：`git pull` → `pip install -r requirements.txt` → `flask db upgrade` → 重启应用。
+- 启用多语言：后台「系统设置 → 国际化」开启，配置默认语言与可用语种，编辑内容时在「多语言版本」Tab 录入翻译。
+- 启用 Redis：Docker 部署在 `install.sh` 中选择启用 Redis；源码部署设置 `REDIS_URL` 环境变量。
+- 未启用 i18n / Redis 的站点，行为与 v2.4.2 完全一致。
+
 ## [2.4.2] - 2026-09-06
 
 **安全加固 + 部署修复版本**，针对 v2.4.1 安全复检报告的遗留建议进行纵深防御加固，并修复 Docker 部署链路中的多项问题，**无功能变更、无数据库结构变更**，覆盖代码即可升级。

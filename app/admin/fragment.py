@@ -5,7 +5,8 @@ from flask import (
 
 from flask_babel import gettext as _gettext
 from ..extensions import db
-from ..models.fragment import Fragment, FragmentGroup
+from ..models.fragment import Fragment, FragmentGroup, FragmentTranslation
+from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..utils.helpers import permission_required, audit_log, clear_content_cache
 from ..utils.uploads import save_upload_file
 from ..models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRAGMENT
@@ -104,7 +105,9 @@ def fragment_create():
         if frag is None:
             return redirect(url_for('admin.fragment_create'))
         return redirect(url_for('admin.fragment_index'))
-    return render_template('admin/fragment/form.html', fragment=None, groups=groups, field_types=FIELD_TYPES)
+    return render_template('admin/fragment/form.html', fragment=None, groups=groups, field_types=FIELD_TYPES,
+                           trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 @admin_bp.route('/fragments/<int:fid>/edit', methods=['GET', 'POST'])
@@ -121,7 +124,9 @@ def fragment_edit(fid):
         if updated is None:
             return redirect(url_for('admin.fragment_edit', fid=fid))
         return redirect(url_for('admin.fragment_index'))
-    return render_template('admin/fragment/form.html', fragment=frag, groups=groups, field_types=FIELD_TYPES)
+    return render_template('admin/fragment/form.html', fragment=frag, groups=groups, field_types=FIELD_TYPES,
+                           trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 def _save_fragment(fragment):
@@ -169,9 +174,38 @@ def _save_fragment(fragment):
     else:
         fragment.value = request.form.get('value') or ''
 
+    # v2.5.0：保存各语种翻译（非默认语言）
+    _save_fragment_translations(fragment)
+
     db.session.commit()
     flash(_gettext('碎片保存成功'), 'success')
     return fragment
+
+
+def _save_fragment_translations(fragment):
+    """保存碎片各语种翻译（v2.5.0）。
+
+    表单字段命名：name_{locale} / value_{locale}。
+    非默认语言且名称非空 → upsert 翻译记录；名称为空 → 删除该翻译。
+    """
+    default_locale = get_default_locale()
+    locales = [l for l in get_available_locales() if l != default_locale]
+    if not locales:
+        return
+
+    existing = {tr.locale: tr for tr in fragment.translations}
+    for loc in locales:
+        tr_name = (request.form.get(f'name_{loc}') or '').strip()
+        if not tr_name:
+            if loc in existing:
+                db.session.delete(existing[loc])
+            continue
+        tr = existing.get(loc)
+        if tr is None:
+            tr = FragmentTranslation(fragment_id=fragment.id, locale=loc)
+            db.session.add(tr)
+        tr.name = tr_name
+        tr.value = request.form.get(f'value_{loc}') or ''
 
 
 @admin_bp.route('/fragments/<int:fid>/delete', methods=['POST'])

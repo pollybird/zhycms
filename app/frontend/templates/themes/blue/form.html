@@ -16,8 +16,8 @@
         <h4 class="mb-0"><i class="fas fa-comment-dots"></i> {{ form.name }}</h4>
       </div>
       <div class="card-body">
-        {% if form.description %}
-        <div class="text-muted mb-3">{{ form.description }}</div>
+        {% if t(form, 'description') %}
+        <div class="text-muted mb-3">{{ t(form, 'description') }}</div>
         {% endif %}
 
         <form method="post" enctype="multipart/form-data" id="submit-form">
