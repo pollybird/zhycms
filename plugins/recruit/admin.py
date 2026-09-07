@@ -14,8 +14,9 @@ from app.extensions import db
 from app.admin import admin_bp
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log
+from app.utils.i18n_content import get_available_locales, get_default_locale
 
-from .models import RecruitJob, RecruitApplication
+from .models import RecruitJob, RecruitApplication, RecruitJobTranslation
 from .frontend_routes import resume_abs_path
 
 AUDIT_MODULE = 'recruit'
@@ -100,7 +101,10 @@ def recruit_job_create():
         if job is None:
             return redirect(url_for('admin.recruit_job_create'))
         return redirect(url_for('admin.recruit_job_edit', jid=job.id))
-    return render_template('recruit/form.html', job=None)
+    return render_template('recruit/form.html', job=None,
+                           trans_locales=[l for l in get_available_locales()
+                                          if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 @admin_bp.route('/recruit/jobs/<int:jid>/edit', methods=['GET', 'POST'])
@@ -114,7 +118,10 @@ def recruit_job_edit(jid):
         if _save_job(job) is None:
             return redirect(url_for('admin.recruit_job_edit', jid=jid))
         return redirect(url_for('admin.recruit_job_edit', jid=jid))
-    return render_template('recruit/form.html', job=job)
+    return render_template('recruit/form.html', job=job,
+                           trans_locales=[l for l in get_available_locales()
+                                          if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 def _save_job(job):
@@ -147,6 +154,11 @@ def _save_job(job):
     if is_new:
         job.created_by = current_user.id
         db.session.add(job)
+        db.session.flush()   # 先取 id，翻译表外键依赖
+
+    # v2.5.0：保存各语种翻译（非默认语言）
+    _save_job_translations(job)
+
     db.session.commit()
 
     audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE,
@@ -155,6 +167,34 @@ def _save_job(job):
                if job.deadline else '长期有效'})
     flash(_gettext('岗位已保存'), 'success')
     return job
+
+
+def _save_job_translations(job):
+    """保存岗位各语种翻译（v2.5.0）。
+
+    表单字段命名：{field}_{locale}，如 title_en / description_en。
+    非默认语言且岗位名称非空 → upsert 翻译记录；名称为空 → 删除该翻译（fallback 默认语言）。
+    """
+    default_locale = get_default_locale()
+    locales = [l for l in get_available_locales() if l != default_locale]
+    if not locales:
+        return
+
+    existing = {tr.locale: tr for tr in job.translations}
+
+    for loc in locales:
+        tr_title = (request.form.get(f'title_{loc}') or '').strip()
+        if not tr_title:
+            # 空名称：删除该翻译（fallback 默认语言）
+            if loc in existing:
+                db.session.delete(existing[loc])
+            continue
+        tr = existing.get(loc)
+        if tr is None:
+            tr = RecruitJobTranslation(job_id=job.id, locale=loc)
+            db.session.add(tr)
+        tr.title = tr_title
+        tr.description = request.form.get(f'description_{loc}') or ''
 
 
 @admin_bp.route('/recruit/jobs/<int:jid>/delete', methods=['POST'])

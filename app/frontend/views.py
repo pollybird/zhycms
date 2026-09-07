@@ -152,19 +152,20 @@ def _build_nav():
 
 
 def _seo(column=None, article=None):
-    """获取页面 SEO 信息。"""
+    """获取页面 SEO 信息（v2.5.0：按当前 locale 取翻译，无翻译回退主表字段）。"""
+    from ..utils.i18n_content import t_field
     s = Setting.get_dict()
     if article:
         return {
-            'title': article.seo_title or article.title or s.get('seo_title', ''),
-            'keywords': article.seo_keywords or s.get('seo_keywords', ''),
-            'description': article.seo_description or article.summary or s.get('seo_description', ''),
+            'title': t_field(article, 'seo_title') or t_field(article, 'title') or s.get('seo_title', ''),
+            'keywords': t_field(article, 'seo_keywords') or s.get('seo_keywords', ''),
+            'description': t_field(article, 'seo_description') or t_field(article, 'summary') or s.get('seo_description', ''),
         }
     if column:
         return {
-            'title': column.seo_title or column.name or s.get('seo_title', ''),
-            'keywords': column.seo_keywords or s.get('seo_keywords', ''),
-            'description': column.seo_description or column.summary or s.get('seo_description', ''),
+            'title': t_field(column, 'seo_title') or t_field(column, 'name') or s.get('seo_title', ''),
+            'keywords': t_field(column, 'seo_keywords') or s.get('seo_keywords', ''),
+            'description': t_field(column, 'seo_description') or t_field(column, 'summary') or s.get('seo_description', ''),
         }
     return {
         'title': s.get('seo_title', ''),

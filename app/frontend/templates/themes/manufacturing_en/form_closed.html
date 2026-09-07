@@ -6,7 +6,7 @@
   <div class="col-md-6 text-center py-5">
     <i class="fas fa-lock text-muted" style="font-size:64px;"></i>
     <h2 class="mt-3">Form Closed</h2>
-    <p class="text-muted">"{{ form.name }}" is currently not accepting submissions. Please come back later.</p>
+    <p class="text-muted">"{{ t(form, 'name') }}" is currently not accepting submissions. Please come back later.</p>
     <a href="{{ url_for('frontend.index') }}" class="btn btn-primary">Back to Home</a>
   </div>
 </div>

@@ -1,6 +1,83 @@
 # zhycms 升级迁移指南
 
-本文件包含各版本升级迁移指引。**v2.3.x → v2.4.0 自动执行 Alembic 迁移，覆盖代码 + 装依赖即可**；运行 v1.1（及更早 1.x）版本的站点升级到 v2.0 涉及大量结构变更，请完整阅读本文后半部分后再操作。
+本文件包含各版本升级迁移指引。**v2.4.x → v2.5.0 执行 Alembic 迁移 0005+0006 建翻译表，覆盖代码 + 装依赖即可**；运行 v1.1（及更早 1.x）版本的站点升级到 v2.0 涉及大量结构变更，请完整阅读本文后半部分后再操作。
+
+---
+
+## v2.4.x → v2.5.0 升级（2026-09-07）
+
+v2.5.0 引入 **内容级多语言（i18n 2.0）** 和 **Redis 缓存后端 + 服务端 Session** 两大能力。**无破坏性变更**——新增 7 张翻译关联表（迁移 `0005` + `0006`），主表字段不变；未启用 i18n / Redis 的站点行为与 v2.4.2 完全一致。
+
+### 一、升级步骤
+
+```bash
+# 0. 备份站点目录与数据库（常规操作，建议保留）
+# 1. 停服并更新代码到 v2.5.0
+git pull    # 或下载 v2.5.0 发布包覆盖
+
+# 2. 更新依赖（新增 redis、Flask-Session）
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 3. 执行数据库迁移（新建 7 张翻译表）
+flask db upgrade
+# 或直接启动应用，create_app 启动时自动执行增量迁移
+
+# 4. 启动服务
+python run.py
+# 或 gunicorn -w 4 -b 0.0.0.0:5000 "wsgi:app"
+```
+
+### 二、行为变化与兼容性
+
+| 项目 | v2.4.x | v2.5.0 | 升级影响 |
+| --- | --- | --- | --- |
+| 数据库结构 | 0004 | 0005 + 0006（7 张翻译表） | **自动迁移**，主表无变更 |
+| 内容多语言 | 界面文案级（Flask-Babel） | 内容级（翻译表 + `t()` 全局函数） | 默认关闭，开启后编辑内容时录入翻译 |
+| 缓存后端 | SimpleCache | SimpleCache 或 RedisCache（环境变量驱动） | 未设 `REDIS_URL` 时行为不变 |
+| Session 存储 | Cookie | Cookie 或 Redis（环境变量驱动） | 未设 `REDIS_URL` 时行为不变 |
+| `CMS_VERSION` | `2.4.2` | `2.5.0` | 后台页脚版本号自动更新 |
+| 新增依赖 | — | `redis>=5.0,<6.0`、`Flask-Session>=0.8,<1.0` | `pip install -r requirements.txt` 即可 |
+
+### 三、启用内容级多语言（可选）
+
+1. 进入后台 **系统设置 → 国际化**（权限 `system:settings`）。
+2. 开启 i18n 总开关，配置默认语种（如 `zh`）与可用语种清单（如 `zh,en,ja`）。
+3. 编辑文章/栏目/碎片/产品/表单/岗位/友情链接时，在「多语言版本」Tab 切换语种录入翻译。
+4. 前台模板使用 `{{ t(obj, field) }}` 按当前 locale 取翻译，无翻译时 fallback 默认语言。
+5. `slug` 不随语言变化，URL 保持稳定。
+
+> 翻译表设计：主表保留默认语言字段（冗余），翻译表仅存非默认语言。查不到翻译时 fallback 主表默认语言，不会出现空白内容。
+
+### 四、启用 Redis 缓存（可选）
+
+v2.5.0 支持 Redis 作为缓存后端与服务端 Session 存储，适合多实例负载均衡场景。**未启用 Redis 不影响站点正常运行，单机部署零依赖。**
+
+启用方式：
+
+```bash
+# 方式一：环境变量（源码部署）
+export REDIS_URL=redis://127.0.0.1:6379/0
+python run.py
+
+# 方式二：Docker 部署
+bash docker/install.sh   # 交互选择启用 Redis，自动写入 .env
+docker compose --profile mysql --profile redis up -d
+```
+
+应用启动时自动检测 `REDIS_URL`：有值且 Redis 可达 → 启用 RedisCache + 服务端 Session；否则回退 SimpleCache + Cookie Session。后台「系统设置 → Redis 缓存」展示当前运行状态（只读，不提供手动开关）。
+
+> Redis 连接地址格式：`redis://[:password@]host:port/db`，如 `redis://:mypassword@127.0.0.1:6379/0`。
+
+### 五、升级后验证清单
+
+- [ ] 应用启动日志中出现 `Alembic` 迁移信息（`0005` / `0006`），无报错
+- [ ] 后台页脚显示版本号 `2.5.0`
+- [ ] 前台首页/栏目页/文章页正常访问，内容与升级前一致
+- [ ] 后台文章/栏目/碎片编辑页可见「多语言版本」Tab（i18n 开启后）
+- [ ] 前台 `?lang=en` 切换语言后内容正确切换（录入翻译后）
+- [ ] 后台「系统设置 → Redis 缓存」页面可访问，状态展示正确
+- [ ] （可选）设置 `REDIS_URL` 后重启，后台 Redis 状态页显示「已启用」
+- [ ] （可选）`flask db current` 显示当前版本为最新 revision（`0006`）
 
 ---
 

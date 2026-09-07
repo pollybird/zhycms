@@ -68,7 +68,9 @@ class Config:
     # 基础配置（SECRET_KEY：环境变量 > instance/secret_key 持久化 > 首次启动生成）
     SECRET_KEY = _resolve_secret_key()
 
-    # v2.5.0：Redis URL（可选）。有值则启用 Redis 缓存 + 服务端 Session，无则回退 SimpleCache + Cookie Session
+    # v2.5.0：Redis URL（可选）。有环境变量 REDIS_URL 且 Redis 可达时自动启用
+    # Redis 缓存 + 服务端 Session；无则回退 SimpleCache + Cookie Session。
+    # 后台「系统设置 → Redis 缓存」仅展示运行状态，不可手动开关。
     REDIS_URL = os.environ.get('REDIS_URL', '')
 
     # 会话安全（v2.4.1）：显式 SameSite，HTTPS 下启用 Secure（生产环境由反向代理
@@ -88,13 +90,8 @@ class Config:
     # 会话
     PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
     SESSION_COOKIE_HTTPONLY = True
-    # v2.5.0：有 REDIS_URL 时 Session 存入 Redis（多实例共享登录态），否则保持默认 Cookie Session
-    if REDIS_URL:
-        SESSION_TYPE = 'redis'
-        SESSION_PERMANENT = True
-        SESSION_USE_SIGNER = True
-        SESSION_KEY_PREFIX = 'zhycms:sess:'
-        # SESSION_REDIS 在 create_app 中用 redis.from_url(REDIS_URL) 延迟初始化，避免 import 阶段建连接
+    # v2.5.0：Redis Session/Cache 配置由 create_app 在 DB 初始化后动态注入
+    # （读取 Setting.redis_enable / redis_url），此处仅保留默认值
 
     # 分页
     DEFAULT_PAGE_SIZE = 10
@@ -102,17 +99,10 @@ class Config:
     # 后台每页显示条数
     ADMIN_PAGE_SIZE = 15
 
-    # 模块8：Flask-Caching 配置
-    # v2.5.0：有 REDIS_URL 时切 RedisCache（多实例共享缓存），否则 SimpleCache（单机零依赖）
-    if REDIS_URL:
-        CACHE_TYPE = 'RedisCache'
-        CACHE_REDIS_URL = REDIS_URL
-        CACHE_KEY_PREFIX = 'zhycms:'
-        CACHE_DEFAULT_TIMEOUT = 3600
-    else:
-        CACHE_TYPE = 'SimpleCache'
-        CACHE_DEFAULT_TIMEOUT = 3600
-        CACHE_DIR = os.path.join(BASE_DIR, 'instance', 'cache')
+    # 模块8：Flask-Caching 配置（默认 SimpleCache，create_app 中按 Setting 切 Redis）
+    CACHE_TYPE = 'SimpleCache'
+    CACHE_DEFAULT_TIMEOUT = 3600
+    CACHE_DIR = os.path.join(BASE_DIR, 'instance', 'cache')
 
     # 图片缩略图与压缩临时目录
     IMAGE_TEMP_DIR = os.path.join(BASE_DIR, 'instance', 'image_cache')

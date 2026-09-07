@@ -19,9 +19,10 @@ from app.models.column import Column
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log, clear_content_cache
 from app.utils.uploads import save_upload_file
+from app.utils.i18n_content import get_available_locales, get_default_locale
 from app.plugin_system import plugin_enabled
 
-from .models import Product
+from .models import Product, ProductTranslation
 
 from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'product'
@@ -191,7 +192,10 @@ def product_create():
         if pre_col is not None:
             _check_column_access(pre_col.id)
     return render_template('product/form.html', product=None,
-                           columns=_visible_list_columns(), pre_col=pre_col)
+                           columns=_visible_list_columns(), pre_col=pre_col,
+                           trans_locales=[l for l in get_available_locales()
+                                          if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 @admin_bp.route('/products/<int:pid>/edit', methods=['GET', 'POST'])
@@ -208,7 +212,10 @@ def product_edit(pid):
         return redirect(url_for('admin.product_edit', pid=pid))
     _check_column_access(product.column_id)
     return render_template('product/form.html', product=product,
-                           columns=_visible_list_columns(), pre_col=None)
+                           columns=_visible_list_columns(), pre_col=None,
+                           trans_locales=[l for l in get_available_locales()
+                                          if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 def _save_product(product):
@@ -293,7 +300,12 @@ def _save_product(product):
     if is_new:
         product.created_by = current_user.id
         db.session.add(product)
+        db.session.flush()   # 先取 id，翻译表外键依赖
     product.updated_by = current_user.id
+
+    # v2.5.0：保存各语种翻译（非默认语言）
+    _save_product_translations(product)
+
     db.session.commit()
 
     audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE,
@@ -304,6 +316,36 @@ def _save_product(product):
     clear_content_cache(column_id=col.id)
     flash(_gettext('产品已保存'), 'success')
     return product
+
+
+def _save_product_translations(product):
+    """保存产品各语种翻译（v2.5.0）。
+
+    表单字段命名：{field}_{locale}，如 title_en / content_en。
+    非默认语言且标题非空 → upsert 翻译记录；标题为空 → 删除该翻译（fallback 默认语言）。
+    """
+    default_locale = get_default_locale()
+    locales = [l for l in get_available_locales() if l != default_locale]
+    if not locales:
+        return
+
+    existing = {tr.locale: tr for tr in product.translations}
+
+    trans_fields = ('title', 'summary', 'content',
+                    'seo_title', 'seo_keywords', 'seo_description')
+    for loc in locales:
+        tr_title = (request.form.get(f'title_{loc}') or '').strip()
+        if not tr_title:
+            # 空标题：删除该翻译（fallback 默认语言）
+            if loc in existing:
+                db.session.delete(existing[loc])
+            continue
+        tr = existing.get(loc)
+        if tr is None:
+            tr = ProductTranslation(product_id=product.id, locale=loc)
+            db.session.add(tr)
+        for fld in trans_fields:
+            setattr(tr, fld, request.form.get(f'{fld}_{loc}') or '')
 
 
 # ============================================================

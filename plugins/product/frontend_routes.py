@@ -58,6 +58,12 @@ def _try_cache(key, ttl_setting_key, default_ttl=900):
             cache_key = f'frontend/{key}/' + '/'.join(
                 [str(v) for v in args] + [f'{k}={v}' for k, v in sorted(kwargs.items())]
             )
+            # v2.5.0：缓存键包含当前 locale，避免不同语言命中同一缓存
+            try:
+                from app.i18n import select_locale
+                cache_key += '|loc=' + select_locale()
+            except Exception:
+                pass
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:
@@ -83,10 +89,12 @@ def _resolve_detail_template():
 
 
 def _seo_for(product, column):
+    """SEO 信息（v2.5.0：按当前 locale 取翻译，无翻译回退主表字段）。"""
+    from app.utils.i18n_content import t_field
     return {
-        'title': product.seo_title or product.title,
-        'keywords': product.seo_keywords or '',
-        'description': product.seo_description or product.summary or '',
+        'title': t_field(product, 'seo_title') or t_field(product, 'title'),
+        'keywords': t_field(product, 'seo_keywords') or '',
+        'description': t_field(product, 'seo_description') or t_field(product, 'summary') or '',
         'column': column,
     }
 
@@ -94,6 +102,7 @@ def _seo_for(product, column):
 def _render_product_detail(column, product):
     """渲染产品详情（导航/上下篇/SEO）。"""
     from app.frontend.views import _build_nav, _inject_default_alt
+    from app.utils.i18n_content import t_field
 
     base_q = Product.query.filter(
         Product.column_id == column.id,
@@ -106,7 +115,7 @@ def _render_product_detail(column, product):
         .order_by(Product.id.asc()).first()
 
     data = product_brief(product, column)
-    content = product.content or ''
+    content = t_field(product, 'content') or ''
     if content:
         content = _inject_default_alt(content)
 

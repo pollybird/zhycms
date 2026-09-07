@@ -15,7 +15,8 @@ from app.utils.helpers import permission_required, audit_log
 from app.utils.uploads import save_upload_file
 from app.plugin_system import plugin_enabled
 
-from .models import FriendLink
+from .models import FriendLink, FriendLinkTranslation
+from app.utils.i18n_content import get_available_locales, get_default_locale
 
 from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'friend_link'
@@ -50,7 +51,9 @@ def friend_link_create():
         if link is None:
             return redirect(url_for('admin.friend_link_create'))
         return redirect(url_for('admin.friend_link_index'))
-    return render_template('friend_link/form.html', link=None)
+    return render_template('friend_link/form.html', link=link,
+                           trans_locales=_trans_locales(),
+                           default_locale=get_default_locale())
 
 
 @admin_bp.route('/friend-links/<int:lid>/edit', methods=['GET', 'POST'])
@@ -63,7 +66,18 @@ def friend_link_edit(lid):
         if updated is None:
             return redirect(url_for('admin.friend_link_edit', lid=lid))
         return redirect(url_for('admin.friend_link_index'))
-    return render_template('friend_link/form.html', link=link)
+    return render_template('friend_link/form.html', link=link,
+                           trans_locales=_trans_locales(),
+                           default_locale=get_default_locale())
+
+
+def _trans_locales():
+    """非默认语言的语种列表（无 i18n 配置时为空列表）。"""
+    try:
+        default_locale = get_default_locale()
+        return [l for l in get_available_locales() if l != default_locale]
+    except Exception:
+        return []
 
 
 def _save_link(link):
@@ -98,10 +112,35 @@ def _save_link(link):
     if is_new:
         db.session.add(link)
     db.session.commit()
+    _save_link_translations(link)
     audit_log(OP_CREATE if is_new else OP_UPDATE, AUDIT_MODULE,
               link.id, link.name, {'action': '链接', 'url': link.url})
     flash(_gettext('友情链接已保存'), 'success')
     return link
+
+
+def _save_link_translations(link):
+    """保存链接名称各语种翻译（v2.5.0）。仅名称；URL/LOGO 不随语言变化。
+
+    表单字段命名：name_{locale}。非默认语言且名称非空 → upsert；
+    名称为空 → 删除该翻译（前台回退默认语言名称）。
+    """
+    locales = _trans_locales()
+    if not locales:
+        return
+    existing = {tr.locale: tr for tr in link.translations}
+    for loc in locales:
+        tr_name = (request.form.get(f'name_{loc}') or '').strip()
+        if not tr_name:
+            if loc in existing:
+                db.session.delete(existing[loc])
+            continue
+        tr = existing.get(loc)
+        if tr is None:
+            tr = FriendLinkTranslation(link_id=link.id, locale=loc)
+            db.session.add(tr)
+        tr.name = tr_name
+    db.session.commit()
 
 
 @admin_bp.route('/friend-links/<int:lid>/delete', methods=['POST'])

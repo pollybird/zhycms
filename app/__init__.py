@@ -339,6 +339,28 @@ def _alembic_bootstrap(app):
 # 主入口
 # ============================================================
 
+def _resolve_redis_url(app):
+    """v2.5.0：检测环境是否有可用的 Redis，返回 Redis URL 或 None。
+
+    逻辑：环境变量 REDIS_URL 有值 → 尝试 ping，可达则启用，不可达则回退 SimpleCache。
+    无环境变量 → None（SimpleCache + Cookie Session）。
+    后台设置页仅展示此结果，不提供手动开关。
+    """
+    env_url = os.environ.get('REDIS_URL', '').strip()
+    if not env_url:
+        return None
+    # 检测 Redis 是否可达
+    try:
+        import redis as _redis
+        conn = _redis.from_url(env_url, decode_responses=False)
+        conn.ping()
+        app.logger.info(f'[Redis] 环境变量 REDIS_URL 已配置且 Redis 可达，启用 Redis 缓存')
+        return env_url
+    except Exception as e:
+        app.logger.warning(f'[Redis] REDIS_URL={env_url} 但连接失败（{e}），回退 SimpleCache')
+        return None
+
+
 def create_app(config_name=None):
     if config_name is None:
         # ZHOCMS_ 为 v2.1 前旧前缀（历史拼写差异），保留兼容回退
@@ -355,21 +377,33 @@ def create_app(config_name=None):
     migrate.init_app(app, db, render_as_batch=True)
     login_manager.init_app(app)
 
-    # 缓存：v2.5.0 支持 Redis 后端（CACHE_REDIS_URL 等由 config 注入）
-    cache.init_app(app, config={
-        'CACHE_TYPE': app.config.get('CACHE_TYPE', 'SimpleCache'),
-        'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 3600),
-        'CACHE_DIR': app.config.get('CACHE_DIR'),
-        'CACHE_REDIS_URL': app.config.get('CACHE_REDIS_URL'),
-        'CACHE_KEY_PREFIX': app.config.get('CACHE_KEY_PREFIX', 'zhycms:'),
-    })
+    # v2.5.0：Redis 缓存 + 服务端 Session
+    # 自动检测：环境变量 REDIS_URL 有值且 Redis 可达 → 启用；否则 SimpleCache + Cookie
+    redis_url = _resolve_redis_url(app)
 
-    # v2.5.0 服务端 Session：仅当 REDIS_URL 配置时启用，否则保持 Flask 默认 Cookie Session
-    if app.config.get('REDIS_URL'):
+    if redis_url:
+        # Redis 缓存
+        cache.init_app(app, config={
+            'CACHE_TYPE': 'RedisCache',
+            'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 3600),
+            'CACHE_REDIS_URL': redis_url,
+            'CACHE_KEY_PREFIX': app.config.get('CACHE_KEY_PREFIX', 'zhycms:'),
+        })
+        # 服务端 Session
         import redis as _redis
-        app.config['SESSION_REDIS'] = _redis.from_url(
-            app.config['REDIS_URL'], decode_responses=False)
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_PERMANENT'] = True
+        app.config['SESSION_USE_SIGNER'] = True
+        app.config['SESSION_KEY_PREFIX'] = 'zhycms:sess:'
+        app.config['SESSION_REDIS'] = _redis.from_url(redis_url, decode_responses=False)
         server_session.init_app(app)
+    else:
+        # SimpleCache（单机零依赖）
+        cache.init_app(app, config={
+            'CACHE_TYPE': 'SimpleCache',
+            'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 3600),
+            'CACHE_DIR': app.config.get('CACHE_DIR'),
+        })
 
     # v2.3.0 国际化：初始化 Babel 并注册 locale 选择器
     # （须在 db 之后：selector 内读 Setting；在蓝图注册之前）

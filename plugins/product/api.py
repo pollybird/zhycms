@@ -17,14 +17,17 @@ from app.models.setting import Setting
 
 
 def _product_summary(p, col=None):
+    """产品摘要（v2.5.0：title/summary 按当前 locale 取翻译，无翻译回退主表）。"""
     from .frontend import frontend_product_url
+    from app.utils.i18n_content import t_field
 
     col = col or p.column
     url = frontend_product_url(p, col)
     if url.startswith('/'):
         url = _abs_url(url)
     return {
-        'id': p.id, 'title': p.title, 'summary': p.summary or '',
+        'id': p.id, 'title': t_field(p, 'title') or '',
+        'summary': t_field(p, 'summary') or '',
         'cover': _abs_url(p.cover_url()),
         'sort_order': p.sort_order, 'url': url,
         'column': {'id': col.id, 'name': col.name, 'slug': col.slug}
@@ -33,15 +36,17 @@ def _product_summary(p, col=None):
 
 
 def _product_detail(p, col):
+    from app.utils.i18n_content import t_field
+
     data = _product_summary(p, col)
     data.update({
-        'content': p.content or '',
+        'content': t_field(p, 'content') or '',
         'gallery': [_abs_url(u) for u in p.gallery_urls()],
         'specs': p.specs_grouped(),
         'seo': {
-            'title': p.seo_title or p.title,
-            'keywords': p.seo_keywords or '',
-            'description': p.seo_description or p.summary or '',
+            'title': t_field(p, 'seo_title') or t_field(p, 'title'),
+            'keywords': t_field(p, 'seo_keywords') or '',
+            'description': t_field(p, 'seo_description') or t_field(p, 'summary') or '',
         },
     })
     return data
@@ -96,6 +101,7 @@ def register(api_bp):
             .order_by(Product.id.desc()).first()
         next_p = base_q.filter(Product.id > p.id) \
             .order_by(Product.id.asc()).first()
-        data['prev'] = {'id': prev_p.id, 'title': prev_p.title} if prev_p else None
-        data['next'] = {'id': next_p.id, 'title': next_p.title} if next_p else None
+        from app.utils.i18n_content import t_field
+        data['prev'] = {'id': prev_p.id, 'title': t_field(prev_p, 'title') or ''} if prev_p else None
+        data['next'] = {'id': next_p.id, 'title': t_field(next_p, 'title') or ''} if next_p else None
         return api_ok(data)

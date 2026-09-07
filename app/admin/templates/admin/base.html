@@ -176,8 +176,8 @@
           </li>
           {% endif %}
 
-          <li class="nav-item has-treeview {{ 'menu-open' if active_menu and (active_menu.startswith('setting') or active_menu in ['profile','password','logs']) }}">
-            <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('setting') or active_menu in ['profile','password','logs']) }}">
+          <li class="nav-item has-treeview {{ 'menu-open' if active_menu and (active_menu.startswith('setting') or active_menu in ['logs']) }}">
+            <a href="#" class="nav-link {{ 'active' if active_menu and (active_menu.startswith('setting') or active_menu in ['logs']) }}">
               <i class="nav-icon fas fa-cog"></i><p>{{ _('系统设置') }}<i class="right fas fa-angle-left"></i></p>
             </a>
             <ul class="nav nav-treeview">
@@ -226,16 +226,6 @@
                 </a>
               </li>
               {% endif %}
-              <li class="nav-item">
-                <a href="{{ url_for('admin.profile') }}" class="nav-link {{ 'active' if active_menu == 'profile' }}">
-                  <i class="far fa-circle nav-icon"></i><p>{{ _('个人资料') }}</p>
-                </a>
-              </li>
-              <li class="nav-item">
-                <a href="{{ url_for('admin.password') }}" class="nav-link {{ 'active' if active_menu == 'password' }}">
-                  <i class="far fa-circle nav-icon"></i><p>{{ _('修改密码') }}</p>
-                </a>
-              </li>
               {% if current_user.has_permission('system:audit_log') %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if active_menu == 'logs' }}">
@@ -272,6 +262,11 @@
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_search') }}" class="nav-link {{ 'active' if active_menu == 'setting_search' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('搜索设置') }}</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_redis') }}" class="nav-link {{ 'active' if active_menu == 'setting_redis' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('Redis 缓存') }}</p>
                 </a>
               </li>
               {% endif %}

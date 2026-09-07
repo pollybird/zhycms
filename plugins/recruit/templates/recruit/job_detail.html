@@ -1,18 +1,18 @@
 {% extends theme_base %}
-{% block title %}{{ job.title }} - {{ _p('recruit', '招贤纳士') }}{% endblock %}
+{% block title %}{{ t(job, 'title') }} - {{ _p('recruit', '招贤纳士') }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">{{ _p('recruit', '首页') }}</a></li>
     <li class="breadcrumb-item"><a href="{{ url_for('recruit_frontend.job_list') }}">{{ _p('recruit', '招贤纳士') }}</a></li>
-    <li class="breadcrumb-item active">{{ job.title }}</li>
+    <li class="breadcrumb-item active">{{ t(job, 'title') }}</li>
   </ol>
 </nav>
 
 <div class="row">
   <div class="col-md-8">
-    <h1>{{ job.title }}</h1>
+    <h1>{{ t(job, 'title') }}</h1>
     <div class="text-muted mb-3">
       {% if job.department %}<span class="mr-3"><i class="fas fa-sitemap"></i> {{ job.department }}</span>{% endif %}
       {% if job.location %}<span class="mr-3"><i class="fas fa-map-marker-alt"></i> {{ job.location }}</span>{% endif %}
@@ -28,9 +28,9 @@
       </span>
     </div>
 
-    {% if job.description %}
+    {% if t(job, 'description') %}
     <div class="article-content">
-      {{ job.description }}
+      {{ t(job, 'description') }}
     </div>
     {% endif %}
   </div>

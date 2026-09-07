@@ -78,7 +78,7 @@
           <div class="spec-group border rounded p-2 mb-3">
             <div class="form-group mb-2 d-flex">
               <input type="text" class="form-control form-control-sm spec-group-name mr-2"
-                     placeholder="{{ _p('product', '分组名称（如：基本参数）') }}" value="{{ g.group }}" style="max-width:240px;">
+                     placeholder="{{ _p('product', '分组名称（如：基本参数）') }}" value="{{ g['group'] }}" style="max-width:240px;">
               <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeGroup(this)" title="{{ _p('product', '删除分组') }}">
                 <i class="fas fa-trash"></i>
               </button>
@@ -86,7 +86,7 @@
             <table class="table table-sm mb-2">
               <thead><tr><th style="width:40%;">{{ _p('product', '参数名') }}</th><th>{{ _p('product', '参数值') }}</th><th width="60"></th></tr></thead>
               <tbody>
-                {% for it in g.items %}
+                {% for it in g['items'] %}
                 <tr class="spec-row">
                   <td><input type="text" class="form-control form-control-sm spec-name" value="{{ it.name }}" placeholder="{{ _p('product', '如：型号') }}"></td>
                   <td><input type="text" class="form-control form-control-sm spec-value" value="{{ it.value }}"></td>
@@ -106,6 +106,55 @@
           {{ _p('product', '参数名为空的行保存时自动忽略；前台详情页按分组渲染规格表。') }}
         </div>
       </div>
+
+      {% if trans_locales %}
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-language"></i> {{ _p('product', '多语言版本') }}</h3>
+          <small class="text-muted ml-2">{{ _('留空则前台回退显示默认语言（%(loc)s）内容', loc=default_locale) }}</small>
+        </div>
+        <div class="card-body">
+          <ul class="nav nav-tabs" id="i18n-tabs" role="tablist">
+            {% for loc in trans_locales %}
+            <li class="nav-item">
+              <a class="nav-link {% if loop.first %}active{% endif %}" data-toggle="pill" href="#i18n-{{ loc }}" role="tab">{{ loc|upper }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+          <div class="tab-content pt-3">
+            {% for loc in trans_locales %}
+            {% set tr = product.translations|selectattr('locale', 'equalto', loc)|list|first if product else none %}
+            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="i18n-{{ loc }}" role="tabpanel">
+              <div class="form-group">
+                <label>{{ _p('product', '标题') }} ({{ loc|upper }})</label>
+                <input type="text" name="title_{{ loc }}" class="form-control" value="{{ tr.title if tr else '' }}">
+              </div>
+              <div class="form-group">
+                <label>{{ _p('product', '摘要') }} ({{ loc|upper }})</label>
+                <textarea name="summary_{{ loc }}" rows="2" class="form-control">{{ tr.summary if tr else '' }}</textarea>
+              </div>
+              <div class="form-group">
+                <label>{{ _p('product', '产品详情') }} ({{ loc|upper }})</label>
+                <textarea name="content_{{ loc }}" rows="10" class="form-control richtext">{{ tr.content if tr and tr.content else '' }}</textarea>
+              </div>
+              <div class="form-group">
+                <label>{{ _p('product', 'SEO 标题') }} ({{ loc|upper }})</label>
+                <input type="text" name="seo_title_{{ loc }}" class="form-control" value="{{ tr.seo_title if tr else '' }}">
+              </div>
+              <div class="form-group">
+                <label>{{ _p('product', 'SEO 关键词') }} ({{ loc|upper }})</label>
+                <input type="text" name="seo_keywords_{{ loc }}" class="form-control" value="{{ tr.seo_keywords if tr else '' }}">
+              </div>
+              <div class="form-group">
+                <label>{{ _p('product', 'SEO 描述') }} ({{ loc|upper }})</label>
+                <textarea name="seo_description_{{ loc }}" rows="2" class="form-control">{{ tr.seo_description if tr else '' }}</textarea>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="col-md-4">
@@ -235,6 +284,14 @@
     .then(e => { mainEditor = e; })
     .catch(err => console.error(err));
 
+  // 多语言翻译内容：与默认语言一致使用富文本编辑器（提交前回写 textarea）
+  const fieldEditors = [];
+  document.querySelectorAll('.richtext').forEach(el => {
+    CKEDITOR.ClassicEditor.create(el, ckConfig).then(e => {
+      fieldEditors.push({el: el, editor: e});
+    }).catch(err => console.error(err));
+  });
+
   // ===== 相册编辑器：拖拽排序 + 移除；新上传文件由服务端追加 =====
   function removeGalleryItem(btn){
     btn.closest('.gallery-item').remove();
@@ -297,6 +354,7 @@
   // ===== 提交前组装 JSON =====
   $('#product-form').on('submit', function(){
     if (mainEditor) document.querySelector('#content').value = mainEditor.getData();
+    fieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
 
     // 相册顺序（保留项按 DOM 顺序）
     const kept = [];

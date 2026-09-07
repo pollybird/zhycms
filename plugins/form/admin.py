@@ -27,9 +27,10 @@ from app.models.audit import (
 )
 from app.utils.helpers import permission_required, audit_log
 from app.utils.uploads import save_upload_file
+from app.utils.i18n_content import get_available_locales, get_default_locale
 from app.plugin_system import plugin_enabled
 
-from .models import Form, FormField, FormSubmission, FormSubmissionValue
+from .models import Form, FormField, FormSubmission, FormSubmissionValue, FormTranslation
 
 # 审计模块代码（与核心版 app.models.audit 常量值一致，历史日志无缝翻译）
 MODULE_FORM = 'form'
@@ -76,7 +77,10 @@ def form_create():
         if form is None:
             return redirect(url_for('admin.form_create'))
         return redirect(url_for('admin.form_edit', fid=form.id))
-    return render_template('admin/form/form.html', form=None, field_types=FIELD_TYPES)
+    return render_template('admin/form/form.html', form=None, field_types=FIELD_TYPES,
+                           trans_locales=[l for l in get_available_locales()
+                                          if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 @admin_bp.route('/forms/<int:fid>/edit', methods=['GET', 'POST'])
@@ -92,7 +96,10 @@ def form_edit(fid):
             return redirect(url_for('admin.form_edit', fid=fid))
         return redirect(url_for('admin.form_edit', fid=fid))
     fields = form.fields.filter_by(is_deleted=False).order_by(FormField.sort_order.asc()).all()
-    return render_template('admin/form/form.html', form=form, fields=fields, field_types=FIELD_TYPES)
+    return render_template('admin/form/form.html', form=form, fields=fields, field_types=FIELD_TYPES,
+                           trans_locales=[l for l in get_available_locales()
+                                          if l != get_default_locale()],
+                           default_locale=get_default_locale())
 
 
 def _save_form(form):
@@ -126,11 +133,43 @@ def _save_form(form):
     # 保存字段
     _save_form_fields(form)
 
+    # v2.5.0：保存各语种文案（非默认语言）
+    _save_form_translations(form)
+
     db.session.commit()
     flash(_gettext('表单已保存'), 'success')
     audit_log(OP_CREATE if is_new else OP_UPDATE, MODULE_FORM, form.id, form.name,
               {'slug': form.slug})
     return form
+
+
+def _save_form_translations(form):
+    """保存表单各语种文案（v2.5.0）。
+
+    表单字段命名：{field}_{locale}，如 name_en / description_en。
+    非默认语言且名称非空 → upsert 翻译记录；名称为空 → 删除该翻译（fallback 默认语言）。
+    """
+    default_locale = get_default_locale()
+    locales = [l for l in get_available_locales() if l != default_locale]
+    if not locales:
+        return
+
+    existing = {tr.locale: tr for tr in form.translations}
+
+    for loc in locales:
+        tr_name = (request.form.get(f'name_{loc}') or '').strip()
+        if not tr_name:
+            # 空名称：删除该翻译（fallback 默认语言）
+            if loc in existing:
+                db.session.delete(existing[loc])
+            continue
+        tr = existing.get(loc)
+        if tr is None:
+            tr = FormTranslation(form_id=form.id, locale=loc)
+            db.session.add(tr)
+        tr.name = tr_name
+        tr.description = (request.form.get(f'description_{loc}') or '').strip()
+        tr.success_message = (request.form.get(f'success_message_{loc}') or '').strip()
 
 
 def _save_form_fields(form):

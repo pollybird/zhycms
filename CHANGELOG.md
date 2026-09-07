@@ -5,39 +5,45 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-## [2.5.0] - 2026-09-06
+## [2.5.0] - 2026-09-07
 
 **内容级多语言（i18n 2.0）+ Redis 缓存与 Session**，企业出海刚需版本。无破坏性变更，覆盖代码 + 执行迁移即可升级。
 
 ### Added
 
-- **内容级多语言（i18n 2.0）**：文章/栏目/碎片支持多语言版本存储。
-  - 新增 `article_translations`、`column_translations`、`fragment_translations` 三张翻译关联表（Alembic 迁移 `0005`）。
+- **内容级多语言（i18n 2.0）**：文章/栏目/碎片/产品/表单/岗位/友情链接支持多语言版本存储。
+  - 新增 `article_translations`、`column_translations`、`fragment_translations` 三张核心翻译关联表（Alembic 迁移 `0005`），以及 `product_translations`（产品 title/summary/content/seo_*）、`form_translations`（表单 name/description/success_message）、`recruit_job_translations`（岗位 title/description）、`friend_link_translations`（友情链接名称）四张插件翻译表（Alembic 迁移 `0006`）。
   - 主表保留默认语言字段（冗余），翻译表存非默认语言；查不到翻译时 fallback 默认语言。
-  - 前台模板新增 Jinja 全局 `t(obj, field)`，6 套主题共 44 个模板的内容字段已接入。
-  - 后台文章/栏目/碎片编辑页新增「多语言版本」Tab，按语种切换录入翻译。
+  - 前台模板新增 Jinja 全局 `t(obj, field)`，6 套主题共 44 个模板的内容字段已接入，产品详情/列表卡片、表单页文案、岗位列表/详情、友情链接名称同步适配。
+  - 后台文章/栏目/碎片编辑页新增「多语言版本」Tab，产品/表单/岗位/友情链接编辑页同批接入，按语种切换录入翻译；富文本翻译字段使用 CKEditor5 与主编辑器一致。
+  - 碎片仅翻译内容值（名称不随语言变化），友情链接仅翻译名称（URL/LOGO 不随语言变化）。
+  - 栏目/文章前台 SEO（meta title/keywords/description）按当前语言取翻译，无翻译回退主表。
+  - 产品 API（列表/详情/上下篇）按当前语言返回内容，API 缓存键加入 locale。
   - `slug` 不随语言变化，URL 保持稳定；语言切换沿用 `?lang=xx` + session 机制。
-  - 页面缓存键加入 locale，不同语言互不串扰。
+  - 页面缓存键加入 locale，不同语言互不串扰（含产品详情页缓存）。
 - **Redis 缓存后端 + 服务端 Session**：
-  - 配置 `REDIS_URL` 环境变量后，Flask-Caching 切 RedisCache、Flask-Session 存 Redis，支撑多实例负载均衡。
-  - 未配置 `REDIS_URL` 时自动回退 SimpleCache + Cookie Session，单机部署零依赖。
+  - 应用启动时自动检测环境变量 `REDIS_URL`：有值且 Redis 可达 → 启用 RedisCache + Flask-Session 存 Redis，支撑多实例负载均衡；否则回退 SimpleCache + Cookie Session，单机部署零依赖。
+  - 后台「系统设置 → Redis 缓存」只读状态页：展示当前运行状态（已启用/未启用/连接失败），未启用时引导安装 Redis 并设置环境变量；不提供手动开关，避免运行时切换导致状态不一致。
   - `docker-compose.yml` 新增可选 `redis` profile（redis:7-alpine + 256MB LRU），`install.sh` 新增 Redis 交互选项。
 
 ### Changed
 
 - 版本号 `CMS_VERSION` 由 `2.4.2` 升级为 `2.5.0`。
 - `requirements.txt` 新增 `redis>=5.0,<6.0`、`Flask-Session>=0.8,<1.0`。
+- 移除后台左侧菜单「个人资料」「修改密码」两项（与右上角用户下拉菜单重复）。
 
 ### Fixed
 
 - 修复前台文章详情页浅拷贝对象丢失 `translations` 关系导致多语言翻译无法渲染的问题。
 - 修复 `t_field` 依赖 babel 缓存 locale 导致 `?lang=` 切换不生效的问题，改为直接调用 `select_locale()`。
+- 修复产品编辑页规格参数分组渲染报 `TypeError: 'builtin_function_or_method' object is not iterable`（`g.items` 命中 dict 内置方法而非键值）。
+- 修复栏目/文章前台 `_seo()` 未按当前语言取翻译 SEO 字段的问题。
 
 ### 升级说明
 
 - v2.4.x 站点：`git pull` → `pip install -r requirements.txt` → `flask db upgrade` → 重启应用。
 - 启用多语言：后台「系统设置 → 国际化」开启，配置默认语言与可用语种，编辑内容时在「多语言版本」Tab 录入翻译。
-- 启用 Redis：Docker 部署在 `install.sh` 中选择启用 Redis；源码部署设置 `REDIS_URL` 环境变量。
+- 启用 Redis：设置环境变量 `REDIS_URL=redis://127.0.0.1:6379/0` 后重启应用；Docker 部署在 `install.sh` 中选择启用 Redis。
 - 未启用 i18n / Redis 的站点，行为与 v2.4.2 完全一致。
 
 ## [2.4.2] - 2026-09-06
@@ -295,7 +301,11 @@ v2.0 的体验优化与缺陷修复版本，**无数据库结构变更**，v2.0 
 - 修复带路径参数路由（如文章列表）分页链接 BuildError。
 - 修复单页栏目自定义字段内容录入问题。
 
-[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.3.0...HEAD
+[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.5.0...HEAD
+[2.5.0]: https://gitee.com/pollybird/zhycms/compare/v2.4.2...v2.5.0
+[2.4.2]: https://gitee.com/pollybird/zhycms/compare/v2.4.1...v2.4.2
+[2.4.1]: https://gitee.com/pollybird/zhycms/compare/v2.4.0...v2.4.1
+[2.4.0]: https://gitee.com/pollybird/zhycms/compare/v2.3.0...v2.4.0
 [2.3.0]: https://gitee.com/pollybird/zhycms/compare/v2.2.0...v2.3.0
 [2.2.0]: https://gitee.com/pollybird/zhycms/compare/v2.1.1...v2.2.0
 [2.1.1]: https://gitee.com/pollybird/zhycms/compare/v2.1.0...v2.1.1

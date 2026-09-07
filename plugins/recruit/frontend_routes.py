@@ -68,6 +68,12 @@ def _base_ctx(seo_title, seo_description=''):
     }
 
 
+def _job_seo_ctx(job):
+    """岗位页 SEO 上下文（v2.5.0：按当前 locale 取翻译，无翻译回退主表）。"""
+    from app.utils.i18n_content import t_field
+    return _base_ctx(t_field(job, 'title') or '', (t_field(job, 'description') or '')[:200])
+
+
 # ============================================================
 # 路由
 # ============================================================
@@ -101,7 +107,7 @@ def job_detail(jid):
     """岗位详情：开放申请时渲染表单，截止后仅展示提示。"""
     job = _get_open_job(jid)
     submitted = request.args.get('submitted') == '1'
-    ctx = _base_ctx(job.title, (job.description or '')[:200])
+    ctx = _job_seo_ctx(job)
     return render_template(_resolve_template('recruit_job_detail.html'),
                            job=job, is_open=job.is_open(),
                            submitted=submitted,

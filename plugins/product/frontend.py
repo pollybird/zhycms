@@ -22,12 +22,17 @@ def frontend_product_url(product, column=None):
 
 
 def product_brief(product, column=None):
-    """产品摘要（列表/卡片用，不含正文大字段）。"""
+    """产品摘要（列表/卡片用，不含正文大字段）。
+
+    v2.5.0：title/summary 按当前 locale 取翻译，无翻译回退主表默认语言。
+    """
+    from app.utils.i18n_content import t_field
+
     col = column or product.column
     return {
         'id': product.id,
-        'title': product.title,
-        'summary': product.summary or '',
+        'title': t_field(product, 'title') or '',
+        'summary': t_field(product, 'summary') or '',
         'cover': product.cover_url(),
         'sort_order': product.sort_order,
         'url': frontend_product_url(product, col),

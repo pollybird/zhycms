@@ -115,6 +115,7 @@
   <a href="#i18n-config" class="sub">后台配置</a>
   <a href="#i18n-dev" class="sub">翻译工作流</a>
   <a href="#i18n-plugin" class="sub">插件国际化</a>
+  <a href="#i18n-content" class="sub">内容级多语言（v2.5）</a>
 </div>
 
 <div class="toc-group">
@@ -142,6 +143,7 @@
   <a href="#search">全文搜索</a>
   <a href="#docker">Docker 容器化</a>
   <a href="#oss">对象存储 OSS</a>
+  <a href="#redis">Redis 缓存与 Session</a>
 </div>
 
 </nav>
@@ -150,7 +152,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v2.4.2</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v2.5.0</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -703,6 +705,42 @@ pybabel init -i ... -d plugins/product/translations -l en
 pybabel update -i ... -d plugins/product/translations
 pybabel compile -d plugins/product/translations</code></pre>
 <div class="warn"><code>.mo</code> 文件在 <code>.gitignore</code> 中排除，<b>部署前必须对每个插件执行 pybabel compile</b>。</div>
+
+<h3 id="i18n-content">内容级多语言（i18n 2.0）<span class="tag tag-new">v2.5</span></h3>
+<p>v2.3 的国际化是<b>界面文案级别</b>（后台按钮、菜单等固定文案的中英文切换）。v2.5 新增<b>内容级多语言</b>：文章标题、栏目名称、碎片内容、产品详情、表单说明、岗位描述、友情链接名称等<b>动态数据</b>也支持多语言版本存储，前台按当前 locale 自动渲染对应语言内容。</p>
+
+<h4>翻译表设计</h4>
+<table>
+  <tr><th>主表</th><th>翻译表</th><th>翻译字段</th></tr>
+  <tr><td>articles</td><td>article_translations</td><td>title, summary, content, seo_title, seo_keywords, seo_description</td></tr>
+  <tr><td>columns</td><td>column_translations</td><td>name, summary, page_content, seo_title, seo_keywords, seo_description</td></tr>
+  <tr><td>fragments</td><td>fragment_translations</td><td>value（仅内容值，名称不翻译）</td></tr>
+  <tr><td>products</td><td>product_translations</td><td>title, summary, content, seo_*</td></tr>
+  <tr><td>forms</td><td>form_translations</td><td>name, description, success_message</td></tr>
+  <tr><td>recruit_jobs</td><td>recruit_job_translations</td><td>title, description</td></tr>
+  <tr><td>friend_links</td><td>friend_link_translations</td><td>name（仅名称，URL 不翻译）</td></tr>
+</table>
+<div class="note"><b>设计原则</b>：主表保留默认语言字段（冗余），翻译表仅存非默认语言。查不到翻译时 fallback 主表默认语言，不会出现空白。<code>slug</code> 不随语言变化，URL 保持稳定。</div>
+
+<h4>前台模板：t() 全局函数</h4>
+<pre><code>&lt;!-- 6 套主题模板已接入，自定义主题按此模式适配 --&gt;
+&lt;h1&gt;{{ t(article, 'title') }}&lt;/h1&gt;
+&lt;p&gt;{{ t(article, 'summary') }}&lt;/p&gt;
+&lt;div&gt;{{ t(article, 'content')|safe }}&lt;/div&gt;
+
+&lt;!-- 栏目名称 --&gt;
+&lt;a href="..."&gt;{{ t(column, 'name') }}&lt;/a&gt;
+
+&lt;!-- 碎片内容 --&gt;
+{{ t(fragment, 'value')|safe }}
+
+&lt;!-- 友情链接名称 --&gt;
+&lt;a href="{{ l.url }}"&gt;{{ t(l, 'name') }}&lt;/a&gt;</code></pre>
+<div class="note">页面缓存键自动加入 locale，不同语言互不串扰。产品 API 缓存键同样加入 locale。</div>
+
+<h4>后台编辑：多语言版本 Tab</h4>
+<p>在文章/栏目/碎片/产品/表单/岗位/友情链接编辑页，开启 i18n 后显示「多语言版本」Tab，按语种切换录入翻译。富文本翻译字段使用 CKEditor5，与主编辑器配置一致。</p>
+<div class="tip">碎片仅翻译内容值（名称不随语言变化）；友情链接仅翻译名称（URL/LOGO 不随语言变化）。</div>
 </section>
 
 <!-- ==================== 第四篇：插件开发实战 ==================== -->
@@ -1130,6 +1168,51 @@ docker compose --profile postgres up -d   # PostgreSQL 方案</code></pre>
   <li>备份恢复文件强制存本地（<code>storage_scope='local'</code>）</li>
   <li>凭证存数据库 settings 表，不写入仓库文件</li>
   <li>七牛云必须绑定自有 CDN 域名（默认下载域名 30 天过期）</li>
+</ul>
+</section>
+
+<section id="redis">
+<h2>Redis 缓存与 Session <span class="tag tag-new">v2.5</span></h2>
+<p>v2.5.0 引入 Redis 作为可选的缓存后端与服务端 Session 存储，适合<b>多实例负载均衡</b>场景。未启用 Redis 时回退 SimpleCache + Cookie Session，单机部署零依赖。</p>
+
+<h3>自动检测机制</h3>
+<p>应用启动时检测环境变量 <code>REDIS_URL</code>：</p>
+<ul>
+  <li><b>有值且 Redis 可达</b> → 启用 RedisCache（Flask-Caching）+ 服务端 Session（Flask-Session 存 Redis）</li>
+  <li><b>有值但不可达</b> → 回退 SimpleCache + Cookie Session，日志输出警告</li>
+  <li><b>未设置</b> → SimpleCache + Cookie Session（与 v2.4.x 行为一致）</li>
+</ul>
+
+<h3>启用方式</h3>
+<pre><code># 源码部署：设置环境变量后启动
+export REDIS_URL=redis://127.0.0.1:6379/0
+python run.py
+
+# 带密码的 Redis
+export REDIS_URL=redis://:yourpassword@127.0.0.1:6379/0
+
+# Docker 部署：install.sh 交互选择启用 Redis
+bash docker/install.sh
+# 自动在 .env 中写入 REDIS_URL，启动时携带 --profile redis
+
+# docker-compose 手动启动
+docker compose --profile mysql --profile redis up -d</code></pre>
+
+<h3>后台状态页</h3>
+<p>后台「系统设置 → Redis 缓存」提供<b>只读</b>状态展示：</p>
+<ul>
+  <li><b>已启用</b>（绿色）：显示连接地址，说明 RedisCache + 服务端 Session 已生效</li>
+  <li><b>未启用</b>（黄色）：提示安装 Redis 并设置环境变量的步骤</li>
+  <li><b>连接失败</b>（红色）：显示错误信息，引导排查 Redis 服务状态与连接参数</li>
+</ul>
+<div class="note">Redis 后端在应用启动时初始化，运行时不可切换。修改 <code>REDIS_URL</code> 后需重启应用生效。后台不提供手动开关，避免运行时切换导致缓存与 Session 状态不一致。</div>
+
+<h3>安全建议</h3>
+<ul>
+  <li>Redis 配置密码（<code>requirepass</code> 或 ACL），<code>REDIS_URL</code> 中携带密码</li>
+  <li>Redis 仅监听内网地址（<code>bind 127.0.0.1</code> 或内网 IP）</li>
+  <li>生产环境通过防火墙限制 6379 端口访问</li>
+  <li><code>REDIS_URL</code> 含密码属敏感信息，<code>.env</code> 已在 <code>.gitignore</code> 中排除</li>
 </ul>
 </section>
 

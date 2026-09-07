@@ -1,0 +1,77 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('Redis 缓存') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('Redis 缓存') }}{% endblock %}
+{% set active_menu = 'setting_redis' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">{{ _('系统设置') }}</li>
+<li class="breadcrumb-item active">{{ _('Redis 缓存') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-8">
+    <div class="card card-outline {{ 'card-success' if runtime_active else 'card-warning' }}">
+      <div class="card-header"><h3 class="card-title">{{ _('运行状态') }}</h3></div>
+      <div class="card-body">
+        {% if runtime_active %}
+        <div class="callout callout-success">
+          <h5><i class="fas fa-check-circle"></i> {{ _('Redis 已启用') }}</h5>
+          <p>{{ _('当前使用 Redis 作为缓存后端与服务端 Session 存储，支撑多实例负载均衡。') }}</p>
+          <p class="mb-0 text-muted small">
+            {{ _('连接地址') }}：<code>{{ env_redis_url }}</code>
+          </p>
+        </div>
+        {% elif env_redis_url and redis_reachable %}
+        <div class="callout callout-info">
+          <h5><i class="fas fa-info-circle"></i> {{ _('Redis 可达但未启用') }}</h5>
+          <p>{{ _('检测到环境变量 REDIS_URL 且 Redis 可连接，但当前应用未使用 Redis（可能是本次启动前刚设置，需重启应用生效）。') }}</p>
+          <p class="mb-0 text-muted small">
+            {{ _('连接地址') }}：<code>{{ env_redis_url }}</code>
+          </p>
+        </div>
+        {% elif env_redis_url and not redis_reachable %}
+        <div class="callout callout-danger">
+          <h5><i class="fas fa-exclamation-triangle"></i> {{ _('Redis 连接失败') }}</h5>
+          <p>{{ _('环境变量 REDIS_URL 已设置，但无法连接 Redis 服务器。') }}</p>
+          <p class="text-muted small">
+            {{ _('连接地址') }}：<code>{{ env_redis_url }}</code><br>
+            {{ _('错误信息') }}：<code>{{ redis_error }}</code>
+          </p>
+          <p class="mb-0">{{ _('请检查 Redis 服务是否已启动、地址/端口/密码是否正确。') }}</p>
+        </div>
+        {% else %}
+        <div class="callout callout-warning">
+          <h5><i class="fas fa-exclamation-circle"></i> {{ _('Redis 未启用') }}</h5>
+          <p>{{ _('当前使用 SimpleCache + Cookie Session（单机模式，不支持多实例负载均衡）。') }}</p>
+          <p>{{ _('如需启用 Redis 缓存与服务端 Session，请按以下步骤操作：') }}</p>
+          <ol class="mb-0">
+            <li>{{ _('安装 Redis 服务（') }}<code>apt install redis</code> {{ _('或 Docker 拉取') }} <code>redis:7-alpine</code>{{ _('）') }}</li>
+            <li>{{ _('设置环境变量 ') }}<code>REDIS_URL=redis://127.0.0.1:6379/0</code></li>
+            <li>{{ _('重启应用（Docker: ') }}<code>docker compose restart</code>{{ _('；源码: 重启 gunicorn/Flask 进程）') }}</li>
+          </ol>
+          <p class="mb-0 text-muted small">{{ _('未启用 Redis 不影响站点正常运行，单机部署零依赖。') }}</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card card-outline card-secondary">
+      <div class="card-header"><h3 class="card-title">{{ _('说明') }}</h3></div>
+      <div class="card-body">
+        <p class="text-muted small">
+          {{ _('Redis 缓存后端在应用启动时自动检测环境变量 ') }}<code>REDIS_URL</code>{{ _('，无需手动开关。') }}
+        </p>
+        <p class="text-muted small">
+          {{ _('有 ') }}<code>REDIS_URL</code>{{ _(' 且 Redis 可达时自动启用 RedisCache + 服务端 Session；否则回退 SimpleCache + Cookie Session。') }}
+        </p>
+        <p class="text-muted small">
+          {{ _('Docker 部署通过 install.sh 选择启用 Redis 时自动写入 ') }}<code>.env</code>{{ _(' 文件。') }}
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

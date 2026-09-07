@@ -30,6 +30,12 @@ class RecruitJob(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now,
                            onupdate=datetime.now, nullable=False)
 
+    # v2.5.0：多语言翻译（非默认语言的 title/description 存于此）
+    translations = db.relationship(
+        'RecruitJobTranslation', backref='job',
+        cascade='all, delete-orphan', lazy='selectin'
+    )
+
     # ---- 截止状态 ----
 
     def is_expired(self):
@@ -79,3 +85,28 @@ class RecruitApplication(db.Model):
 
     def status_label(self):
         return self.STATUS_LABELS.get(self.status, self.status)
+
+
+class RecruitJobTranslation(db.Model):
+    """岗位多语言翻译（v2.5.0）。
+
+    主表 recruit_jobs 存默认语言的 title/description；非默认语言存于此表。
+    查不到对应 locale 的翻译时 fallback 到主表默认语言字段。
+    department/location/salary/headcount 为结构化短字段，不做翻译。
+    """
+    __tablename__ = 'recruit_job_translations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('recruit_jobs.id', ondelete='CASCADE'),
+                       nullable=False, index=True)
+    locale = db.Column(db.String(10), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('job_id', 'locale', name='uq_recruit_job_locale'),
+        db.Index('ix_recruit_job_trans_locale', 'locale'),
+    )

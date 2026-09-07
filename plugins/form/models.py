@@ -36,6 +36,11 @@ class Form(db.Model):
         'FormSubmission', backref='form', lazy='dynamic',
         cascade='all, delete-orphan'
     )
+    # v2.5.0：多语言文案（非默认语言的 name/description/success_message 存于此）
+    translations = db.relationship(
+        'FormTranslation', backref='form',
+        cascade='all, delete-orphan', lazy='selectin'
+    )
 
 
 class FormField(db.Model):
@@ -110,3 +115,28 @@ class FormSubmissionValue(db.Model):
     value = db.Column(db.Text)
 
     field = db.relationship('FormField')
+
+
+class FormTranslation(db.Model):
+    """表单多语言文案（v2.5.0）。
+
+    主表 forms 存默认语言的 name/description/success_message；非默认语言
+    存于此表。查不到对应 locale 的翻译时 fallback 到主表默认语言字段。
+    """
+    __tablename__ = 'form_translations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    form_id = db.Column(db.Integer, db.ForeignKey('forms.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    locale = db.Column(db.String(10), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text)
+    success_message = db.Column(db.String(255))
+
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('form_id', 'locale', name='uq_form_locale'),
+        db.Index('ix_form_trans_locale', 'locale'),
+    )

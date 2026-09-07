@@ -4,9 +4,10 @@
 
 | 版本 | 支持状态 | 说明 |
 | --- | --- | --- |
-| 2.4.x | ✅ 完整支持 | 当前发布线，**最新安全版本 v2.4.2**（CSRF 同源校验 + 纯文本字段 XSS 防御），建议运行 v2.4.0/2.4.1 的站点直接覆盖代码升级 |
-| 2.3.x | ⚠️ 仅严重漏洞 | 建议升级至 2.4.x（覆盖代码 + 装依赖，首次启动自动迁移） |
-| 2.0.x ~ 2.2.x | ⚠️ 仅严重漏洞 | 建议升级至 2.4.x |
+| 2.5.x | ✅ 完整支持 | 当前发布线，**最新安全版本 v2.5.0**（内容级多语言 + Redis 缓存与 Session），建议运行 v2.4.x 的站点覆盖代码 + 执行迁移升级 |
+| 2.4.x | ✅ 完整支持 | 安全加固线（CSRF 同源校验 + 纯文本字段 XSS 防御） |
+| 2.3.x | ⚠️ 仅严重漏洞 | 建议升级至 2.5.x |
+| 2.0.x ~ 2.2.x | ⚠️ 仅严重漏洞 | 建议升级至 2.5.x |
 | 1.x 及更早 | ❌ 不再支持 | 自 v2.0 起包含登录安全加固/上传校验/RBAC 等安全模块，请尽快升级 |
 
 ## 报告漏洞
@@ -40,6 +41,7 @@
 - **审计日志**：后台操作全留痕，详情渲染全程 HTML 转义。
 - **会话密钥（v2.4.1 修复 CWE-798）**：不再使用源码中硬编码的默认密钥。优先级为 环境变量 `ZHYCMS_SECRET_KEY` > `instance/secret_key` 持久化文件 > 首次启动自动生成 `secrets.token_hex(32)` 并落盘（权限 600）。**部署时仍强烈建议显式设置 `ZHYCMS_SECRET_KEY` 环境变量**（旧前缀 `ZHOCMS_SECRET_KEY` 仅兼容保留）。
 - **会话 Cookie**：`HttpOnly` 始终启用；显式设置 `SameSite=Lax`；生产环境（`ProductionConfig`）启用 `Secure`，仅通过 HTTPS 传输。
+- **Redis 服务端 Session（v2.5.0）**：设置环境变量 `REDIS_URL` 后，Session 从客户端 Cookie 迁移到 Redis 服务端存储，降低 XSS 窃取 Session 的风险，并支持多实例负载均衡。Redis 连接建议配置密码（`redis://:password@host:port/db`），生产环境建议 Redis 仅监听内网或通过防火墙限制访问。未配置 `REDIS_URL` 时回退 Cookie Session，行为与 v2.4.x 一致。
 - **重定向校验**：登录与语种切换的 `next` 参数仅允许站内相对路径，拒绝协议相对 URL（`//evil.com`），杜绝开放重定向钓鱼。
 - **CSRF 防护**：双机制纵深防御——(1) 会话 Cookie 显式 `SameSite=Lax`（v2.4.1）；(2) `before_request` 对所有 Cookie 鉴权的 POST/PUT/PATCH/DELETE 做 Origin/Referer 同源校验，跨站来源直接 403（v2.4.2）。REST API（`/api/`，X-API-Token 头鉴权，不依赖 Cookie）豁免；无 Origin/Referer 的非浏览器客户端（curl/SDK）放行。覆盖旧浏览器（不识别 SameSite）与同站子域名攻击场景。
 - **输出转义**：搜索高亮过滤器先对原文与关键词做 HTML 转义再包裹 `<mark>`（v2.4.1）；v2.4.2 进一步把页脚版权、关站提示、表单说明、招聘岗位描述等**纯文本录入字段**的 `|safe` 全部移除（19 处模板），后台文本框内容一律自动 HTML 转义。富文本字段（文章正文、单页内容、richtext 自定义字段）为 CMS 设计的 HTML 内容，经受控编辑器录入。
@@ -58,3 +60,4 @@
 5. **备份**：定期在后台「备份运维」导出备份，验证 `instance/backups/` 的磁盘余量；恢复上传的备份文件不会残留 Web 目录。
 6. **密钥轮换**：升级 v2.4.1 后若此前使用过默认硬编码密钥，请立即轮换 `ZHYCMS_SECRET_KEY`（或删除 `instance/secret_key` 让系统重新生成），旧会话会失效需重新登录。
 7. **反向代理 / CSRF 同源校验（v2.4.2）**：CSRF 防护基于 `Origin/Referer` 与请求 `Host` 头比对，Nginx 反代需确保 `proxy_set_header Host $host;`（标准配置即满足）；若站点同时绑定多个域名访问，跨域名提交表单会被 403 拦截，属预期行为（同一域名访问正常）。REST API 调用（X-API-Token 鉴权）不受影响。
+8. **Redis 安全（v2.5.0）**：启用 Redis 后，建议配置密码（`requirepass` 或 ACL），Redis 仅监听内网地址（`bind 127.0.0.1` 或内网 IP），生产环境通过防火墙限制 6379 端口访问。`REDIS_URL` 中的密码与数据库 URI 中的密码一样属于敏感信息，不应入版本库（`.env` 已在 `.gitignore` 中）。

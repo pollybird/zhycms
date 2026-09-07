@@ -7,6 +7,7 @@
   - 备份周期：直接复用 app/admin/backup.py 的 setting_backup_save POST 路由
 """
 from datetime import datetime
+import os
 
 from flask import (
     render_template, redirect, url_for, request, flash, abort, current_app,
@@ -559,6 +560,38 @@ def setting_search():
     ok, message = _health()
     return render_template('admin/setting/search.html',
                            settings=settings, health_ok=ok, health_msg=message)
+
+
+# ============ Redis 缓存配置（v2.5.0）============
+
+@admin_bp.route('/settings/redis')
+@permission_required('system:settings')
+def setting_redis():
+    """Redis 缓存运行状态（v2.5.0，只读）。
+
+    自动检测：环境变量 REDIS_URL 有值且 Redis 可达 → 已启用；
+    否则未启用，提示用户安装 Redis 并设置环境变量。
+    不提供手动开关——Redis 后端在应用启动时初始化，运行时不可切换。
+    """
+    env_redis_url = os.environ.get('REDIS_URL', '').strip()
+    # 当前运行时状态
+    runtime_active = bool(current_app.config.get('SESSION_TYPE') == 'redis')
+    # 检测 Redis 可达性（用于未启用时给出原因）
+    redis_reachable = False
+    redis_error = ''
+    if env_redis_url:
+        try:
+            import redis as _redis
+            conn = _redis.from_url(env_redis_url, decode_responses=False)
+            conn.ping()
+            redis_reachable = True
+        except Exception as e:
+            redis_error = str(e)
+    return render_template('admin/setting/redis.html',
+                           env_redis_url=env_redis_url,
+                           runtime_active=runtime_active,
+                           redis_reachable=redis_reachable,
+                           redis_error=redis_error)
 
 
 # ============ 个人资料 / 密码 ============

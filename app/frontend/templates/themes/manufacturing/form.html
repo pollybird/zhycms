@@ -1,11 +1,11 @@
 {% extends theme_base %}
-{% block title %}{{ form.name }}{% endblock %}
+{% block title %}{{ t(form, 'name') }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
-    <li class="breadcrumb-item active">{{ form.name }}</li>
+    <li class="breadcrumb-item active">{{ t(form, 'name') }}</li>
   </ol>
 </nav>
 
@@ -13,7 +13,7 @@
   <div class="col-md-8">
     <div class="card">
       <div class="card-header bg-primary text-white">
-        <h4 class="mb-0"><i class="fas fa-comment-dots"></i> {{ form.name }}</h4>
+        <h4 class="mb-0"><i class="fas fa-comment-dots"></i> {{ t(form, 'name') }}</h4>
       </div>
       <div class="card-body">
         {% if t(form, 'description') %}

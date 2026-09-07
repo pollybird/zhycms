@@ -23,6 +23,7 @@ from app.models.setting import Setting
 from app.plugin_system import plugin_enabled
 from app.utils.themes import theme_template
 from app.utils.uploads import save_upload_file
+from app.utils.i18n_content import t_field
 
 from .models import Form, FormField, FormSubmission, FormSubmissionValue
 
@@ -140,7 +141,8 @@ def form_submit(slug):
             except Exception:
                 current_app.logger.exception('notify form submission failed')
 
-        flash(form.success_message, 'success')
+        # v2.5.0：成功提示按当前 locale 取翻译，无翻译回退主表默认语言
+        flash(t_field(form, 'success_message') or form.success_message, 'success')
         return redirect(url_for('.form_submit', slug=slug))
 
     return render_template(

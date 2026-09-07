@@ -185,8 +185,8 @@ def _save_fragment(fragment):
 def _save_fragment_translations(fragment):
     """保存碎片各语种翻译（v2.5.0）。
 
-    表单字段命名：name_{locale} / value_{locale}。
-    非默认语言且名称非空 → upsert 翻译记录；名称为空 → 删除该翻译。
+    表单字段命名：value_{locale}。仅翻译内容值，名称不随语言变化。
+    非默认语言且值非空 → upsert 翻译记录；值为空 → 删除该翻译（前台回退默认语言）。
     """
     default_locale = get_default_locale()
     locales = [l for l in get_available_locales() if l != default_locale]
@@ -195,17 +195,18 @@ def _save_fragment_translations(fragment):
 
     existing = {tr.locale: tr for tr in fragment.translations}
     for loc in locales:
-        tr_name = (request.form.get(f'name_{loc}') or '').strip()
-        if not tr_name:
+        raw_value = request.form.get(f'value_{loc}')
+        if raw_value is None or not raw_value.strip():
             if loc in existing:
                 db.session.delete(existing[loc])
             continue
         tr = existing.get(loc)
         if tr is None:
-            tr = FragmentTranslation(fragment_id=fragment.id, locale=loc)
+            # name 列 NOT NULL（表结构兼容）：同步主表名称作为占位
+            tr = FragmentTranslation(fragment_id=fragment.id, locale=loc,
+                                     name=fragment.name)
             db.session.add(tr)
-        tr.name = tr_name
-        tr.value = request.form.get(f'value_{loc}') or ''
+        tr.value = raw_value
 
 
 @admin_bp.route('/fragments/<int:fid>/delete', methods=['POST'])

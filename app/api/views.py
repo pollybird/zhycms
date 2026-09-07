@@ -45,6 +45,12 @@ def api_cache(key_prefix):
             cache_key = f'api/{key_prefix}/' + '/'.join(
                 [str(v) for v in args] + [f'{k}={v}' for k, v in sorted(kwargs.items())]
             ) + request.query_string.decode('utf-8', errors='ignore')
+            # v2.5.0：缓存键包含当前 locale，多语言内容互不串扰
+            try:
+                from ..i18n import select_locale
+                cache_key += '|loc=' + select_locale()
+            except Exception:
+                pass
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:

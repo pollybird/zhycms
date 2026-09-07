@@ -20,7 +20,7 @@
     <div class="card h-100">
       <div class="card-body d-flex flex-column">
         <h5 class="card-title mb-2">
-          {{ j.title }}
+          {{ t(j, 'title') }}
           {% if j.headcount %}<span class="badge badge-light border">{{ _p('recruit', '招') }}{{ j.headcount }}{{ _p('recruit', '人') }}</span>{% endif %}
         </h5>
         <div class="text-muted mb-2" style="font-size:13px;">
@@ -53,7 +53,7 @@
   <div class="col-md-6 mb-3">
     <div class="card h-100 bg-light">
       <div class="card-body text-muted">
-        <h5 class="card-title mb-2" style="font-size:1.05rem;">{{ j.title }}</h5>
+        <h5 class="card-title mb-2" style="font-size:1.05rem;">{{ t(j, 'title') }}</h5>
         <div class="mb-2" style="font-size:13px;">
           {% if j.department %}<span class="mr-2">{{ j.department }}</span>{% endif %}
           {% if j.location %}<span class="mr-2">{{ j.location }}</span>{% endif %}

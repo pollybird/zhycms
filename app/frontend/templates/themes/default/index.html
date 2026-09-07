@@ -81,8 +81,8 @@
       <div class="card-header"><i class="fas fa-link"></i> 友情链接</div>
       <div class="card-body p-2">
         {% for l in friend_links %}
-        <a href="{{ l.url }}" target="{{ l.target }}" class="d-block mb-1 text-truncate" title="{{ l.name }}">
-          {% if l.logo %}<img src="{{ l.logo }}" class="friend-link" alt="{{ l.name }}">{% else %}{{ l.name }}{% endif %}
+        <a href="{{ l.url }}" target="{{ l.target }}" class="d-block mb-1 text-truncate" title="{{ t(l, 'name') }}">
+          {% if l.logo %}<img src="{{ l.logo }}" class="friend-link" alt="{{ t(l, 'name') }}">{% else %}{{ t(l, 'name') }}{% endif %}
         </a>
         {% endfor %}
       </div>

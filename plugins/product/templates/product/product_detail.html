@@ -1,22 +1,22 @@
 {% extends theme_base %}
-{% block title %}{{ product.title }} - {{ column.name }}{% endblock %}
+{% block title %}{{ t(product, 'title') }} - {{ t(column, 'name') }}{% endblock %}
 
 {% block content %}
 <nav aria-label="breadcrumb">
   <ol class="breadcrumb">
     <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">{{ _p('product', '首页') }}</a></li>
-    <li class="breadcrumb-item"><a href="{{ url_for('frontend.column_detail', slug=column.slug) }}">{{ column.name }}</a></li>
-    <li class="breadcrumb-item active">{{ product.title|truncate_text(30) }}</li>
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.column_detail', slug=column.slug) }}">{{ t(column, 'name') }}</a></li>
+    <li class="breadcrumb-item active">{{ t(product, 'title')|truncate_text(30) }}</li>
   </ol>
 </nav>
 
 <div class="row">
   <div class="col-md-9">
     <article>
-      <h1>{{ product.title }}</h1>
-      {% if product.summary %}
+      <h1>{{ t(product, 'title') }}</h1>
+      {% if t(product, 'summary') %}
       <div class="alert alert-light border">
-        <i class="fas fa-quote-left text-muted"></i> {{ product.summary }}
+        <i class="fas fa-quote-left text-muted"></i> {{ t(product, 'summary') }}
       </div>
       {% endif %}
 
@@ -24,13 +24,13 @@
       {% if gallery %}
       <div class="product-gallery mb-4">
         <img id="gallery-main" src="{{ gallery[0] }}" class="img-fluid rounded border w-100"
-             style="max-height:480px;object-fit:contain;" alt="{{ product.title }}">
+             style="max-height:480px;object-fit:contain;" alt="{{ t(product, 'title') }}">
         {% if gallery|length > 1 %}
         <div class="d-flex flex-wrap mt-2">
           {% for url in gallery %}
           <img src="{{ url }}" class="rounded border mr-2 mb-2 gallery-thumb {{ 'border-primary' if loop.first }}"
                style="width:72px;height:56px;object-fit:cover;cursor:pointer;"
-               onclick="switchGallery(this)" alt="{{ product.title }} {{ _p('product', '图片') }}{{ loop.index }}">
+               onclick="switchGallery(this)" alt="{{ t(product, 'title') }} {{ _p('product', '图片') }}{{ loop.index }}">
           {% endfor %}
         </div>
         {% endif %}
@@ -69,14 +69,14 @@
         <div class="col-6">
           {% if prev_product %}
           <a href="{{ frontend_product_url(prev_product, column) }}" class="btn btn-outline-secondary btn-block text-left">
-            <small>{{ _p('product', '上一个产品') }}</small><br>{{ prev_product.title|truncate_text(20) }}
+            <small>{{ _p('product', '上一个产品') }}</small><br>{{ t(prev_product, 'title')|truncate_text(20) }}
           </a>
           {% endif %}
         </div>
         <div class="col-6">
           {% if next_product %}
           <a href="{{ frontend_product_url(next_product, column) }}" class="btn btn-outline-secondary btn-block text-right">
-            <small>{{ _p('product', '下一个产品') }}</small><br>{{ next_product.title|truncate_text(20) }}
+            <small>{{ _p('product', '下一个产品') }}</small><br>{{ t(next_product, 'title')|truncate_text(20) }}
           </a>
           {% endif %}
         </div>

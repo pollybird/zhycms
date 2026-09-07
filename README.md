@@ -2,7 +2,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v2.4.2**（安全加固版本：CSRF 同源校验 + 纯文本字段 XSS 防御；详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v2.5.0**（内容级多语言 + Redis 缓存与 Session：详见 [CHANGELOG](CHANGELOG.md)）
 
 ---
 
@@ -51,7 +51,8 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **多主题模板系统** | 前台模板按主题组织，后台一键切换；内置 6 套主题（含 2 套英文主题） | v1.0 |
 | **主题管理** | 上传/启用/删除/打包下载主题压缩包，缺失模板自动兜底 | v2.2 |
 | **插件机制** | `plugins/<slug>/` 零侵入扩展，启停即时生效、无需重启 | v2.2 |
-| **国际化（i18n）** | Flask-Babel 中英文自由切换，插件独立翻译域 | v2.3 |
+| **国际化（i18n）** | Flask-Babel 界面文案 + 内容级多语言翻译表（文章/栏目/碎片/产品/表单/岗位/友情链接） | v2.3/v2.5 |
+| **Redis 缓存** | 环境变量自动检测，RedisCache + 服务端 Session，支撑多实例负载均衡 | v2.5 |
 | **数据库迁移** | Flask-Migrate（Alembic）管理 schema 版本，支持回滚 | v2.4 |
 | **全文搜索** | 默认 Whoosh + jieba 中文分词，可选 Meilisearch | v2.4 |
 | **对象存储 OSS** | 阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，一键迁移本地文件上云 | v2.4 |
@@ -67,6 +68,15 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v2.5.0（2026-09-07）
+- **新增**：内容级多语言（i18n 2.0）——文章/栏目/碎片/产品/表单/岗位/友情链接多语言翻译表，前台 `t(obj, field)` 全局函数，后台「多语言版本」Tab
+- **新增**：Redis 缓存后端 + 服务端 Session——环境变量自动检测，多实例负载均衡
+- **改进**：移除后台左侧菜单冗余项、富文本翻译字段使用 CKEditor5
+
+### v2.4.2（2026-09-06）
+- **安全**：CSRF 同源校验 + 纯文本字段 XSS 防御
+- **修复**：Docker 部署 worker 启动失败、CSP 拦截 CDN、初始化向导 localhost 问题
 
 ### v2.4.0（2026-09-04）
 - **新增**：Alembic 数据库迁移、Whoosh 全文搜索、Docker 容器化、对象存储 OSS 插件
@@ -209,7 +219,8 @@ zhycms/
 
 ### 国际化
 
-- **Flask-Babel 全站覆盖**：前台 + 后台界面文案支持中英文切换
+- **界面文案国际化（v2.3）**：Flask-Babel 全站覆盖，前台 + 后台界面文案支持中英文切换
+- **内容级多语言（v2.5）**：文章/栏目/碎片/产品/表单/岗位/友情链接支持多语言翻译表，前台 Jinja 全局 `t(obj, field)` 按当前 locale 取翻译，无翻译 fallback 默认语言
 - **多级 Locale 选择**：URL 参数 → Session → Cookie → Accept-Language → 默认语种
 - **插件独立翻译域**：每个插件可在 `plugins/<slug>/translations/` 自带译文
 - **默认关闭**：不影响现有站点，开启后即时生效
@@ -254,7 +265,8 @@ zhycms/
 - **伪静态**：`/{slug}.html`、`/{slug}-{page}.html`、`/article-{id}.html`
 - **Sitemap**：栏目与文章独立配置更新频率/优先级，插件 URL 自动聚合
 - **Robots.txt**：后台可视化编辑，支持追加自定义规则
-- **页面缓存**：Flask-Caching，首页/栏目/文章独立 TTL，内容变更自动清理
+- **页面缓存**：Flask-Caching，首页/栏目/文章独立 TTL，内容变更自动清理；配置 `REDIS_URL` 后自动切 RedisCache，支撑多实例
+- **Redis 缓存后端（v2.5）**：设置环境变量 `REDIS_URL` 后，Flask-Caching 切 RedisCache、Flask-Session 存 Redis，多实例共享缓存与 Session；后台「系统设置 → Redis 缓存」展示运行状态
 - **图片优化**：自动压缩、缩略图生成、默认 ALT 注入
 
 ### 内容工作流
@@ -272,6 +284,14 @@ zhycms/
 ---
 
 ## 升级指南
+
+### v2.4.x → v2.5.0
+
+覆盖代码 + `pip install -r requirements.txt` + `flask db upgrade` 即可。新增 7 张翻译表（迁移 `0005` + `0006`），无破坏性变更。
+
+- 启用多语言：后台「系统设置 → 国际化」开启，配置默认语言与可用语种
+- 启用 Redis：设置环境变量 `REDIS_URL=redis://127.0.0.1:6379/0` 后重启应用
+- 未启用 i18n / Redis 的站点，行为与 v2.4.2 完全一致
 
 ### v2.3.x → v2.4.0
 

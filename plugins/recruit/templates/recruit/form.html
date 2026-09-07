@@ -52,6 +52,38 @@
         <label>{{ _p('recruit', '岗位介绍（岗位职责、任职要求等）') }}</label>
         <textarea name="description" id="content" rows="4">{{ job.description if job and job.description else '' }}</textarea>
       </div>
+
+      {% if trans_locales %}
+      <div class="border rounded p-3 mb-3">
+        <div class="d-flex align-items-center mb-2">
+          <b><i class="fas fa-language"></i> {{ _p('recruit', '多语言版本') }}</b>
+          <small class="text-muted ml-2">{{ _('留空则前台回退显示默认语言（%(loc)s）内容', loc=default_locale) }}</small>
+        </div>
+        <ul class="nav nav-tabs" id="i18n-tabs" role="tablist">
+          {% for loc in trans_locales %}
+          <li class="nav-item">
+            <a class="nav-link {% if loop.first %}active{% endif %}" data-toggle="pill" href="#i18n-{{ loc }}" role="tab">{{ loc|upper }}</a>
+          </li>
+          {% endfor %}
+        </ul>
+        <div class="tab-content pt-3">
+          {% for loc in trans_locales %}
+          {% set tr = job.translations|selectattr('locale', 'equalto', loc)|list|first if job else none %}
+          <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="i18n-{{ loc }}" role="tabpanel">
+            <div class="form-group">
+              <label>{{ _p('recruit', '岗位名称') }} ({{ loc|upper }})</label>
+              <input type="text" name="title_{{ loc }}" class="form-control" maxlength="200" value="{{ tr.title if tr else '' }}">
+            </div>
+            <div class="form-group mb-0">
+              <label>{{ _p('recruit', '岗位介绍') }} ({{ loc|upper }})</label>
+              <textarea name="description_{{ loc }}" rows="4" class="form-control richtext">{{ tr.description if tr and tr.description else '' }}</textarea>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       <div class="row">
         <div class="col-md-3 form-group">
           <label>{{ _p('recruit', '排序（大值靠前）') }}</label>
@@ -82,9 +114,8 @@
   .ck.ck-editor__editable_inline { min-height: 320px; }
 </style>
 <script>
-  // 提交前把编辑器内容写回 textarea
-  let recruitEditor = null;
-  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), {
+  // 与默认语言一致的富文本配置（主编辑器 + 多语言翻译编辑器共用）
+  const ckConfig = {
     licenseKey: 'GPL',
     language: 'zh-cn',
     placeholder: "{{ _p('recruit', '在此输入岗位职责、任职要求……') }}",
@@ -116,10 +147,24 @@
       contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
     },
     simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=recruit' }
-  }).then(e => { recruitEditor = e; }).catch(err => console.error(err));
+  };
+
+  // 提交前把编辑器内容写回 textarea
+  let recruitEditor = null;
+  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), ckConfig)
+    .then(e => { recruitEditor = e; }).catch(err => console.error(err));
+
+  // 多语言翻译内容：与默认语言一致使用富文本编辑器
+  const fieldEditors = [];
+  document.querySelectorAll('.richtext').forEach(el => {
+    CKEDITOR.ClassicEditor.create(el, ckConfig).then(e => {
+      fieldEditors.push({el: el, editor: e});
+    }).catch(err => console.error(err));
+  });
 
   document.getElementById('job-form').addEventListener('submit', function(){
     if (recruitEditor) document.querySelector('#content').value = recruitEditor.getData();
+    fieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
   });
 </script>
 {% endblock %}
