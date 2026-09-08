@@ -487,7 +487,7 @@ def theme_asset(slug, filename):
 
 @frontend_bp.route('/search')
 def search():
-    """全站搜索（全文搜索 + 中文分词）。"""
+    """全站搜索（全文搜索 + 中文分词，v2.5.1 起按当前语言检索）。"""
     keyword = (request.args.get('q') or '').strip()
     page = max(int(request.args.get('page', 1)), 1)
     per_page = int(Setting.get('search_results_per_page', '20'))
@@ -495,7 +495,10 @@ def search():
     total = 0
     if keyword:
         from ..utils.search import search_articles
-        results, total = search_articles(keyword, page=page, per_page=per_page)
+        from ..i18n import select_locale
+        results, total = search_articles(
+            keyword, page=page, per_page=per_page, locale=select_locale()
+        )
     # 为每个结果生成 URL
     for r in results:
         if r.get('column_slug') and r.get('id'):

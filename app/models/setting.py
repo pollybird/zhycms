@@ -28,7 +28,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '2.5.0'
+    CMS_VERSION = '2.5.1'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名

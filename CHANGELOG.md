@@ -5,6 +5,31 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.5.1] - 2026-09-08
+
+**全文检索国际化（i18n 搜索）**版本。在 v2.5.0 内容级多语言基础上，让全站搜索按当前语言检索对应语言的内容。**无数据库结构变更**，升级后到后台「系统设置 → 搜索设置」点击一次「重建索引」即可。
+
+### Added
+
+- **全文检索支持多语言**：Whoosh / Meilisearch / SQL LIKE 三个搜索后端全部按当前 locale 检索。
+  - Whoosh 按语言分索引目录 `instance/search_index/<locale>/`；Meilisearch 按语言分索引 `zhycms_articles_<locale>`。
+  - 每篇文章对每种语言写入一份索引文档，内容经 `t_field` 解析——有翻译用翻译，无翻译回退默认语言（与前台 `t()` 渲染表现完全一致，未翻译文章不会因切换语言而搜不到）。
+  - 栏目名同步按语言索引，搜索结果中的栏目名称随语言切换。
+  - 前台 `/search` 按当前语言（`?lang=xx` / session）检索对应语言索引；该语言索引尚未建立时自动回退默认语言索引。
+  - 文章保存/删除时自动同步更新全部语言索引（复用 v2.4.0 的 `clear_content_cache` 钩子）。
+  - 后台「搜索设置 → 重建索引」一键重建全部语言索引；健康检查分语言显示文档数（如 `zh:120, en:98`）。
+
+### Changed
+
+- 版本号 `CMS_VERSION` 由 `2.5.0` 升级为 `2.5.1`。
+- `search_articles()` 新增 `locale` 参数；Whoosh 索引根目录由单层 `instance/search_index/` 改为 `<locale>/` 子目录（重建时自动清理旧单层结构）。
+
+### 升级说明
+
+- v2.5.0 站点：`git pull` → 重启应用 → 后台「系统设置 → 搜索设置」点击「重建索引」（生成各语言索引）。
+- i18n 未开启的站点行为与 v2.5.0 完全一致（仅维护默认语言单一索引）。
+- 无数据库迁移、无新增依赖。
+
 ## [2.5.0] - 2026-09-07
 
 **内容级多语言（i18n 2.0）+ Redis 缓存与 Session**，企业出海刚需版本。无破坏性变更，覆盖代码 + 执行迁移即可升级。
@@ -301,7 +326,8 @@ v2.0 的体验优化与缺陷修复版本，**无数据库结构变更**，v2.0 
 - 修复带路径参数路由（如文章列表）分页链接 BuildError。
 - 修复单页栏目自定义字段内容录入问题。
 
-[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.5.0...HEAD
+[Unreleased]: https://gitee.com/pollybird/zhycms/compare/v2.5.1...HEAD
+[2.5.1]: https://gitee.com/pollybird/zhycms/compare/v2.5.0...v2.5.1
 [2.5.0]: https://gitee.com/pollybird/zhycms/compare/v2.4.2...v2.5.0
 [2.4.2]: https://gitee.com/pollybird/zhycms/compare/v2.4.1...v2.4.2
 [2.4.1]: https://gitee.com/pollybird/zhycms/compare/v2.4.0...v2.4.1

@@ -1096,6 +1096,16 @@ flask db migrate -m "xxx" # 新建迁移脚本（开发用）</code></pre>
   <li><b>索引位置</b>：<code>instance/search_index/</code></li>
 </ul>
 <div class="note">6 套主题搜索模板均支持分页与关键词高亮（<code>|highlight(keyword)|safe</code>）。</div>
+
+<h3>多语言检索 <span class="tag tag-new">v2.5.1</span></h3>
+<p>开启内容级多语言后，搜索<b>按当前语言检索对应语言的内容</b>，三个后端均已适配：</p>
+<ul>
+  <li><b>Whoosh</b>：按语言分索引目录 <code>instance/search_index/&lt;locale&gt;/</code>；<b>Meilisearch</b>：按语言分索引 <code>zhycms_articles_&lt;locale&gt;</code></li>
+  <li>每篇文章对每种语言写入一份索引，内容经 <code>t_field</code> 解析——有翻译用翻译、无翻译回退默认语言（未翻译文章不会因切语言而搜不到）</li>
+  <li>搜索结果的标题、摘要、栏目名均随当前语言显示；前台 <code>/search</code> 按 <code>?lang=xx</code> / session 自动选索引</li>
+  <li>该语言索引尚未建立时自动回退默认语言索引；i18n 关闭时仅维护默认语言单一索引，行为不变</li>
+</ul>
+<div class="tip">升级到 v2.5.1 后，到后台「系统设置 → 搜索设置」点击一次<b>「重建索引」</b>即可生成各语言索引；文章保存/删除会自动同步全部语言索引，无需手动维护。</div>
 </section>
 
 <section id="docker">
