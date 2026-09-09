@@ -24,6 +24,68 @@ from ..models.article import Article, ArticleTranslation, STATUS_PUBLISHED
 from ..models.column import Column
 
 
+# 内容类型标识（索引文档 uid 前缀）
+TYPE_ARTICLE = 'article'
+
+
+# ============================================================
+# 插件搜索内容提供者协议
+# ============================================================
+
+class SearchProvider:
+    """插件搜索内容提供者基类（插件按需子类化并经 get_search_provider 暴露）。
+
+    用于把插件自有的前台公开内容（如产品）纳入全站搜索。约定：
+      - type             内容类型标识，全局唯一（如 'product'），作为 uid 前缀
+      - iter_docs(loc)   重建索引时产出该语言下全部可见文档 dict
+      - get_doc(id, loc) 单条文档（保存时实时索引用）；不可见/不存在返回 None
+      - sql_search(kw, loc, page, per_page)  SQL 兜底检索，返回 (items, total)
+      - build_url(item)  请求上下文中为结果项生成详情 URL
+    文档 dict 字段：id, title, summary, content(可含 HTML), column_id,
+    column_name, column_slug, published_at(datetime)。
+    结果 item 字段同 SqlLikeBackend 返回（需含 id/type/title/column_slug 等）。
+    """
+
+    type = ''
+
+    def iter_docs(self, locale):
+        return iter(())
+
+    def get_doc(self, obj_id, locale):
+        return None
+
+    def sql_search(self, keyword, locale, page=1, per_page=20):
+        return [], 0
+
+    def build_url(self, item):
+        return '#'
+
+
+def get_search_providers():
+    """收集启用插件的搜索提供者，返回 {type: provider}。
+
+    每次调用遍历插件注册表（量小，开销可忽略）；单个插件异常静默跳过。
+    """
+    providers = {}
+    try:
+        from ..plugin_system import _registry, enabled_slugs
+        enabled = set(enabled_slugs())
+        for rec in _registry:
+            if rec.slug not in enabled or rec.instance is None:
+                continue
+            try:
+                prov = rec.instance.get_search_provider()
+            except Exception:
+                current_app.logger.exception(
+                    '插件 %s 搜索提供者初始化失败', rec.slug)
+                prov = None
+            if prov is not None and getattr(prov, 'type', ''):
+                providers[prov.type] = prov
+    except Exception:
+        pass
+    return providers
+
+
 # ============================================================
 # 工具函数
 # ============================================================
@@ -111,11 +173,13 @@ def _localized_text(article, col, locale):
 
 
 def _build_doc(article, col, locale, meili=False):
-    """构造写入索引的文档 dict。meili=True 时日期转 ISO 字符串。"""
+    """构造文章写入索引的文档 dict。meili=True 时日期转 ISO 字符串。"""
     fields = _localized_text(article, col, locale)
     published = article.published_at or datetime.now()
-    return {
+    doc = {
         'id': article.id,
+        'uid': f'{TYPE_ARTICLE}:{article.id}',
+        'type': TYPE_ARTICLE,
         'title': fields['title'],
         'content': fields['content'],
         'summary': fields['summary'],
@@ -124,21 +188,50 @@ def _build_doc(article, col, locale, meili=False):
         'column_slug': fields['column_slug'],
         'published_at': published.isoformat() if meili else published,
         'status': article.status or STATUS_PUBLISHED,
-        **({'is_deleted': False} if meili else {}),
     }
+    if meili:
+        doc['is_deleted'] = False
+    return doc
+
+
+def _provider_doc(prov, raw, meili=False):
+    """归一化插件提供者产出的文档 dict 为索引文档。
+
+    raw 至少含 id / title；content 可为 HTML（统一剥标签）；published_at 为
+    datetime；提供者只需保证仅产出上架且未删除的内容。
+    """
+    published = raw.get('published_at') or datetime.now()
+    doc = {
+        'id': raw.get('id'),
+        'uid': f'{prov.type}:{raw.get("id")}',
+        'type': prov.type,
+        'title': raw.get('title') or '',
+        'content': _strip_html(raw.get('content') or ''),
+        'summary': raw.get('summary') or '',
+        'column_id': raw.get('column_id'),
+        'column_name': raw.get('column_name') or '',
+        'column_slug': raw.get('column_slug') or '',
+        'published_at': published.isoformat() if meili else published,
+        'status': STATUS_PUBLISHED,
+    }
+    if meili:
+        doc['is_deleted'] = False
+    return doc
 
 
 def _result_item(doc):
     """从索引文档统一构造搜索结果 dict。"""
     return {
         'id': doc.get('id'),
+        'uid': doc.get('uid') or f"{doc.get('type', TYPE_ARTICLE)}:{doc.get('id')}",
+        'type': doc.get('type') or TYPE_ARTICLE,
         'title': doc.get('title', ''),
         'summary': doc.get('summary', ''),
         'column_id': doc.get('column_id'),
         'column_name': doc.get('column_name', ''),
         'column_slug': doc.get('column_slug', ''),
         'published_at': doc.get('published_at'),
-        'url': None,  # 由模板层生成
+        'url': None,  # 由视图层生成
     }
 
 
@@ -157,9 +250,17 @@ class SearchBackend:
         """从全部语言索引中移除文章。"""
         raise NotImplementedError
 
+    def index_object(self, type_, obj_id):
+        """索引/更新插件内容单条记录（默认空实现，索引型后端覆写）。"""
+        pass
+
+    def unindex_object(self, type_, obj_id):
+        """从全部语言索引中移除插件内容单条记录。"""
+        pass
+
     def search(self, keyword, page=1, per_page=20, locale=None):
         """搜索，返回 (items, total)。
-        items: [{id, title, summary, column_id, column_name, published_at}]
+        items: [{id, uid, type, title, summary, column_id, column_name, published_at}]
         """
         raise NotImplementedError
 
@@ -177,7 +278,7 @@ class SearchBackend:
 # ============================================================
 
 class SqlLikeBackend(SearchBackend):
-    """使用 SQL LIKE 的简单搜索后端（支持翻译表匹配）。"""
+    """使用 SQL LIKE 的简单搜索后端（文章 + 启用插件内容，支持翻译表匹配）。"""
 
     def index_article(self, article):
         pass  # SQL 后端无需索引
@@ -185,13 +286,11 @@ class SqlLikeBackend(SearchBackend):
     def unindex_article(self, article_id):
         pass
 
-    def search(self, keyword, page=1, per_page=20, locale=None):
-        """搜索标题、摘要和正文（非默认语言同时匹配翻译表）。"""
+    def _search_articles(self, like, loc, page, per_page):
+        """文章 LIKE 检索（非默认语言同时匹配翻译表）。返回 (items, total)。"""
         from .i18n_content import t_field, get_default_locale
-        like = f'%{keyword}%'
-        loc = _search_locale(locale)
         q = Article.query.filter(
-            Article.is_deleted == False,
+            Article.is_deleted == False,  # noqa: E712
             Article.status == STATUS_PUBLISHED,
         )
         main_match = db.or_(
@@ -220,6 +319,8 @@ class SqlLikeBackend(SearchBackend):
             col = Column.query.get(a.column_id)
             items.append({
                 'id': a.id,
+                'uid': f'{TYPE_ARTICLE}:{a.id}',
+                'type': TYPE_ARTICLE,
                 'title': t_field(a, 'title', loc) or a.title or '',
                 'summary': t_field(a, 'summary', loc) or '',
                 'column_id': a.column_id,
@@ -230,9 +331,37 @@ class SqlLikeBackend(SearchBackend):
             })
         return items, pagination.total
 
+    def search(self, keyword, page=1, per_page=20, locale=None):
+        """合并检索文章与启用插件内容（各来源取当前页窗口后按时间归并排序）。"""
+        like = f'%{keyword}%'
+        loc = _search_locale(locale)
+        # 各来源取前 page*per_page 条，保证归并后当前页数据完整
+        window = page * per_page
+        items, total = self._search_articles(like, loc, 1, window)
+        for prov in get_search_providers().values():
+            try:
+                p_items, p_total = prov.sql_search(keyword, loc,
+                                                   page=1, per_page=window)
+                items.extend(p_items or [])
+                total += (p_total or 0)
+            except Exception:
+                current_app.logger.exception(
+                    '插件 %s SQL 兜底搜索失败', prov.type)
+        items.sort(key=lambda x: x.get('published_at') or datetime.min,
+                   reverse=True)
+        start = (page - 1) * per_page
+        return items[start:start + per_page], total
+
     def rebuild_all(self):
-        articles = Article.query.filter_by(is_deleted=False).all()
-        return len(articles), 0
+        count = Article.query.filter_by(is_deleted=False).count()
+        for prov in get_search_providers().values():
+            try:
+                for loc in _index_locales():
+                    count += sum(1 for _ in prov.iter_docs(loc))
+            except Exception:
+                current_app.logger.exception(
+                    '插件 %s 重建计数失败', prov.type)
+        return count, 0
 
     def health(self):
         return True, 'SQL LIKE（无需外部服务）'
@@ -255,10 +384,12 @@ def _get_whoosh_schema():
         from jieba.analyse import ChineseAnalyzer as _JiebaAnalyzer
         _whoosh_analyzer = _JiebaAnalyzer()
     return Schema(
-        id=NUMERIC(stored=True, unique=True),
+        uid=ID(stored=True, unique=True),
+        type=ID(stored=True),
+        id=NUMERIC(stored=True),
         title=TEXT(analyzer=_whoosh_analyzer, stored=True),
         content=TEXT(analyzer=_whoosh_analyzer),
-        summary=TEXT(analyzer=_whoosh_analyzer),
+        summary=TEXT(analyzer=_whoosh_analyzer, stored=True),
         column_id=NUMERIC(stored=True),
         column_name=TEXT(stored=True),
         column_slug=TEXT(stored=True),
@@ -289,7 +420,22 @@ def _get_whoosh_index(locale, create=False):
 class WhooshBackend(SearchBackend):
     """Whoosh 全文搜索后端（纯 Python + jieba 中文分词，按语言分索引）。"""
 
+    def _ensure_current_schema(self):
+        """旧版索引（v2.5.2 前无 uid/type 字段）一次性重建自愈。
+
+        升级后未手动「重建索引」时，旧 schema 索引无法写入多类型文档；
+        检测到任一语言索引 schema 过旧即全量重建（仅触发一次）。
+        """
+        for loc in _index_locales():
+            index = _get_whoosh_index(loc)
+            if index is not None and 'uid' not in index.schema:
+                current_app.logger.info(
+                    '检测到旧版搜索索引 schema，自动重建（%s）', loc)
+                self.rebuild_all()
+                return
+
     def index_article(self, article):
+        self._ensure_current_schema()
         col = Column.query.get(article.column_id)
         for loc in _index_locales():
             index = _get_whoosh_index(loc, create=True)
@@ -308,7 +454,40 @@ class WhooshBackend(SearchBackend):
                 continue
             writer = index.writer()
             try:
-                writer.delete_by_term('id', article_id)
+                writer.delete_by_term('uid', f'{TYPE_ARTICLE}:{article_id}')
+                writer.commit()
+            except Exception:
+                writer.cancel()
+
+    def index_object(self, type_, obj_id):
+        """索引/更新插件内容单条记录（写入全部语言索引）。"""
+        prov = get_search_providers().get(type_)
+        if prov is None:
+            return
+        self._ensure_current_schema()
+        for loc in _index_locales():
+            raw = prov.get_doc(obj_id, loc)
+            index = _get_whoosh_index(loc, create=True)
+            writer = index.writer()
+            try:
+                if raw is None:
+                    # 下架/删除：从索引移除
+                    writer.delete_by_term('uid', f'{type_}:{obj_id}')
+                else:
+                    writer.update_document(**_provider_doc(prov, raw))
+                writer.commit()
+            except Exception:
+                writer.cancel()
+                raise
+
+    def unindex_object(self, type_, obj_id):
+        for loc in _index_locales():
+            index = _get_whoosh_index(loc)
+            if index is None:
+                continue
+            writer = index.writer()
+            try:
+                writer.delete_by_term('uid', f'{type_}:{obj_id}')
                 writer.commit()
             except Exception:
                 writer.cancel()
@@ -329,11 +508,17 @@ class WhooshBackend(SearchBackend):
             schema=index.schema
         )
         query = parser.parse(keyword)
+        # 只召回已发布内容（索引可能包含草稿/归档）
+        if 'status' in index.schema:
+            from whoosh.query import Term
+            query = query & Term('status', STATUS_PUBLISHED)
         searcher = index.searcher()
         try:
             results = searcher.search_page(query, page, pagelen=per_page)
             items = [_result_item({
                 'id': r.get('id'),
+                'uid': r.get('uid'),
+                'type': r.get('type'),
                 'title': r.get('title', ''),
                 'summary': r.get('summary', ''),
                 'column_id': r.get('column_id'),
@@ -357,7 +542,9 @@ class WhooshBackend(SearchBackend):
         _whoosh_indexes = {}
 
         articles = Article.query.filter_by(is_deleted=False).all()
+        providers = get_search_providers()
         errors = 0
+        indexed = 0
         locales = _index_locales()
         for loc in locales:
             index_dir = _get_index_dir(loc)
@@ -369,13 +556,26 @@ class WhooshBackend(SearchBackend):
                     try:
                         col = Column.query.get(a.column_id)
                         writer.add_document(**_build_doc(a, col, loc))
+                        indexed += 1
                     except Exception:
                         errors += 1
+                for prov in providers.values():
+                    try:
+                        for raw in prov.iter_docs(loc):
+                            try:
+                                writer.add_document(**_provider_doc(prov, raw))
+                                indexed += 1
+                            except Exception:
+                                errors += 1
+                    except Exception:
+                        errors += 1
+                        current_app.logger.exception(
+                            '插件 %s 索引文档产出失败', prov.type)
                 writer.commit()
             except Exception:
                 writer.cancel()
                 raise
-        return len(articles), errors
+        return indexed, errors
 
     def health(self):
         try:
@@ -420,11 +620,37 @@ class MeilisearchBackend(SearchBackend):
             )
 
     def unindex_article(self, article_id):
+        self.unindex_object(TYPE_ARTICLE, article_id)
+
+    def index_object(self, type_, obj_id):
+        """索引/更新插件内容单条记录（写入全部语言索引）。"""
         import requests
+        prov = get_search_providers().get(type_)
+        if prov is None:
+            return
+        for loc in _index_locales():
+            raw = prov.get_doc(obj_id, loc)
+            if raw is None:
+                self.unindex_object(type_, obj_id)
+                continue
+            doc = _provider_doc(prov, raw, meili=True)
+            try:
+                requests.put(
+                    f'{self._get_url()}/indexes/{self.INDEX_NAME}_{loc}/documents',
+                    json=[doc], headers=self._headers(), timeout=10
+                )
+            except Exception:
+                current_app.logger.exception(
+                    'Meili 索引 %s#%s 失败', type_, obj_id)
+
+    def unindex_object(self, type_, obj_id):
+        import requests
+        from urllib.parse import quote
+        uid = quote(f'{type_}:{obj_id}', safe='')
         for loc in _index_locales():
             try:
                 requests.delete(
-                    f'{self._get_url()}/indexes/{self.INDEX_NAME}_{loc}/documents/{article_id}',
+                    f'{self._get_url()}/indexes/{self.INDEX_NAME}_{loc}/documents/{uid}',
                     headers=self._headers(), timeout=10
                 )
             except Exception:
@@ -453,24 +679,39 @@ class MeilisearchBackend(SearchBackend):
     def rebuild_all(self):
         import requests
         articles = Article.query.filter_by(is_deleted=False).all()
+        providers = get_search_providers()
+        indexed = 0
         for loc in _index_locales():
             index_name = f'{self.INDEX_NAME}_{loc}'
-            # 创建索引（如不存在）
-            requests.patch(
-                f'{self._get_url()}/indexes/{index_name}',
-                json={'primaryKey': 'id'}, headers=self._headers(), timeout=10
-            )
+            # 创建索引（如不存在）；主键用 uid（文章/产品跨类型唯一）。
+            # 注意：已存在且含文档的旧索引主键无法在线变更，需在 Meili 侧
+            # 删除索引后重建，否则跨类型同 id 会互相覆盖（搜索仍可用）。
+            try:
+                requests.patch(
+                    f'{self._get_url()}/indexes/{index_name}',
+                    json={'primaryKey': 'uid'}, headers=self._headers(), timeout=10
+                )
+            except Exception:
+                pass
             docs = []
             for a in articles:
                 col = Column.query.get(a.column_id)
                 docs.append(_build_doc(a, col, loc, meili=True))
+            for prov in providers.values():
+                try:
+                    for raw in prov.iter_docs(loc):
+                        docs.append(_provider_doc(prov, raw, meili=True))
+                except Exception:
+                    current_app.logger.exception(
+                        'Meili 插件 %s 文档产出失败', prov.type)
+            indexed += len(docs)
             # 分批发送（每批 1000）
             for i in range(0, len(docs), 1000):
                 requests.put(
                     f'{self._get_url()}/indexes/{index_name}/documents',
                     json=docs[i:i + 1000], headers=self._headers(), timeout=30
                 )
-        return len(articles), 0
+        return indexed, 0
 
     def health(self):
         try:
@@ -504,17 +745,42 @@ def get_backend():
 def search_articles(keyword, page=1, per_page=20, locale=None):
     """公共搜索 API：返回 (items, total)。
     后端故障时自动回退到 SQL LIKE。locale 为当前语言代码。
+
+    兜底策略：索引后端（Whoosh/Meilisearch）零命中时，再用实时 SQL 查一次。
+    索引可能未建立或陈旧（如升级到多语言版本后未点「重建索引」），导致
+    按外文关键词检索时漏召回；SQL 直接查翻译表，始终为最新数据。
     """
     if not keyword or not keyword.strip():
         return [], 0
     backend = get_backend()
     kw = keyword.strip()
+    sql_backend = SqlLikeBackend()
+    if not isinstance(backend, SqlLikeBackend):
+        try:
+            items, total = backend.search(kw, page=page, per_page=per_page, locale=locale)
+            if total > 0:
+                return items, total
+        except Exception as e:
+            current_app.logger.warning('搜索后端 %s 故障，回退到 SQL LIKE: %s',
+                                       type(backend).__name__, e)
+            return sql_backend.search(kw, page=page, per_page=per_page, locale=locale)
+        # 索引零命中：用实时 SQL 兜底（索引未建/陈旧场景）
+        try:
+            sql_items, sql_total = sql_backend.search(
+                kw, page=page, per_page=per_page, locale=locale)
+            if sql_total > 0:
+                current_app.logger.info(
+                    '索引后端零命中，SQL 兜底召回 %d 条（关键词 %s，locale=%s）',
+                    sql_total, kw, locale)
+                return sql_items, sql_total
+        except Exception:
+            current_app.logger.exception('SQL 兜底搜索失败')
+        return items, total
     try:
-        return backend.search(kw, page=page, per_page=per_page, locale=locale)
+        return sql_backend.search(kw, page=page, per_page=per_page, locale=locale)
     except Exception as e:
-        current_app.logger.warning('搜索后端 %s 故障，回退到 SQL LIKE: %s',
-                                   type(backend).__name__, e)
-        return SqlLikeBackend().search(kw, page=page, per_page=per_page, locale=locale)
+        current_app.logger.warning('SQL LIKE 搜索失败: %s', e)
+        return [], 0
 
 
 def reindex_article(article_id):
@@ -541,6 +807,51 @@ def unindex_article(article_id):
         backend.unindex_article(article_id)
     except Exception as e:
         current_app.logger.warning('移除索引 %s 失败: %s', article_id, e)
+
+
+def reindex_object(type_, obj_id):
+    """插件内容保存/更新后重新索引（写入全部语言索引）。
+
+    提供者 get_doc 返回 None（下架/不可见）时自动从索引移除。
+    """
+    if Setting.get('search_index_on_save') != 'on':
+        return
+    backend = get_backend()
+    try:
+        backend.index_object(type_, obj_id)
+    except Exception as e:
+        current_app.logger.warning('索引 %s#%s 失败: %s', type_, obj_id, e)
+
+
+def unindex_object(type_, obj_id):
+    """插件内容删除/下架后从全部语言索引中移除。"""
+    if Setting.get('search_index_on_save') != 'on':
+        return
+    backend = get_backend()
+    try:
+        backend.unindex_object(type_, obj_id)
+    except Exception as e:
+        current_app.logger.warning('移除索引 %s#%s 失败: %s', type_, obj_id, e)
+
+
+def build_result_url(item):
+    """请求上下文中为搜索结果项生成详情 URL（按内容类型分发）。"""
+    from flask import url_for
+    type_ = item.get('type') or TYPE_ARTICLE
+    if type_ != TYPE_ARTICLE:
+        prov = get_search_providers().get(type_)
+        if prov is not None:
+            try:
+                url = prov.build_url(item)
+                if url:
+                    return url
+            except Exception:
+                current_app.logger.exception(
+                    '插件 %s 结果 URL 生成失败', type_)
+    if item.get('column_slug') and item.get('id'):
+        return url_for('frontend.article_detail',
+                       slug=item['column_slug'], aid=item['id'])
+    return '#'
 
 
 def rebuild_all():

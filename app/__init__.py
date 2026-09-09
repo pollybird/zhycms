@@ -409,6 +409,11 @@ def create_app(config_name=None):
     # （须在 db 之后：selector 内读 Setting；在蓝图注册之前）
     babel.init_app(app, locale_selector=select_locale)
 
+    # 兜底编译核心翻译（.mo 不入库；开发环境未 pybabel compile 时自动生成，
+    # 避免英文等语种下全站 _() 文案回退中文）
+    from .i18n import ensure_translations_compiled
+    ensure_translations_compiled()
+
     # 注册用户加载器
     from .models.user import User
 

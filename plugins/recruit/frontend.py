@@ -38,13 +38,14 @@ def recruit_jobs(limit=10, only_open=False):
     jobs = q.order_by(RecruitJob.sort_order.desc(),
                       RecruitJob.id.desc()) \
         .limit(max(int(limit or 10), 1)).all()
+    from app.utils.i18n_content import t_field
     return [{
         'id': j.id,
         'title': j.title,
-        'department': j.department or '',
-        'location': j.location or '',
+        'department': t_field(j, 'department') or '',
+        'location': t_field(j, 'location') or '',
         'headcount': j.headcount or 1,
-        'salary': j.salary or '',
+        'salary': t_field(j, 'salary') or '',
         'is_expired': j.is_expired(),
         'deadline': j.deadline.strftime('%Y-%m-%d') if j.deadline else '',
         'url': recruit_job_url(j),

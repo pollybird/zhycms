@@ -12,6 +12,8 @@ __init__.py（定义 PluginBase 子类并实例化为模块级变量 `plugin`）
                                  未启用时返回 get_jinja_fallbacks() 声明的空值）
   - get_admin_menu()             声明后台侧边栏菜单（启用且有权限才显示）
   - get_sitemap_urls()           向 sitemap.xml 贡献 URL
+  - get_search_provider()        v2.5.2：向全站搜索贡献独立内容（如产品），
+                                 返回 app.utils.search.SearchProvider 子类实例
   - generate_demo_data()         演示数据生成钩子（仅启用时调用）
   - get_i18n_dir()               v2.3：返回插件自有翻译目录（默认 translations/），
                                  存在时自动作为独立 domain 加载；模板中
@@ -166,6 +168,15 @@ class PluginBase:
     def get_sitemap_urls(self):
         """yield {'loc', 'lastmod', 'changefreq', 'priority'}（loc 为完整 URL）。"""
         return []
+
+    def get_search_provider(self):
+        """返回全站搜索内容提供者（v2.5.2）：SearchProvider 子类实例或 None。
+
+        插件自有的前台公开内容（如产品、招聘职位）通过该提供者进入全站搜索：
+        重建索引、保存时实时索引、索引故障/未建时的 SQL 兜底检索均自动覆盖。
+        协议见 app/utils/search.py 的 SearchProvider。
+        """
+        return None
 
     def generate_demo_data(self, industry):
         """演示数据生成钩子（industry: manufacturing / service）。"""

@@ -17,7 +17,7 @@ from .frontend import recruit_job_url, recruit_jobs
 
 class RecruitPlugin(PluginBase):
     slug = 'recruit'
-    version = '1.0.0'
+    version = '1.1.0'
     author = 'ZhyCMS 社区示例'
 
     # ---- 声明式注册 ----
@@ -87,6 +87,29 @@ class RecruitPlugin(PluginBase):
             'recruit_job_url': '#',
             'recruit_jobs': [],
         }
+
+    def get_search_provider(self):
+        """岗位进入全站搜索（v2.5.2）：索引/SQL 兜底/结果 URL 均由其负责。"""
+        from .search import RecruitSearchProvider
+        return RecruitSearchProvider()
+
+    def on_disabled(self):
+        """禁用后从全站搜索索引移除全部岗位（禁用后 SQL 兜底亦不再召回）。
+
+        历史索引中的岗位文档需主动清除，否则索引检索仍会命中并导致
+        详情链接 404；SQL 兜底因提供者已随门控失效，天然不再返回岗位。
+        """
+        try:
+            from app.extensions import db
+            from app.utils.search import get_backend
+            from .models import RecruitJob
+            backend = get_backend()
+            ids = [row[0] for row in
+                   db.session.query(RecruitJob.id).filter_by(is_deleted=False).all()]
+            for jid in ids:
+                backend.unindex_object('recruit_job', jid)
+        except Exception:
+            pass
 
     def get_sitemap_urls(self):
         """开放申请的岗位详情页收录（loc 为完整 URL）。"""

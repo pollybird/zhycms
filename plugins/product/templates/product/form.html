@@ -3,6 +3,38 @@
 {% block page_header %}{{ _p('product', '编辑产品') if product else _p('product', '新增产品') }}{% endblock %}
 {% set active_menu = 'product' %}
 
+{# 规格参数编辑器（默认语言与多语言版本共用；box_id/json_id 各语言唯一） #}
+{% macro spec_editor(box_id, groups) %}
+<div class="card-body" id="{{ box_id }}">
+  {% for g in groups %}
+  <div class="spec-group border rounded p-2 mb-3">
+    <div class="form-group mb-2 d-flex">
+      <input type="text" class="form-control form-control-sm spec-group-name mr-2"
+             placeholder="{{ _p('product', '分组名称（如：基本参数）') }}" value="{{ g['group'] }}" style="max-width:240px;">
+      <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeGroup(this)" title="{{ _p('product', '删除分组') }}">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+    <table class="table table-sm mb-2">
+      <thead><tr><th style="width:40%;">{{ _p('product', '参数名') }}</th><th>{{ _p('product', '参数值') }}</th><th width="60"></th></tr></thead>
+      <tbody>
+        {% for it in g['items'] %}
+        <tr class="spec-row">
+          <td><input type="text" class="form-control form-control-sm spec-name" value="{{ it.name }}" placeholder="{{ _p('product', '如：型号') }}"></td>
+          <td><input type="text" class="form-control form-control-sm spec-value" value="{{ it.value }}"></td>
+          <td><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeRow(this)"><i class="fas fa-times"></i></button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="button" class="btn btn-outline-secondary btn-sm py-0" onclick="addRow(this)">
+      <i class="fas fa-plus"></i> {{ _p('product', '添加参数') }}
+    </button>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
 {% block breadcrumb %}
   <li class="breadcrumb-item"><a href="{{ url_for('admin.product_index') }}">{{ _p('product', '产品管理') }}</a></li>
   <li class="breadcrumb-item active">{{ _p('product', '编辑') if product else _p('product', '新增') }}</li>
@@ -67,41 +99,12 @@
         <div class="card-header">
           <h3 class="card-title"><i class="fas fa-list"></i> {{ _p('product', '规格参数') }}</h3>
           <div class="card-tools">
-            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addGroup()">
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="addGroup('specs-box')">
               <i class="fas fa-plus"></i> {{ _p('product', '添加分组') }}
             </button>
           </div>
         </div>
-        <div class="card-body" id="specs-box">
-          {% if product %}
-          {% for g in product.specs_grouped() %}
-          <div class="spec-group border rounded p-2 mb-3">
-            <div class="form-group mb-2 d-flex">
-              <input type="text" class="form-control form-control-sm spec-group-name mr-2"
-                     placeholder="{{ _p('product', '分组名称（如：基本参数）') }}" value="{{ g['group'] }}" style="max-width:240px;">
-              <button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeGroup(this)" title="{{ _p('product', '删除分组') }}">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-            <table class="table table-sm mb-2">
-              <thead><tr><th style="width:40%;">{{ _p('product', '参数名') }}</th><th>{{ _p('product', '参数值') }}</th><th width="60"></th></tr></thead>
-              <tbody>
-                {% for it in g['items'] %}
-                <tr class="spec-row">
-                  <td><input type="text" class="form-control form-control-sm spec-name" value="{{ it.name }}" placeholder="{{ _p('product', '如：型号') }}"></td>
-                  <td><input type="text" class="form-control form-control-sm spec-value" value="{{ it.value }}"></td>
-                  <td><button type="button" class="btn btn-outline-danger btn-sm py-0" onclick="removeRow(this)"><i class="fas fa-times"></i></button></td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            <button type="button" class="btn btn-outline-secondary btn-sm py-0" onclick="addRow(this)">
-              <i class="fas fa-plus"></i> {{ _p('product', '添加参数') }}
-            </button>
-          </div>
-          {% endfor %}
-          {% endif %}
-        </div>
+        {{ spec_editor('specs-box', product.specs_grouped() if product else []) }}
         <div class="card-footer text-muted" style="font-size:12px;">
           {{ _p('product', '参数名为空的行保存时自动忽略；前台详情页按分组渲染规格表。') }}
         </div>
@@ -148,6 +151,17 @@
               <div class="form-group">
                 <label>{{ _p('product', 'SEO 描述') }} ({{ loc|upper }})</label>
                 <textarea name="seo_description_{{ loc }}" rows="2" class="form-control">{{ tr.seo_description if tr else '' }}</textarea>
+              </div>
+              <div class="form-group mb-0">
+                <label>
+                  {{ _p('product', '规格参数') }} ({{ loc|upper }})
+                  <small class="text-muted">{{ _('留空则前台回退显示默认语言（%(loc)s）内容', loc=default_locale) }}</small>
+                </label>
+                {{ spec_editor('specs-box-' ~ loc, product.translation_specs_grouped(loc) if product else []) }}
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="addGroup('specs-box-{{ loc }}')">
+                  <i class="fas fa-plus"></i> {{ _p('product', '添加分组') }}
+                </button>
+                <input type="hidden" name="specs_json_{{ loc }}" id="specs-json-{{ loc }}">
               </div>
             </div>
             {% endfor %}
@@ -321,8 +335,8 @@
     });
   })();
 
-  // ===== 规格参数编辑器 =====
-  function addGroup(){
+  // ===== 规格参数编辑器（默认语言 specs-box + 各翻译语言 specs-box-<loc> 共用） =====
+  function addGroup(boxId){
     const html =
       '<div class="spec-group border rounded p-2 mb-3">' +
       '  <div class="form-group mb-2 d-flex">' +
@@ -332,8 +346,8 @@
       '  <table class="table table-sm mb-2"><thead><tr><th style="width:40%;">{{ _p('product', '参数名') }}</th><th>{{ _p('product', '参数值') }}</th><th width="60"></th></tr></thead><tbody></tbody></table>' +
       '  <button type="button" class="btn btn-outline-secondary btn-sm py-0" onclick="addRow(this)"><i class="fas fa-plus"></i> {{ _p('product', '添加参数') }}</button>' +
       '</div>';
-    document.getElementById('specs-box').insertAdjacentHTML('beforeend', html);
-    const groups = document.querySelectorAll('#specs-box .spec-group');
+    document.getElementById(boxId).insertAdjacentHTML('beforeend', html);
+    const groups = document.querySelectorAll('#' + boxId + ' .spec-group');
     const last = groups[groups.length - 1];
     addRow(last.querySelector('button'));
   }
@@ -352,6 +366,21 @@
   function removeRow(btn){ btn.closest('tr').remove(); }
 
   // ===== 提交前组装 JSON =====
+  function collectSpecs(boxId, hiddenId){
+    const specs = [];
+    document.querySelectorAll('#' + boxId + ' .spec-group').forEach(g => {
+      const groupName = (g.querySelector('.spec-group-name') || {value: ''}).value.trim();
+      const items = [];
+      g.querySelectorAll('.spec-row').forEach(tr => {
+        const name = tr.querySelector('.spec-name').value.trim();
+        const value = tr.querySelector('.spec-value').value.trim();
+        if (name) items.push({name: name, value: value});
+      });
+      if (groupName || items.length) specs.push({group: groupName, items: items});
+    });
+    document.getElementById(hiddenId).value = JSON.stringify(specs);
+  }
+
   $('#product-form').on('submit', function(){
     if (mainEditor) document.querySelector('#content').value = mainEditor.getData();
     fieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
@@ -362,19 +391,11 @@
       .forEach(i => kept.push(i.value));
     document.getElementById('gallery-json').value = JSON.stringify(kept);
 
-    // 规格参数
-    const specs = [];
-    document.querySelectorAll('#specs-box .spec-group').forEach(g => {
-      const groupName = (g.querySelector('.spec-group-name') || {value: ''}).value.trim();
-      const items = [];
-      g.querySelectorAll('.spec-row').forEach(tr => {
-        const name = tr.querySelector('.spec-name').value.trim();
-        const value = tr.querySelector('.spec-value').value.trim();
-        if (name) items.push({name: name, value: value});
-      });
-      if (groupName || items.length) specs.push({group: groupName, items: items});
+    // 规格参数：默认语言 + 各翻译语言
+    collectSpecs('specs-box', 'specs-json');
+    document.querySelectorAll('[id^="specs-box-"]').forEach(box => {
+      collectSpecs(box.id, 'specs-json-' + box.id.slice('specs-box-'.length));
     });
-    document.getElementById('specs-json').value = JSON.stringify(specs);
   });
 </script>
 {% endblock %}

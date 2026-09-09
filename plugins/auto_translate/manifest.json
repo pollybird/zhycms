@@ -1,0 +1,9 @@
+{
+  "slug": "auto_translate",
+  "name": "一键翻译",
+  "version": "1.0.0",
+  "description": "内容编辑页多语言字段一键翻译：配置百度/有道/Google/DeepSeek 翻译服务后，自动翻译标题、摘要、正文与 SEO 字段；v2.5.1 内置插件",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "min_core_version": "2.5.0"
+}

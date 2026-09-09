@@ -304,7 +304,9 @@ def _save_product(product):
     product.updated_by = current_user.id
 
     # v2.5.0：保存各语种翻译（非默认语言）
-    _save_product_translations(product)
+    if not _save_product_translations(product):
+        db.session.rollback()
+        return None
 
     db.session.commit()
 
@@ -314,20 +316,25 @@ def _save_product(product):
                'gallery_count': len(gallery_urls),
                'specs_groups': len(specs)})
     clear_content_cache(column_id=col.id)
+    # v2.5.2：同步全站搜索索引（下架时提供者返回 None，自动移出索引）
+    from app.utils.search import reindex_object
+    reindex_object('product', product.id)
     flash(_gettext('产品已保存'), 'success')
     return product
 
 
 def _save_product_translations(product):
-    """保存产品各语种翻译（v2.5.0）。
+    """保存产品各语种翻译（v2.5.0；v2.5.2 增加规格参数）。
 
-    表单字段命名：{field}_{locale}，如 title_en / content_en。
+    表单字段命名：{field}_{locale}，如 title_en / content_en / specs_json_en。
     非默认语言且标题非空 → upsert 翻译记录；标题为空 → 删除该翻译（fallback 默认语言）。
+    规格 specs_json_{loc} 为编辑器组装的 JSON：留空/解析为空 → 置 None（回退主表），
+    非法 JSON → flash 提示并返回 False（调用方 rollback 中止保存）。
     """
     default_locale = get_default_locale()
     locales = [l for l in get_available_locales() if l != default_locale]
     if not locales:
-        return
+        return True
 
     existing = {tr.locale: tr for tr in product.translations}
 
@@ -347,6 +354,16 @@ def _save_product_translations(product):
         for fld in trans_fields:
             setattr(tr, fld, request.form.get(f'{fld}_{loc}') or '')
 
+        # v2.5.2：该语言规格参数（编辑器提交 specs_json_{loc}）
+        if f'specs_json_{loc}' in request.form:
+            specs = _parse_specs(request.form.get(f'specs_json_{loc}'))
+            if specs is None:
+                flash(_gettext('规格参数数据格式错误，请检查编辑器内容')
+                      + f' ({loc.upper()})', 'danger')
+                return False
+            tr.specs = _serialize_specs(specs) if specs else None
+    return True
+
 
 # ============================================================
 # 删除 / 批量
@@ -365,6 +382,8 @@ def product_delete(pid):
     audit_log(OP_DELETE, AUDIT_MODULE, pid, product.title,
               {'action': '产品', 'column_id': product.column_id})
     clear_content_cache(column_id=product.column_id)
+    from app.utils.search import unindex_object
+    unindex_object('product', pid)
     flash(_gettext('产品已删除（软删除，可由管理员在数据库恢复）'), 'success')
     return redirect(url_for('admin.product_index',
                             cid=product.column_id))
@@ -420,5 +439,12 @@ def product_batch():
               {'action': f'批量{action}', 'count': len(products)})
     for cid in col_ids:
         clear_content_cache(column_id=cid)
+    # v2.5.2：同步全站搜索索引（下架/删除移出，启用/移动重建）
+    from app.utils.search import reindex_object, unindex_object
+    for p in products:
+        if action in ('delete', 'disable'):
+            unindex_object('product', p.id)
+        else:
+            reindex_object('product', p.id)
     flash(_gettext('批量操作完成'), 'success')
     return redirect(url_for('admin.product_index'))

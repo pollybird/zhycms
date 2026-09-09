@@ -2927,6 +2927,27 @@ msgstr "No roles yet"
 msgid "搜索文章"
 msgstr "Search articles"
 
+#: app/frontend/templates/themes/blue/search.html:2
+#: app/frontend/templates/themes/default/search.html:2
+#: app/frontend/templates/themes/manufacturing/search.html:2
+#: app/frontend/templates/themes/service/search.html:2
+msgid "搜索结果"
+msgstr "Search Results"
+
+#: app/frontend/templates/themes/blue/search.html:8
+#: app/frontend/templates/themes/default/search.html:8
+#: app/frontend/templates/themes/manufacturing/search.html:8
+#: app/frontend/templates/themes/service/search.html:8
+msgid "关键词：“%(kw)s”，共找到 %(total)d 条结果"
+msgstr "Found %(total)d result(s) for: %(kw)s"
+
+#: app/frontend/templates/themes/blue/search.html:42
+#: app/frontend/templates/themes/default/search.html:42
+#: app/frontend/templates/themes/manufacturing/search.html:42
+#: app/frontend/templates/themes/service/search.html:42
+msgid "未找到匹配结果"
+msgstr "No matching results found"
+
 #: app/frontend/templates/themes/manufacturing/base.html:23
 msgid "服务热线"
 msgstr "Service hotline"

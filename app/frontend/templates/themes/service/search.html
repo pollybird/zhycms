@@ -1,11 +1,11 @@
 {% extends theme_base %}
-{% block title %}搜索结果{% endblock %}
+{% block title %}{{ _('搜索结果') }}{% endblock %}
 
 {% block content %}
 <div class="row">
   <div class="col-md-12">
-    <h2><i class="fas fa-search"></i> 搜索结果</h2>
-    <p class="text-muted">关键词：「{{ keyword }}」 共找到 {{ total }} 条结果</p>
+    <h2><i class="fas fa-search"></i> {{ _('搜索结果') }}</h2>
+    <p class="text-muted">{{ _('关键词：“%(kw)s”，共找到 %(total)d 条结果', kw=keyword, total=total) }}</p>
     <hr>
 
     {% if results %}
@@ -39,7 +39,7 @@
     {% else %}
     <div class="text-center text-muted py-5">
       <i class="far fa-frown" style="font-size:48px;"></i>
-      <p class="mt-3">未找到匹配结果</p>
+      <p class="mt-3">{{ _('未找到匹配结果') }}</p>
     </div>
     {% endif %}
   </div>

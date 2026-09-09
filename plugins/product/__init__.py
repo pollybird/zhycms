@@ -21,7 +21,7 @@ from .frontend import (
 
 class ProductPlugin(PluginBase):
     slug = 'product'
-    version = '1.0.0'
+    version = '1.1.0'
     author = 'ZhyCMS 官方'
 
     # ---- 声明式注册 ----
@@ -107,6 +107,29 @@ class ProductPlugin(PluginBase):
                 'priority': prio,
             })
         return urls
+
+    def get_search_provider(self):
+        """产品进入全站搜索（v2.5.2）：索引/SQL 兜底/结果 URL 均由其负责。"""
+        from .search import ProductSearchProvider
+        return ProductSearchProvider()
+
+    def on_disabled(self):
+        """禁用后从全站搜索索引移除全部产品（禁用后 SQL 兜底亦不再召回）。
+
+        重建前历史索引中的产品文档需主动清除，否则索引检索仍会命中并导致
+        详情链接 404；SQL 兜底因提供者已随门控失效，天然不再返回产品。
+        """
+        try:
+            from app.extensions import db
+            from app.utils.search import get_backend
+            from .models import Product
+            backend = get_backend()
+            ids = [row[0] for row in
+                   db.session.query(Product.id).filter_by(is_deleted=False).all()]
+            for pid in ids:
+                backend.unindex_object('product', pid)
+        except Exception:
+            pass
 
     def generate_demo_data(self, industry):
         from .demo import generate

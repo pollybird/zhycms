@@ -165,15 +165,19 @@ def _save_job(job):
               job.id, job.title,
               {'action': '岗位', 'deadline': job.deadline.strftime('%Y-%m-%d %H:%M')
                if job.deadline else '长期有效'})
+    # v2.5.2：同步全站搜索索引（下架时提供者返回 None，自动移出索引）
+    from app.utils.search import reindex_object
+    reindex_object('recruit_job', job.id)
     flash(_gettext('岗位已保存'), 'success')
     return job
 
 
 def _save_job_translations(job):
-    """保存岗位各语种翻译（v2.5.0）。
+    """保存岗位各语种翻译（v2.5.0；v2.5.2 增加部门/地点/薪资）。
 
-    表单字段命名：{field}_{locale}，如 title_en / description_en。
+    表单字段命名：{field}_{locale}，如 title_en / description_en / department_en。
     非默认语言且岗位名称非空 → upsert 翻译记录；名称为空 → 删除该翻译（fallback 默认语言）。
+    department/location/salary 翻译留空即回退主表默认语言字段。
     """
     default_locale = get_default_locale()
     locales = [l for l in get_available_locales() if l != default_locale]
@@ -195,6 +199,12 @@ def _save_job_translations(job):
             db.session.add(tr)
         tr.title = tr_title
         tr.description = request.form.get(f'description_{loc}') or ''
+        tr.department = (request.form.get(f'department_{loc}')
+                         or '').strip()[:100] or None
+        tr.location = (request.form.get(f'location_{loc}')
+                       or '').strip()[:200] or None
+        tr.salary = (request.form.get(f'salary_{loc}')
+                     or '').strip()[:100] or None
 
 
 @admin_bp.route('/recruit/jobs/<int:jid>/delete', methods=['POST'])
@@ -207,6 +217,8 @@ def recruit_job_delete(jid):
     job.is_deleted = True
     db.session.commit()
     audit_log(OP_DELETE, AUDIT_MODULE, jid, job.title, {'action': '岗位'})
+    from app.utils.search import unindex_object
+    unindex_object('recruit_job', jid)
     flash(_gettext('岗位已删除（软删除，可由管理员在数据库恢复）'), 'success')
     return redirect(url_for('admin.recruit_job_index'))
 
@@ -237,6 +249,13 @@ def recruit_job_batch():
     db.session.commit()
     audit_log(OP_BATCH, AUDIT_MODULE, None, None,
               {'action': f'批量{action}', 'count': len(jobs), 'module': '招聘岗位'})
+    # v2.5.2：同步全站搜索索引（下架/删除移出，启用重建）
+    from app.utils.search import reindex_object, unindex_object
+    for j in jobs:
+        if action in ('delete', 'disable'):
+            unindex_object('recruit_job', j.id)
+        else:
+            reindex_object('recruit_job', j.id)
     flash(_gettext('批量操作完成'), 'success')
     return redirect(url_for('admin.recruit_job_index'))
 

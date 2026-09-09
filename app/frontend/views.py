@@ -494,16 +494,14 @@ def search():
     results = []
     total = 0
     if keyword:
-        from ..utils.search import search_articles
+        from ..utils.search import search_articles, build_result_url
         from ..i18n import select_locale
         results, total = search_articles(
             keyword, page=page, per_page=per_page, locale=select_locale()
         )
-    # 为每个结果生成 URL
+    # 为每个结果生成 URL（文章 → 文章详情；产品等插件内容 → 插件路由）
     for r in results:
-        if r.get('column_slug') and r.get('id'):
-            r['url'] = url_for('frontend.article_detail',
-                               slug=r['column_slug'], aid=r['id'])
+        r['url'] = build_result_url(r)
     return render_template(
         theme_template('search'), keyword=keyword, results=results,
         total=total, page=page, per_page=per_page,

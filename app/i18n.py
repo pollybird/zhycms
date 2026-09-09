@@ -257,3 +257,36 @@ def current_locale():
         return str(loc) if loc else 'zh'
     except Exception:
         return 'zh'
+
+
+def ensure_translations_compiled():
+    """启动时兜底编译核心翻译：.mo 缺失或落后于 .po 时自动生成。
+
+    背景：`*.mo` 在 .gitignore 中不入库，正式部署用 `pybabel compile -d
+    app/translations` 生成；但开发环境（run.py）若未手动编译，Flask-Babel
+    运行时只加载 .mo，会导致全站 `_()` 文案回退成中文。故在 create_app 时
+    做一次幂等编译。任何失败都静默跳过（gettext 回退原文，不影响启动）。
+    """
+    try:
+        from babel.messages import mofile as _mofile, pofile as _pofile
+        trans_root = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), 'translations')
+        if not os.path.isdir(trans_root):
+            return
+        for loc in os.listdir(trans_root):
+            lc_dir = os.path.join(trans_root, loc, 'LC_MESSAGES')
+            if not os.path.isdir(lc_dir):
+                continue
+            po_path = os.path.join(lc_dir, 'messages.po')
+            mo_path = os.path.join(lc_dir, 'messages.mo')
+            if not os.path.isfile(po_path):
+                continue
+            if os.path.isfile(mo_path) and \
+                    os.path.getmtime(mo_path) >= os.path.getmtime(po_path):
+                continue
+            with open(po_path, 'rb') as fp:
+                catalog = _pofile.read_po(fp)
+            with open(mo_path, 'wb') as fp:
+                _mofile.write_mo(fp, catalog)
+    except Exception:
+        pass

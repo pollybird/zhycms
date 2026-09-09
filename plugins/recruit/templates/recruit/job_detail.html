@@ -14,10 +14,10 @@
   <div class="col-md-8">
     <h1>{{ t(job, 'title') }}</h1>
     <div class="text-muted mb-3">
-      {% if job.department %}<span class="mr-3"><i class="fas fa-sitemap"></i> {{ job.department }}</span>{% endif %}
-      {% if job.location %}<span class="mr-3"><i class="fas fa-map-marker-alt"></i> {{ job.location }}</span>{% endif %}
+      {% if t(job, 'department') %}<span class="mr-3"><i class="fas fa-sitemap"></i> {{ t(job, 'department') }}</span>{% endif %}
+      {% if t(job, 'location') %}<span class="mr-3"><i class="fas fa-map-marker-alt"></i> {{ t(job, 'location') }}</span>{% endif %}
       {% if job.headcount %}<span class="mr-3"><i class="fas fa-users"></i> {{ _p('recruit', '招聘') }} {{ job.headcount }} {{ _p('recruit', '人') }}</span>{% endif %}
-      {% if job.salary %}<span class="mr-3"><i class="fas fa-yen-sign"></i> {{ job.salary }}</span>{% endif %}
+      {% if t(job, 'salary') %}<span class="mr-3"><i class="fas fa-yen-sign"></i> {{ t(job, 'salary') }}</span>{% endif %}
       <span>
         {% if job.deadline %}
         <i class="fas fa-hourglass-half"></i>

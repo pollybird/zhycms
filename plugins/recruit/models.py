@@ -88,11 +88,11 @@ class RecruitApplication(db.Model):
 
 
 class RecruitJobTranslation(db.Model):
-    """岗位多语言翻译（v2.5.0）。
+    """岗位多语言翻译（v2.5.0；v2.5.2 增加部门/地点/薪资）。
 
-    主表 recruit_jobs 存默认语言的 title/description；非默认语言存于此表。
-    查不到对应 locale 的翻译时 fallback 到主表默认语言字段。
-    department/location/salary/headcount 为结构化短字段，不做翻译。
+    主表 recruit_jobs 存默认语言的 title/description/department/location/salary；
+    非默认语言存于此表。查不到对应 locale 的翻译时 fallback 到主表默认语言字段
+    （翻译字段置空即回退主表）。headcount 为数值，不随语言变化。
     """
     __tablename__ = 'recruit_job_translations'
 
@@ -102,6 +102,9 @@ class RecruitJobTranslation(db.Model):
     locale = db.Column(db.String(10), nullable=False)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
+    department = db.Column(db.String(100))   # 所属部门翻译（空回退主表）
+    location = db.Column(db.String(200))     # 工作地点翻译（空回退主表）
+    salary = db.Column(db.String(100))       # 薪资待遇翻译（空回退主表）
 
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)

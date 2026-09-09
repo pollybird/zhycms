@@ -130,6 +130,7 @@
   <a href="#pd-upload" class="sub">表单与上传</a>
   <a href="#pd-nav" class="sub">前台导航</a>
   <a href="#pd-sitemap" class="sub">sitemap 贡献</a>
+  <a href="#pd-search" class="sub">全站搜索贡献</a>
   <a href="#pd-api" class="sub">REST API 扩展</a>
   <a href="#pd-lifecycle" class="sub">生命周期管理</a>
   <a href="#pd-test" class="sub">自测清单</a>
@@ -152,7 +153,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v2.5.0</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v2.5.2</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -596,11 +597,13 @@ docker compose --profile postgres up -d
 <table>
   <tr><th>slug</th><th>名称</th><th>关键接口</th></tr>
   <tr><td>banner</td><td>轮播图</td><td><code>banner_items('home-hero')</code>；<code>GET /api/v1/banners/&lt;slug&gt;</code></td></tr>
-  <tr><td>product</td><td>产品展示</td><td><code>product_latest()</code>；<code>/product-&lt;id&gt;.html</code>；<code>GET /api/v1/products/&lt;id&gt;</code></td></tr>
+  <tr><td>product</td><td>产品展示</td><td><code>product_latest()</code>；<code>/product-&lt;id&gt;.html</code>；<code>GET /api/v1/products/&lt;id&gt;</code>；全站搜索提供者</td></tr>
   <tr><td>friend_link</td><td>友情链接</td><td><code>friend_links()</code>；后台 <code>/friend-links</code></td></tr>
   <tr><td>form</td><td>自定义表单</td><td>后台 <code>/forms</code>；前台 <code>/form/&lt;slug&gt;</code>；v2.3 由核心转插件</td></tr>
   <tr><td>analytics</td><td>统计代码</td><td><code>analytics_head()|safe</code> / <code>analytics_body()|safe</code>；v2.3 新增</td></tr>
   <tr><td>oss_storage</td><td>对象存储</td><td>阿里云/腾讯云/七牛云；v2.4 新增</td></tr>
+  <tr><td>recruit</td><td>招聘管理</td><td><code>recruit_jobs()</code>；<code>/job-&lt;id&gt;.html</code>；简历上传；全站搜索提供者</td></tr>
+  <tr><td>auto_translate</td><td>一键翻译</td><td>编辑页多语言 Tab 一键调用百度/有道/Google/DeepSeek 翻译；v2.5.2 新增</td></tr>
 </table>
 
 <h3 id="pl-ui">插件管理页</h3>
@@ -715,12 +718,12 @@ pybabel compile -d plugins/product/translations</code></pre>
   <tr><td>articles</td><td>article_translations</td><td>title, summary, content, seo_title, seo_keywords, seo_description</td></tr>
   <tr><td>columns</td><td>column_translations</td><td>name, summary, page_content, seo_title, seo_keywords, seo_description</td></tr>
   <tr><td>fragments</td><td>fragment_translations</td><td>value（仅内容值，名称不翻译）</td></tr>
-  <tr><td>products</td><td>product_translations</td><td>title, summary, content, seo_*</td></tr>
+  <tr><td>products</td><td>product_translations</td><td>title, summary, content, seo_*；specs（规格参数 JSON，v2.5.2）</td></tr>
   <tr><td>forms</td><td>form_translations</td><td>name, description, success_message</td></tr>
-  <tr><td>recruit_jobs</td><td>recruit_job_translations</td><td>title, description</td></tr>
+  <tr><td>recruit_jobs</td><td>recruit_job_translations</td><td>title, description；department, location, salary（v2.5.2）</td></tr>
   <tr><td>friend_links</td><td>friend_link_translations</td><td>name（仅名称，URL 不翻译）</td></tr>
 </table>
-<div class="note"><b>设计原则</b>：主表保留默认语言字段（冗余），翻译表仅存非默认语言。查不到翻译时 fallback 主表默认语言，不会出现空白。<code>slug</code> 不随语言变化，URL 保持稳定。</div>
+<div class="note"><b>设计原则</b>：主表保留默认语言字段（冗余），翻译表仅存非默认语言。查不到翻译时 fallback 主表默认语言，不会出现空白。<code>slug</code> 不随语言变化，URL 保持稳定。<b>v2.5.2 起结构化字段同样可翻译</b>：产品规格参数（JSON，结构同主表，留空回退主表）、岗位的部门/工作地点/薪资待遇（短文本，留空回退主表），对应 Alembic 迁移 <code>0007</code>。</div>
 
 <h4>前台模板：t() 全局函数</h4>
 <pre><code>&lt;!-- 6 套主题模板已接入，自定义主题按此模式适配 --&gt;
@@ -760,16 +763,19 @@ pybabel compile -d plugins/product/translations</code></pre>
   <tr><td>前台列表/详情/投递</td><td>前台蓝图</td><td><code>/jobs</code>、<code>/job-&lt;id&gt;.html</code></td></tr>
   <tr><td>前台导航入口</td><td>菜单钩子</td><td><code>get_frontend_menu()</code></td></tr>
   <tr><td>权限/审计/sitemap</td><td>声明式注册</td><td><code>permissions</code> / <code>audit_modules</code> / <code>get_sitemap_urls()</code></td></tr>
+  <tr><td>岗位进入全站搜索 <span class="tag tag-new">v2.5.2</span></td><td>搜索提供者</td><td><code>get_search_provider()</code> → SearchProvider（<code>search.py</code>）</td></tr>
 </table>
 
 <h3 id="pd-layout">2. 目录结构与 manifest.json</h3>
 <pre><code>plugins/recruit/
 ├── manifest.json          # 元数据（builtin=false 可卸载）
 ├── __init__.py            # PluginBase 子类 + plugin 实例
-├── models.py              # RecruitJob / RecruitApplication
+├── models.py              # RecruitJob / RecruitApplication / RecruitJobTranslation
 ├── admin.py               # 后台路由（挂核心 admin_bp）
 ├── frontend.py            # 模板函数 recruit_jobs() / recruit_job_url()
 ├── frontend_routes.py     # 前台蓝图
+├── search.py              # 全站搜索提供者 SearchProvider（v2.5.2）
+├── translations/          # 插件独立翻译域（en）
 └── templates/recruit/
     ├── index.html         # 后台岗位列表
     ├── form.html          # 后台岗位表单
@@ -781,7 +787,7 @@ pybabel compile -d plugins/product/translations</code></pre>
 <pre><code>{
   "slug": "recruit",
   "name": "招聘管理",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "招聘岗位发布与在线求职申请...",
   "author": "ZhyCMS 社区示例",
   "builtin": false,
@@ -796,7 +802,7 @@ from .frontend import recruit_job_url, recruit_jobs
 class RecruitPlugin(PluginBase):
     slug = 'recruit'
     name = '招聘管理'
-    version = '1.0.0'
+    version = '1.1.0'
 
     permissions = [('recruit:manage', '招聘管理', '招聘岗位维护与求职申请处理')]
     preset_role_grants = {
@@ -830,6 +836,15 @@ class RecruitPlugin(PluginBase):
         # 返回岗位详情页 URL 列表
         ...
 
+    def get_search_provider(self):
+        # v2.5.2：岗位进入全站搜索（索引/SQL 兜底/结果 URL）
+        from .search import RecruitSearchProvider
+        return RecruitSearchProvider()
+
+    def on_disabled(self):
+        # 禁用时把历史索引中的岗位文档全部移除，避免搜索命中 404 页
+        ...
+
 plugin = RecruitPlugin()   # 必须！核心通过模块级 plugin 变量识别</code></pre>
 <div class="note"><b>导入顺序陷阱</b>：<code>from . import admin</code> 必须在顶部完成，保证模型在 <code>db.create_all()</code> 之前注册进 metadata。</div>
 
@@ -858,6 +873,25 @@ plugin = RecruitPlugin()   # 必须！核心通过模块级 plugin 变量识别<
 
     def is_open(self):
         return self.is_enabled and not self.is_deleted and not self.is_expired()
+
+
+class RecruitJobTranslation(db.Model):
+    """岗位多语言翻译（v2.5.0 基础字段；v2.5.2 增加结构化字段）。
+
+    主表存默认语言，翻译表存非默认语言；查不到翻译或字段为空时
+    fallback 主表（前台用全局 t() / 后端 t_field 自动处理）。
+    """
+    __tablename__ = 'recruit_job_translations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('recruit_jobs.id', ondelete='CASCADE'),
+                       nullable=False, index=True)
+    locale = db.Column(db.String(10), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+    department = db.Column(db.String(100))   # v2.5.2 部门翻译
+    location = db.Column(db.String(200))     # v2.5.2 工作地点翻译
+    salary = db.Column(db.String(100))       # v2.5.2 薪资待遇翻译
 
 
 class RecruitApplication(db.Model):
@@ -912,7 +946,12 @@ def recruit_jobs(limit=10, only_open=False):
                      | (RecruitJob.deadline > datetime.now()))
     jobs = q.order_by(RecruitJob.sort_order.desc(),
                       RecruitJob.id.desc()).limit(limit).all()
-    return [{'id': j.id, 'title': j.title, 'url': recruit_job_url(j)} for j in jobs]</code></pre>
+    from app.utils.i18n_content import t_field
+    # v2.5.2：结构化字段同样经 t_field 按当前语言取翻译，空回退默认语言
+    return [{'id': j.id, 'title': j.title, 'url': recruit_job_url(j),
+             'department': t_field(j, 'department') or '',
+             'location': t_field(j, 'location') or '',
+             'salary': t_field(j, 'salary') or ''} for j in jobs]</code></pre>
 <div class="warn">模板中生成插件对象链接时用注册的 URL 全局函数（<code>recruit_job_url(j)</code>），<b>不要写 <code>{{ j.url }}</code></b>——模型没有该属性时 Jinja 静默输出空 href。</div>
 
 <p><b>前台蓝图</b>（<code>frontend_routes.py</code>）三个关键机制：</p>
@@ -970,7 +1009,41 @@ def job_detail_rewrite(jid):
                'lastmod': j.updated_at.strftime('%Y-%m-%d'),
                'changefreq': 'monthly', 'priority': '0.6'}</code></pre>
 
-<h3 id="pd-api">10. REST API 扩展（可选）</h3>
+<h3 id="pd-search">10. 全站搜索贡献 <span class="tag tag-new">v2.5.2</span></h3>
+<p>插件自有的前台公开内容（岗位、产品等）通过 <code>get_search_provider()</code> 提供一个 <code>SearchProvider</code> 实例，即可进入全站搜索——<b>无需插件自己维护任何索引</b>。核心统一负责：重建索引写入各语言、保存时实时索引（<code>reindex_object('recruit_job', id)</code>）、索引零命中/故障时 SQL 兜底、结果按类型生成详情 URL、插件禁用时清理索引残留。</p>
+<p><code>search.py</code> 的完整骨架（节选自 recruit，产品插件同构）：</p>
+<pre><code>from app.utils.search import SearchProvider
+
+class RecruitSearchProvider(SearchProvider):
+    type = 'recruit_job'    # 全局唯一的内容类型标识，作为索引 uid 前缀
+
+    def iter_docs(self, locale):
+        """后台「重建索引」时逐条产出该语言下的可见文档。"""
+        for j in RecruitJob.query.filter_by(is_enabled=True, is_deleted=False):
+            doc = self._doc(j, locale)
+            if doc: yield doc
+
+    def get_doc(self, obj_id, locale):
+        """单条文档（保存时实时索引）；返回 None 表示下架/删除 → 移出索引。"""
+        j = RecruitJob.query.filter_by(id=obj_id, is_enabled=True,
+                                       is_deleted=False).first()
+        return self._doc(j, locale) if j else None
+
+    def sql_search(self, keyword, locale, page=1, per_page=20):
+        """索引故障/未建时的 SQL LIKE 兜底，返回 (items, total)。
+
+        非默认语言同时匹配翻译表（含 v2.5.2 的 department/location/salary）。
+        """
+        ...
+
+    def build_url(self, item):
+        """搜索结果 → 详情页链接（伪静态开关两种模式）。"""
+        if Setting.get('seo_rewrite_enable') == 'on':
+            return f'/job-{item["id"]}.html'
+        return url_for('recruit_frontend.job_detail', jid=item['id'])</code></pre>
+<div class="note">文档 dict 字段：<code>id, title, summary, content(可含 HTML，核心自动去标签), column_id, column_name, column_slug, published_at</code>。保存/删除/批量上下架时在 admin.py 里调 <code>reindex_object()</code> / <code>unindex_object()</code> 即完成同步；结果项的 <code>url</code> 由核心视图调用 <code>build_url()</code> 统一生成。</div>
+
+<h3 id="pd-api">11. REST API 扩展（可选）</h3>
 <pre><code>def get_api_routes(self, api_bp):
     @api_bp.route('/recruit/jobs')
     @api_cache('recruit_job')
@@ -981,7 +1054,7 @@ def job_detail_rewrite(jid):
         return api_ok([{'id': r.id, 'title': r.title} for r in rows])</code></pre>
 <div class="note">挂在核心 <code>api_bp</code> 自动享受 Token 鉴权、CORS、缓存与统一响应包。</div>
 
-<h3 id="pd-lifecycle">11. 生命周期管理</h3>
+<h3 id="pd-lifecycle">12. 生命周期管理</h3>
 <table>
   <tr><th>操作</th><th>行为</th><th>数据保留</th></tr>
   <tr><td>启用</td><td>种子权限 → 角色授权 → 建表 → 写清单</td><td>复用历史数据</td></tr>
@@ -991,7 +1064,7 @@ def job_detail_rewrite(jid):
   <tr><td>上传</td><td>8 层校验后解压</td><td>—</td></tr>
 </table>
 
-<h3 id="pd-test">12. 自测清单</h3>
+<h3 id="pd-test">13. 自测清单</h3>
 <ul class="check">
   <li>启动无异常，管理页显示已加载</li>
   <li>启用后权限点/菜单/表创建成功</li>
@@ -1000,10 +1073,12 @@ def job_detail_rewrite(jid):
   <li>验证码一次性消费，非法文件被拒绝</li>
   <li>导航/sitemap/API 启用后出现，禁用后消失</li>
   <li>模板函数禁用后返回 fallback 不报错</li>
+  <li>搜索：保存后可搜到，下架/删除后消失，禁用插件后无残留（v2.5.2）</li>
+  <li>多语言：翻译留空回退默认语言，前台/搜索/API 三处一致（v2.5.2）</li>
   <li>卸载后目录删除，数据表保留，重新上传恢复</li>
 </ul>
 
-<h3 id="pd-common">13. 常见陷阱</h3>
+<h3 id="pd-common">14. 常见陷阱</h3>
 <ul>
   <li>后台模板脚本块是 <code>{% block js %}</code>（不是 <code>scripts</code>），父模板不存在的块名会被静默丢弃。</li>
   <li><code>__init__.py</code> 末尾必须 <code>plugin = RecruitPlugin()</code>。</li>
@@ -1011,6 +1086,7 @@ def job_detail_rewrite(jid):
   <li>前台交互页（含验证码/flash）不要接页面缓存。</li>
   <li>字典用 <code>g['items']</code> 而非 <code>g.items</code>（后者命中 dict 方法）。</li>
   <li>伪静态路由加入回归测试，确保不劫持核心 <code>/article-&lt;id&gt;.html</code>。</li>
+  <li>SearchProvider 的 <code>iter_docs/get_doc</code> 必须自己过滤下架/删除内容——核心靠 <code>get_doc</code> 返回 <code>None</code> 判断移出索引，过滤漏了下架内容仍会被搜到（v2.5.2）。</li>
 </ul>
 </section>
 
@@ -1090,10 +1166,10 @@ flask db migrate -m "xxx" # 新建迁移脚本（开发用）</code></pre>
 
 <h3>索引与更新</h3>
 <ul>
-  <li><b>索引范围</b>：标题 + 正文（去 HTML）+ 摘要 + 栏目名</li>
-  <li><b>自动更新</b>：文章保存/删除时通过钩子触发，<b>独立于缓存开关</b></li>
+  <li><b>索引范围</b>：文章（标题 + 正文去 HTML + 摘要 + 栏目名）+ 插件内容（产品、招聘岗位，v2.5.2）</li>
+  <li><b>自动更新</b>：文章与插件内容保存/删除时通过钩子触发，<b>独立于缓存开关</b></li>
   <li><b>重建索引</b>：后台「搜索设置」一键重建，未索引前自动回退 SQL LIKE</li>
-  <li><b>索引位置</b>：<code>instance/search_index/</code></li>
+  <li><b>索引位置</b>：<code>instance/search_index/&lt;locale&gt;/</code>（按语言分目录）</li>
 </ul>
 <div class="note">6 套主题搜索模板均支持分页与关键词高亮（<code>|highlight(keyword)|safe</code>）。</div>
 
@@ -1101,11 +1177,24 @@ flask db migrate -m "xxx" # 新建迁移脚本（开发用）</code></pre>
 <p>开启内容级多语言后，搜索<b>按当前语言检索对应语言的内容</b>，三个后端均已适配：</p>
 <ul>
   <li><b>Whoosh</b>：按语言分索引目录 <code>instance/search_index/&lt;locale&gt;/</code>；<b>Meilisearch</b>：按语言分索引 <code>zhycms_articles_&lt;locale&gt;</code></li>
-  <li>每篇文章对每种语言写入一份索引，内容经 <code>t_field</code> 解析——有翻译用翻译、无翻译回退默认语言（未翻译文章不会因切语言而搜不到）</li>
+  <li>每篇内容对每种语言写入一份索引，内容经 <code>t_field</code> 解析——有翻译用翻译、无翻译回退默认语言（未翻译内容不会因切语言而搜不到）</li>
   <li>搜索结果的标题、摘要、栏目名均随当前语言显示；前台 <code>/search</code> 按 <code>?lang=xx</code> / session 自动选索引</li>
   <li>该语言索引尚未建立时自动回退默认语言索引；i18n 关闭时仅维护默认语言单一索引，行为不变</li>
+  <li><b>插件内容同样本地化检索（v2.5.2）</b>：产品的规格参数、岗位的部门/工作地点/薪资待遇均按语言索引与兜底匹配（如英文搜 <code>Model</code>、<code>Shanghai</code> 可命中）</li>
 </ul>
-<div class="tip">升级到 v2.5.1 后，到后台「系统设置 → 搜索设置」点击一次<b>「重建索引」</b>即可生成各语言索引；文章保存/删除会自动同步全部语言索引，无需手动维护。</div>
+<div class="tip">升级到 v2.5.1 后，到后台「系统设置 → 搜索设置」点击一次<b>「重建索引」</b>即可生成各语言索引；内容保存/删除会自动同步全部语言索引，无需手动维护。</div>
+
+<h3>插件内容接入搜索（SearchProvider） <span class="tag tag-new">v2.5.2</span></h3>
+<p>插件通过 <code>get_search_provider()</code> 钩子返回一个 <code>SearchProvider</code> 实例，自有内容即可进入全站搜索（官方「产品展示」「招聘管理」已接入）。协议四方法：</p>
+<table>
+  <tr><th>方法</th><th>职责</th></tr>
+  <tr><td><code>type</code></td><td>内容类型标识（全局唯一，如 <code>product</code> / <code>recruit_job</code>），与 id 组成索引唯一键 <code>uid = "类型:id"</code></td></tr>
+  <tr><td><code>iter_docs(locale)</code></td><td>重建索引时产出该语言下全部可见文档</td></tr>
+  <tr><td><code>get_doc(id, locale)</code></td><td>单条文档（保存时实时索引）；返回 <code>None</code> 表示下架/删除，核心自动移出索引</td></tr>
+  <tr><td><code>sql_search(kw, locale, page, per_page)</code></td><td>SQL LIKE 兜底检索（索引故障/未建时），需自行匹配翻译表</td></tr>
+  <tr><td><code>build_url(item)</code></td><td>搜索结果 → 详情页 URL（伪静态两种模式），核心统一分发</td></tr>
+</table>
+<div class="note">完整示例见「插件开发指南 → 全站搜索贡献」。文档以 <code>uid</code> 区分类型，文章与产品/岗位互不覆盖；插件禁用时核心回调 <code>on_disabled()</code> 清理索引残留。产品/岗位保存、删除、批量上下架均实时同步索引。</div>
 </section>
 
 <section id="docker">

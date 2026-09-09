@@ -37,12 +37,13 @@ def _product_summary(p, col=None):
 
 def _product_detail(p, col):
     from app.utils.i18n_content import t_field
+    from app.i18n import current_locale
 
     data = _product_summary(p, col)
     data.update({
         'content': t_field(p, 'content') or '',
         'gallery': [_abs_url(u) for u in p.gallery_urls()],
-        'specs': p.specs_grouped(),
+        'specs': p.specs_grouped(current_locale()),
         'seo': {
             'title': t_field(p, 'seo_title') or t_field(p, 'title'),
             'keywords': t_field(p, 'seo_keywords') or '',

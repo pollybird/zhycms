@@ -323,6 +323,7 @@
 <script src="{{ url_for('static', filename='vendor/jquery/3.6.4/jquery.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/bootstrap/4.6.2/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/adminlte/3.2.0/js/adminlte.min.js') }}"></script>
+{{ auto_translate_assets() }}
 {% block js %}{% endblock %}
 </body>
 </html>

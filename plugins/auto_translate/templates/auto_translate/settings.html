@@ -1,0 +1,142 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _p('auto_translate', '一键翻译配置') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('auto_translate', '一键翻译配置') }}{% endblock %}
+{% set active_menu = 'auto_translate' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">{{ _p('auto_translate', '插件') }}</li>
+<li class="breadcrumb-item active">{{ _p('auto_translate', '一键翻译') }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <div class="card card-outline card-primary">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-language"></i> {{ _p('auto_translate', '翻译服务商') }}</h3></div>
+    <div class="card-body">
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        {{ _p('auto_translate', '启用本插件并配置服务商后，内容编辑页（文章 / 栏目 / 碎片 / 产品 / 表单 / 招聘 / 友链）的「多语言版本」标签页会出现「一键翻译」按钮：填写默认语言内容后点击，即可自动翻译标题、摘要、正文与 SEO 字段。译文填入后请人工校对再保存。') }}
+      </div>
+      <div class="row">
+        {% for code, label in providers %}
+        <div class="col-md-3 col-sm-6">
+          <div class="card card-outline {{ 'card-success' if current_provider == code else 'card-secondary' }} provider-card" data-provider="{{ code }}" style="cursor:pointer;">
+            <div class="card-body py-3">
+              <div class="icheck-primary">
+                <input type="radio" name="auto_translate_provider" value="{{ code }}" id="pv-{{ code }}" {{ 'checked' if current_provider == code }}>
+                <label for="pv-{{ code }}" class="font-weight-bold">{{ label }}</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <!-- 百度翻译 -->
+      <div class="card card-outline card-danger provider-panel" data-provider="baidu">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-key"></i> {{ _p('auto_translate', '百度通用翻译 API') }}</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>APP ID</label>
+            <input type="text" name="auto_translate_baidu_appid" class="form-control" value="{{ settings.auto_translate_baidu_appid or '' }}" placeholder="2003xxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('auto_translate', '密钥（Secret）') }}</label>
+            <input type="text" name="auto_translate_baidu_secret" class="form-control" value="{{ settings.auto_translate_baidu_secret or '' }}" placeholder="{{ _p('auto_translate', '留空表示不修改') }}">
+          </div>
+          <small class="form-text text-muted">{{ _p('auto_translate', '在 fanyi-api.baidu.com 注册「通用翻译API」（标准版免费），获取 APP ID 与密钥。') }}</small>
+        </div>
+      </div>
+
+      <!-- 有道翻译 -->
+      <div class="card card-outline card-info provider-panel" data-provider="youdao">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-key"></i> {{ _p('auto_translate', '有道智云文本翻译') }}</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>{{ _p('auto_translate', '应用 ID（App Key）') }}</label>
+            <input type="text" name="auto_translate_youdao_key" class="form-control" value="{{ settings.auto_translate_youdao_key or '' }}">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('auto_translate', '应用密钥（App Secret）') }}</label>
+            <input type="text" name="auto_translate_youdao_secret" class="form-control" value="{{ settings.auto_translate_youdao_secret or '' }}" placeholder="{{ _p('auto_translate', '留空表示不修改') }}">
+          </div>
+          <small class="form-text text-muted">{{ _p('auto_translate', '在 ai.youdao.com 创建「文本翻译」应用获取凭证（有免费额度）。') }}</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <!-- Google 翻译 -->
+      <div class="card card-outline card-warning provider-panel" data-provider="google">
+        <div class="card-header"><h3 class="card-title"><i class="fab fa-google"></i> Google Cloud Translation</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="text" name="auto_translate_google_key" class="form-control" value="{{ settings.auto_translate_google_key or '' }}" placeholder="{{ _p('auto_translate', '留空表示不修改') }}">
+          </div>
+          <small class="form-text text-muted">{{ _p('auto_translate', 'Google Cloud Translation v2 的 API Key；富文本以 HTML 模式翻译保留标签。注意：国内服务器可能无法直连 Google。') }}</small>
+        </div>
+      </div>
+
+      <!-- DeepSeek -->
+      <div class="card card-outline card-primary provider-panel" data-provider="deepseek">
+        <div class="card-header"><h3 class="card-title"><i class="fas fa-robot"></i> DeepSeek {{ _p('auto_translate', '大模型（推荐长文/富文本）') }}</h3></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="text" name="auto_translate_deepseek_key" class="form-control" value="{{ settings.auto_translate_deepseek_key or '' }}" placeholder="sk-xxxx（{{ _p('auto_translate', '留空表示不修改') }}）">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('auto_translate', '模型') }}</label>
+            <input type="text" name="auto_translate_deepseek_model" class="form-control" value="{{ settings.auto_translate_deepseek_model or 'deepseek-chat' }}">
+          </div>
+          <div class="form-group">
+            <label>{{ _p('auto_translate', '接口地址（兼容 OpenAI 协议的网关可改）') }}</label>
+            <input type="text" name="auto_translate_deepseek_base_url" class="form-control" value="{{ settings.auto_translate_deepseek_base_url or 'https://api.deepseek.com' }}">
+          </div>
+          <small class="form-text text-muted">{{ _p('auto_translate', '大模型翻译对长正文与 HTML 排版保持最好；也支持任何 OpenAI 兼容接口（如通义、智谱、Kimi 等，改接口地址与模型名即可）。') }}</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-outline card-success">
+    <div class="card-footer d-flex">
+      <button type="submit" name="action" value="save" class="btn btn-primary flex-fill mr-2"><i class="fas fa-save"></i> {{ _p('auto_translate', '保存配置') }}</button>
+      <button type="submit" name="action" value="test" class="btn btn-outline-warning flex-fill ml-2"><i class="fas fa-plug"></i> {{ _p('auto_translate', '测试当前服务商') }}</button>
+    </div>
+  </div>
+</form>
+
+<script>
+  // 服务商选择：高亮单选卡片 + 显示对应凭证面板
+  (function () {
+    function refresh() {
+      var cur = document.querySelector('input[name="auto_translate_provider"]:checked');
+      var code = cur ? cur.value : 'baidu';
+      document.querySelectorAll('.provider-card').forEach(function (c) {
+        var on = c.getAttribute('data-provider') === code;
+        c.classList.toggle('card-success', on);
+        c.classList.toggle('card-secondary', !on);
+      });
+      document.querySelectorAll('.provider-panel').forEach(function (p) {
+        p.style.display = p.getAttribute('data-provider') === code ? '' : 'none';
+      });
+    }
+    document.querySelectorAll('input[name="auto_translate_provider"]').forEach(function (r) {
+      r.addEventListener('change', refresh);
+    });
+    document.querySelectorAll('.provider-card').forEach(function (c) {
+      c.addEventListener('click', function () {
+        var r = c.querySelector('input[type=radio]');
+        if (r) { r.checked = true; refresh(); }
+      });
+    });
+    refresh();
+  })();
+</script>
+{% endblock %}

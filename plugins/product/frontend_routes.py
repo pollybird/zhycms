@@ -119,11 +119,12 @@ def _render_product_detail(column, product):
     if content:
         content = _inject_default_alt(content)
 
+    from app.i18n import current_locale
     return render_template(
         _resolve_detail_template(),
         product=product, pdata=data, content=content,
         gallery=[u for u in product.gallery_urls()],
-        specs=product.specs_grouped(),
+        specs=product.specs_grouped(current_locale()),
         column=column, nav=_build_nav(),
         prev_product=prev_p, next_product=next_p,
         seo=_seo_for(product, column),

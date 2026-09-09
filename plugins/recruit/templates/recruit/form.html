@@ -74,6 +74,23 @@
               <label>{{ _p('recruit', '岗位名称') }} ({{ loc|upper }})</label>
               <input type="text" name="title_{{ loc }}" class="form-control" maxlength="200" value="{{ tr.title if tr else '' }}">
             </div>
+            <div class="row">
+              <div class="col-md-4 form-group">
+                <label>{{ _p('recruit', '所属部门') }} ({{ loc|upper }})</label>
+                <input type="text" name="department_{{ loc }}" class="form-control" maxlength="100"
+                       value="{{ tr.department if tr and tr.department else '' }}">
+              </div>
+              <div class="col-md-4 form-group">
+                <label>{{ _p('recruit', '工作地点') }} ({{ loc|upper }})</label>
+                <input type="text" name="location_{{ loc }}" class="form-control" maxlength="200"
+                       value="{{ tr.location if tr and tr.location else '' }}">
+              </div>
+              <div class="col-md-4 form-group">
+                <label>{{ _p('recruit', '薪资待遇') }} ({{ loc|upper }})</label>
+                <input type="text" name="salary_{{ loc }}" class="form-control" maxlength="100"
+                       value="{{ tr.salary if tr and tr.salary else '' }}">
+              </div>
+            </div>
             <div class="form-group mb-0">
               <label>{{ _p('recruit', '岗位介绍') }} ({{ loc|upper }})</label>
               <textarea name="description_{{ loc }}" rows="4" class="form-control richtext">{{ tr.description if tr and tr.description else '' }}</textarea>
