@@ -59,7 +59,7 @@ echo ""
 
 # ---- 步骤 1：停止并删除容器 ----
 info "停止并删除容器..."
-for profile in mysql postgres search; do
+for profile in mysql mariadb postgres search redis; do
     "${COMPOSE_CMD[@]}" --profile "$profile" down --remove-orphans 2>/dev/null || true
 done
 "${COMPOSE_CMD[@]}" down --remove-orphans 2>/dev/null || true

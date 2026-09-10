@@ -17,13 +17,13 @@ from flask import (render_template, redirect, url_for, request, flash,
                    send_file)
 
 from flask_babel import gettext as _gettext
-from ..extensions import db
-from ..models.audit import (OP_UPDATE, OP_UPLOAD, OP_DELETE, OP_EXPORT,
+from ...extensions import db
+from ...models.audit import (OP_UPDATE, OP_UPLOAD, OP_DELETE, OP_EXPORT,
                             MODULE_SETTING)
-from ..models.setting import Setting
-from ..utils.helpers import permission_required, audit_log
-from ..utils.pack import zip_directory
-from ..utils.themes import (
+from ...models.setting import Setting
+from ...utils.helpers import permission_required, audit_log
+from ...utils.pack import zip_directory
+from ...utils.themes import (
     THEMES_DIR,
     THEME_ALLOWED_EXTS,
     THEME_REQUIRED_FILES,
@@ -31,8 +31,8 @@ from ..utils.themes import (
     get_active_theme,
     list_theme_records,
 )
-from . import admin_bp
-from .confirm import verify_delete_captcha
+from .. import admin_bp
+from ..confirm import verify_delete_captcha
 
 # ------- 校验工具（与 plugins.py 同构，校验规则不同） -------
 

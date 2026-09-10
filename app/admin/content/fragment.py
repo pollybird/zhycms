@@ -4,14 +4,14 @@ from flask import (
 )
 
 from flask_babel import gettext as _gettext
-from ..extensions import db
-from ..constants import Upload as _U
-from ..models.fragment import Fragment, FragmentGroup, FragmentTranslation
-from ..utils.i18n_content import get_available_locales, get_default_locale
-from ..utils.helpers import permission_required, audit_log, clear_content_cache
-from ..utils.uploads import save_upload_file
-from ..models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRAGMENT
-from . import admin_bp
+from ...extensions import db
+from ...constants import Upload as _U
+from ...models.fragment import Fragment, FragmentGroup, FragmentTranslation
+from ...utils.i18n_content import get_available_locales, get_default_locale
+from ...utils.helpers import permission_required, audit_log, clear_content_cache
+from ...utils.uploads import save_upload_file
+from ...models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRAGMENT
+from .. import admin_bp
 
 
 FIELD_TYPES = [

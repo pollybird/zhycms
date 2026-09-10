@@ -16,26 +16,25 @@ from flask import (
 from flask_babel import gettext as _gettext
 from flask_login import current_user
 
-from ..extensions import db
-from ..constants import Upload as _U
-from ..models.column import Column, ColumnField
-from ..models.article import Article, ArticleFieldValue, ArticleTranslation
-from ..utils.i18n_content import get_available_locales, get_default_locale
-from ..models.workflow import (
+from ...extensions import db
+from ...models.column import Column, ColumnField
+from ...models.article import Article
+from ...utils.i18n_content import get_available_locales, get_default_locale
+from ...models.workflow import (
     STATUS_DRAFT, STATUS_REVIEW, STATUS_PUBLISHED, STATUS_ARCHIVED,
     STATUS_CHOICES, ArticleVersion,
 )
-from ..utils.helpers import (
+from ...utils.helpers import (
     permission_required, audit_log, clear_content_cache,
 )
-from ..utils.uploads import save_upload_file
-from ..utils.word_import import convert_docx_to_html
-from ..models.audit import (
+from ...utils.word_import import convert_docx_to_html
+from ...models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_PUBLISH, OP_ARCHIVE,
     OP_REVIEW_PASS, OP_REVIEW_REJECT, OP_BATCH, OP_ROLLBACK,
     MODULE_ARTICLE,
 )
-from . import admin_bp
+from ...services.article_service import save_article
+from .. import admin_bp
 
 
 # ============================================================
@@ -125,7 +124,13 @@ def article_create(cid):
     fields = col.fields.filter_by(is_deleted=False).order_by(ColumnField.sort_order.desc()).all()
 
     if request.method == 'POST':
-        article = _save_article(None, col, fields)
+        article, messages = save_article(
+            None, col, fields,
+            form_data=request.form, files_data=request.files,
+            current_user=current_user,
+        )
+        for category, msg in messages:
+            flash(msg, category)
         if article is None:
             return redirect(url_for('admin.article_create', cid=cid))
         return redirect(url_for('admin.article_index', cid=cid))
@@ -150,7 +155,13 @@ def article_edit(cid, aid):
     fields = col.fields.filter_by(is_deleted=False).order_by(ColumnField.sort_order.desc()).all()
 
     if request.method == 'POST':
-        updated = _save_article(article, col, fields)
+        updated, messages = save_article(
+            article, col, fields,
+            form_data=request.form, files_data=request.files,
+            current_user=current_user,
+        )
+        for category, msg in messages:
+            flash(msg, category)
         if updated is None:
             return redirect(url_for('admin.article_edit', cid=cid, aid=aid))
         return redirect(url_for('admin.article_index', cid=cid))
@@ -168,191 +179,6 @@ def article_edit(cid, aid):
         trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
         default_locale=get_default_locale(),
     )
-
-
-def _save_article(article, column, fields):
-    """创建或更新文章，自动同步 enabled ↔ status，创建版本快照。"""
-    title = (request.form.get('title') or '').strip()
-    if not title:
-        flash(_gettext('文章标题必填'), 'danger')
-        return None
-
-    is_new = article is None
-    if is_new:
-        article = Article(column_id=column.id)
-    else:
-        # 清理旧的自定义字段值，重建
-        ArticleFieldValue.query.filter_by(article_id=article.id).delete()
-
-    article.title = title
-    article.summary = (request.form.get('summary') or '').strip()
-    article.content = request.form.get('content') or ''
-    article.author = (request.form.get('author') or '').strip()
-    article.source = (request.form.get('source') or '').strip()
-    article.sort_order = int(request.form.get('sort_order') or 0)
-
-    # 工作流状态（优先新的 status，兼容旧的 is_enabled）
-    status = request.form.get('status') or ''
-    if status in (STATUS_DRAFT, STATUS_REVIEW, STATUS_PUBLISHED, STATUS_ARCHIVED):
-        # 无发布权限者不允许直接把内容置为「已发布」，自动改为待审核走流程
-        if status == STATUS_PUBLISHED and not (
-            current_user.is_super or current_user.has_permission('content:publish')):
-            status = STATUS_REVIEW
-            flash(_gettext('您无「发布」权限，状态已自动改为「待审核」'), 'warning')
-        article.status = status
-    elif not is_new:
-        # 编辑时保持原状态
-        pass
-    else:
-        # 新建默认草稿
-        article.status = STATUS_DRAFT
-    # 同步 is_enabled 字段
-    article.sync_enabled_from_status()
-
-    # SEO
-    article.seo_title = (request.form.get('seo_title') or '').strip()
-    article.seo_keywords = (request.form.get('seo_keywords') or '').strip()
-    article.seo_description = (request.form.get('seo_description') or '').strip()
-
-    # 发布时间
-    published_str = request.form.get('published_at') or ''
-    if published_str:
-        try:
-            article.published_at = datetime.strptime(published_str, '%Y-%m-%d %H:%M')
-        except ValueError:
-            article.published_at = datetime.now()
-    elif is_new:
-        article.published_at = datetime.now()
-
-    # 封面图
-    cover_file = request.files.get('cover')
-    if cover_file and cover_file.filename:
-        rel, url, err = save_upload_file(cover_file, sub_dir='article',
-                                         allowed_exts=list(_U.IMAGE_EXTS),
-                                         max_size=10 * 1024 * 1024)
-        if err:
-            flash(_gettext('封面图上传失败：{0}').format(err), 'danger')
-            return None
-        article.cover = url
-    elif request.form.get('cover_remove') == 'on':
-        article.cover = None
-
-    # created_by / updated_by
-    now = datetime.now()
-    uid = getattr(current_user, 'id', None)
-    if is_new:
-        article.created_by = uid
-        db.session.add(article)
-        db.session.flush()
-    else:
-        # 若编辑把待审核文章改回草稿，清除驳回原因
-        if article.status == STATUS_DRAFT:
-            article.reject_reason = None
-    article.updated_by = uid
-    article.updated_at = now
-
-    # 自定义字段值
-    for f in fields:
-        value = None
-        if f.field_type in ('image', 'file'):
-            file_obj = request.files.get(f'field_{f.id}')
-            if file_obj and file_obj.filename:
-                allowed = None
-                maxsize = None
-                if f.field_type == 'file':
-                    allowed = f.allowed_exts.split(',') if f.allowed_exts else None
-                    maxsize = f.max_size
-                else:
-                    allowed = list(_U.IMAGE_EXTS)
-                rel, url, err = save_upload_file(file_obj, sub_dir='article',
-                                                 allowed_exts=allowed, max_size=maxsize)
-                if err:
-                    flash(_gettext('字段 {0} 上传失败：{1}').format(f.label, err), 'danger')
-                    return None
-                value = url
-            elif request.form.get(f'field_{f.id}_remove') == 'on':
-                value = ''
-            else:
-                value = (request.form.get(f'field_{f.id}_existing') or '')
-        else:
-            value = request.form.get(f'field_{f.id}') or ''
-
-        if f.is_required and not value:
-            flash(_gettext('字段 {0} 为必填').format(f.label), 'danger')
-            return None
-
-        if value is not None:
-            v = ArticleFieldValue(article_id=article.id, field_id=f.id, value=value)
-            db.session.add(v)
-
-    # v2.5.0：保存各语种翻译（非默认语言）
-    _save_article_translations(article)
-
-    try:
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        flash(_gettext('文章保存失败（数据库错误）'), 'danger')
-        current_app.logger.exception('article save DB error')
-        return None
-
-    # 保存版本快照（必须在 commit 后 article.id 已存在且字段值已写库）
-    note = '新建' if is_new else '编辑修改'
-    try:
-        ArticleVersion.snapshot(article, status_snapshot=article.status,
-                                note=note, created_by=uid)
-        db.session.commit()
-    except Exception:
-        current_app.logger.exception('article snapshot failed')
-        # 快照失败不影响主事务
-        try:
-            db.session.rollback()
-        except Exception:
-            pass
-
-    # 清缓存 + 审计日志
-    clear_content_cache(column_id=column.id, article_id=article.id)
-    if is_new:
-        flash(_gettext('文章创建成功'), 'success')
-        audit_log(OP_CREATE, MODULE_ARTICLE, article.id, article.title,
-                  {'column_id': column.id, 'status': article.status})
-    else:
-        flash(_gettext('文章保存成功'), 'success')
-        audit_log(OP_UPDATE, MODULE_ARTICLE, article.id, article.title,
-                  {'column_id': column.id, 'status': article.status})
-    return article
-
-
-def _save_article_translations(article):
-    """保存文章各语种翻译（v2.5.0）。
-
-    表单字段命名：{field}_{locale}，如 title_en / content_en。
-    非默认语言且标题非空 → upsert 翻译记录；标题为空 → 删除该翻译（fallback 默认语言）。
-    """
-    default_locale = get_default_locale()
-    locales = [l for l in get_available_locales() if l != default_locale]
-    if not locales:
-        return
-
-    # 已有翻译记录（按 locale 索引）
-    existing = {tr.locale: tr for tr in article.translations}
-
-    trans_fields = ('title', 'summary', 'content', 'seo_title', 'seo_keywords', 'seo_description')
-    for loc in locales:
-        tr_title = (request.form.get(f'title_{loc}') or '').strip()
-        if not tr_title:
-            # 空标题：删除该翻译（fallback 默认语言）
-            if loc in existing:
-                db.session.delete(existing[loc])
-            continue
-        tr = existing.get(loc)
-        if tr is None:
-            tr = ArticleTranslation(article_id=article.id, locale=loc)
-            db.session.add(tr)
-        tr.title = tr_title
-        for fld in trans_fields[1:]:
-            setattr(tr, fld, (request.form.get(f'{fld}_{loc}') or '').strip()
-                    if fld != 'content' else (request.form.get(f'{fld}_{loc}') or ''))
 
 
 # ============================================================

@@ -465,31 +465,9 @@ def create_app(config_name=None):
         except Exception:
             return dict(plugin_admin_menus=[])
 
-    # 注册蓝本
-    from .admin import admin_bp, admin_auth_bp
-    from .frontend import frontend_bp
-    from .utils.admin_prefix import get_admin_url_prefix
-
-    # v2.2.0 内容 API 蓝本（先于插件导入，插件可向其注册只读端点）
-    from .api import api_bp as content_api_bp
-    from .api.views import _register_cors
-
-    # v2.2.0 插件机制：先于 admin_bp 注册前加载插件（插件向 admin_bp 追加路由，
-    # 使其 endpoint 归入 admin.* 从而自动获得后台前缀即时生效机制）
-    from .plugin_system import discover_and_load
-    discover_and_load(app)
-
-    # 后台路由前缀：启动时注册一次
-    admin_prefix = get_admin_url_prefix()
-    app.register_blueprint(admin_auth_bp, url_prefix=admin_prefix)
-    app.register_blueprint(admin_bp, url_prefix=admin_prefix)
-    app.register_blueprint(frontend_bp)
-    app.register_blueprint(content_api_bp, url_prefix='/api/v1')
-    _register_cors(app)
-
-    # v2.6.0：统一异常处理（403/404/500 + HTTPException + 兜底 Exception）
-    from .errors import register_error_handlers
-    register_error_handlers(app)
+    # v2.6.1：蓝图注册 + 插件加载 + 错误处理（抽离至 app/blueprints.py）
+    from .blueprints import register_blueprints
+    register_blueprints(app)
 
     # 应用 url_for 动态前缀（模块5：路由修改即时生效）
     _patch_jinja_url_for(app)

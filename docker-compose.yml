@@ -2,6 +2,7 @@
 # zhycms Docker Compose
 # 用法：
 #   MySQL:      docker compose --profile mysql up -d
+#   MariaDB:    docker compose --profile mariadb up -d
 #   PostgreSQL: docker compose --profile postgres up -d
 #   + 搜索:     追加 --profile search
 #   + Redis:    追加 --profile redis（缓存与 Session 走 Redis，支持多实例）
@@ -54,6 +55,34 @@ services:
       timeout: 5s
       retries: 5
     profiles: ["mysql"]
+
+  # ---- MariaDB 方案（MySQL 协议兼容，PyMySQL 直连） ----
+  app-mariadb:
+    <<: *app-base
+    environment:
+      <<: *app-env
+      ZHYCMS_DB_URI: mysql+pymysql://zhycms:${MARIADB_PASSWORD:-zhycms}@db-mariadb:3306/zhycms?charset=utf8mb4
+    depends_on:
+      db-mariadb:
+        condition: service_healthy
+    profiles: ["mariadb"]
+
+  db-mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root}
+      MARIADB_DATABASE: zhycms
+      MARIADB_USER: zhycms
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-zhycms}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles: ["mariadb"]
 
   # ---- PostgreSQL 方案 ----
   app-pg:
@@ -110,6 +139,7 @@ services:
 
 volumes:
   mysql_data:
+  mariadb_data:
   pg_data:
   meili_data:
   redis_data:

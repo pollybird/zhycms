@@ -43,6 +43,147 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$PROJECT_DIR/.env"
 
+# ---- 国内 Docker 镜像加速站 ----
+# 说明：以下均为「前缀替换式」镜像服务，拉取时把原镜像名改写为 <host>/<原路径>，
+#       例如 redis:7-alpine → docker.m.daocloud.io/library/redis:7-alpine。
+#       配置到 daemon.json 的 registry-mirrors 后，dockerd 会自动按序尝试，
+#       原镜像名无需改动（compose / build 均透明生效）。
+CN_REGISTRY_MIRRORS=(
+    "https://docker.m.daocloud.io"
+    "https://docker.1ms.run"
+    "https://docker.xuanyuan.me"
+    "https://hub.rat.dev"
+)
+# 仅保留 host（去掉 https://），用于 docker pull 前缀替换
+CN_MIRROR_HOSTS=("${CN_REGISTRY_MIRRORS[@]#https://}")
+
+# 判断 dockerd 是否已配置任意 registry mirror
+daemon_has_mirror() {
+    docker info 2>/dev/null | grep -A15 'Registry Mirrors:' \
+        | grep -Eq 'https?://[0-9a-zA-Z.-]+'
+}
+
+# 合并写入 registry-mirrors 到 /etc/docker/daemon.json（保留已有其它字段），
+# 然后重启 docker。需要 root 或 sudo。返回 0 表示成功。
+configure_daemon_mirrors() {
+    local target="/etc/docker/daemon.json"
+    local tmp
+    tmp="$(mktemp)"
+
+    # 用 python3 或 jq 做 JSON 合并；二者皆无则放弃（避免手写 JSON 破坏配置）
+    if command -v python3 >/dev/null 2>&1; then
+        local mirrors_json
+        mirrors_json=$(printf '%s\n' "${CN_REGISTRY_MIRRORS[@]}" \
+            | python3 -c 'import sys,json;print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')
+        python3 - "$target" "$mirrors_json" "$tmp" <<'PY'
+import json, os, shutil, sys
+target, mirrors_json, tmp = sys.argv[1], sys.argv[2], sys.argv[3]
+mirrors = json.loads(mirrors_json)
+data = {}
+if os.path.exists(target):
+    try:
+        with open(target, encoding='utf-8') as f:
+            data = json.load(f) or {}
+        if not isinstance(data, dict):
+            data = {}
+    except Exception:
+        # 原文件损坏：备份后从空对象开始，不直接丢弃
+        shutil.copy2(target, target + '.corrupt.bak')
+        data = {}
+    else:
+        shutil.copy2(target, target + '.bak')
+merged = []
+for m in list(data.get('registry-mirrors', [])) + mirrors:
+    if m not in merged:
+        merged.append(m)
+data['registry-mirrors'] = merged
+with open(tmp, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+PY
+    elif command -v jq >/dev/null 2>&1; then
+        if [ -f "$target" ]; then
+            jq -s --argjson m "$(printf '%s\n' "${CN_REGISTRY_MIRRORS[@]}" | jq -R . | jq -s .)" \
+                '.[0] * {"registry-mirrors": ((.[0]["registry-mirrors"] // []) + $m | unique)}' \
+                "$target" > "$tmp"
+            cp -a "$target" "$target.bak"
+        else
+            jq -n --argjson m "$(printf '%s\n' "${CN_REGISTRY_MIRRORS[@]}" | jq -R . | jq -s .)" \
+                '{"registry-mirrors": $m}' > "$tmp"
+        fi
+    else
+        rm -f "$tmp"
+        warn "未找到 python3 或 jq，无法安全合并 $target"
+        return 1
+    fi
+
+    # 提权安装：root 直接写；否则用 sudo（交互终端会提示输入密码，sudo -v 先验密）
+    if [ "$(id -u)" = "0" ]; then
+        SUDO=""
+    elif sudo -v 2>/dev/null; then
+        SUDO="sudo"
+    else
+        warn "需要 root 权限写入 $target（当前非 root 且 sudo 不可用 / 已取消）"
+        echo "  可手动执行以下命令完成配置（已生成好的内容如下）："
+        echo "    sudo mkdir -p /etc/docker && sudo tee $target >/dev/null <<'JSON'"
+        sed 's/^/    /' "$tmp"
+        echo "    JSON"
+        echo "    sudo systemctl restart docker"
+        rm -f "$tmp"
+        return 1
+    fi
+    $SUDO mkdir -p /etc/docker
+    $SUDO sh -c "cat '$tmp' > '$target'"
+    rm -f "$tmp"
+
+    info "已写入 registry-mirrors 到 $target（原配置已备份为 .bak）"
+    info "重启 Docker 守护进程使配置生效..."
+    $SUDO systemctl restart docker 2>/dev/null || $SUDO service docker restart 2>/dev/null || true
+
+    # 等待 dockerd 恢复
+    local i
+    for i in $(seq 1 30); do
+        if docker info >/dev/null 2>&1; then
+            info "Docker 已恢复，镜像加速器生效 ✓"
+            return 0
+        fi
+        sleep 1
+    done
+    warn "Docker 重启后 30s 内未恢复，请手动检查：systemctl status docker"
+    return 1
+}
+
+# 通过镜像站前缀拉取单个镜像并 retag 为官方名（多源回退 + 每源 2 次重试）。
+# 用法：pull_image_via_mirror <官方镜像名>
+pull_image_via_mirror() {
+    local img="$1" path host url attempt
+    # 本地已存在则跳过
+    if docker image inspect "$img" >/dev/null 2>&1; then
+        info "  $img 本地已存在，跳过拉取"
+        return 0
+    fi
+    if [[ "$img" != */* ]]; then
+        path="library/$img"        # 官方镜像（mysql/redis/python 等）
+    else
+        path="$img"                # 带命名空间（getmeili/meilisearch 等）
+    fi
+    for host in "${CN_MIRROR_HOSTS[@]}"; do
+        url="${host}/${path}"
+        for attempt in 1 2; do
+            info "  拉取 ${url}（第 ${attempt} 次）"
+            if docker pull "$url"; then
+                docker tag "$url" "$img"
+                info "  → 已 retag 为 $img ✓"
+                return 0
+            fi
+            sleep 2
+        done
+        warn "  $host 拉取失败，尝试下一镜像站..."
+    done
+    error "  所有镜像站均无法拉取 $img"
+    return 1
+}
+
 # ============================================================
 # 欢迎界面
 # ============================================================
@@ -103,16 +244,18 @@ echo ""
 # ============================================================
 # 步骤 1：数据库选择
 # ============================================================
-echo -e "${GREEN}━━━ 步骤 1/5：选择数据库 ━━━${NC}"
+echo -e "${GREEN}━━━ 步骤 1/6：选择数据库 ━━━${NC}"
 echo "  1) MySQL 8.4（推荐，功能最全）"
 echo "  2) PostgreSQL 16（高并发性能更强）"
+echo "  3) MariaDB 11.4（MySQL 协议兼容，开源社区维护）"
 echo ""
-prompt "请选择 [1-2]" DB_CHOICE
+prompt "请选择 [1-3]" DB_CHOICE
 DB_CHOICE="${DB_CHOICE:-1}"
 
 case "$DB_CHOICE" in
-    1) DB_PROFILE="mysql";   DB_NAME="MySQL" ;;
-    2) DB_PROFILE="postgres"; DB_NAME="PostgreSQL" ;;
+    1) DB_PROFILE="mysql";    DB_NAME="MySQL 8.4" ;;
+    2) DB_PROFILE="postgres"; DB_NAME="PostgreSQL 16" ;;
+    3) DB_PROFILE="mariadb";  DB_NAME="MariaDB 11.4" ;;
     *) error "无效选择"; exit 1 ;;
 esac
 info "已选择：${DB_NAME}"
@@ -140,6 +283,7 @@ echo ""
 EXISTING_VOL=""
 case "$DB_PROFILE" in
     mysql)    EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_mysql_data$' | head -1 || true) ;;
+    mariadb)  EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_mariadb_data$' | head -1 || true) ;;
     postgres) EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_pg_data$' | head -1 || true) ;;
 esac
 
@@ -193,23 +337,53 @@ else
 fi
 
 MYSQL_ROOT_PASSWORD=$(gen_random)
-POSTGRES_PASSWORD="$DB_PASSWORD"
 MYSQL_PASSWORD="$DB_PASSWORD"
+# MariaDB 复用同一组生成的密码（compose 中按 profile 各取所需）
+MARIADB_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD"
+MARIADB_PASSWORD="$DB_PASSWORD"
+POSTGRES_PASSWORD="$DB_PASSWORD"
 info "安全配置完成"
 echo ""
 
 # ============================================================
 # 步骤 3：镜像源加速
 # ============================================================
-echo -e "${GREEN}━━━ 步骤 3/5：镜像源加速 ━━━${NC}"
-echo "  国内网络建议启用加速，否则 Docker 构建可能非常慢。"
-echo "  启用后：apt 用清华源、pip 用清华源、基础镜像走镜像站。"
+echo -e "${GREEN}━━━ 步骤 3/6：镜像源加速 ━━━${NC}"
+echo "  国内网络建议启用加速，否则 Docker 拉取镜像/构建可能超时失败。"
+echo "  启用后：Docker 镜像走国内加速站、apt 用清华源、pip 用清华源。"
 echo ""
+
+# daemon 加速器是否就绪（国内模式下使用，决定后续是否需要手动 retag 兜底）
+DAEMON_MIRROR_READY=false
+
 if confirm "是否在中国 / 需要国内镜像加速？" "y"; then
     USE_MIRROR="yes"
     APT_MIRROR="mirrors.tuna.tsinghua.edu.cn"
     PIP_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
-    info "已启用国内镜像加速（清华源）"
+    info "已启用国内镜像加速（apt/pip 用清华源）"
+    echo ""
+
+    # 推荐方式：写入 dockerd 的 registry-mirrors（对 build 与 compose up 全透明生效）
+    if daemon_has_mirror; then
+        info "检测到 Docker 守护进程已配置镜像加速器，镜像拉取将自动加速 ✓"
+        DAEMON_MIRROR_READY=true
+    else
+        echo "  Docker 守护进程当前未配置 registry-mirrors。"
+        echo "  配置后，所有镜像（含数据库 / Redis / 搜索引擎）拉取均自动走国内加速站："
+        printf '    - %s\n' "${CN_REGISTRY_MIRRORS[@]}"
+        echo ""
+        echo "  该操作会【合并】写入 /etc/docker/daemon.json（保留已有配置并备份），"
+        echo "  然后重启 Docker（运行中容器会短暂中断后自动恢复）。"
+        if confirm "是否现在自动配置 Docker 守护进程加速器？" "y"; then
+            if configure_daemon_mirrors; then
+                DAEMON_MIRROR_READY=true
+            else
+                warn "守护进程加速器未配置成功，稍后将改用「镜像站前缀拉取 + retag」兜底"
+            fi
+        else
+            info "已跳过守护进程配置，稍后使用镜像站前缀拉取 + retag 兜底（无需重启 Docker）"
+        fi
+    fi
 else
     USE_MIRROR="no"
     APT_MIRROR=""
@@ -299,6 +473,8 @@ SECRET_KEY=${SECRET_KEY}
 # 数据库密码
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
 MYSQL_PASSWORD=${MYSQL_PASSWORD}
+MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+MARIADB_PASSWORD=${MARIADB_PASSWORD}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
 # Web 端口
@@ -346,69 +522,69 @@ fix_ownership "$PROJECT_DIR/instance"
 fix_ownership "$PROJECT_DIR/app/static/uploads"
 info "数据目录就绪"
 echo ""
-
 # ============================================================
 # 基础镜像加速（国内网络）
+# ------------------------------------------------------------
+# 若 dockerd 已配置 registry-mirrors（步骤 3 自动配置或原本就有），
+# build 与 compose up 拉镜像会自动走加速器，此处无需任何处理。
+# 否则用「镜像站前缀拉取 + retag 为官方名」兜底，覆盖本次部署
+# 所需的【全部】镜像：构建基础镜像(python) + 数据库 + 搜索 + Redis。
 # ============================================================
 if [ "$USE_MIRROR" = "yes" ]; then
-    info "检查基础镜像加速..."
-
-    # 检查 daemon.json 是否已配 registry-mirrors
-    DAEMON_JSON="/etc/docker/daemon.json"
-    NEED_PULL_RETAG=false
-
-    if [ -f "$DAEMON_JSON" ] && grep -q "registry-mirrors" "$DAEMON_JSON" 2>/dev/null; then
-        info "已检测到 Docker 守护进程镜像加速配置，跳过手动 retag"
-    else
-        warn "Docker 守护进程未配置 registry-mirrors"
-        echo "  建议配置 /etc/docker/daemon.json 实现全局加速："
-        echo '    {"registry-mirrors":["https://docker.m.daocloud.io","https://docker.1ms.run"]}'
-        echo "  配置后执行：sudo systemctl restart docker"
-        echo ""
-        if confirm "是否现在通过镜像站手动拉取并 retag 基础镜像？" "y"; then
-            NEED_PULL_RETAG=true
-        fi
+    # 重新探测一次（步骤 3 可能刚重启过 docker）
+    if daemon_has_mirror; then
+        DAEMON_MIRROR_READY=true
     fi
 
-    if [ "$NEED_PULL_RETAG" = "true" ]; then
-        info "通过镜像站拉取基础镜像（daocloud）..."
+    if [ "$DAEMON_MIRROR_READY" = "true" ]; then
+        info "Docker 守护进程加速器已就绪，所有镜像将自动走国内加速站，跳过手动拉取 ✓"
+    else
+        info "未启用守护进程加速器，改用镜像站前缀拉取 + retag 兜底..."
+        echo "  将依次尝试：${CN_MIRROR_HOSTS[*]}"
+        echo ""
 
-        MIRROR_PREFIX="docker.m.daocloud.io"
+        # 组装本次部署需要的全部镜像（必须与 docker-compose.yml / Dockerfile 一致）
+        REQUIRED_IMAGES=("python:3.12-slim")   # 多阶段构建的基础镜像
+        OPTIONAL_IMAGES=()
+        case "$DB_PROFILE" in
+            mysql)    REQUIRED_IMAGES+=("mysql:8.4") ;;
+            mariadb)  REQUIRED_IMAGES+=("mariadb:11.4") ;;
+            postgres) REQUIRED_IMAGES+=("postgres:16-alpine") ;;
+        esac
+        [ "$USE_MEILI" = "yes" ] && OPTIONAL_IMAGES+=("getmeili/meilisearch:v1.8")
+        [ "$USE_REDIS" = "yes" ] && OPTIONAL_IMAGES+=("redis:7-alpine")
 
-        # 基础镜像列表
-        [ "$DB_PROFILE" = "mysql" ] && DB_NAME_IMAGE="mysql:8.4"
-        [ "$DB_PROFILE" = "postgres" ] && DB_NAME_IMAGE="postgres:16-alpine"
-
-        for img in "python:3.12-slim" "$DB_NAME_IMAGE"; do
-            # 判断是否 library 镜像
-            if [[ "$img" != */* ]]; then
-                PULL_URL="${MIRROR_PREFIX}/library/${img}"
-            else
-                PULL_URL="${MIRROR_PREFIX}/${img}"
-            fi
-
-            info "拉取 $PULL_URL ..."
-            if docker pull "$PULL_URL" 2>/dev/null; then
-                docker tag "$PULL_URL" "$img"
-                info "  → retag 为 $img ✓"
-            else
-                warn "  拉取失败，将使用 Docker 默认源（可能较慢）"
+        PULL_FAILED=()
+        info "拉取必需镜像（构建 / 数据库）..."
+        for img in "${REQUIRED_IMAGES[@]}"; do
+            if ! pull_image_via_mirror "$img"; then
+                PULL_FAILED+=("$img")
             fi
         done
 
-        if [ "$USE_MEILI" = "yes" ]; then
-            MEILI_IMG="getmeili/meilisearch:v1.8"
-            PULL_URL="${MIRROR_PREFIX}/${MEILI_IMG}"
-            info "拉取 $PULL_URL ..."
-            if docker pull "$PULL_URL" 2>/dev/null; then
-                docker tag "$PULL_URL" "$MEILI_IMG"
-                info "  → retag 为 $MEILI_IMG ✓"
-            else
-                warn "  拉取失败，将使用 Docker 默认源"
-            fi
+        if [ ${#OPTIONAL_IMAGES[@]} -gt 0 ]; then
+            info "拉取可选服务镜像（搜索引擎 / Redis）..."
+            for img in "${OPTIONAL_IMAGES[@]}"; do
+                if ! pull_image_via_mirror "$img"; then
+                    PULL_FAILED+=("$img")
+                fi
+            done
         fi
         echo ""
+
+        if [ ${#PULL_FAILED[@]} -gt 0 ]; then
+            error "以下镜像经所有国内镜像站均拉取失败："
+            printf '    - %s\n' "${PULL_FAILED[@]}"
+            echo ""
+            echo "  建议（任选其一）："
+            echo "    A. 配置守护进程加速器后重试：重跑本脚本并在步骤 3 选择「自动配置」"
+            echo "    B. 若主机可访问外网，可直接让 Docker 走默认源（耗时可能较长）"
+            echo "    C. 检查网络/代理后手动拉取：docker pull <镜像名>"
+            exit 1
+        fi
+        info "全部基础镜像拉取完成 ✓"
     fi
+    echo ""
 fi
 
 # ============================================================
@@ -445,6 +621,11 @@ CREDS_OK=false
 for _ in $(seq 1 30); do
     if [ "$DB_PROFILE" = "mysql" ]; then
         if "${COMPOSE_CMD[@]}" --profile mysql exec -T db-mysql mysql -uzhycms "-p${MYSQL_PASSWORD}" -e "SELECT 1" &>/dev/null; then
+            CREDS_OK=true
+            break
+        fi
+    elif [ "$DB_PROFILE" = "mariadb" ]; then
+        if "${COMPOSE_CMD[@]}" --profile mariadb exec -T db-mariadb mariadb -uzhycms "-p${MARIADB_PASSWORD}" -e "SELECT 1" &>/dev/null; then
             CREDS_OK=true
             break
         fi

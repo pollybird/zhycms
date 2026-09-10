@@ -9,8 +9,8 @@ from flask import (
 from flask_babel import gettext as _gettext
 from flask_login import current_user
 
-from ..extensions import db
-from ..models.audit import (
+from ...extensions import db
+from ...models.audit import (
     AuditLog, OP_TYPE_CHOICES,
     MODULE_USER, MODULE_ROLE, MODULE_COLUMN, MODULE_ARTICLE, MODULE_FRAGMENT,
     MODULE_FORM, MODULE_FORM_SUBMISSION, MODULE_SETTING,
@@ -19,9 +19,9 @@ from ..models.audit import (
     OP_REVIEW_PASS, OP_REVIEW_REJECT, OP_BATCH, OP_ROLLBACK, OP_CONFIG_CHANGE,
     OP_USER_MANAGE, OP_BACKUP_CREATE, OP_BACKUP_RESTORE, OP_EXPORT, OP_UPLOAD, OP_OTHER,
 )
-from ..models.setting import Setting
-from ..utils.helpers import permission_required, audit_log
-from . import admin_bp
+from ...models.setting import Setting
+from ...utils.helpers import permission_required, audit_log
+from .. import admin_bp
 
 
 MODULE_CHOICES = [
@@ -89,15 +89,15 @@ def audit_index():
     # 总条数概览
     total_count = query.order_by(None).count()
     # 详情人性化翻译用的 ID→名称映射
-    from ..models.rbac import Role
-    from ..models.column import Column
+    from ...models.rbac import Role
+    from ...models.column import Column
     audit_maps = {
         'roles': {r.id: r.name for r in Role.query.all()},
         'columns': {c.id: c.name for c in Column.query.filter_by(is_deleted=False).all()},
     }
     # v2.2.0：模块筛选下拉追加启用插件的审计模块（如 product→产品管理）
     try:
-        from ..plugin_system import plugin_audit_modules
+        from ...plugin_system import plugin_audit_modules
         module_choices = list(MODULE_CHOICES) + list(plugin_audit_modules())
     except Exception:
         module_choices = MODULE_CHOICES

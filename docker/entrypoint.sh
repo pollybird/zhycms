@@ -46,7 +46,7 @@ while True:
             print('[entrypoint] ERROR: database auth failed (Access denied).', file=sys.stderr)
             print('[entrypoint] The data volume was initialized with a different password.', file=sys.stderr)
             print('[entrypoint] Fix A: rerun install.sh, choose "reuse existing data" and enter the old password.', file=sys.stderr)
-            print('[entrypoint] Fix B (data loss): docker compose --profile mysql down -v, then reinstall.', file=sys.stderr)
+            print('[entrypoint] Fix B (data loss): docker compose --profile <mysql|mariadb|postgres> down -v, then reinstall.', file=sys.stderr)
             sys.exit(1)
         print('[entrypoint] Waiting for database... (attempt {})'.format(attempt))
         time.sleep(2)

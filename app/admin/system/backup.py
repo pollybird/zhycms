@@ -9,17 +9,17 @@ from flask import (
 from flask_babel import gettext as _gettext
 from flask_login import current_user
 
-from ..extensions import db
-from ..models.backup import BackupRecord, TRIGGER_MANUAL, TRIGGER_SCHEDULED
-from ..models.setting import Setting
-from ..utils.helpers import permission_required, audit_log
-from ..utils.backup_utils import (
+from ...extensions import db
+from ...models.backup import BackupRecord, TRIGGER_MANUAL, TRIGGER_SCHEDULED
+from ...models.setting import Setting
+from ...utils.helpers import permission_required, audit_log
+from ...utils.backup_utils import (
     create_backup, restore_backup, system_monitor_stats, run_scheduled_backup,
 )
-from ..models.audit import (
+from ...models.audit import (
     OP_BACKUP_CREATE, OP_BACKUP_RESTORE, OP_DELETE, OP_EXPORT, MODULE_BACKUP, OP_UPDATE,
 )
-from . import admin_bp
+from .. import admin_bp
 
 
 # ============================================================
@@ -242,7 +242,7 @@ def setting_backup_save():
 
     # 尝试动态重设定时任务（如果调度器已启动）
     try:
-        from ..extensions import get_scheduler
+        from ...extensions import get_scheduler
         sched = get_scheduler()
         if sched is not None:
             from apscheduler.triggers.cron import CronTrigger
@@ -280,7 +280,7 @@ def setting_backup_save():
 def monitor_index():
     """系统监控页：服务器/磁盘/数据库状态。"""
     import platform, sys as _sys, time as _time, os as _os
-    from ..config import BASE_DIR
+    from ...config import BASE_DIR
     stats = system_monitor_stats()
 
     # 服务器信息
@@ -312,7 +312,7 @@ def monitor_index():
     }
 
     # 数据库信息
-    from ..utils.backup_utils import _db_type_and_path
+    from ...utils.backup_utils import _db_type_and_path
     try:
         db_type, db_name = _db_type_and_path()[:2]
     except Exception:

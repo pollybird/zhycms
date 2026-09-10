@@ -16,17 +16,17 @@ from flask import (
 from flask_babel import gettext as _gettext
 from flask_login import current_user
 
-from ..extensions import db
-from ..models.user import User, LoginLog
-from ..models.setting import Setting
-from ..utils.helpers import admin_required, permission_required, audit_log, clear_content_cache
-from ..utils.uploads import save_upload_file
-from ..utils.themes import list_theme_templates
-from ..utils.admin_prefix import load_admin_prefix, validate_prefix, save_admin_prefix
-from ..models.audit import (
+from ...extensions import db
+from ...models.user import User, LoginLog
+from ...models.setting import Setting
+from ...utils.helpers import admin_required, permission_required, audit_log, clear_content_cache
+from ...utils.uploads import save_upload_file
+from ...utils.themes import list_theme_templates
+from ...utils.admin_prefix import load_admin_prefix, validate_prefix, save_admin_prefix
+from ...models.audit import (
     OP_CONFIG_CHANGE, OP_UPDATE, MODULE_SETTING,
 )
-from . import admin_bp
+from .. import admin_bp
 
 
 # ============================================================
@@ -518,7 +518,7 @@ def setting_search():
         action = request.form.get('action', '')
         if action == 'rebuild':
             # 重建索引
-            from ..utils.search import rebuild_all as _rebuild
+            from ...utils.search import rebuild_all as _rebuild
             indexed, errors = _rebuild()
             flash(_gettext('索引重建完成：成功 %(n)d 篇，失败 %(e)d 篇',
                            n=indexed, e=errors), 'success')
@@ -556,7 +556,7 @@ def setting_search():
         return redirect(url_for('admin.setting_search'))
     settings = Setting.get_dict()
     # 健康检查
-    from ..utils.search import health as _health
+    from ...utils.search import health as _health
     ok, message = _health()
     return render_template('admin/setting/search.html',
                            settings=settings, health_ok=ok, health_msg=message)

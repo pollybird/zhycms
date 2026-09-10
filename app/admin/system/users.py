@@ -7,19 +7,20 @@ from flask import (
 from flask_babel import gettext as _gettext
 from flask_login import current_user
 
-from ..extensions import db
-from ..models.user import User
-from ..models.column import Column
-from ..models.rbac import (
+from ...extensions import db
+from ...models.user import User
+from ...models.column import Column
+from ...models.rbac import (
     Role, Permission, UserRole, UserColumnPermission,
     ROLE_SUPER_ADMIN, ROLE_CONTENT_EDITOR,
 )
-from ..utils.helpers import permission_required, audit_log
-from ..models.audit import (
+from ...utils.helpers import permission_required, audit_log
+from ...models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_USER_MANAGE,
     MODULE_USER, MODULE_ROLE,
 )
-from . import admin_bp
+from ...services.user_service import create_user, update_user
+from .. import admin_bp
 
 
 # ============================================================
@@ -100,56 +101,10 @@ def user_index():
 @permission_required('system:user_manage')
 def user_create():
     if request.method == 'POST':
-        username = (request.form.get('username') or '').strip().lower()
-        nickname = (request.form.get('nickname') or '').strip()
-        email = (request.form.get('email') or '').strip()
-        password = request.form.get('password') or ''
-        confirm = request.form.get('confirm_password') or ''
-        role_ids = request.form.getlist('role_ids[]')
-        is_active = request.form.get('is_active_flag') == 'on'
-        is_super = request.form.get('is_super') == 'on'
-
-        if not username or len(username) < 3:
-            flash(_gettext('用户名至少 3 位'), 'danger')
-        elif User.query.filter_by(username=username, is_deleted=False).first():
-            flash(_gettext('用户名已存在'), 'danger')
-        elif len(password) < 6:
-            flash(_gettext('密码至少 6 位'), 'danger')
-        elif password != confirm:
-            flash(_gettext('两次输入的密码不一致'), 'danger')
-        else:
-            try:
-                role_ids = [int(x) for x in role_ids if x.isdigit()]
-            except ValueError:
-                role_ids = []
-
-            user = User(username=username, nickname=nickname or username,
-                        email=email, is_active_flag=is_active, is_super=is_super)
-            user.set_password(password)
-            db.session.add(user)
-            db.session.flush()
-
-            # 分配角色
-            for rid in role_ids:
-                if Role.query.get(rid):
-                    db.session.add(UserRole(user_id=user.id, role_id=rid))
-
-            # 栏目专属权限
-            col_ids = request.form.getlist('column_ids[]')
-            col_ids = [int(x) for x in col_ids if x.isdigit()]
-            can_review_ids = set(request.form.getlist('can_review_ids[]'))
-            can_publish_ids = set(request.form.getlist('can_publish_ids[]'))
-            for cid in col_ids:
-                db.session.add(UserColumnPermission(
-                    user_id=user.id, column_id=cid,
-                    can_review=str(cid) in can_review_ids,
-                    can_publish=str(cid) in can_publish_ids,
-                ))
-
-            db.session.commit()
-            flash(_gettext('账号创建成功'), 'success')
-            audit_log(OP_CREATE, MODULE_USER, user.id, user.username,
-                      {'nickname': nickname, 'email': email, 'role_ids': role_ids})
+        user, messages = create_user(form_data=request.form)
+        for category, msg in messages:
+            flash(msg, category)
+        if user is not None:
             return redirect(url_for('admin.user_index'))
 
     return render_template(
@@ -171,57 +126,10 @@ def user_edit(uid):
         return redirect(url_for('admin.user_index'))
 
     if request.method == 'POST':
-        nickname = (request.form.get('nickname') or '').strip()
-        email = (request.form.get('email') or '').strip()
-        password = request.form.get('password') or ''
-        confirm = request.form.get('confirm_password') or ''
-        role_ids = request.form.getlist('role_ids[]')
-        is_active = request.form.get('is_active_flag') == 'on'
-        is_super = request.form.get('is_super') == 'on'
-
-        if password and len(password) < 6:
-            flash(_gettext('密码至少 6 位'), 'danger')
-        elif password and password != confirm:
-            flash(_gettext('两次输入的密码不一致'), 'danger')
-        else:
-            try:
-                role_ids = [int(x) for x in role_ids if x.isdigit()]
-            except ValueError:
-                role_ids = []
-
-            user.nickname = nickname or user.username
-            user.email = email
-            user.is_active_flag = is_active
-            # 系统第一个超级管理员 is_super 不可被取消（兜底）
-            if not (user.is_super and User.query.filter_by(is_super=True, is_deleted=False).count() <= 1):
-                user.is_super = is_super
-            if password:
-                user.set_password(password)
-
-            # 重建角色
-            UserRole.query.filter_by(user_id=user.id).delete()
-            for rid in role_ids:
-                if Role.query.get(rid):
-                    db.session.add(UserRole(user_id=user.id, role_id=rid))
-
-            # 重建栏目权限
-            UserColumnPermission.query.filter_by(user_id=user.id).delete()
-            col_ids = request.form.getlist('column_ids[]')
-            col_ids = [int(x) for x in col_ids if x.isdigit()]
-            can_review_ids = set(request.form.getlist('can_review_ids[]'))
-            can_publish_ids = set(request.form.getlist('can_publish_ids[]'))
-            for cid in col_ids:
-                db.session.add(UserColumnPermission(
-                    user_id=user.id, column_id=cid,
-                    can_review=str(cid) in can_review_ids,
-                    can_publish=str(cid) in can_publish_ids,
-                ))
-
-            db.session.commit()
-            flash(_gettext('账号保存成功'), 'success')
-            audit_log(OP_UPDATE, MODULE_USER, user.id, user.username,
-                      {'nickname': nickname, 'email': email, 'role_ids': role_ids,
-                       'is_active': is_active, 'pwd_changed': bool(password)})
+        updated, messages = update_user(user, form_data=request.form)
+        for category, msg in messages:
+            flash(msg, category)
+        if updated is not None:
             return redirect(url_for('admin.user_index'))
 
     # 当前分配的角色ID集合
@@ -324,7 +232,7 @@ def role_save_permissions(rid):
     # 只接收存在于 permissions 表的 code
     valid = {p.code for p in Permission.query.all()}
     codes = [c for c in codes if c in valid]
-    from ..models.rbac import RolePermission
+    from ...models.rbac import RolePermission
     RolePermission.ensure_for_role(role.id, codes)
     db.session.commit()
     flash(_gettext('角色「{0}」的权限已保存').format(role.name), 'success')
@@ -353,7 +261,7 @@ def role_create():
             flash(_gettext('角色「{0}」创建成功').format(name), 'success')
             audit_log(OP_CREATE, MODULE_ROLE, role.id, role.name, {'code': code})
             return redirect(url_for('admin.role_index'))
-    from ..models.rbac import Permission as _Perm
+    from ...models.rbac import Permission as _Perm
     perms = _Perm.query.order_by(_Perm.group.asc(), _Perm.code.asc()).all()
     return render_template('admin/users/role_form.html', role=None,
                            all_permissions=perms, role_permissions=[],
@@ -391,7 +299,7 @@ def role_edit(rid):
         flash(_gettext('角色「{0}」修改成功').format(role.name), 'success')
         audit_log(OP_UPDATE, MODULE_ROLE, role.id, role.name, {})
         return redirect(url_for('admin.role_index'))
-    from ..models.rbac import Permission as _Perm
+    from ...models.rbac import Permission as _Perm
     perms = _Perm.query.order_by(_Perm.group.asc(), _Perm.code.asc()).all()
     return render_template('admin/users/role_form.html', role=role,
                            all_permissions=perms, role_permissions=perms,

@@ -2,7 +2,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v2.6.0**（工程化完善：发布 Checklist + pytest/CI + 统一异常处理 + 常量治理：详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v2.6.1**（架构重构：蓝图抽离 + admin 分目录 + service 层 + 插件热加载安全：详见 [CHANGELOG](CHANGELOG.md)）
 
 ---
 
@@ -153,6 +153,9 @@ cp docker/.env.example .env
 
 # 2. 启动（MySQL）
 docker compose --profile mysql up -d
+
+# 或启动（MariaDB 11.4）
+docker compose --profile mariadb up -d
 
 # 或启动（PostgreSQL）
 docker compose --profile postgres up -d

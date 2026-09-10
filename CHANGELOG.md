@@ -5,6 +5,35 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.6.1] - 2026-09-10
+
+**架构与可维护性**版本。蓝图注册抽离、admin 按业务域分目录、引入 service 层剥离业务逻辑、插件热加载线程安全文档化与缓存优化。**无数据库结构变更**，覆盖代码即可升级。
+
+### Added
+
+- **`app/blueprints.py`**：蓝图注册从 `create_app` 抽离到独立模块，封装插件加载 → 注册蓝图 → CORS → 错误处理全流程，`create_app` 瘦身 25 行。
+- **`app/services/` 业务逻辑层**：新增 `article_service.save_article`、`column_service.save_column`、`user_service.create_user/update_user`，将路由内联的业务逻辑（表单校验、DB 写入、审计日志、缓存清理）抽离到 service，路由层只负责 HTTP 协议转换。service 函数不依赖 `request`/`current_user` 全局对象，数据通过参数显式传入，返回 `(result, messages)` 由调用方 flash。
+- **admin 目录按业务域重组**：`app/admin/content/`（column/article/fragment）与 `app/admin/system/`（setting/users/audit/backup/themes）两个子包，endpoint 命名空间 `admin.*` 保持不变。
+- **插件启用清单缓存**：`enabled_slugs()` 经 Flask-Cache 缓存 60s，`set_enabled_slugs()` 写入后主动失效；Redis 后端时跨 worker 自动失效，SimpleCache 时最坏 60s 自愈。
+- **Docker 部署支持 MariaDB**：`docker-compose.yml` 新增 `--profile mariadb`（`mariadb:11.4` LTS，MySQL 协议兼容、PyMySQL 直连）；`install.sh` 数据库选择新增「3) MariaDB 11.4」，数据卷检测、镜像拉取、凭据校验全链路支持。
+- **Docker 安装国内镜像加速**：`install.sh` 步骤 3 可选自动配置 dockerd `registry-mirrors`（4 个国内站、合并写入不覆盖已有配置、自动备份重启）；未配置时以「多源前缀拉取 + retag」兜底并覆盖全部镜像（含此前遗漏的 `redis:7-alpine`），单镜像多源回退 + 重试。
+
+### Changed
+
+- `run.py` 显式 `use_reloader=debug`，生产环境关闭 reloader 避免插件重复加载。
+- `app/plugin_system.py` 补充线程安全 / 多 worker 保证文档：URL Map 仅启动期修改，运行时启停只写 DB。
+- `scripts/check_constants.py` 白名单路径随 admin 子包重组更新（`app/admin/setting.py` → `app/admin/system/setting.py`）。
+
+### Fixed
+
+- admin 子包重组后函数体内延迟导入（`audit`/`users`/`setting`/`backup` 等 10 处）相对层级未同步，访问对应后台页报 `ModuleNotFoundError: No module named 'app.admin.models'`。
+- 插件启用 / 禁用提示在插件管理页重复显示两行（base.html 与页面模板各渲染一次 flash）；同步清理备份页的重复渲染。
+- `uninstall.sh` profile 清理列表补齐 `mariadb` 与 `redis`。
+
+### Upgrade
+
+- 纯代码重构，无数据库迁移。覆盖代码后重启即可。
+
 ## [2.6.0] - 2026-09-10
 
 **工程化完善**版本。新增发布 Checklist、pytest 测试脚手架 + GitHub Actions CI、统一异常处理（403/404/500 三协议分发）、常量治理（消除硬编码、统一 `app/constants.py`）。**无数据库结构变更**，覆盖代码即可升级。

@@ -6,18 +6,6 @@
 {% block breadcrumb %}<li class="breadcrumb-item active">{{ _('备份与恢复') }}</li>{% endblock %}
 
 {% block content %}
-{# 操作结果提示 #}
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, msg in messages %}
-      <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
-        <i class="icon fas {{ 'fa-check-circle' if category == 'success' else 'fa-exclamation-circle' }}"></i>
-        {{ msg }}
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
 
 {# 备份状态/空间概览 #}
 <div class="row">

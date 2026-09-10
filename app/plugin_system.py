@@ -6,6 +6,16 @@
   - 运行时以 site_settings.enabled_plugins（逗号分隔 slug）门控，
     启停只改设置值，即时生效、无需重启、天然兼容多 worker；
   - 启用动作幂等：种子权限点 → 预设角色补授权 → db.create_all() 兜底建表。
+
+线程安全 / 多 worker 保证（v2.6.1）：
+  - URL Map 仅在启动期（discover_and_load）被修改一次，运行时绝不增删路由，
+    因此不存在运行时改 URL Map 的线程安全问题；
+  - 启停操作只写 Setting 表（enabled_plugins），不触碰 URL Map；
+  - plugin_enabled() 每次请求从 DB 读启用清单（请求级 memo via flask.g），
+    多 worker 天然一致——worker A 启停后，worker B 下一次请求即读到新值；
+  - 为降低 DB 读压力，启用清单额外经 Flask-Cache 缓存 60s；set_enabled_slugs()
+    写入后主动 delete 缓存键。若缓存后端为 Redis，则跨 worker 自动失效；
+    若为 SimpleCache，则仅本进程失效，最坏 60s 后自愈。
 """
 import os
 import json
@@ -21,6 +31,12 @@ PLUGINS_DIR = os.path.join(
 )
 
 SETTING_KEY = 'enabled_plugins'
+
+# 启用清单缓存（v2.6.1）：经 Flask-Cache 缓存 60s 以降低 DB 读压力。
+# 若缓存后端为 Redis，则 set_enabled_slugs() 的 delete 跨 worker 生效；
+# 若为 SimpleCache，仅本进程失效，最坏 60s 后自愈。
+_ENABLED_CACHE_KEY = 'plugin:enabled_slugs'
+_ENABLED_CACHE_TTL = 60  # 秒
 
 
 # ============================================================
@@ -80,21 +96,38 @@ def _record(slug):
 # ============================================================
 
 def enabled_slugs():
-    """读取当前启用插件 slug 集合。"""
+    """读取当前启用插件 slug 集合（带 60s 缓存）。"""
     from .models.setting import Setting
+    from .extensions import cache
+
+    cached = cache.get(_ENABLED_CACHE_KEY)
+    if cached is not None:
+        return cached
+
     raw = Setting.get(SETTING_KEY, '') or ''
-    return {s.strip() for s in raw.split(',') if s.strip()}
+    slugs = {s.strip() for s in raw.split(',') if s.strip()}
+    try:
+        cache.set(_ENABLED_CACHE_KEY, slugs, timeout=_ENABLED_CACHE_TTL)
+    except Exception:
+        pass  # 缓存失败不影响功能
+    return slugs
 
 
 def set_enabled_slugs(slugs):
     """写入启用清单（不去校验存在性，调用方负责）。"""
     from .models.setting import Setting
-    from .extensions import db
+    from .extensions import db, cache
+
     Setting.set(SETTING_KEY, ','.join(sorted(set(slugs))))
     db.session.commit()
     # 清理请求级缓存
     if has_app_context():
         g.pop('_plugin_enabled_slugs', None)
+    # 清理进程/共享缓存（Redis 后端时跨 worker 失效）
+    try:
+        cache.delete(_ENABLED_CACHE_KEY)
+    except Exception:
+        pass
 
 
 def plugin_enabled(slug):

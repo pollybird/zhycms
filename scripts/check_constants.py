@@ -48,7 +48,7 @@ WHITELIST_PATHS = {
     'app/models/workflow.py',     # 重导出
     'app/models/rbac.py',         # 重导出
     'app/models/setting.py',      # 种子数据中的 key/value
-    'app/admin/setting.py',       # 设置页白名单校验
+    'app/admin/system/setting.py',  # 设置页白名单校验
     'scripts/check_constants.py',
 }
 
