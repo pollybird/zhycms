@@ -5,6 +5,7 @@ from flask import (
 
 from flask_babel import gettext as _gettext
 from ..extensions import db
+from ..constants import Upload as _U
 from ..models.fragment import Fragment, FragmentGroup, FragmentTranslation
 from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..utils.helpers import permission_required, audit_log, clear_content_cache
@@ -161,7 +162,7 @@ def _save_fragment(fragment):
     if field_type in ('image', 'file'):
         file_obj = request.files.get('value_file')
         if file_obj and file_obj.filename:
-            allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'] if field_type == 'image' else None
+            allowed = list(_U.IMAGE_EXTS) if field_type == 'image' else None
             rel, url, err = save_upload_file(file_obj, sub_dir=f'fragment/{field_type}',
                                              allowed_exts=allowed)
             if err:

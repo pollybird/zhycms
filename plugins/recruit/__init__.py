@@ -10,6 +10,7 @@
   templates/recruit/     后台页面 + 前台兜底模板（主题可覆盖）
 """
 from app.plugin_api import PluginBase
+from app.constants import Roles as _R
 
 from . import admin as _admin       # noqa: F401  导入即注册后台路由（并引入 models）
 from .frontend import recruit_job_url, recruit_jobs
@@ -24,8 +25,8 @@ class RecruitPlugin(PluginBase):
     permissions = [('recruit:manage', '招聘管理',
                     '招聘岗位维护与求职申请处理')]
     preset_role_grants = {
-        'content_editor': ['recruit:manage'],
-        'content_auditor': ['recruit:manage'],
+        _R.CONTENT_EDITOR: ['recruit:manage'],
+        _R.CONTENT_AUDITOR: ['recruit:manage'],
     }
 
     # ---- 代码钩子 ----

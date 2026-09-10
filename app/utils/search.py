@@ -19,6 +19,7 @@ from datetime import datetime
 from flask import current_app, g
 
 from ..extensions import db
+from ..constants import Search as _S
 from ..models.setting import Setting
 from ..models.article import Article, ArticleTranslation, STATUS_PUBLISHED
 from ..models.column import Column
@@ -731,10 +732,10 @@ def get_backend():
     """根据 Setting 返回当前搜索后端（每请求缓存）。"""
     if hasattr(g, '_search_backend'):
         return g._search_backend
-    engine = Setting.get('search_engine', 'whoosh')
-    if engine == 'whoosh':
+    engine = Setting.get('search_engine', _S.DEFAULT_ENGINE)
+    if engine == _S.ENGINE_WHOOSH:
         backend = WhooshBackend()
-    elif engine == 'meilisearch':
+    elif engine == _S.ENGINE_MEILI:
         backend = MeilisearchBackend()
     else:
         backend = SqlLikeBackend()

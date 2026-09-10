@@ -27,7 +27,9 @@ from .models import Product, ProductTranslation
 from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'product'
 
-_IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+from app.constants import Upload as _U
+
+_IMAGE_EXTS = list(_U.IMAGE_EXTS)
 
 
 # ============================================================

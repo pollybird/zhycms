@@ -17,6 +17,7 @@ from flask_babel import gettext as _gettext
 from flask_login import current_user
 
 from ..extensions import db
+from ..constants import Upload as _U
 from ..models.column import Column, ColumnField
 from ..models.article import Article, ArticleFieldValue, ArticleTranslation
 from ..utils.i18n_content import get_available_locales, get_default_locale
@@ -227,7 +228,7 @@ def _save_article(article, column, fields):
     cover_file = request.files.get('cover')
     if cover_file and cover_file.filename:
         rel, url, err = save_upload_file(cover_file, sub_dir='article',
-                                         allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                                         allowed_exts=list(_U.IMAGE_EXTS),
                                          max_size=10 * 1024 * 1024)
         if err:
             flash(_gettext('封面图上传失败：{0}').format(err), 'danger')
@@ -262,7 +263,7 @@ def _save_article(article, column, fields):
                     allowed = f.allowed_exts.split(',') if f.allowed_exts else None
                     maxsize = f.max_size
                 else:
-                    allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+                    allowed = list(_U.IMAGE_EXTS)
                 rel, url, err = save_upload_file(file_obj, sub_dir='article',
                                                  allowed_exts=allowed, max_size=maxsize)
                 if err:

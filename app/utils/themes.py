@@ -14,8 +14,10 @@ THEMES_DIR = os.path.join(
     'frontend', 'templates', 'themes'
 )
 
-# 主题上传：扩展名白名单（与插件保持一致）
-THEME_ALLOWED_EXTS = ('zip', 'tar.gz', 'tgz')
+# 主题上传：扩展名白名单（v2.6.0 起统一定义在 app/constants.py）
+from ..constants import Upload as _U
+
+THEME_ALLOWED_EXTS = _U.THEME_EXTS
 THEME_SLUG_RE = re.compile(r'^[a-zA-Z0-9_-]{2,32}$')
 
 # 主题必备模板文件（缺一不可，否则主题不完整会在渲染时抛错）

@@ -19,6 +19,7 @@
   templates/auto_translate/settings.html  后台设置页
 """
 from app.plugin_api import PluginBase
+from app.constants import Roles as _R
 
 from . import admin as _admin  # noqa: F401  导入即注册后台路由
 from .assets import render_assets
@@ -37,8 +38,8 @@ class AutoTranslatePlugin(PluginBase):
     ]
     # 内容编辑、内容审核角色可直接使用；配置权限仅超级管理员（默认拥有全部权限）
     preset_role_grants = {
-        'content_editor': ['auto_translate:use'],
-        'content_auditor': ['auto_translate:use'],
+        _R.CONTENT_EDITOR: ['auto_translate:use'],
+        _R.CONTENT_AUDITOR: ['auto_translate:use'],
     }
 
     @property

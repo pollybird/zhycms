@@ -12,6 +12,7 @@
   templates/product/   后台页面 + 前台详情兜底模板
 """
 from app.plugin_api import PluginBase
+from app.constants import Roles as _R
 
 from . import admin as _admin       # noqa: F401  导入即注册后台路由（并引入 models）
 from .frontend import (
@@ -27,8 +28,8 @@ class ProductPlugin(PluginBase):
     # ---- 声明式注册 ----
     permissions = [('product:manage', '产品管理', '产品增删改与相册/规格维护')]
     preset_role_grants = {
-        'content_auditor': ['product:manage'],
-        'content_editor': ['product:manage'],
+        _R.CONTENT_AUDITOR: ['product:manage'],
+        _R.CONTENT_EDITOR: ['product:manage'],
     }
 
     # ---- 代码钩子 ----

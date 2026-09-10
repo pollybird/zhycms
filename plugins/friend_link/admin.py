@@ -13,6 +13,7 @@ from app.admin import admin_bp
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log
 from app.utils.uploads import save_upload_file
+from app.constants import Upload as _U
 from app.plugin_system import plugin_enabled
 
 from .models import FriendLink, FriendLinkTranslation
@@ -101,7 +102,7 @@ def _save_link(link):
     logo_file = request.files.get('logo')
     if logo_file and logo_file.filename:
         rel, file_url, err = save_upload_file(logo_file, sub_dir='friend_link',
-                                              allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp'])
+                                              allowed_exts=list(_U.IMAGE_EXTS))
         if err:
             flash(_gettext('LOGO 上传失败：{0}').format(err), 'danger')
             return None

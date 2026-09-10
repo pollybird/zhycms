@@ -11,6 +11,7 @@
   templates/      后台页面 + 前台轮播 partial（主题 index.html include）
 """
 from app.plugin_api import PluginBase
+from app.constants import Roles as _R
 
 from . import admin as _admin  # noqa: F401  导入即注册后台路由（并引入 models）
 from . import api as _api      # noqa: F401
@@ -25,8 +26,8 @@ class BannerPlugin(PluginBase):
     # ---- 声明式注册 ----
     permissions = [('banner:manage', '轮播图管理', '轮播分组与图片管理')]
     preset_role_grants = {
-        'content_auditor': ['banner:manage'],
-        'content_editor': ['banner:manage'],
+        _R.CONTENT_AUDITOR: ['banner:manage'],
+        _R.CONTENT_EDITOR: ['banner:manage'],
     }
 
     # ---- 代码钩子 ----

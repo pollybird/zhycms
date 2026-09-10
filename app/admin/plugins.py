@@ -38,7 +38,9 @@ from .confirm import verify_delete_captcha
 
 # ========== 常量 ==========
 
-_PLUGIN_ALLOWED_EXTS = ('zip', 'tar.gz', 'tgz')
+from ..constants import Upload as _U
+
+_PLUGIN_ALLOWED_EXTS = _U.PLUGIN_EXTS
 _PLUGIN_SLUG_RE = re.compile(r'^[a-zA-Z0-9_-]{2,32}$')
 
 # 插件必备文件名（缺一不可）；api.py 可选（纯模板/纯后台扩展类插件可以没有 API）

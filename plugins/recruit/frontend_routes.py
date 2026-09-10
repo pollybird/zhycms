@@ -32,8 +32,10 @@ from .frontend import recruit_job_url
 recruit_frontend = Blueprint('recruit_frontend', __name__,
                              template_folder='templates')
 
-# 简历类型白名单：word / excel / pdf（从原始文件名提取后缀）
-RESUME_EXTS = ['doc', 'docx', 'xls', 'xlsx', 'pdf']
+from app.constants import Upload as _U
+
+# 简历类型白名单：word / excel / pdf（v2.6.0 起统一定义在 app/constants.py）
+RESUME_EXTS = list(_U.RESUME_EXTS)
 RESUME_MAX_SIZE = 10 * 1024 * 1024   # 简历单文件上限 10MB（优先级低于后台设置）
 
 

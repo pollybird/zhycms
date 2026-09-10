@@ -5,6 +5,35 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.6.0] - 2026-09-10
+
+**工程化完善**版本。新增发布 Checklist、pytest 测试脚手架 + GitHub Actions CI、统一异常处理（403/404/500 三协议分发）、常量治理（消除硬编码、统一 `app/constants.py`）。**无数据库结构变更**，覆盖代码即可升级。
+
+### Added
+
+- **发布 Checklist（`RELEASE.md`）**：标准化的发布操作清单（版本一致性 → 迁移 → 翻译 → 文档 → 测试 → tag → 发布后验证），配合 `scripts/check_release.py` 自动校验 CMS_VERSION / CHANGELOG / README / wiki.html 版本号一致。
+- **pytest 测试脚手架**：`tests/` 目录含 conftest fixture（隔离 SQLite + 临时索引目录 + session 注入登录）与 9 个测试文件（冒烟 / 认证 RBAC / 工作流 / 搜索 / i18n / 插件 / API / 异常处理 / 常量治理），34 项测试全绿。
+- **GitHub Actions CI（`.github/workflows/ci.yml`）**：三 Python 矩阵（3.10/3.11/3.12）跑 pytest + 发布一致性检查 + 常量门禁，共 3 个 job。
+- **统一异常处理（`app/errors.py`）**：全局接管 400/403/404/405/500 + HTTPException + 未知异常，按请求路径分发三种协议——`/api/` 返回 JSON、`/admin/` 返回后台模板、前台返回主题模板；新增 6 个主题 403.html + 3 个后台 errors 模板。
+- **常量治理（`app/constants.py`）**：零依赖常量模块统一 Workflow / Upload / Locales / Search / Roles / Pagination 命名空间；收编散落在 models/utils/admin/plugins 中的 17 处硬编码字面量；`scripts/check_constants.py` CI 门禁防新增回流。
+- **`TestingConfig`**：`app/config.py` 新增测试环境配置类（TESTING=True、CSRF 禁用、内存 SQLite）。
+
+### Changed
+
+- `app/models/workflow.py` 与 `app/models/rbac.py` 的状态/角色常量改为从 `app/constants.py` 重导出（向后兼容）。
+- 上传扩展名白名单（图片/主题/插件/简历）统一引用 `constants.Upload`。
+- 搜索引擎名（whoosh/meilisearch）统一引用 `constants.Search`。
+- 4 个插件（banner/product/recruit/auto_translate）的角色预设名统一引用 `constants.Roles`。
+- `app/frontend/views.py` 的 404/500 错误处理迁移至 `app/errors.py` 统一注册。
+
+### Upgrade
+
+- **无数据库迁移**：覆盖代码重启即可。
+- **CI 自动运行**：push 到 main 或提 PR 时 GitHub Actions 自动跑测试 + 检查；本地可 `pip install -r requirements-dev.txt && pytest`。
+- **开发依赖**：`requirements-dev.txt` 含 pytest/pytest-cov/pytest-timeout。
+
+---
+
 ## [2.5.2] - 2026-09-09
 
 **一键翻译插件**版本。新增官方内置插件「一键翻译」，在文章、栏目、碎片、产品、表单、招聘、友情链接等编辑页的「多语言版本」标签页中提供一键翻译按钮，把默认语言（中文）的标题、摘要、正文、SEO 字段自动翻译填充为目标语言。**无数据库结构变更**，启用插件并配置翻译服务密钥后即时可用。

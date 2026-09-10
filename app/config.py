@@ -131,8 +131,20 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True
 
 
+class TestingConfig(Config):
+    """v2.6.0 测试环境配置。"""
+    TESTING = True
+    DEBUG = True
+    ENV = 'testing'
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'ZHYCMS_DB_URI', 'sqlite:///:memory:')
+    WTF_CSRF_ENABLED = False
+    SECRET_KEY = os.environ.get('ZHYCMS_SECRET_KEY', 'test-secret-key-for-pytest-only')
+
+
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,
     'default': DevelopmentConfig,
 }

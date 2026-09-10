@@ -634,16 +634,8 @@ def sitemap():
     )
 
 
-@frontend_bp.app_errorhandler(404)
-def page_not_found(e):
-    return render_template(theme_template('404'), nav=_build_nav(),
-                           seo=_seo()), 404
-
-
-@frontend_bp.app_errorhandler(500)
-def server_error(e):
-    return render_template(theme_template('500'), nav=_build_nav(),
-                           seo=_seo()), 500
+# v2.6.0：404/500 错误处理已迁移至 app/errors.py 统一注册
+# （支持 403 + 三协议分发：前台主题 / 后台模板 / API JSON）
 
 
 # v2.4.0：Docker 健康检查端点（豁免初始化拦截）

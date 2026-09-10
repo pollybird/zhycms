@@ -2,23 +2,18 @@
 from datetime import datetime
 
 from ..extensions import db
+from ..constants import Workflow as _W
 
+# ========== 内容状态（v2.6.0 起统一定义在 app/constants.py，此处向后兼容重导出） ==========
+STATUS_DRAFT = _W.STATUS_DRAFT          # 草稿
+STATUS_REVIEW = _W.STATUS_REVIEW        # 待审核
+STATUS_PUBLISHED = _W.STATUS_PUBLISHED  # 已发布
+STATUS_ARCHIVED = _W.STATUS_ARCHIVED    # 已归档
 
-# ========== 内容状态 ==========
-STATUS_DRAFT = 'draft'          # 草稿
-STATUS_REVIEW = 'review'        # 待审核
-STATUS_PUBLISHED = 'published'  # 已发布
-STATUS_ARCHIVED = 'archived'    # 已归档
-
-STATUS_CHOICES = [
-    (STATUS_DRAFT, '草稿'),
-    (STATUS_REVIEW, '待审核'),
-    (STATUS_PUBLISHED, '已发布'),
-    (STATUS_ARCHIVED, '已归档'),
-]
+STATUS_CHOICES = list(_W.STATUS_CHOICES)
 
 # 发布态 <-> 原 is_enabled 映射：STATUS_PUBLISHED → is_enabled=True，其他 → False
-STATUSES_ENABLED = {STATUS_PUBLISHED}
+STATUSES_ENABLED = set(_W.PUBLISHED_STATUSES)
 
 
 class ArticleVersion(db.Model):

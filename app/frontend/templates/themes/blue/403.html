@@ -1,0 +1,12 @@
+{% extends theme_base %}
+{% block title %}无权访问{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 text-center py-5">
+    <h1 class="display-1 text-muted">403</h1>
+    <p class="lead">抱歉，您没有权限访问此页面。</p>
+    <a href="{{ url_for('frontend.index') }}" class="btn btn-primary"><i class="fas fa-home"></i> 返回首页</a>
+  </div>
+</div>
+{% endblock %}

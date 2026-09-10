@@ -1,0 +1,14 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ error_code }} - {{ cms_name }}{% endblock %}
+
+{% block content %}
+<div class="error-page text-center" style="padding: 60px 20px;">
+  <h1 class="display-1 text-muted">{{ error_code }}</h1>
+  <p class="lead mb-3">{{ error_description }}</p>
+  <p>
+    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-primary">
+      <i class="fas fa-tachometer-alt"></i> 返回后台首页
+    </a>
+  </p>
+</div>
+{% endblock %}

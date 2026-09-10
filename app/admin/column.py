@@ -8,6 +8,7 @@ from flask import (
 
 from flask_babel import gettext as _gettext
 from ..extensions import db
+from ..constants import Upload as _U
 from ..models.column import Column, ColumnField, ColumnFieldValue, ColumnTranslation
 from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..utils.helpers import permission_required, audit_log, clear_content_cache
@@ -302,7 +303,7 @@ def _save_page_field_values(column):
                     allowed = f.allowed_exts.split(',') if f.allowed_exts else None
                     maxsize = f.max_size
                 else:
-                    allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+                    allowed = list(_U.IMAGE_EXTS)
                     maxsize = None
                 rel, url, err = save_upload_file(file_obj, sub_dir='column',
                                                  allowed_exts=allowed, max_size=maxsize)

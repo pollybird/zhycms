@@ -15,6 +15,7 @@ from app.models.upload import UploadedFile
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE
 from app.utils.helpers import permission_required, audit_log
 from app.utils.uploads import save_upload_file
+from app.constants import Upload as _U
 from app.plugin_system import plugin_enabled
 
 from .models import BannerGroup, Banner
@@ -216,7 +217,7 @@ def _save_item(group, item):
     if upload and upload.filename:
         rel, file_url, err = save_upload_file(
             upload, sub_dir='banner',
-            allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp'])
+            allowed_exts=list(_U.IMAGE_EXTS))
         if err:
             flash(_gettext('图片上传失败：{0}').format(err), 'danger')
             return None

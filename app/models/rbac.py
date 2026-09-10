@@ -16,16 +16,16 @@
 from datetime import datetime
 
 from ..extensions import db
-
+from ..constants import Roles as _R
 
 # ============================================================
-# 预设角色常量
+# 预设角色常量（v2.6.0 起统一定义在 app/constants.py，此处向后兼容重导出）
 # ============================================================
 
-ROLE_SUPER_ADMIN = 'super_admin'        # 超级管理员
-ROLE_CONTENT_AUDITOR = 'content_auditor'   # 内容审核员
-ROLE_CONTENT_EDITOR = 'content_editor'     # 内容编辑
-ROLE_READONLY_VIEWER = 'readonly_viewer'   # 只读查看员
+ROLE_SUPER_ADMIN = _R.SUPER_ADMIN        # 超级管理员
+ROLE_CONTENT_AUDITOR = _R.CONTENT_AUDITOR   # 内容审核员
+ROLE_CONTENT_EDITOR = _R.CONTENT_EDITOR     # 内容编辑
+ROLE_READONLY_VIEWER = _R.READONLY_VIEWER   # 只读查看员
 
 PRESET_ROLES = {
     ROLE_SUPER_ADMIN: {

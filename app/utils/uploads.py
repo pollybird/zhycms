@@ -21,7 +21,9 @@ from .storage import (
 )
 
 
-IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
+from ..constants import Upload as _U
+
+IMAGE_EXTS = set(_U.IMAGE_EXTS)
 
 
 def _detect_mime(file_stream, original_name=''):

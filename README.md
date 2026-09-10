@@ -2,7 +2,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v2.5.2**（一键翻译插件 + 全站搜索国际化：详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v2.6.0**（工程化完善：发布 Checklist + pytest/CI + 统一异常处理 + 常量治理：详见 [CHANGELOG](CHANGELOG.md)）
 
 ---
 
@@ -68,6 +68,13 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v2.6.0（2026-09-10）
+
+- 工程化完善：发布 Checklist（`RELEASE.md` + `scripts/check_release.py`）
+- pytest 测试脚手架 + GitHub Actions CI（34 项测试，3 Python 矩阵）
+- 统一异常处理（`app/errors.py`，403/404/500 三协议分发：前台主题 / 后台模板 / API JSON）
+- 常量治理（`app/constants.py` 零依赖统一命名空间 + `scripts/check_constants.py` CI 门禁）
 
 ### v2.5.2（2026-09-09）
 - **新增**：一键翻译插件——编辑页多语言 Tab 一键调用百度/有道/Google/DeepSeek 翻译回填

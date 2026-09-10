@@ -487,6 +487,10 @@ def create_app(config_name=None):
     app.register_blueprint(content_api_bp, url_prefix='/api/v1')
     _register_cors(app)
 
+    # v2.6.0：统一异常处理（403/404/500 + HTTPException + 兜底 Exception）
+    from .errors import register_error_handlers
+    register_error_handlers(app)
+
     # 应用 url_for 动态前缀（模块5：路由修改即时生效）
     _patch_jinja_url_for(app)
     # 为当前 prefix 可能对应的老环境补充路由
