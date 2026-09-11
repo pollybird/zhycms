@@ -174,7 +174,7 @@
   <tr><td>数据库迁移</td><td>Flask-Migrate (Alembic)，支持回滚与插件迁移脚本</td><td>v2.4</td></tr>
   <tr><td>全文搜索</td><td>默认 Whoosh + jieba，可选 Meilisearch，SQL LIKE 兜底</td><td>v2.4</td></tr>
   <tr><td>对象存储 OSS</td><td>阿里云/腾讯云/七牛云，一键迁移，默认本地零变化</td><td>v2.4</td></tr>
-  <tr><td>Docker 部署</td><td>多阶段构建，MySQL/PostgreSQL 一键启动</td><td>v2.4</td></tr>
+  <tr><td>Docker 部署</td><td>官方镜像 pollybird/zhycms 已发布，MySQL/PostgreSQL 一键启动，支持本地构建</td><td>v2.4</td></tr>
   <tr><td>RBAC 权限</td><td>角色/权限点两级模型，菜单与按钮级授权，栏目级内容粒度</td><td>v2.0</td></tr>
   <tr><td>内容工作流</td><td>草稿 → 待审核 → 已发布/已驳回，版本快照与对比还原</td><td>v2.0</td></tr>
   <tr><td>审计日志</td><td>登录、配置变更、内容 CRUD 全量留痕，多维度检索</td><td>v2.0</td></tr>
@@ -205,7 +205,10 @@
 ├── docker/                 # Docker 部署辅助
 ├── instance/               # 实例数据（数据库、配置、备份等）
 ├── requirements.txt
-├── Dockerfile / docker-compose.yml
+├── Dockerfile
+├── docker-compose.yml                # 通用编排（--profile，本地构建）
+├── docker-compose.mysql.yml          # MySQL 独立编排（拉取 pollybird/zhycms:mysql）
+├── docker-compose.postgresql.yml     # PostgreSQL 独立编排（拉取 pollybird/zhycms:postgresql）
 ├── docker/
 │   ├── install.sh           # 一键安装脚本
 │   ├── uninstall.sh         # 卸载脚本
@@ -270,20 +273,20 @@ python -m gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app</code></pre>
 <div class="warn">生产环境务必设置 <code>ZHYCMS_SECRET_KEY</code>；建议前置 Nginx 反向代理并托管静态资源。</div>
 
 <h3 id="deploy-docker">Docker 部署 <span class="tag tag-new">v2.4</span></h3>
-<p>一键安装（推荐，自动生成密钥与密码、配置镜像加速）：</p>
+<p>官方镜像已发布到 Docker Hub（<code>pollybird/zhycms</code>），开箱即用，无需本地构建。一键安装（推荐，自动生成密钥与密码、配置镜像加速）：</p>
 <pre><code>bash docker/install.sh</code></pre>
-<p>或手动配置：</p>
+<p>或手动配置（拉取预构建镜像）：</p>
 <pre><code>cp docker/.env.example .env
-# 编辑 .env 修改密钥和数据库密码
+# 编辑 .env 修改 SECRET_KEY 和数据库密码
 
-# MySQL 方案
-docker compose --profile mysql up -d
+# MySQL 8.4 方案（镜像 pollybird/zhycms:mysql）
+docker compose -f docker-compose.mysql.yml up -d
 
-# PostgreSQL 方案
-docker compose --profile postgres up -d
+# PostgreSQL 16 方案（镜像 pollybird/zhycms:postgresql）
+docker compose -f docker-compose.postgresql.yml up -d
 
 # 访问 http://localhost:5000 完成初始化</code></pre>
-<p>容器启动时自动执行：数据库迁移 → 恢复演示图片 → 编译 i18n → 启动 gunicorn。<code>instance/</code> 和上传目录通过 volume 持久化。卸载运行 <code>bash docker/uninstall.sh</code>。</p>
+<p>也可直接拉取镜像：<code>docker pull pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:latest</code>，三个 tag 指向同一镜像）。容器启动时自动执行：数据库迁移 → 恢复演示图片 → 编译 i18n → 启动 gunicorn。<code>instance/</code> 和上传目录通过 volume 持久化。卸载运行 <code>bash docker/uninstall.sh</code>。</p>
 
 <h3 id="deploy-env">环境变量</h3>
 <table>
@@ -1207,16 +1210,21 @@ flask db migrate -m "xxx" # 新建迁移脚本（开发用）</code></pre>
 <div class="note">脚本自动生成的 <code>.env</code> 包含随机密钥和密码，安全可靠。卸载时运行 <code>bash docker/uninstall.sh</code>，可选择保留或删除数据。</div>
 
 <h3>手动配置（进阶）</h3>
-<p>如需完全手动控制，可直接编辑配置文件：</p>
+<p>如需完全手动控制，可直接编辑配置文件。官方镜像已发布到 Docker Hub，拉取即用：</p>
 <pre><code>cp docker/.env.example .env
-# 编辑 .env 修改密钥和数据库密码
+# 编辑 .env 修改 SECRET_KEY 和数据库密码
 
-docker compose --profile mysql up -d      # MySQL 方案
-docker compose --profile postgres up -d   # PostgreSQL 方案</code></pre>
+# MySQL 8.4（镜像 pollybird/zhycms:mysql）
+docker compose -f docker-compose.mysql.yml up -d
+
+# PostgreSQL 16（镜像 pollybird/zhycms:postgresql）
+docker compose -f docker-compose.postgresql.yml up -d</code></pre>
+<p>也可直接拉取：<code>docker pull pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:latest</code>）。</p>
 
 <h3>镜像特点</h3>
 <ul>
-  <li><b>多阶段构建</b>：builder 阶段编译依赖，runtime 阶段基于 <code>python:3.12-slim</code>，体积更小。</li>
+  <li><b>已发布到 Docker Hub</b>：<code>pollybird/zhycms</code>，提供 <code>mysql</code> / <code>postgresql</code> / <code>latest</code> 三个 tag（同一镜像，内置 MySQL + PostgreSQL 驱动，通过 <code>ZHYCMS_DB_URI</code> 切换）。</li>
+  <li><b>多阶段构建</b>：builder 阶段编译依赖，runtime 阶段基于 <code>python:3.12-slim</code>，体积约 495MB。</li>
   <li><b>非 root 运行</b>：uid 1000 的 <code>zhycms</code> 用户，增强安全性。</li>
   <li><b>自动初始化</b>：entrypoint.sh 执行迁移 → 恢复演示图 → 编译 i18n → 启动 gunicorn。</li>
   <li><b>健康检查</b>：<code>GET /healthz</code> 返回数据库状态，豁免初始化拦截，供探针使用。</li>
@@ -1293,7 +1301,9 @@ export REDIS_URL=redis://:yourpassword@127.0.0.1:6379/0
 bash docker/install.sh
 # 自动在 .env 中写入 REDIS_URL，启动时携带 --profile redis
 
-# docker-compose 手动启动
+# 独立 compose 文件：取消注释文件中的 redis 服务块与 redis_data 卷
+# docker-compose.mysql.yml 或 docker-compose.postgresql.yml 内已预置（默认注释）
+# 也可用通用编排文件：
 docker compose --profile mysql --profile redis up -d</code></pre>
 
 <h3>后台状态页</h3>

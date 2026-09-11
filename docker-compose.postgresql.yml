@@ -1,0 +1,65 @@
+# ============================================================
+# zhycms Docker Compose — PostgreSQL 版（独立文件，无需 --profile）
+# 用法：
+#   cp docker/.env.example .env   # 按需修改 SECRET_KEY / POSTGRES_PASSWORD
+#   docker compose -f docker-compose.postgresql.yml up -d
+#
+# 镜像：pollybird/zhycms:postgresql（已含 MySQL / PostgreSQL 驱动，靠 DB_URI 切换）
+# 本地重新构建：docker compose -f docker-compose.postgresql.yml build
+# ============================================================
+
+services:
+  app:
+    image: pollybird/zhycms:postgresql
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        APT_MIRROR: ${APT_MIRROR:-}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5000}:5000"
+    environment:
+      ZHYCMS_ENV: production
+      ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      REDIS_URL: ${REDIS_URL:-}
+      ZHYCMS_DB_URI: postgresql+psycopg2://zhycms:${POSTGRES_PASSWORD:-zhycms}@db:5432/zhycms
+    volumes:
+      - ./instance:/app/instance
+      - ./app/static/uploads:/app/app/static/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zhycms
+      POSTGRES_USER: zhycms
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zhycms}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zhycms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Redis（可选，取消注释启用；启用后缓存与 Session 走 Redis）----
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 3
+
+volumes:
+  pg_data:
+  # redis_data:

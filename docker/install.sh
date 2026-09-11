@@ -2,7 +2,14 @@
 # ============================================================
 # zhycms Docker 一键安装脚本
 # 用法：bash docker/install.sh
-# 功能：交互式配置 → 生成 .env → 拉取基础镜像 → 构建启动
+# 功能：交互式配置 → 生成 .env → 拉取基础镜像 → 本地构建并启动
+#
+# 提示：官方镜像已发布到 Docker Hub（pollybird/zhycms），
+# 若不想本地构建，可直接用独立 compose 文件拉取预构建镜像：
+#   docker compose -f docker-compose.mysql.yml up -d       # MySQL
+#   docker compose -f docker-compose.postgresql.yml up -d  # PostgreSQL
+# 三个 tag（mysql/postgresql/latest）指向同一镜像。
+# 本脚本走本地构建路径，适合需要定制 Dockerfile 的场景。
 # ============================================================
 set -euo pipefail
 

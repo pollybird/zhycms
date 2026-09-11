@@ -56,7 +56,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **数据库迁移** | Flask-Migrate（Alembic）管理 schema 版本，支持回滚 | v2.4 |
 | **全文搜索** | 默认 Whoosh + jieba 中文分词，可选 Meilisearch；多语言检索、插件内容接入、SQL 兜底 | v2.4 |
 | **对象存储 OSS** | 阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，一键迁移本地文件上云 | v2.4 |
-| **Docker 部署** | 多阶段构建 + docker-compose，MySQL/PostgreSQL 一键启动 | v2.4 |
+| **Docker 部署** | 官方镜像 `pollybird/zhycms` 已发布，MySQL/PostgreSQL 一键启动，支持本地构建 | v2.4 |
 | **REST API** | `/api/v1/` 只读端点，Token 鉴权 + CORS，适合小程序/Headless | v2.2 |
 | **RBAC 权限** | 角色/权限点两级模型，菜单与按钮级授权，栏目级内容粒度 | v2.0 |
 | **内容工作流** | 草稿 → 待审核 → 已发布/已驳回，版本快照与对比还原 | v2.0 |
@@ -146,21 +146,31 @@ python run.py
 
 ### Docker 部署
 
+官方镜像已发布到 Docker Hub（`pollybird/zhycms`），开箱即用，无需本地构建：
+
 ```bash
 # 1. 配置环境变量
 cp docker/.env.example .env
-# 编辑 .env 修改密钥和数据库密码
+# 编辑 .env 修改 SECRET_KEY 和数据库密码
 
-# 2. 启动（MySQL）
-docker compose --profile mysql up -d
+# 2. 启动（MySQL 8.4，镜像 pollybird/zhycms:mysql）
+docker compose -f docker-compose.mysql.yml up -d
 
-# 或启动（MariaDB 11.4）
-docker compose --profile mariadb up -d
-
-# 或启动（PostgreSQL）
-docker compose --profile postgres up -d
+# 或启动（PostgreSQL 16，镜像 pollybird/zhycms:postgresql）
+docker compose -f docker-compose.postgresql.yml up -d
 
 # 3. 访问 http://localhost:5000 完成初始化
+```
+
+> 也可直接拉取镜像：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest`）。
+> 三个 tag 指向同一镜像，内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。
+
+如需本地构建或使用 MariaDB 方案，仍可用通用编排文件：
+
+```bash
+docker compose --profile mysql up -d      # 本地构建 + MySQL
+docker compose --profile mariadb up -d    # 本地构建 + MariaDB 11.4
+docker compose --profile postgres up -d   # 本地构建 + PostgreSQL
 ```
 
 容器启动时自动执行数据库迁移、编译 i18n 翻译并启动 gunicorn。`instance/` 和上传目录通过 volume 持久化。
@@ -214,7 +224,9 @@ zhycms/
 ├── requirements.txt        # 核心依赖
 ├── requirements-prod.txt   # 生产依赖（gunicorn + gevent）
 ├── Dockerfile              # 多阶段构建镜像
-├── docker-compose.yml      # 编排文件
+├── docker-compose.yml      # 通用编排文件（--profile mysql/mariadb/postgres，本地构建）
+├── docker-compose.mysql.yml      # MySQL 独立编排（拉取 pollybird/zhycms:mysql）
+├── docker-compose.postgresql.yml # PostgreSQL 独立编排（拉取 pollybird/zhycms:postgresql）
 ├── wsgi.py                 # 生产 WSGI 入口
 ├── run.py                  # 开发启动入口
 └── babel.cfg               # pybabel 提取配置
