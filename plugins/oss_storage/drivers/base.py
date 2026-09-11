@@ -6,8 +6,31 @@
 - 必填配置缺失抛 StorageConfigError；
 - 上传/删除/查询失败统一包装为 StorageUploadError；
 - URL 拼接标准化（域名去尾斜杠、key 去前导斜杠），杜绝斜杠粘连。
+
+==============================================================
+新增云厂商驱动契约（v2.6.2，参考 Apache Libcloud 的 Driver 抽象）
+==============================================================
+1. 在 drivers/ 目录新建驱动文件，定义 :class:`CloudStorageDriver` 子类；
+   插件启动时自动发现并注册，无需改动插件其它代码（见
+   OSSStoragePlugin.get_storage_drivers）。
+2. 类属性（必填）：
+   - ``name``           驱动唯一标识（后台「存储驱动」选项值），如 'upyun'
+   - ``pip_package``    SDK 的 pip 包名（缺包提示用）
+   - ``sdk_import_name`` SDK 的 import 模块名
+   - ``required_config`` 必填 Setting 配置键 [(key, 中文说明), ...]
+3. 方法（必填）：
+   - ``_build_client(sdk)``   用 SDK 构建客户端对象
+   - ``_public_base()``       公开访问域名（含 scheme，无尾斜杠）
+   - ``_put_object(path, key)``      文件路径上传
+   - ``_object_exists(key)``  对象是否存在
+   - ``_delete_object(key)``  删除对象
+   - ``_health()``            连通性自检，返回 (ok, message)
+4. 方法（可选）：
+   - ``_put_bytes(data, key)`` 字节流上传；默认实现为写临时文件后调用
+     ``_put_object``，子类可覆写为 SDK 原生字节流接口以省去落盘。
 """
 import importlib
+import os
 
 from app.utils.storage import (
     StorageDriver,
@@ -118,6 +141,35 @@ class CloudStorageDriver(StorageDriver):
         except Exception as e:
             raise StorageUploadError('{0} 上传失败：{1}'.format(self.name, e))
         return self.public_url(key)
+
+    def save_bytes(self, data, key):
+        """把字节流发布到存储，返回可访问 URL（v2.6.2）。
+
+        默认经 :meth:`_put_bytes`（临时文件 → :meth:`_put_object`），
+        子类可覆写 :meth:`_put_bytes` 改用 SDK 原生字节流接口。
+        """
+        key = self._normalize_key(key)
+        try:
+            self._put_bytes(data, key)
+        except (StorageDependencyError, StorageConfigError, StorageUploadError):
+            raise
+        except Exception as e:
+            raise StorageUploadError('{0} 上传失败：{1}'.format(self.name, e))
+        return self.public_url(key)
+
+    def _put_bytes(self, data, key):
+        """字节流上传默认实现：写临时文件后走 :meth:`_put_object`。"""
+        import tempfile
+        fd, tmp_path = tempfile.mkstemp(suffix='.tmp')
+        try:
+            with os.fdopen(fd, 'wb') as f:
+                f.write(data)
+            self._put_object(tmp_path, key)
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
     def exists(self, key):
         key = self._normalize_key(key)

@@ -49,12 +49,18 @@ def app():
     import app.utils.search as search_mod
     search_mod._get_index_root = lambda: _SEARCH_INDEX_DIR
 
+    # 种子数据放在独立 context 中完成并**及时关闭**：
+    # Flask RequestContext.push() 会复用同 app 的活动 app context，
+    # 若 fixture 跨 yield 持有 context，整个测试 session 的请求将共享
+    # 同一个 g，flask-login 的 g._login_user 会被首个请求永久缓存，
+    # 导致 session 注入式登录（_user_id）在第二次起全部失效。
     with app.app_context():
         db.create_all()
-        # 种子数据
-        from app.models.rbac import Role
+        # 种子数据（先建权限点，再建角色，保证角色-权限关联可 join）
+        from app.models.rbac import Permission, Role
         from app.models.setting import Setting
         from app.models.user import User
+        Permission.ensure_presets()
         Role.ensure_presets()
         Setting.set('site_initialized', '1')
         Setting.set('i18n_enable', '0')
@@ -65,7 +71,7 @@ def app():
             admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
-        yield app
+    yield app
 
     # 清理
     import shutil

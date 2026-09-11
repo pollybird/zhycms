@@ -68,10 +68,33 @@ class OSSStoragePlugin(PluginBase):
                          template_folder='templates')
 
     def get_storage_drivers(self):
-        from .drivers.aliyun import AliyunOSSDriver
-        from .drivers.tencent import TencentCOSDriver
-        from .drivers.qiniu import QiniuDriver
-        return [AliyunOSSDriver, TencentCOSDriver, QiniuDriver]
+        """自动发现 drivers/ 包下的全部云驱动（v2.6.2）。
+
+        契约：drivers/ 下每个模块顶层定义的 CloudStorageDriver 子类
+        （须有唯一非空 name 属性）都会被自动收集注册。新增云厂商时
+        只需在 drivers/ 下新增一个驱动文件，无需改动本插件其它代码。
+        以 ``_`` 开头的内部模块自动跳过。
+        """
+        import importlib
+        import pkgutil
+        from . import drivers as _pkg
+        from .drivers.base import CloudStorageDriver
+
+        found = {}
+        for _, modname, _ in pkgutil.iter_modules(_pkg.__path__):
+            if modname.startswith('_'):
+                continue
+            try:
+                mod = importlib.import_module(f'.{modname}', _pkg.__name__)
+            except Exception:
+                continue  # 单个驱动文件导入失败不影响其它驱动
+            for attr in vars(mod).values():
+                if (isinstance(attr, type)
+                        and issubclass(attr, CloudStorageDriver)
+                        and attr is not CloudStorageDriver
+                        and getattr(attr, 'name', '')):
+                    found[attr.name] = attr
+        return [found[name] for name in sorted(found)]
 
     def on_disabled(self):
         """禁用插件：存储驱动强制回到本地，防止新上传指向不可用配置。"""

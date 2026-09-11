@@ -190,7 +190,7 @@ def _file_still_exists(dup):
     try:
         if storage_name == 'local':
             return LocalStorageDriver().exists(key)
-        if _storage._cloud_plugin_enabled():
+        if _storage._driver_allowed(storage_name):
             try:
                 return get_driver(storage_name).exists(key)
             except Exception:

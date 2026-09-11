@@ -212,10 +212,11 @@ def _register_instance(app, rec):
         pass
 
     # 5) v2.4.0 存储驱动（oss_storage 插件注册云端 OSS 驱动）
+    #    v2.6.2：驱动按归属插件门控——插件禁用后其驱动自动回退本地
     try:
         from .utils import storage as _storage
         for drv_cls in (inst.get_storage_drivers() or []):
-            _storage.register_driver(drv_cls)
+            _storage.register_driver(drv_cls, owner_slug=rec.slug)
     except Exception as e:
         app.logger.warning('插件 %s 存储驱动注册失败： %s', rec.slug, e)
 

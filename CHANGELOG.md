@@ -5,6 +5,33 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.6.2] - 2026-09-11
+
+**质量加固**版本。补齐 5 大测试域（RBAC 权限边界 / 插件全生命周期 / Alembic 迁移 / API 契约 / 存储驱动抽象），测试规模 34 → 113 项；`oss_storage` 存储驱动抽象升级：驱动自动发现 + 字节流上传契约 + 归属插件门控。**无数据库结构变更**，覆盖代码重启即可升级。
+
+### Added
+
+- **RBAC 栏目级权限边界测试**（`tests/test_rbac_boundary.py`，17 项）：权限矩阵（无授权 / 单栏目授权 / 多栏目 / 全站授权）、路由与装饰器路径双覆盖、超管绕过、跨栏目数据隔离（授权编辑看不到未授权栏目文章）。
+- **插件全生命周期测试**（`tests/test_plugin_lifecycle.py`，20 项）：启用 → 使用 → 禁用 → 重新启用全链路，验证路由 / 模板函数 / 菜单 / API 端点注册与清理、数据保留（禁用不删表）、权限种子幂等、视图守卫 404。
+- **Alembic 迁移测试**（`tests/test_migrations.py`，9 项）：版本图线性无分叉、upgrade/downgrade 幂等、模拟生产 bootstrap（create_all → stamp 0001 → upgrade heads）、核心表结构与种子设置完整性校验。
+- **API 契约测试**（`tests/test_api_contract.py`，17 项）：统一响应包 `{"code","message","data","meta"}` 结构、/site /columns /articles 端点字段契约、`api_enable`/`api_token` 门控（off 全端点 404、缺 token 401）、CORS 白名单 / 通配回显、曝光规则（草稿 / 已删除 / 停用栏目一律 404）、分页 meta 与 `per_page` 钳制（1..50）。
+- **存储驱动抽象层测试**（`tests/test_storage.py`，16 项）：驱动注册表、归属插件门控回退、LocalStorageDriver 功能、`CloudStorageDriver` 字节流上传契约。
+- **`oss_storage` 驱动自动发现**：插件启动时 `pkgutil` 扫描 `drivers/` 包，顶层 `CloudStorageDriver` 子类自动收集注册，新增云厂商只需新增驱动文件，零改动插件其它代码。
+- **`CloudStorageDriver.save_bytes` 字节流上传契约**：默认经临时文件中转 `_put_object`，子类可覆写 `_put_bytes` 改用 SDK 原生字节流接口；`drivers/base.py` 补充新增云厂商驱动开发契约文档（必填类属性 / 方法清单）。
+
+### Changed
+
+- **存储驱动按「归属插件」门控**（`app/utils/storage.py`）：`register_driver` 新增 `owner_slug` 参数，驱动注册表记录归属插件；插件禁用后其驱动在 `get_driver` 中自动回退 `LocalStorageDriver`，替代原先写死 `OSS_PLUGIN_SLUG` 的单插件判断，任意插件均可安全注册驱动。
+- pytest 注册 5 个新标记：`boundary` / `lifecycle` / `migration` / `contract` / `storage`。
+- `tests/conftest.py`：种子数据移入独立 app context 并及时关闭，修复 flask-login 跨请求缓存 `g._login_user` 导致的登录失效；种子流程先建权限点再建角色。
+- `tests/factories.py`：`make_user` 改为直接写 `UserRole` 关联行，修复角色绑定不落库。
+
+### Fixed
+
+- `app/utils/uploads.py` 重复文件检测引用已删除的 `_cloud_plugin_enabled` 私有函数，改用公开的 `_driver_allowed`，云端驱动的重复上传检测恢复正常。
+
+---
+
 ## [2.6.1] - 2026-09-10
 
 **架构与可维护性**版本。蓝图注册抽离、admin 按业务域分目录、引入 service 层剥离业务逻辑、插件热加载线程安全文档化与缓存优化。**无数据库结构变更**，覆盖代码即可升级。

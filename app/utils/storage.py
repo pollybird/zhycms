@@ -123,20 +123,24 @@ class LocalStorageDriver(StorageDriver):
 
 
 # ============================================================
-# 驱动注册表
+# 驱动注册表（v2.6.2：驱动按「归属插件」门控）
 # ============================================================
 
 _DRIVERS = {'local': LocalStorageDriver}
+#: 驱动名 → 注册它的插件 slug；None 表示核心/测试注册，不受插件启停门控
+_DRIVER_OWNERS = {'local': None}
 
-#: 提供云端驱动的官方插件 slug（禁用该插件时强制回退本地）
-OSS_PLUGIN_SLUG = 'oss_storage'
 
+def register_driver(driver_cls, owner_slug=None):
+    """注册驱动类（插件启动时调用）。
 
-def register_driver(driver_cls):
-    """注册驱动类（插件启动时调用）。"""
+    :param owner_slug: 注册方插件 slug。运行时该插件被禁用后，其驱动
+        在 :func:`get_driver` 中自动回退本地。核心/测试注册传 None。
+    """
     if not getattr(driver_cls, 'name', ''):
         raise ValueError('存储驱动必须定义 name 属性')
     _DRIVERS[driver_cls.name] = driver_cls
+    _DRIVER_OWNERS[driver_cls.name] = owner_slug
 
 
 def registered_drivers():
@@ -144,11 +148,14 @@ def registered_drivers():
     return sorted(_DRIVERS.keys())
 
 
-def _cloud_plugin_enabled():
-    """oss_storage 插件是否启用（未安装/异常时按 False 处理）。"""
+def _driver_allowed(name):
+    """驱动是否可用：归属插件未注册或已启用才可用（核心注册不受门控）。"""
+    owner = _DRIVER_OWNERS.get(name)
+    if owner is None:
+        return True
     try:
         from ..plugin_system import plugin_enabled
-        return plugin_enabled(OSS_PLUGIN_SLUG)
+        return plugin_enabled(owner)
     except Exception:
         return False
 
@@ -157,7 +164,7 @@ def get_driver(name=None):
     """获取驱动实例。
 
     :param name: 驱动名；None 时读 Setting ``storage_driver``（默认 local）。
-    :return: StorageDriver 实例。云端驱动要求插件启用且已注册，
+    :return: StorageDriver 实例。归属插件的驱动要求该插件已启用，
              否则安全回退 :class:`LocalStorageDriver`。
     """
     if name is None:
@@ -170,8 +177,8 @@ def get_driver(name=None):
     if name == 'local' or name not in _DRIVERS:
         return LocalStorageDriver()
 
-    # 云端驱动：插件必须启用
-    if not _cloud_plugin_enabled():
+    # 归属插件被禁用的驱动：安全回退本地
+    if not _driver_allowed(name):
         return LocalStorageDriver()
 
     cls = _DRIVERS[name]

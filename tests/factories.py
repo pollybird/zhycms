@@ -12,13 +12,16 @@ from app.models.workflow import STATUS_PUBLISHED
 
 def make_user(username='testuser', password='testpass', is_super=False,
               role=None):
-    """创建普通用户。"""
+    """创建普通用户，可选绑定角色（直接写 UserRole 关联行）。"""
+    from app.models.rbac import UserRole
+
     user = User(username=username, is_super=is_super, is_deleted=False)
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
-    if role:
-        user.roles.append(role)
+    if role is not None:
+        db.session.add(UserRole(user_id=user.id, role_id=role.id))
+        db.session.flush()
     return user
 
 
