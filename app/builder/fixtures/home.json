@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_home_hero",
+      "type": "section",
+      "props": {"bg_color": "#f5f7fa", "text_color": "", "padding": "py-8", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_home_hero_h",
+          "type": "heading",
+          "props": {"text": "欢迎访问我们的企业官网", "level": 1, "align": "center", "color": "#2c3e50"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_home_hero_t",
+          "type": "text",
+          "props": {"content": "专业、可靠、值得信赖的合作伙伴，欢迎在下方了解我们的产品与服务。", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_home_hero_b",
+          "type": "button",
+          "props": {"text": "了解更多", "href": "/about.html", "style": "primary", "size": "lg", "align": "center", "icon": "", "target_blank": false},
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_home_row",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_home_grid",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_home_col_main",
+              "type": "grid-col",
+              "props": {"span_md": 8, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_home_news_title",
+                  "type": "heading",
+                  "props": {"text": "最新动态", "level": 3, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_home_news",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 6, "layout": "list", "card_cols": 3,
+                    "show_cover": true, "show_date": true, "show_summary": true,
+                    "show_more": true, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_home_col_side",
+              "type": "grid-col",
+              "props": {"span_md": 4, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_home_contact",
+                  "type": "contact-card",
+                  "props": {"title": "联系我们"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_home_links",
+                  "type": "friend-links",
+                  "props": {},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_home_cta",
+      "type": "cta-banner",
+      "props": {
+        "title": "准备好开始合作了吗？", "subtitle": "立即联系我们，获取专属解决方案",
+        "button_text": "立即咨询", "button_url": "/about.html",
+        "bg_color": "#34495e", "text_color": "#ffffff"
+      },
+      "visibility": {}, "children": []
+    }
+  ]
+}

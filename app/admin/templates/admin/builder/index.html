@@ -1,0 +1,94 @@
+{% extends 'admin/base.html' %}
+{% block title %}页面构建 - {{ cms_name }}{% endblock %}
+{% block page_header %}<i class="fas fa-shapes"></i> 页面构建{% endblock %}
+{% set active_menu = 'builder' %}
+{% block breadcrumb %}<li class="breadcrumb-item active">页面构建</li>{% endblock %}
+
+{% block content %}
+<div class="alert alert-info">
+  <i class="fas fa-info-circle"></i>
+  可视化页面构建器（v3.0.0）：拖拽组件搭建首页 / 单页 / 列表页 / 文章详情页。
+  未创建构建记录的页面继续使用主题手写模板，<strong>互不影响、随时可回退</strong>。
+</div>
+
+{% for scope, label in scope_labels.items() %}
+<div class="card mb-3">
+  <div class="card-header">
+    <h3 class="card-title">{{ label }}
+      {% if scope == 'home' %}<small class="text-muted ml-2">全站唯一</small>{% endif %}
+    </h3>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm mb-0">
+      <thead>
+      <tr>
+        <th>页面</th><th width="110">状态</th><th width="170">发布时间</th>
+        <th width="340">操作</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for p in by_scope[scope] %}
+      <tr>
+        <td>
+          {{ p.name or label }}
+          {% if p.column_id %}<small class="text-muted">#{{ p.column_id }}</small>{% endif %}
+          {% if p.draft_json and p.draft_json != p.published_json %}
+          <span class="badge badge-warning ml-1">未发布改动</span>{% endif %}
+        </td>
+        <td>
+          {% if p.has_published %}<span class="badge badge-success">已发布</span>
+          {% else %}<span class="badge badge-secondary">草稿</span>{% endif %}
+        </td>
+        <td>{{ p.published_at.strftime('%Y-%m-%d %H:%M') if p.published_at else '—' }}</td>
+        <td>
+          <a href="{{ url_for('admin.builder_editor', pid=p.id) }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-edit"></i> 可视化编辑</a>
+          {% if scope != 'home' %}
+          <form method="post" action="{{ url_for('admin.builder_page_delete', pid=p.id) }}"
+                class="d-inline" onsubmit="return confirm('删除后该页面将回退到主题手写模板，确定？')">
+            <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="text-center text-muted py-2">
+        {% if scope == 'home' %}
+        <form method="post" action="{{ url_for('admin.builder_page_create') }}">
+          <input type="hidden" name="scope" value="home">
+          <button class="btn btn-outline-primary btn-sm"><i class="fas fa-plus"></i> 创建首页构建</button>
+        </form>
+        {% elif scope == 'article' %}
+        <form method="post" action="{{ url_for('admin.builder_page_create') }}" class="form-inline justify-content-center">
+          <input type="hidden" name="scope" value="article">
+          <button class="btn btn-outline-primary btn-sm"><i class="fas fa-plus"></i> 创建全局文章详情布局</button>
+        </form>
+        {% else %}
+        <span class="text-muted">暂无可构建栏目（需要叶子{{ '单页' if scope == 'page' else '列表' }}栏目）</span>
+        {% endif %}
+      </td></tr>
+      {% endfor %}
+
+      {# 尚未创建构建记录的栏目快捷入口 #}
+      {% if scope in ['page', 'list'] %}
+        {% for col in available[scope] %}
+        <tr>
+          <td class="text-muted">{{ col.name }} <small>(/{{ col.slug }})</small></td>
+          <td><span class="badge badge-light">手写模板</span></td>
+          <td>—</td>
+          <td>
+            <form method="post" action="{{ url_for('admin.builder_page_create') }}" class="d-inline">
+              <input type="hidden" name="scope" value="{{ scope }}">
+              <input type="hidden" name="column_id" value="{{ col.id }}">
+              <button class="btn btn-outline-primary btn-sm"><i class="fas fa-plus"></i> 可视化构建</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

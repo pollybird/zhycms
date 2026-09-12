@@ -5,6 +5,37 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.0.0] - 2026-09-12
+
+**可视化页面构建器**版本。新增自研轻量拖拽式页面构建器（原生 HTML5 拖拽 + JSON Schema 组件注册 + iframe 内服务端真实渲染），覆盖首页、单页、列表页、文章详情页四种全页面类型；内置 24 个 Bootstrap4 组件（布局 6 + 基础 8 + 数据 10），支持草稿/发布/修订回滚、中英双语文案、语言白名单与会员可见性、桌面/平板/手机三端预览。插件可通过 `get_builder_widgets()` 钩子注册自有组件，插件禁用/卸载时前台静默降级、后台卸载前做布局引用拦截。采用「构建器为主、手写模板永久兜底」双轨策略：只有已发布布局的页面才走构建器，老站升级后零行为变化。**数据库结构变更**：新增迁移 `0009`（`builder_pages` / `builder_revisions` 两张表）。无 Node 构建链、无新增 Python 依赖（编辑器为原生 ES module）。
+
+### Added
+
+- **可视化页面构建器（核心）**：
+  - 四作用域：网站首页 / 单页（page 栏目）/ 列表页（list 栏目）/ 文章详情页（支持栏目级布局 + 全局默认回退）。
+  - 24 个内置组件：section/container/grid-row/grid-col/spacer/divider；heading/text/richtext/image/button/icon-box/alert/video-embed；article-list/article-detail/page-content/breadcrumb/fragment/carousel/contact-card/cta-banner/friend-links/stat-numbers。
+  - 编辑器：组件库、iframe 真实主题画布（服务端渲染，非模拟）、属性面板（文本/多行/富文本/数字/下拉/开关/颜色/图片上传/图标/栏目选择/重复项）、图层树、拖拽排序与嵌套、复制/删除/上移下移、三端设备切换、CKEditor5 富文本、800ms 防抖自动存草稿、未保存离开提示。
+  - 发布工作流：草稿/已发布双版本隔离（匿名访客只见已发布版）、每次发布生成修订快照、一键回滚（回滚即发布并再记快照）、从默认布局初始化向导、页面管理四分组列表与未构建栏目快捷入口。
+  - 预览：`/admin/builder/preview/<id>` 仅登录可访问，注入真实导航/SEO/栏目/文章/分页/上下篇数据，禁用组件显示黄色占位，单组件取数或渲染异常不拖垮整页。
+  - 主题适配：8 套主题（default/blue/manufacturing/service/catering/education/default_en/manufacturing_en）全部验证可渲染；组件支持 `themes/<theme>/builder/widgets/*.html` 主题级覆写。
+- **布局 JSON Schema v1**：服务端 allowlist 校验（组件类型/props 白名单/select 双向类型兼容/repeater 子字段/localized 语言键）、最大嵌套深度 8、单页节点上限 300、文档体积上限 256KB；非法草稿/发布返回 400。
+- **多语言与可见性**：文本类 props 支持 `{zh, en}` 多值并按当前语言回退；节点支持 `visibility.locales` 语言白名单与 `member_only` 会员限定。
+- **插件联动**：`PluginBase.get_builder_widgets()` 注册钩子（owner=插件 slug，随插件启用状态门控）；插件卸载前若仍有页面引用其组件则拒绝卸载并列出引用页面；插件被禁用后生产渲染空、预览标黄占位、完全未知类型静默跳过。
+- **权限与审计**：新增权限点 `builder:manage`（content_auditor/content_editor）与 `builder:publish`（仅 content_auditor）；创建/发布/回滚/删除写入审计日志（`audit` 模块新增 `builder` 分类）。
+- **文档**：新增 [docs/PAGE_BUILDER.md](docs/PAGE_BUILDER.md)（用户手册 + 组件开发 API）；[docs/PLUGIN_DEV.md](docs/PLUGIN_DEV.md) 补充 `get_builder_widgets` 章节。
+- **测试**：新增 65 个用例（组件注册表与插件门控、Schema 校验边界、四作用域双轨 HTTP、8 主题渲染矩阵、分页/伪静态/发布清缓存、i18n/会员可见性、后台 RBAC 角色矩阵与发布工作流），全量 206 项通过。
+
+### Changed
+
+- 前台 `index` / `column_detail`（page/list）/ `article_detail` 视图接入双轨：存在已发布构建布局时走构建器渲染（缓存键仍含分页/语言/主题），无布局时渲染既有手写模板，伪静态路由无需改动自动复用。
+- 侧边栏新增「页面构建」一级菜单（受 `builder:manage` 权限门控）。
+
+### Notes
+
+- 升级后所有页面默认仍走手写模板；在「页面构建」中创建并**发布**布局后，对应页面才切换到构建器，删除构建记录即回退（首页记录不可删除，可清空后发布）。
+- 不做 header/footer/导航可视化，不提供独立落地页；构建器只接管内容区。
+- 富文本编辑器复用既有自托管 CKEditor5；图片上传复用 `/admin/upload`。
+
 ## [2.6.4] - 2026-09-12
 
 **前台会员体系 + 插件依赖治理**版本。新增社区插件「前台用户中心」（member），提供用户注册/登录/资料编辑/修改密码/找回密码、微信与 QQ 一键登录、短信验证码登录、注册协议管理、栏目会员可见性控制；核心新增 `Column.member_only` 字段与前台访问守卫钩子；插件系统新增依赖（`requires`）、继承（`extends`）、最低核心版本（`min_core_version`）启用强校验与禁用反向依赖校验。**数据库结构变更**：新增迁移 `0008`（`columns.member_only` 列），member 插件首次启用时自动创建 `members` / `member_oauths` / `member_sms_codes` 三张表。无新增 Python 依赖（复用既有 `requests`）。

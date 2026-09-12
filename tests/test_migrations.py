@@ -131,14 +131,16 @@ class TestDowngrade:
         assert I18N_TABLES <= set(_inspector(db).get_table_names())
 
     def test_stepwise_downgrade_one_step(self, tmp_path):
-        """逐级 -1（0008 → 0007）后可再次升级回 head。"""
+        """逐级 -1（head → 上一版）后可再次升级回 head。"""
         db = str(tmp_path / 'mig.db')
         cfg = _bootstrap_like_production(db)
+        script = ScriptDirectory.from_config(cfg)
+        head_rev = script.get_current_head()
+        previous = script.get_revision(head_rev).down_revision
         command.downgrade(cfg, '-1')
-        assert _current_version(db) == '0007'
+        assert _current_version(db) == previous
         command.upgrade(cfg, 'heads')
-        head = ScriptDirectory.from_config(cfg).get_current_head()
-        assert _current_version(db) == head
+        assert _current_version(db) == head_rev
 
 
 @migration
@@ -151,12 +153,13 @@ class TestRevisionGraph:
         assert len(heads) == 1, f'存在多个迁移 head: {heads}'
 
     def test_linear_chain_from_baseline(self):
-        """walk_revisions 自 head 向 base 回溯：0008 → … → 0001。"""
+        """walk_revisions 自 head 向 base 回溯：head → … → 0001。"""
         script = ScriptDirectory.from_config(_cfg('unused.db'))
+        head = script.get_current_head()
         objs = list(script.walk_revisions('base', 'heads'))
-        assert objs[0].revision.startswith('0008')
+        assert objs[0].revision == head
         assert objs[-1].revision.startswith('0001')
-        assert len(objs) == 8
+        assert len(objs) == int(head[:4])
         ordered = list(reversed(objs))  # base → head
         for i, rev in enumerate(ordered):
             assert (rev.down_revision is None) if i == 0 \

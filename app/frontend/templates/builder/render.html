@@ -1,0 +1,23 @@
+{# v3.0.0 构建器通用渲染壳：继承当前主题 base.html，navbar/footer/SEO 与手写模板一致 #}
+{% extends theme_base %}
+
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='builder/css/widgets.css') }}">
+{% if preview %}
+<link rel="stylesheet" href="{{ url_for('static', filename='builder/css/preview.css') }}">
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if preview %}
+<div data-zbw-children="__root__" data-zbw-root="1">{{ builder_html }}</div>
+{% else %}
+{{ builder_html }}
+{% endif %}
+{% endblock %}
+
+{% block js %}
+{% if preview %}
+<script src="{{ url_for('static', filename='builder/js/preview_bridge.js') }}"></script>
+{% endif %}
+{% endblock %}

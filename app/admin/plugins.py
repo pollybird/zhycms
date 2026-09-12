@@ -114,6 +114,21 @@ def plugin_delete(slug):
         flash(_gettext('插件正在启用中，请先禁用再卸载'), 'danger')
         return redirect(url_for('admin.plugin_index'))
 
+    # v3.0.0：卸载前检查页面构建器布局是否引用了该插件的组件
+    try:
+        from ..builder.registry import _registry as _widget_registry
+        from ..builder import service as _builder_svc
+        owned_types = [t for t, r in _widget_registry.items() if r['owner'] == slug]
+        ref_pages = _builder_svc.pages_referencing_widget_types(owned_types)
+        if ref_pages:
+            names = '、'.join(p.name for p in ref_pages[:10])
+            flash(_gettext('以下页面构建布局仍在使用该插件的组件（{0}），'
+                           '请先在「页面构建」中移除相关组件并发布后再卸载').format(names),
+                  'danger')
+            return redirect(url_for('admin.plugin_index'))
+    except ImportError:
+        pass
+
     pkg_dir = os.path.join(plugin_system.PLUGINS_DIR, slug)
     if not os.path.isdir(pkg_dir):
         flash(_gettext('插件目录不存在：plugins/{0}/').format(slug), 'danger')

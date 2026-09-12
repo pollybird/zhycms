@@ -69,3 +69,43 @@ class Pagination:
     FRONT_PER_PAGE = 10
     ADMIN_PER_PAGE = 20
     SEARCH_PER_PAGE = 20
+
+
+class Builder:
+    """v3.0.0 可视化页面构建器常量。"""
+
+    # 布局 JSON Schema 版本
+    SCHEMA_VERSION = 1
+
+    # 页面作用域
+    SCOPE_HOME = 'home'        # 首页（唯一，column_id=NULL）
+    SCOPE_PAGE = 'page'        # 单页栏目
+    SCOPE_LIST = 'list'        # 列表栏目列表页
+    SCOPE_ARTICLE = 'article'  # 列表栏目文章详情页（column_id=NULL 表示全局默认）
+    SCOPES = (SCOPE_HOME, SCOPE_PAGE, SCOPE_LIST, SCOPE_ARTICLE)
+
+    # 页面状态
+    STATUS_DRAFT = 'draft'
+    STATUS_PUBLISHED = 'published'
+
+    # 组件分类
+    CAT_LAYOUT = 'layout'
+    CAT_BASIC = 'basic'
+    CAT_DATA = 'data'
+    CATEGORIES = (
+        (CAT_LAYOUT, '布局组件'),
+        (CAT_BASIC, '基础组件'),
+        (CAT_DATA, '数据组件'),
+    )
+
+    # 布局安全限制
+    MAX_DEPTH = 8            # 最大嵌套深度
+    MAX_NODES = 300          # 单页节点数上限
+    MAX_PAYLOAD_BYTES = 256 * 1024  # 布局文档体积上限 256KB
+
+    # 数据绑定模式
+    BIND_AUTO = 'auto'       # 自动绑定当前访问栏目
+    BIND_SELECT = 'select'   # 手动指定栏目
+
+    # 预览查询参数（iframe 画布桥识别）
+    PREVIEW_PARAM = 'zbw_preview'

@@ -58,6 +58,7 @@ MODULE_AUDIT = 'audit'
 MODULE_BACKUP = 'backup'
 MODULE_UPLOAD = 'upload'
 MODULE_PLUGIN = 'plugin'   # v2.2.0 插件管理
+MODULE_BUILDER = 'builder'  # v3.0.0 可视化页面构建器
 MODULE_OTHER = 'other'
 
 

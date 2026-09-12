@@ -1,0 +1,39 @@
+<article class="zbw-article-detail" {{ node_attrs() }}>
+  {% set a = page_ctx.article %}
+  {% if a %}
+  {% if zbw_p('show_title', True) %}<h1 class="zbw-article-title">{{ t(a, 'title') }}</h1>{% endif %}
+  {% if zbw_p('show_meta', True) %}
+  <div class="zbw-article-meta text-muted mb-3 pb-2 border-bottom">
+    {% if column %}<span><i class="far fa-folder"></i> {{ t(column, 'name') }}</span>{% endif %}
+    <span class="ml-2"><i class="far fa-calendar-alt"></i> {{ a.published_at|date }}</span>
+    <span class="ml-2"><i class="far fa-eye"></i> {{ a.viewed or 0 }}</span>
+  </div>
+  {% endif %}
+  {% if zbw_p('show_cover', True) and a.cover %}
+  <img src="{{ a.cover }}" alt="{{ t(a, 'title') }}" class="img-fluid rounded mb-3 zbw-article-cover">
+  {% endif %}
+  {% if zbw_p('show_content', True) %}
+  <div class="zbw-article-content article-content">{{ t(a, 'content')|safe }}</div>
+  {% endif %}
+  {% if zbw_p('show_fields', True) and fields %}
+  <div class="zbw-article-fields mt-3">
+    {% for fv in fields %}
+      {% set val = a.get_field_value(fv.id) if a.get_field_value else '' %}
+      {% if val %}<p><strong>{{ fv.label }}：</strong>{{ val }}</p>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if zbw_p('show_prev_next', True) and (prev_article or next_article) %}
+  <nav class="zbw-prev-next row mt-4 pt-3 border-top">
+    <div class="col-sm-6 text-left">
+      {% if prev_article %}<a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=prev_article.id) }}"><i class="fas fa-angle-left"></i> {{ t(prev_article, 'title') }}</a>{% endif %}
+    </div>
+    <div class="col-sm-6 text-right">
+      {% if next_article %}<a href="{{ url_for('frontend.article_detail', slug=column.slug, aid=next_article.id) }}">{{ t(next_article, 'title') }} <i class="fas fa-angle-right"></i></a>{% endif %}
+    </div>
+  </nav>
+  {% endif %}
+  {% elif preview %}
+  <div class="zbw-placeholder"><i class="fas fa-file-alt"></i> 文章正文区块（前台访问具体文章时显示）</div>
+  {% endif %}
+</article>

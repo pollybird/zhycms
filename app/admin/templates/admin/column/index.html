@@ -64,6 +64,15 @@
                 {% elif col.can_have_content and col.type == 'page' %}
                 <a href="{{ url_for('admin.column_edit', cid=col.id) }}" class="btn btn-info" title="{{ _('编辑单页内容') }}"><i class="fas fa-file-alt"></i> {{ _('编辑内容') }}</a>
                 {% endif %}
+                {% if current_user.is_super or current_user.has_permission('builder:manage') %}
+                {% if col.type in ('page', 'list') and not col.is_parent %}
+                <form method="post" action="{{ url_for('admin.builder_page_create') }}" class="d-inline">
+                  <input type="hidden" name="scope" value="{{ col.type }}">
+                  <input type="hidden" name="column_id" value="{{ col.id }}">
+                  <button type="submit" class="btn btn-warning" title="{{ _('可视化构建此页面') }}"><i class="fas fa-shapes"></i> {{ _('页面构建') }}</button>
+                </form>
+                {% endif %}
+                {% endif %}
                 <form method="post" action="{{ url_for('admin.column_toggle', cid=col.id) }}" class="d-inline">
                   <button type="submit" class="btn btn-default" title="{{ _('禁用') if col.is_enabled else _('启用') }}">
                     <i class="fas {{ 'fa-toggle-on text-success' if col.is_enabled else 'fa-toggle-off text-muted' }}"></i>

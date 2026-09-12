@@ -1,0 +1,17 @@
+<div class="card zbw-contact-card" {{ node_attrs() }}>
+  <div class="card-header"><i class="fas fa-address-book"></i> {{ localized('title', '联系我们') }}</div>
+  <div class="card-body">
+    {% if site_fragments.contact_phone and site_fragments.contact_phone.value %}
+    <p class="mb-2"><i class="fas fa-phone-square text-primary"></i> {{ site_fragments.contact_phone.value }}</p>
+    {% endif %}
+    {% if site_fragments.contact_email and site_fragments.contact_email.value %}
+    <p class="mb-2"><i class="fas fa-envelope text-primary"></i> {{ site_fragments.contact_email.value }}</p>
+    {% endif %}
+    {% if site_fragments.contact_address and site_fragments.contact_address.value %}
+    <p class="mb-0"><i class="fas fa-map-marker-alt text-primary"></i> {{ site_fragments.contact_address.value }}</p>
+    {% endif %}
+    {% if not site_fragments.contact_phone or not site_fragments.contact_phone.value %}
+      {% if preview %}<div class="zbw-placeholder">请先在「碎片管理」配置联系方式</div>{% endif %}
+    {% endif %}
+  </div>
+</div>

@@ -1,0 +1,5 @@
+<div class="alert alert-{{ zbw_p('alert_type', 'info') }} {{ 'alert-dismissible fade show' if zbw_p('dismissible') }} zbw-alert"
+     role="alert" {{ node_attrs() }}>
+  <i class="fas fa-bullhorn mr-1"></i>{{ localized('content', '') }}
+  {% if zbw_p('dismissible') %}<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>{% endif %}
+</div>

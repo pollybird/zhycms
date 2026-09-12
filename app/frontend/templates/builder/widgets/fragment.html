@@ -1,0 +1,4 @@
+<div class="zbw-fragment" {{ node_attrs() }}>
+  {% if fragment_value %}{{ fragment_value|safe }}
+  {% elif preview %}<div class="zbw-placeholder"><i class="fas fa-puzzle-piece"></i> 碎片「{{ zbw_p('slug', '') }}」为空或不存在</div>{% endif %}
+</div>

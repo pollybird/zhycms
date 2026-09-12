@@ -1,0 +1,14 @@
+<section class="zbw-stats py-4"
+  style="background-color:{{ zbw_p('bg_color', '#2c3e50') }};color:{{ zbw_p('text_color', '#ffffff') }};"
+  {{ node_attrs() }}>
+  <div class="container">
+    <div class="row text-center">
+      {% for item in zbw_p('items', []) %}
+      <div class="col-6 col-md mb-3">
+        <div class="zbw-stat-number">{{ item.number }}</div>
+        <div class="zbw-stat-label">{{ item.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>

@@ -1,0 +1,136 @@
+{% extends 'admin/base.html' %}
+{% block title %}页面构建 - {{ page.name }} - {{ cms_name }}{% endblock %}
+{% block page_header %}<i class="fas fa-shapes"></i> 页面构建 · {{ page.name }}{% endblock %}
+{% set active_menu = 'builder' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.builder_index') }}">页面构建</a></li>
+<li class="breadcrumb-item active">{{ page.name }}</li>
+{% endblock %}
+
+{% block content %}
+<div id="zbw-app"
+     data-page-id="{{ page.id }}"
+     data-preview-url="{{ url_for('admin.builder_preview', pid=page.id) }}"
+     data-can-publish="{{ '1' if can_publish else '0' }}"
+     data-front-url="{{ url_for('admin.builder_index') }}">
+  <div class="zbw-toolbar">
+    <div class="zbw-toolbar-left">
+      <a href="{{ url_for('admin.builder_index') }}" class="btn btn-default btn-sm">
+        <i class="fas fa-arrow-left"></i> 返回</a>
+      <strong class="zbw-page-name">{{ page.name }}</strong>
+      <span id="zbw-save-status" class="zbw-save-status text-muted">未修改</span>
+    </div>
+    <div class="zbw-toolbar-center btn-group btn-group-sm">
+      <button type="button" class="btn btn-default active" data-device="desktop" title="桌面端">
+        <i class="fas fa-desktop"></i></button>
+      <button type="button" class="btn btn-default" data-device="tablet" title="平板">
+        <i class="fas fa-tablet-alt"></i></button>
+      <button type="button" class="btn btn-default" data-device="mobile" title="手机">
+        <i class="fas fa-mobile-alt"></i></button>
+    </div>
+    <div class="zbw-toolbar-right">
+      <button type="button" class="btn btn-default btn-sm" id="zbw-btn-revisions">
+        <i class="fas fa-history"></i> 修订历史</button>
+      <button type="button" class="btn btn-info btn-sm" id="zbw-btn-front">
+        <i class="fas fa-eye"></i> 查看前台</button>
+      <button type="button" class="btn btn-success btn-sm" id="zbw-btn-publish"
+              {% if not can_publish %}disabled title="需要 builder:publish 权限"{% endif %}>
+        <i class="fas fa-upload"></i> 发布</button>
+    </div>
+  </div>
+
+  <div class="zbw-workspace">
+    <aside class="zbw-panel zbw-panel-left">
+      <div class="zbw-panel-title"><i class="fas fa-puzzle-piece"></i> 组件库</div>
+      <div class="zbw-panel-body" id="zbw-widget-catalog">
+        <div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> 加载中…</div>
+      </div>
+    </aside>
+
+    <main class="zbw-canvas-wrap">
+      <iframe id="zbw-canvas" title="页面画布"></iframe>
+    </main>
+
+    <aside class="zbw-panel zbw-panel-right">
+      <ul class="nav nav-tabs nav-justified zbw-side-tabs">
+        <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#zbw-tab-props">属性</a></li>
+        <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#zbw-tab-outline">图层</a></li>
+      </ul>
+      <div class="tab-content zbw-panel-body">
+        <div class="tab-pane fade show active" id="zbw-tab-props">
+          <div id="zbw-props-form" class="zbw-props-form">
+            <p class="text-muted text-center py-4">点击画布中的组件进行编辑</p>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="zbw-tab-outline">
+          <div id="zbw-outline-tree" class="zbw-outline-tree"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- 富文本编辑弹窗 -->
+<div class="modal fade" id="zbw-richtext-modal" tabindex="-1" data-backdrop="static">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑富文本</h5>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">当前编辑语言：<span id="zbw-rt-locale-label">中文</span></p>
+        <textarea id="zbw-richtext-area" rows="14" class="form-control"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-default" data-dismiss="modal">取消</button>
+        <button class="btn btn-primary" id="zbw-rt-save">确定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 修订历史弹窗 -->
+<div class="modal fade" id="zbw-revisions-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">修订历史（发布快照）</h5>
+        <button type="button" class="close" data-dismiss="modal">&times;</button></div>
+      <div class="modal-body">
+        <table class="table table-sm table-hover">
+          <thead><tr><th>#</th><th>时间</th><th>备注</th><th width="120">操作</th></tr></thead>
+          <tbody id="zbw-revisions-body">
+            <tr><td colspan="4" class="text-center text-muted">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 发布确认弹窗 -->
+<div class="modal fade" id="zbw-publish-modal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">发布页面</h5>
+        <button type="button" class="close" data-dismiss="modal">&times;</button></div>
+      <div class="modal-body">
+        <p>发布后线上立即生效并自动更新整页缓存。确认发布当前布局？</p>
+        <input type="text" class="form-control" id="zbw-publish-note" maxlength="255" placeholder="版本备注（可选）">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-default" data-dismiss="modal">取消</button>
+        <button class="btn btn-success" id="zbw-publish-confirm"><i class="fas fa-upload"></i> 确认发布</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='builder/css/editor.css') }}">
+{% endblock %}
+
+{% block js %}
+<script type="module" src="{{ url_for('static', filename='builder/js/editor.js') }}"></script>
+{% endblock %}

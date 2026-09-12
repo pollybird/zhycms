@@ -1,0 +1,61 @@
+/* ============================================================
+   v3.0.0 构建器组件基础样式（.zbw- 命名空间，8 主题通用）
+   仅提供组件必需的结构性样式；颜色/字体跟随当前主题与 Bootstrap4。
+   ============================================================ */
+
+/* ---- 布局 ---- */
+.zbw-section { width: 100%; }
+.zbw-gutter-lg > div > [class*="zbw-col"] { margin-bottom: 1.5rem; }
+.zbw-spacer { width: 100%; }
+.zbw-divider { border-top-width: 2px; margin-left: auto; margin-right: auto; }
+
+/* ---- 基础组件 ---- */
+.zbw-heading { margin-top: .5rem; margin-bottom: 1rem; font-weight: 600; }
+.zbw-text { line-height: 1.8; }
+.zbw-richtext { line-height: 1.8; }
+.zbw-richtext img { max-width: 100%; height: auto; }
+.zbw-image-img { display: inline-block; }
+.zbw-icon-box { padding: 1rem; }
+.zbw-icon-box-icon { font-size: 2.5rem; line-height: 1; margin-bottom: .75rem; }
+.zbw-icon-box-title { font-size: 1.15rem; font-weight: 600; margin-bottom: .5rem; }
+.zbw-icon-box-text { color: inherit; opacity: .85; margin-bottom: 0; }
+.zbw-video { margin: 1rem 0; }
+.zbw-placeholder {
+  padding: 1.25rem; text-align: center; color: #868e96;
+  background: #f8f9fa; border: 1px dashed #ced4da; border-radius: .25rem;
+}
+
+/* ---- 数据组件 ---- */
+.zbw-article-list .zbw-cover { height: 200px; width: 100%; object-fit: cover; }
+.zbw-article-list .zbw-cover-sm { width: 160px; height: 100px; object-fit: cover;
+  border-radius: .25rem; }
+.zbw-article-summary {
+  color: #6c757d; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.zbw-article-title { font-weight: 600; margin-bottom: .5rem; }
+.zbw-article-cover { max-height: 480px; object-fit: cover; width: 100%; }
+.zbw-article-content { line-height: 1.9; }
+.zbw-article-content img { max-width: 100%; height: auto; }
+.zbw-field-row dd { margin-bottom: .5rem; }
+.zbw-field-img { max-width: 320px; }
+.zbw-breadcrumb { margin-bottom: 1rem; }
+.zbw-carousel { background: #000; overflow: hidden; border-radius: .25rem; }
+.zbw-carousel-img { object-fit: cover; }
+.zbw-contact-card { margin-bottom: 1rem; }
+.zbw-friend-logo { max-height: 24px; vertical-align: middle; }
+.zbw-stat-number { font-size: 2.2rem; font-weight: 700; line-height: 1.2; }
+.zbw-stat-label { opacity: .85; }
+.zbw-cta-title { font-weight: 700; margin-bottom: .5rem; }
+.zbw-cta-subtitle { opacity: .9; margin-bottom: 0; }
+.zbw-disabled-placeholder {
+  padding: 1rem; margin: .5rem 0; text-align: center;
+  color: #856404; background: #fff3cd; border: 1px dashed #ffc107;
+  border-radius: .25rem; font-size: .9rem;
+}
+
+/* 小屏适配 */
+@media (max-width: 575.98px) {
+  .zbw-article-list .zbw-cover-sm { width: 100px; height: 70px; }
+  .zbw-stat-number { font-size: 1.6rem; }
+}

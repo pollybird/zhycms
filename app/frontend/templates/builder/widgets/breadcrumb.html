@@ -1,0 +1,9 @@
+<nav aria-label="breadcrumb" class="zbw-breadcrumb" {{ node_attrs() }}>
+  <ol class="breadcrumb bg-light px-3">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}"><i class="fas fa-home"></i> {{ _('首页') }}</a></li>
+    {% if column %}
+    <li class="breadcrumb-item {{ 'active' if not article }}">{{ t(column, 'name') if not article else '' }}{% if article %}<a href="{{ url_for('frontend.column_detail', slug=column.slug) }}">{{ t(column, 'name') }}</a>{% endif %}</li>
+    {% endif %}
+    {% if article %}<li class="breadcrumb-item active" aria-current="page">{{ t(article, 'title') }}</li>{% endif %}
+  </ol>
+</nav>

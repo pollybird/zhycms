@@ -1,0 +1,7 @@
+<section class="zbw-section {{ zbw_p('padding', 'py-5') }}"
+  style="background-color:{{ zbw_p('bg_color', '#ffffff') }};{% if zbw_p('text_color') %}color:{{ zbw_p('text_color') }};{% endif %}"
+  {{ node_attrs() }}>
+  {% if zbw_p('container', True) %}<div class="container">{% endif %}
+  <div {{ children_attrs() }}>{{ render_children() }}</div>
+  {% if zbw_p('container', True) %}</div>{% endif %}
+</section>

@@ -23,6 +23,8 @@ from .workflow import (
 )
 from .backup import BackupRecord, TRIGGER_MANUAL, TRIGGER_SCHEDULED
 from .upload import UploadedFile
+# v3.0.0 可视化页面构建器
+from .builder import BuilderPage, BuilderRevision
 
 # v2.4.0: search_index 表由迁移 0002 创建；为避免 Alembic 下一次 autogenerate
 # 把它误报为 DROP，需要有一个对应的 ORM 模型声明在 db.metadata 中「锚定」。
@@ -56,6 +58,7 @@ __all__ = [
     'MODULE_USER', 'MODULE_ROLE', 'MODULE_COLUMN', 'MODULE_ARTICLE',
     'MODULE_FRAGMENT', 'MODULE_FORM', 'MODULE_FORM_SUBMISSION',
     'MODULE_SETTING', 'MODULE_AUDIT', 'MODULE_BACKUP', 'MODULE_UPLOAD', 'MODULE_OTHER',
+    'MODULE_BUILDER',
     'OP_LOGIN', 'OP_LOGOUT', 'OP_CREATE', 'OP_UPDATE', 'OP_DELETE',
     'OP_PUBLISH', 'OP_ARCHIVE', 'OP_REVIEW_PASS', 'OP_REVIEW_REJECT',
     'OP_BATCH', 'OP_ROLLBACK', 'OP_CONFIG_CHANGE', 'OP_USER_MANAGE',
@@ -67,4 +70,6 @@ __all__ = [
     'BackupRecord', 'TRIGGER_MANUAL', 'TRIGGER_SCHEDULED',
     # Upload
     'UploadedFile',
+    # Builder (v3.0.0)
+    'BuilderPage', 'BuilderRevision',
 ]

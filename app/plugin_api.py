@@ -149,6 +149,16 @@ class PluginBase:
         """返回 {模板全局函数名: 函数}；核心自动包裹启用守卫。"""
         return {}
 
+    def get_builder_widgets(self):
+        """v3.0.0：返回贡献给可视化页面构建器的组件类列表
+        （app.builder.registry.Widget 的子类，不是实例）。
+
+        核心在插件注册期自动 register_widget(owner=slug)；
+        插件禁用后组件在编辑器中标灰、前台渲染跳过；
+        插件卸载/重载时按 owner 自动注销。
+        """
+        return []
+
     def get_jinja_fallbacks(self):
         """返回 {函数名: 未启用时的返回值}，未声明的默认 None。"""
         return {}

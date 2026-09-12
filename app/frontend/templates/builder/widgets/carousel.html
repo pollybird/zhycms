@@ -1,0 +1,38 @@
+{% set _items = zbw_p('items', []) %}
+{% set _valid = _items|selectattr('image')|list %}
+<div id="zbw-carousel-{{ node.id }}" class="carousel slide zbw-carousel" data-ride="carousel"
+     style="{{ zbw_p('height', '420px') and ('height:' + zbw_p('height', '420px')) }}"
+     {{ node_attrs() }}>
+  {% if _valid %}
+  {% if zbw_p('show_indicators', True) %}
+  <ol class="carousel-indicators">
+    {% for item in _valid %}
+    <li data-target="#zbw-carousel-{{ node.id }}" data-slide-to="{{ loop.index0 }}" class="{{ 'active' if loop.first }}"></li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+  <div class="carousel-inner" role="listbox">
+    {% for item in _valid %}
+    <div class="carousel-item {{ 'active' if loop.first }}" style="height:{{ zbw_p('height', '420px') }};">
+      {% if item.link %}<a href="{{ item.link }}" target="_blank" rel="noopener">{% endif %}
+      <img class="d-block w-100 h-100 zbw-carousel-img" src="{{ item.image }}" alt="{{ item.title or '' }}">
+      {% if item.link %}</a>{% endif %}
+      {% if zbw_p('show_caption', True) and (item.title or item.subtitle) %}
+      <div class="carousel-caption d-none d-md-block">
+        {% if item.title %}<h3>{{ item.title }}</h3>{% endif %}
+        {% if item.subtitle %}<p>{{ item.subtitle }}</p>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <a class="carousel-control-prev" href="#zbw-carousel-{{ node.id }}" role="button" data-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="sr-only">Previous</span>
+  </a>
+  <a class="carousel-control-next" href="#zbw-carousel-{{ node.id }}" role="button" data-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span><span class="sr-only">Next</span>
+  </a>
+  {% elif preview %}
+  <div class="zbw-placeholder"><i class="fas fa-images"></i> 请在属性面板添加轮播图片</div>
+  {% endif %}
+</div>

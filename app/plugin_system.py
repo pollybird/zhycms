@@ -304,6 +304,14 @@ def _register_instance(app, rec):
     except Exception as e:
         app.logger.warning('插件 %s 存储驱动注册失败： %s', rec.slug, e)
 
+    # 6) v3.0.0 页面构建器组件（注册后按 owner=slug 做启用门控）
+    try:
+        from .builder.registry import register_widget
+        for widget_cls in (inst.get_builder_widgets() or []):
+            register_widget(widget_cls, owner=rec.slug)
+    except Exception as e:
+        app.logger.warning('插件 %s 构建器组件注册失败： %s', rec.slug, e)
+
 
 def _import_plugin_models_recursive(base_module):
     """把插件包内的模型模块导入 metadata（仅用于 db.create_all()

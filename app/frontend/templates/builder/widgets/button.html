@@ -1,0 +1,7 @@
+<div class="zbw-button text-{{ zbw_p('align', 'left') }}" {{ node_attrs() }}>
+  <a href="{{ zbw_p('href', '#') }}"
+     class="btn btn-{{ zbw_p('style', 'primary') }} {{ 'btn-' ~ zbw_p('size') if zbw_p('size', 'md') != 'md' }}"
+     {% if zbw_p('target_blank') %}target="_blank" rel="noopener"{% endif %}>
+    {% if zbw_p('icon') %}<i class="{{ zbw_p('icon') }} mr-1"></i>{% endif %}{{ localized('text', '按钮') }}
+  </a>
+</div>

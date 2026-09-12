@@ -1,0 +1,4 @@
+<div class="zbw-video embed-responsive embed-responsive-{{ zbw_p('ratio', '16by9') }}" {{ node_attrs() }}>
+  {% if embed_url %}<iframe class="embed-responsive-item" src="{{ embed_url }}" allowfullscreen referrerpolicy="no-referrer"></iframe>
+  {% elif preview %}<div class="zbw-placeholder"><i class="fas fa-video"></i> 请在属性面板填写视频链接</div>{% endif %}
+</div>

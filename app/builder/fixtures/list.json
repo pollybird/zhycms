@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_list_section",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_list_crumb",
+          "type": "breadcrumb",
+          "props": {},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_list_items",
+          "type": "article-list",
+          "props": {
+            "bind": "auto", "column_id": null, "include_children": false,
+            "limit": 10, "layout": "card", "card_cols": 3,
+            "show_cover": true, "show_date": true, "show_summary": true,
+            "show_more": false, "show_pagination": true
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    }
+  ]
+}

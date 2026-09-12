@@ -1,0 +1,9 @@
+{% set _lvl = zbw_p('level', 2)|int %}
+{% set _style = 'color:' ~ zbw_p('color', '') ~ ';' if zbw_p('color') else '' %}
+{% set _cls = 'zbw-heading text-' ~ zbw_p('align', 'left') %}
+{% if _lvl == 1 %}<h1 class="{{ _cls }}" style="{{ _style }}" {{ node_attrs() }}>{{ localized('text', '标题文字') }}</h1>
+{% elif _lvl == 2 %}<h2 class="{{ _cls }}" style="{{ _style }}" {{ node_attrs() }}>{{ localized('text', '标题文字') }}</h2>
+{% elif _lvl == 3 %}<h3 class="{{ _cls }}" style="{{ _style }}" {{ node_attrs() }}>{{ localized('text', '标题文字') }}</h3>
+{% elif _lvl == 4 %}<h4 class="{{ _cls }}" style="{{ _style }}" {{ node_attrs() }}>{{ localized('text', '标题文字') }}</h4>
+{% elif _lvl == 5 %}<h5 class="{{ _cls }}" style="{{ _style }}" {{ node_attrs() }}>{{ localized('text', '标题文字') }}</h5>
+{% else %}<h6 class="{{ _cls }}" style="{{ _style }}" {{ node_attrs() }}>{{ localized('text', '标题文字') }}</h6>{% endif %}

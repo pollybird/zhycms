@@ -1,0 +1,24 @@
+<div class="zbw-page-content" {{ node_attrs() }}>
+  {% set col = page_ctx.column %}
+  {% if col %}
+  {% if zbw_p('show_title', True) %}<h1 class="zbw-page-title">{{ t(col, 'name') }}</h1>{% endif %}
+  {% if zbw_p('show_content', True) and col.page_content %}
+  <div class="zbw-page-body article-content">{{ t(col, 'page_content')|safe }}</div>
+  {% endif %}
+  {% if zbw_p('show_fields', True) and fields %}
+  <div class="zbw-page-fields mt-3">
+    {% for fv in fields %}
+      {% set val = col.get_field_value(fv.id) %}
+      {% if val %}
+      <div class="zbw-field-row">
+        <dt>{{ fv.label }}</dt>
+        <dd>{% if fv.field_type == 'image' %}<img src="{{ val }}" alt="{{ fv.label }}" class="img-fluid zbw-field-img">{% elif fv.field_type == 'url' %}<a href="{{ val }}" target="_blank" rel="noopener">{{ val }}</a>{% else %}{{ val }}{% endif %}</dd>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% elif preview %}
+  <div class="zbw-placeholder"><i class="fas fa-file"></i> 单页内容（前台访问具体页面时显示栏目正文）</div>
+  {% endif %}
+</div>

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_article_section",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_article_crumb",
+          "type": "breadcrumb",
+          "props": {},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_article_body",
+          "type": "article-detail",
+          "props": {
+            "show_title": true, "show_meta": true, "show_cover": true,
+            "show_content": true, "show_fields": true, "show_prev_next": true
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    }
+  ]
+}

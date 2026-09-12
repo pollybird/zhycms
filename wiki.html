@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v2.6.4 使用手册</title>
+<title>ZhyCMS v3.0.0 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -87,6 +87,10 @@
   <a href="#seo">SEO 与站点性能</a>
   <a href="#seo-rewrite" class="sub">伪静态 URL</a>
   <a href="#seo-cache" class="sub">页面缓存与图片 ALT</a>
+  <a href="#builder">可视化页面构建器 <span class="tag tag-new">v3.0.0</span></a>
+  <a href="#builder-ui" class="sub">编辑器与发布流程</a>
+  <a href="#builder-widgets" class="sub">24 个内置组件</a>
+  <a href="#builder-dev" class="sub">组件开发 API</a>
   <a href="#security">安全加固</a>
   <a href="#sec-login" class="sub">登录防暴破</a>
   <a href="#sec-upload" class="sub">上传安全</a>
@@ -156,7 +160,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v2.6.4</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.0.0</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -185,6 +189,7 @@
   <tr><td>SEO 优化</td><td>伪静态、sitemap、robots.txt、页面缓存、图片默认 ALT</td><td>v2.0</td></tr>
   <tr><td>表单收集</td><td>可视化表单设计，提交后邮件/企微实时通知</td><td>v2.0</td></tr>
   <tr><td>备份恢复</td><td>MySQL/PostgreSQL/JSON 三种方式，一键备份与恢复</td><td>v2.0</td></tr>
+  <tr><td>可视化页面构建器</td><td>拖拽搭建首页/单页/列表/文章详情：24 组件、草稿/发布/修订回滚、双语与会员可见性、插件可扩展；无布局永久回退手写模板</td><td>v3.0.0</td></tr>
 </table>
 </section>
 
@@ -424,6 +429,57 @@ docker compose -f docker-compose.postgresql.yml up -d
   <li><b>图片默认 ALT</b>：为缺失或空 <code>alt</code> 的 <code>&lt;img&gt;</code> 自动填充默认值。</li>
   <li><b>图片 ALT 批量管理</b>：后台工具页，批量排查全站图片 ALT 缺失情况。</li>
 </ul>
+</section>
+
+<section id="builder">
+<h2>可视化页面构建器 <span class="tag tag-new">v3.0.0</span></h2>
+<p>v3.0.0 新增自研轻量构建器：<b>原生 HTML5 拖拽 + JSON Schema 组件注册 + iframe 内服务端真实渲染</b>。布局以 JSON 存数据库（不生成磁盘文件），只有<b>已发布</b>布局的页面才走构建器，其余页面继续使用手写主题模板；删除构建记录即回退，老站升级零行为变化。构建器只接管内容区，header/导航/footer 与 SEO 基础信息仍由主题统一控制。</p>
+<table>
+  <tr><th>作用域</th><th>页面</th><th>数据上下文</th></tr>
+  <tr><td>首页</td><td><code>/</code></td><td>全站最新文章</td></tr>
+  <tr><td>单页</td><td>type=page 叶子栏目</td><td>栏目正文、自定义字段</td></tr>
+  <tr><td>列表页</td><td>type=list 叶子栏目</td><td>当前栏目文章、分页（伪静态/缓存规则沿用）</td></tr>
+  <tr><td>文章详情</td><td>文章页</td><td>正文、字段、上下篇；栏目级缺省回退全局默认</td></tr>
+</table>
+
+<h3 id="builder-ui">编辑器与发布流程</h3>
+<ul>
+  <li><b>左栏组件库</b>：布局/基础/数据三组，按页面作用域过滤；插件组件禁用时置灰。</li>
+  <li><b>中栏画布</b>：iframe 内是当前主题 + 真实数据的服务端渲染页面，支持桌面/平板/手机三宽；组件点击选中、拖拽排序与跨容器移动，蓝色指示条显示落点。</li>
+  <li><b>右栏属性/图层</b>：表单按 Schema 自动生成（文本/多行/富文本/数字/下拉/开关/颜色/图片/图标/栏目/重复项），文案支持中英 Tab，节点可设语言白名单与会员限定；图层树支持删除/复制/上下移。</li>
+  <li><b>草稿与发布</b>：修改 800ms 防抖自动存草稿（访客不可见）；发布生成修订快照；修订历史一键回滚（回滚即发布并再记快照）；支持「载入默认布局」向导。</li>
+  <li><b>权限</b>：<code>builder:manage</code>（编辑/草稿/预览，auditor+editor）与 <code>builder:publish</code>（发布/回滚/删除，仅 auditor），操作写审计日志。</li>
+</ul>
+<p>安全约束：服务端 allowlist 校验，单页深度 ≤ 8、节点 ≤ 300、体积 ≤ 256KB；单组件取数/渲染异常被隔离（前台跳过、画布黄色占位）；插件禁用后其组件前台为空、画布提示，卸载前有引用则拒绝。</p>
+
+<h3 id="builder-widgets">24 个内置组件</h3>
+<table>
+  <tr><th>分组</th><th>组件</th></tr>
+  <tr><td>布局 ×6</td><td>section、container、grid-row、grid-col、spacer、divider</td></tr>
+  <tr><td>基础 ×8</td><td>heading、text、richtext、image、button、icon-box、alert、video-embed</td></tr>
+  <tr><td>数据 ×10</td><td>article-list、article-detail、page-content、breadcrumb、fragment、carousel、contact-card、cta-banner、friend-links、stat-numbers</td></tr>
+</table>
+
+<h3 id="builder-dev">组件开发 API</h3>
+<p>组件 = <code>Widget</code> 子类（元数据 + <code>prop_schema</code> + <code>context()</code> 取数）+ Jinja partial。模板解析链：<code>themes/&lt;主题&gt;/builder/widgets/&lt;type&gt;.html</code> → <code>builder/widgets/&lt;type&gt;.html</code>。核心代码位于 <code>app/builder/</code>（registry/schema/renderer/service/widgets）。插件经 <code>get_builder_widgets()</code> 钩子注册（owner=插件 slug，随启用状态门控）。完整 API 与模板变量见仓库 <a href="https://github.com/pollybird/zhycms/blob/main/docs/PAGE_BUILDER.md">docs/PAGE_BUILDER.md</a>。</p>
+<pre><code>from app.builder.registry import Widget
+from app.constants import Builder as B
+
+class PromoWidget(Widget):
+    type = 'mypromo-promo'
+    label = '促销横幅'
+    category = B.CAT_DATA
+    scopes = B.SCOPES
+    default_props = {{'text': '限时优惠'}}
+    prop_schema = [{{'key': 'text', 'label': '文案', 'type': 'text'}}]
+
+    def context(self, node, page_ctx):
+        return {{'rows': []}}
+
+# 插件入口
+class MyPlugin(PluginBase):
+    def get_builder_widgets(self):
+        return [PromoWidget]</code></pre>
 </section>
 
 <section id="security">
@@ -1048,6 +1104,7 @@ def notice_page():
   <tr><td><code>get_admin_menu()</code></td><td>后台菜单 <code>{'label','endpoint','icon','permission','active_prefix'}</code></td></tr>
   <tr><td><code>get_frontend_menu()</code></td><td>前台导航 <code>{'label','url','target'}</code>，仅启用时聚合</td></tr>
   <tr><td><code>get_frontend_guard()</code></td><td>v2.6.4 前台登录守卫（会员体系）：<code>{'is_authenticated': fn, 'login_url': fn}</code></td></tr>
+  <tr><td><code>get_builder_widgets()</code></td><td>v3.0.0 返回 <code>Widget</code> 子类列表，向页面构建器注册组件（owner=插件 slug，禁用门控、卸载引用拦截）</td></tr>
   <tr><td><code>get_sitemap_urls()</code></td><td>yield <code>{'loc','lastmod','changefreq','priority'}</code></td></tr>
   <tr><td><code>get_search_provider()</code></td><td>v2.5.2 全站搜索提供者（SearchProvider 子类实例）</td></tr>
   <tr><td><code>get_migration_files()</code></td><td>自动发现 migrations/versions/*.py，一般无需覆写</td></tr>
@@ -1377,6 +1434,7 @@ docker compose --profile mysql --profile redis up -d</code></pre>
   <tr><td>v2.4.0</td><td>0002 / 0003 / 0004</td><td>search_index 表 / 搜索设置种子 / 对象存储设置</td></tr>
   <tr><td>v2.5.x</td><td>0005 / 0006 / 0007</td><td>内容级 i18n / 插件 i18n / 插件 i18n 结构化字段</td></tr>
   <tr><td>v2.6.4</td><td>0008</td><td>栏目 member_only</td></tr>
+  <tr><td>v3.0.0</td><td>0009</td><td>页面构建器 builder_pages / builder_revisions</td></tr>
 </table>
 <p>启动时 <code>_alembic_bootstrap()</code> 自动判断：全新安装 stamp 0001；v2.3.0 及更早旧库 stamp 0001 后 upgrade 增量；bootstrap 异常仅记 <code>WARNING（非致命）</code> 不阻断启动，<b>但需尽快手工修复</b>：</p>
 <pre><code>python - &lt;&lt;'PY'

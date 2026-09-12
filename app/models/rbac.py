@@ -77,6 +77,9 @@ PERMISSION_DEFS = [
     ('content:archive',        '内容归档',    '归档内容'),
     ('content:batch',          '批量操作',    '批量移动/发布/归档/删除'),
     ('content:rollback',       '版本回滚',    '查看历史版本并回滚'),
+    # v3.0.0 可视化页面构建器
+    ('builder:manage',         '页面构建编辑', '可视化页面构建器的布局编辑与草稿保存'),
+    ('builder:publish',        '页面构建发布', '发布/回滚可视化构建的页面布局'),
 ]
 
 # 四种预设角色的默认权限（超级管理员所有权限在运行时由 is_super 兜底，不必写全）
@@ -90,11 +93,14 @@ PRESET_ROLE_PERMISSIONS = {
         'content:submit_review', 'content:review',
         'content:publish', 'content:archive', 'content:batch',
         'content:rollback',
+        'builder:manage', 'builder:publish',
         'form:view',
     ],
     ROLE_CONTENT_EDITOR: [
         'content:create', 'content:edit',
         'content:submit_review',
+        # v3.0.0：编辑可拖拽构建页面草稿，发布/回滚需审核员权限
+        'builder:manage',
         # 编辑默认不给全栏目权限，需通过 UserColumnPermission 绑定具体栏目；
         # 如需全局编辑权限，可额外授予 content_manage:all_columns
     ],

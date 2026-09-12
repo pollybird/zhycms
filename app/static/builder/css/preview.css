@@ -1,0 +1,44 @@
+/* v3.0.0 构建器画布预览态：悬浮/选中高亮、拖放指示、禁用组件占位 */
+
+[data-zbw-id] { position: relative; cursor: pointer; outline: 1px dashed transparent; outline-offset: -1px; }
+[data-zbw-id]:hover { outline-color: rgba(52, 152, 219, .55); }
+[data-zbw-id].zbw-selected { outline: 2px solid #2d8cf0 !important; outline-offset: -2px; }
+
+[data-zbw-children] { min-height: 24px; }
+[data-zbw-children].zbw-dragover { outline: 2px dashed #2d8cf0 !important; outline-offset: -2px; background: rgba(45,140,240,.05); }
+
+/* 插入指示条 */
+.zbw-drop-indicator {
+  position: absolute; left: 4px; right: 4px; height: 3px;
+  background: #2d8cf0; border-radius: 2px; pointer-events: none;
+  z-index: 9999; box-shadow: 0 0 4px rgba(45,140,240,.6);
+}
+
+/* 组件标签浮层（hover/选中时显示类型） */
+[data-zbw-id] > .zbw-tag {
+  position: absolute; top: 0; left: 0; z-index: 9998;
+  background: #2d8cf0; color: #fff; font-size: 11px; line-height: 1;
+  padding: 2px 6px; border-radius: 0 0 4px 0;
+  display: none; pointer-events: none; font-family: -apple-system, "Segoe UI", sans-serif;
+}
+[data-zbw-id]:hover > .zbw-tag,
+[data-zbw-id].zbw-selected > .zbw-tag { display: block; }
+[data-zbw-id].zbw-selected > .zbw-tag { background: #1f6fc4; }
+
+/* 被禁用插件提供的组件 */
+.zbw-disabled-placeholder {
+  border: 1px dashed #f0ad4e; background: #fcf8e3; color: #8a6d3b;
+  padding: 14px; text-align: center; border-radius: 4px;
+  font-family: -apple-system, "Segoe UI", sans-serif; font-size: 13px;
+}
+
+/* 拖拽中的原节点半透明 */
+.zbw-dragging-source { opacity: .35; }
+
+/* 空容器提示 */
+[data-zbw-children]:empty::before {
+  content: "拖放组件到此处";
+  display: block; text-align: center; color: #aab2bd;
+  font-size: 12px; padding: 18px 8px;
+  font-family: -apple-system, "Segoe UI", sans-serif;
+}

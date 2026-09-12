@@ -91,6 +91,38 @@ def generate_demo_data(industry='manufacturing'):
         _generate_catering_demo()
     else:
         _generate_manufacturing_demo()
+    _seed_builder_demo_layouts()
+
+
+def _seed_builder_demo_layouts():
+    """v3.0.0：为演示站点发布默认构建布局。
+
+    首页 + 文章详情（全局默认）+ 全部叶子单页/列表栏目（各自作用域 fixture），
+    让初始化向导生成的演示站开箱即展示可视化构建效果。
+    """
+    from ..builder import service as bsvc
+    from ..models.builder import BuilderPage
+    from ..models.column import Column
+
+    def _publish(scope, column_id):
+        try:
+            page, err = bsvc.init_default_layout(scope, column_id)
+            if err:
+                return
+            bsvc.publish_page(page, note='演示数据默认布局')
+        except Exception:
+            db.session.rollback()
+
+    _publish('home', None)
+    _publish('article', None)
+    for col in Column.query.filter_by(is_deleted=False).all():
+        if col.is_parent:
+            continue
+        if col.type == 'page':
+            _publish('page', col.id)
+        elif col.type == 'list':
+            _publish('list', col.id)
+    bsvc._clear_cache()
 
 
 def _clean_demo_data():
@@ -103,6 +135,13 @@ def _clean_demo_data():
     Article.query.delete()
     ColumnFieldValue.query.delete()
     ColumnField.query.delete()
+    # v3.0.0：构建记录外键指向 columns.id，须先于栏目删除
+    try:
+        from ..models.builder import BuilderRevision, BuilderPage
+        BuilderRevision.query.delete()
+        BuilderPage.query.delete()
+    except Exception:
+        db.session.rollback()
     Column.query.delete()
     Fragment.query.delete()
     FragmentGroup.query.delete()

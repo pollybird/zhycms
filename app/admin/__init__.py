@@ -18,3 +18,6 @@ from . import content  # noqa: E402,F401
 
 # ---- v2.6.1：系统管理域（设置 / 用户 / 审计 / 备份 / 主题）----
 from . import system  # noqa: E402,F401
+
+# ---- v3.0.0：可视化页面构建器 ----
+from . import builder  # noqa: E402,F401

@@ -1,0 +1,11 @@
+<section class="zbw-cta text-center py-5"
+  style="background-color:{{ zbw_p('bg_color', '#34495e') }};color:{{ zbw_p('text_color', '#ffffff') }};"
+  {{ node_attrs() }}>
+  <div class="container">
+    <h2 class="zbw-cta-title">{{ localized('title', '') }}</h2>
+    <p class="lead zbw-cta-subtitle">{{ localized('subtitle', '') }}</p>
+    {% if zbw_p('button_text') %}
+    <a href="{{ zbw_p('button_url', '#') }}" class="btn btn-light btn-lg mt-2">{{ localized('button_text', '') }}</a>
+    {% endif %}
+  </div>
+</section>

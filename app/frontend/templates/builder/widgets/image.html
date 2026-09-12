@@ -1,0 +1,6 @@
+<div class="zbw-image text-{{ zbw_p('align', 'center') }}" {{ node_attrs() }}>
+  {% set _img %}<img src="{{ zbw_p('src', '') }}" alt="{{ localized('alt', '') }}"
+    class="{{ zbw_p('shape', 'rounded') }} zbw-image-img"
+    style="width:{{ zbw_p('width', '100%') }};max-width:100%;height:auto;">{% endset %}
+  {% if zbw_p('href') %}<a href="{{ zbw_p('href') }}"{% if zbw_p('target_blank') %} target="_blank" rel="noopener"{% endif %}>{{ _img }}</a>{% else %}{{ _img }}{% endif %}
+</div>

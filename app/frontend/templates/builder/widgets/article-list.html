@@ -1,0 +1,83 @@
+<div class="zbw-article-list" {{ node_attrs() }}>
+  {% if list_articles %}
+  {% if zbw_p('layout', 'card') == 'card' %}
+  <div class="row">
+    {% for a in list_articles %}
+    <div class="col-12 col-md-{{ 12 // zbw_p('card_cols', 3)|int }} mb-4">
+      <div class="card zbw-article-card h-100">
+        {% if zbw_p('show_cover', True) and a.cover %}
+        <a href="{{ url_for('frontend.article_detail', slug=list_column.slug if list_column else a.column.slug, aid=a.id) }}">
+          <img src="{{ a.cover }}" class="card-img-top zbw-cover" alt="{{ a.title }}">
+        </a>
+        {% endif %}
+        <div class="card-body">
+          <h5 class="card-title">
+            <a href="{{ url_for('frontend.article_detail', slug=list_column.slug if list_column else a.column.slug, aid=a.id) }}">{{ a.title }}</a>
+          </h5>
+          {% if zbw_p('show_date', True) %}
+          <p class="card-text"><small class="text-muted"><i class="far fa-calendar-alt"></i> {{ a.published_at|date }}</small></p>
+          {% endif %}
+          {% if zbw_p('show_summary', True) and a.summary %}
+          <p class="card-text zbw-article-summary">{{ a.summary }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% elif zbw_p('layout') == 'list' %}
+  {% for a in list_articles %}
+  <div class="media zbw-article-row mb-3">
+    {% if zbw_p('show_cover', True) and a.cover %}
+    <a href="{{ url_for('frontend.article_detail', slug=list_column.slug if list_column else a.column.slug, aid=a.id) }}">
+      <img src="{{ a.cover }}" class="mr-3 zbw-cover-sm" alt="{{ a.title }}">
+    </a>
+    {% endif %}
+    <div class="media-body">
+      <h5><a href="{{ url_for('frontend.article_detail', slug=list_column.slug if list_column else a.column.slug, aid=a.id) }}">{{ a.title }}</a></h5>
+      {% if zbw_p('show_date', True) %}<small class="text-muted"><i class="far fa-calendar-alt"></i> {{ a.published_at|date }}</small>{% endif %}
+      {% if zbw_p('show_summary', True) and a.summary %}<p class="zbw-article-summary mb-1">{{ a.summary }}</p>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <ul class="list-group zbw-article-simple">
+    {% for a in list_articles %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <a href="{{ url_for('frontend.article_detail', slug=list_column.slug if list_column else a.column.slug, aid=a.id) }}">{{ a.title }}</a>
+      {% if zbw_p('show_date', True) %}<small class="text-muted">{{ a.published_at|date }}</small>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if list_pagination and list_pagination.pages > 1 %}
+  <nav class="zbw-pagination mt-4">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {{ 'disabled' if list_pagination.page <= 1 }}">
+        <a class="page-link" href="{{ frontend_pager_url(list_column, list_pagination.page - 1) }}">&laquo;</a>
+      </li>
+      {% for p in range(1, list_pagination.pages + 1) %}
+      <li class="page-item {{ 'active' if p == list_pagination.page }}">
+        <a class="page-link" href="{{ frontend_pager_url(list_column, p) }}">{{ p }}</a>
+      </li>
+      {% endfor %}
+      <li class="page-item {{ 'disabled' if list_pagination.page >= list_pagination.pages }}">
+        <a class="page-link" href="{{ frontend_pager_url(list_column, list_pagination.page + 1) }}">&raquo;</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+
+  {% if zbw_p('show_more', True) and list_column and not list_pagination %}
+  <div class="text-center mt-2">
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('frontend.column_detail', slug=list_column.slug) }}">查看更多 <i class="fas fa-angle-right"></i></a>
+  </div>
+  {% endif %}
+
+  {% elif preview %}
+  <div class="zbw-placeholder"><i class="fas fa-newspaper"></i>
+    {% if not list_column %}请在属性面板选择数据来源栏目{% else %}该栏目下暂无已发布文章{% endif %}
+  </div>
+  {% endif %}
+</div>

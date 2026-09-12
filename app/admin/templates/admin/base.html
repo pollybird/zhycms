@@ -109,6 +109,15 @@
           </li>
           {% endif %}
 
+          {# v3.0.0 可视化页面构建器 #}
+          {% if current_user.is_super or current_user.has_permission('builder:manage') %}
+          <li class="nav-item">
+            <a href="{{ url_for('admin.builder_index') }}" class="nav-link {{ 'active' if active_menu == 'builder' }}">
+              <i class="nav-icon fas fa-shapes"></i><p>{{ _('页面构建') }}</p>
+            </a>
+          </li>
+          {% endif %}
+
           {# v2.2.0/v2.3.0 插件菜单：启用且当前用户有权限才显示
              自定义表单 v2.3.0 起由 plugins/form 提供，核心不再硬编码菜单项 #}
           {% for pm in plugin_admin_menus %}

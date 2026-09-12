@@ -262,10 +262,34 @@ def _home_column_articles(slug, limit=8):
 # 首页（模块8缓存：cache_ttl_index）
 # ============================================================
 
+def _builder_published(scope, column_id=None):
+    """v3.0.0：取已发布构建布局（无则 None），集中一处便于视图双轨分支。"""
+    try:
+        from ..builder.service import get_published_layout
+        return get_published_layout(scope, column_id)
+    except Exception:
+        current_app.logger.exception('构建器布局读取失败，回退手写模板')
+        return None
+
+
+def _render_builder(layout, page_ctx):
+    """v3.0.0：渲染构建器页面（继承当前主题 base.html）。"""
+    from ..builder.renderer import render_builder_page
+    return render_builder_page(layout, page_ctx)
+
+
 @frontend_bp.route('/')
 @_try_cache('index', 'cache_ttl_index', 600)
 def index():
     nav = _build_nav()
+
+    # v3.0.0：首页存在已发布构建布局时走构建器，否则保持手写模板（双轨兜底）
+    home_layout = _builder_published('home')
+    if home_layout is not None:
+        return _render_builder(home_layout, {
+            'scope': 'home', 'nav': nav, 'seo': _seo(),
+        })
+
     top_pages = Column.query.filter_by(
         parent_id=None, type='page', is_enabled=True, is_deleted=False
     ).order_by(Column.sort_order.desc()).first()
@@ -408,6 +432,13 @@ def column_detail(slug, page=None):
             from copy import copy as _shallow_copy
             render_col = _shallow_copy(col)
             render_col.page_content = _inject_default_alt(col.page_content)
+        # v3.0.0：单页构建布局优先，无布局回退手写模板
+        page_layout = _builder_published('page', col.id)
+        if page_layout is not None:
+            return _render_builder(page_layout, {
+                'scope': 'page', 'column': render_col, 'fields': fields,
+                'nav': nav, 'seo': _seo(column=col),
+            })
         tpl = get_column_template(col, 'page')
         return render_template(
             theme_template(tpl),
@@ -427,6 +458,14 @@ def column_detail(slug, page=None):
         ).order_by(
             Article.sort_order.desc(), Article.published_at.desc()
         ).paginate(page=page, per_page=per_page, error_out=False)
+        # v3.0.0：列表构建布局优先（分页状态随请求上下文注入），无布局回退手写模板
+        list_layout = _builder_published('list', col.id)
+        if list_layout is not None:
+            return _render_builder(list_layout, {
+                'scope': 'list', 'column': col,
+                'articles': pagination.items, 'pagination': pagination,
+                'nav': nav, 'seo': _seo(column=col),
+            })
         tpl = get_column_template(col, 'list')
         return render_template(
             theme_template(tpl),
@@ -495,6 +534,15 @@ def article_detail(slug, aid):
     # v2.5.0：浅拷贝不复制 ORM 关系，需手动带上 translations 供 t() 多语言取值
     render_article.translations = article.translations
 
+    # v3.0.0：文章详情构建布局优先（栏目级 → 全局默认），无布局回退手写模板
+    article_layout = _builder_published('article', col.id)
+    if article_layout is not None:
+        return _render_builder(article_layout, {
+            'scope': 'article', 'column': col, 'article': render_article,
+            'fields': fields, 'latest_articles': latest_articles,
+            'prev_article': prev_article, 'next_article': next_article,
+            'nav': nav, 'seo': _seo(article=article),
+        })
     tpl = get_column_template(col, 'detail')
     return render_template(
         theme_template(tpl),

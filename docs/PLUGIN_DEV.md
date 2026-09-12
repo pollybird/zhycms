@@ -386,6 +386,7 @@ plugins/notice/
 | `get_storage_drivers()` | list | 存储驱动类注册（oss_storage 插件使用） |
 | `generate_demo_data(industry)` | None | 演示数据钩子，仅启用时调用 |
 | `get_i18n_dir()` | str | 插件翻译目录，默认 `translations/` |
+| `get_builder_widgets()` | list | v3.0.0 可视化页面构建器组件（`Widget` 子类列表，见 §8.7） |
 | `on_disabled()` | None | 禁用回调：清理外部资源（如搜索索引残留） |
 | `_(message)` / `ngettext(s, p, n)` | str | 插件域翻译便捷函数 |
 
@@ -492,6 +493,50 @@ def get_api_routes(self, api_bp):
 - 存储驱动：`get_storage_drivers()` 返回 `CloudStorageDriver` 子类列表（契约见 `plugins/oss_storage/drivers/base.py` docstring）；按归属插件门控，禁用即回退本地。
 - 演示数据：`generate_demo_data(industry)` 在初始化向导勾选时调用。
 - Alembic：`plugins/<slug>/migrations/versions/xxx.py` 自动并入迁移链（rev 需自行衔接核心链尾或插件内前序版本）。
+
+### 8.7 页面构建器组件（v3.0.0）
+
+插件可向「页面构建」编辑器注册自有可视化组件。在插件入口实现：
+
+```python
+from app.builder.registry import Widget
+from app.constants import Builder as B
+
+class PromoBannerWidget(Widget):
+    type = 'myplugin-promo'        # 全局唯一，建议带插件前缀
+    label = '促销横幅'
+    icon = 'fa-bullhorn'
+    category = B.CAT_DATA          # layout / basic / data
+    scopes = B.SCOPES              # 或限定，如 (B.SCOPE_HOME, B.SCOPE_PAGE)
+    allowed_children = ()          # 容器组件用 ('*',) 或类型元组
+    default_props = {'text': '限时优惠', 'link': '/sale'}
+    prop_schema = [
+        {'key': 'text', 'label': '文案', 'type': 'text'},
+        {'key': 'link', 'label': '链接', 'type': 'url'},
+    ]
+
+    def context(self, node, page_ctx):
+        # 服务端取数（异常自动隔离，不拖垮整页）
+        return {'extra': {...}}
+
+class MyPlugin(PluginBase):
+    def get_builder_widgets(self):
+        return [PromoBannerWidget]
+```
+
+配套模板放在插件的 `templates/builder/widgets/myplugin-promo.html`
+（模板目录与核心组件一致，主题可用
+`themes/<theme>/builder/widgets/myplugin-promo.html` 覆写）。模板内可用：
+`props`、`zbw_p('key')`、`localized('key','默认')`、`node_attrs()`、
+`children_attrs()`、`render_children()` 以及 page_ctx 中的
+`column/article/articles/pagination/nav/seo` 等页面级变量。
+
+生命周期与门控：
+
+- 组件 owner 自动记为插件 slug，仅在插件**启用**时可拖入与渲染；禁用后已发布页面中的该组件生产环境渲染为空、编辑器画布显示黄色占位，页面其余部分不受影响。
+- 卸载前核心会扫描全部草稿/已发布布局，仍有页面引用该插件组件时**拒绝卸载**并提示页面名称，需先在构建器中移除相关组件。
+- props 校验与核心组件同一套规则：未知 prop 键、非法 select/toggle/number、repeater 非法子字段、超深/超节点/超体积的布局一律拒绝保存（400）。
+- 完整用户手册与组件 API 见 [PAGE_BUILDER.md](PAGE_BUILDER.md)。
 
 ## 9. 打包、上传与生命周期
 
