@@ -28,6 +28,7 @@
   - [SEO 与性能](#seo-与性能)
   - [内容工作流](#内容工作流)
   - [审计日志](#审计日志)
+- [开发者文档](#开发者文档)
 - [升级指南](#升级指南)
 - [参与贡献](#参与贡献)
 - [许可证](#许可证)
@@ -324,6 +325,21 @@ zhycms/
 - **覆盖范围**：登录/登出、配置变更、内容 CRUD、备份恢复、权限调整、插件/主题操作
 - **检索维度**：按模块、操作类型、操作人、时间范围筛选
 - **详情人性化**：键名/配置项中文翻译、状态语义化、变更对照（旧值 → 新值）、ID 自动显示名称
+
+---
+
+## 开发者文档
+
+深入开发与运维排障请阅读仓库 `docs/` 目录下的权威文档：
+
+| 文档 | 内容 |
+| --- | --- |
+| [docs/PLUGIN_DEV.md](docs/PLUGIN_DEV.md) | 插件开发手册：目录结构、manifest.json 字段、PluginBase API、钩子与数据模型规范，含可直接复制的最小示例插件 |
+| [docs/THEME_TEMPLATE_API.md](docs/THEME_TEMPLATE_API.md) | 主题模板开发 API：模板继承链、全局变量、Jinja 过滤器与函数、页面上下文 |
+| [docs/OPERATIONS_FAQ.md](docs/OPERATIONS_FAQ.md) | 运维故障排查 FAQ：常见报错、数据库迁移失败处理、缓存/主题/插件/伪静态/Docker 排障速查 |
+| [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) | 插件依赖 / 继承 / 最低核心版本校验详解 |
+
+单页版文档见 [wiki.html](wiki.html)，在线 Wiki 见 Gitee / GitHub 仓库 Wiki 页。
 
 ---
 
