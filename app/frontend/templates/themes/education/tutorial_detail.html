@@ -1,0 +1,84 @@
+{% extends theme_base %}
+{% block title %}{{ tutorial.title }} - {{ site_settings.site_name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">{{ _('首页') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('tutorial_frontend.tutorial_list') }}">{{ _('教程中心') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('tutorial_frontend.tutorial_category', slug=tutorial.category.slug) }}">{{ tutorial.category.name }}</a></li>
+    <li class="breadcrumb-item active">{{ tutorial.title }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  {# 主内容 #}
+  <div class="col-lg-8 mb-4">
+    <div class="card">
+      <div class="card-body">
+        <h1 class="h3 mb-3">{{ tutorial.title }}</h1>
+        <div class="d-flex flex-wrap gap-3 text-muted small mb-3">
+          <span><i class="fas fa-folder"></i> {{ tutorial.category.name }}</span>
+          <span><span class="badge badge-{{ 'success' if tutorial.difficulty=='beginner' else 'warning' if tutorial.difficulty=='intermediate' else 'danger' }}">{{ tutorial.difficulty_label }}</span></span>
+          <span><i class="fas fa-clock"></i> {{ tutorial.duration }}{{ _('分钟') }}</span>
+          <span><i class="fas fa-eye"></i> {{ tutorial.view_count }}{{ _('次浏览') }}</span>
+          <span><i class="fas fa-calendar"></i> {{ tutorial.created_at|date }}</span>
+        </div>
+
+        {% if tutorial.cover %}
+        <img src="{{ tutorial.cover }}" class="img-fluid rounded mb-3" alt="{{ tutorial.title }}">
+        {% endif %}
+
+        {% if tutorial.summary %}
+        <div class="alert alert-light border">{{ tutorial.summary }}</div>
+        {% endif %}
+
+        <div class="article-content">
+          {{ tutorial.content|safe }}
+        </div>
+      </div>
+    </div>
+
+    {# 相邻教程导航 #}
+    <div class="row mt-3">
+      <div class="col-6">
+        {% if prev_tutorial %}
+        <a href="{{ url_for('tutorial_frontend.tutorial_detail', slug=prev_tutorial.slug) }}" class="card text-decoration-none">
+          <div class="card-body">
+            <small class="text-muted">{{ _('上一篇') }}</small>
+            <div class="font-weight-bold text-truncate">{{ prev_tutorial.title }}</div>
+          </div>
+        </a>
+        {% endif %}
+      </div>
+      <div class="col-6 text-right">
+        {% if next_tutorial %}
+        <a href="{{ url_for('tutorial_frontend.tutorial_detail', slug=next_tutorial.slug) }}" class="card text-decoration-none">
+          <div class="card-body">
+            <small class="text-muted">{{ _('下一篇') }}</small>
+            <div class="font-weight-bold text-truncate">{{ next_tutorial.title }}</div>
+          </div>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# 侧栏：相关推荐 #}
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header bg-primary text-white"><i class="fas fa-thumbs-up"></i> {{ _('相关推荐') }}</div>
+      <div class="list-group list-group-flush">
+        {% for r in related %}
+        <a href="{{ url_for('tutorial_frontend.tutorial_detail', slug=r.slug) }}" class="list-group-item list-group-item-action">
+          <div class="font-weight-bold text-truncate">{{ r.title }}</div>
+          <small class="text-muted"><i class="fas fa-eye"></i> {{ r.view_count }} · {{ r.difficulty_label }}</small>
+        </a>
+        {% else %}
+        <div class="list-group-item text-center text-muted">{{ _('暂无推荐') }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

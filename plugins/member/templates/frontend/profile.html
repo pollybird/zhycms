@@ -1,0 +1,67 @@
+{% extends theme_base %}
+{% block title %}{{ _('资料编辑') }} - {{ site_settings.site_name }}{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">{{ _('首页') }}</a></li>
+      <li class="breadcrumb-item"><a href="{{ url_for('member_frontend.center') }}">{{ _('会员中心') }}</a></li>
+      <li class="breadcrumb-item active">{{ _('资料编辑') }}</li>
+    </ol>
+  </nav>
+
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card">
+        <div class="card-header">{{ _('编辑个人资料') }}</div>
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            <div class="form-group text-center">
+              {% if member.avatar %}
+              <img src="{{ member.avatar }}" class="rounded-circle mb-2" width="80" height="80" style="object-fit:cover;" alt="avatar">
+              {% endif %}
+              <div>
+                <label class="btn btn-sm btn-outline-secondary">{{ _('更换头像') }}
+                  <input type="file" name="avatar" class="d-none" accept="image/*">
+                </label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>{{ _('用户名') }}</label>
+              <input type="text" class="form-control" value="{{ member.username }}" disabled>
+              <small class="text-muted">{{ _('用户名不可修改') }}</small>
+            </div>
+            <div class="form-group">
+              <label>{{ _('昵称') }} <span class="text-danger">*</span></label>
+              <input type="text" name="nickname" class="form-control" value="{{ member.nickname or '' }}" required>
+            </div>
+            <div class="form-group">
+              <label>{{ _('手机号') }}</label>
+              <input type="tel" name="phone" class="form-control" value="{{ member.phone or '' }}" maxlength="11">
+            </div>
+            <div class="form-group">
+              <label>{{ _('邮箱') }}</label>
+              <input type="email" name="email" class="form-control" value="{{ member.email or '' }}">
+            </div>
+            <div class="form-group">
+              <label>{{ _('性别') }}</label>
+              <select name="gender" class="form-control">
+                <option value="" {{ 'selected' if not member.gender else '' }}>{{ _('保密') }}</option>
+                <option value="male" {{ 'selected' if member.gender == 'male' else '' }}>{{ _('男') }}</option>
+                <option value="female" {{ 'selected' if member.gender == 'female' else '' }}>{{ _('女') }}</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>{{ _('个性签名') }}</label>
+              <input type="text" name="signature" class="form-control" maxlength="255" value="{{ member.signature or '' }}">
+            </div>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存') }}</button>
+            <a href="{{ url_for('member_frontend.center') }}" class="btn btn-default">{{ _('返回') }}</a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

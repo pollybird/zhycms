@@ -5,6 +5,85 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [2.6.4] - 2026-09-12
+
+**前台会员体系 + 插件依赖治理**版本。新增社区插件「前台用户中心」（member），提供用户注册/登录/资料编辑/修改密码/找回密码、微信与 QQ 一键登录、短信验证码登录、注册协议管理、栏目会员可见性控制；核心新增 `Column.member_only` 字段与前台访问守卫钩子；插件系统新增依赖（`requires`）、继承（`extends`）、最低核心版本（`min_core_version`）启用强校验与禁用反向依赖校验。**数据库结构变更**：新增迁移 `0008`（`columns.member_only` 列），member 插件首次启用时自动创建 `members` / `member_oauths` / `member_sms_codes` 三张表。无新增 Python 依赖（复用既有 `requests`）。
+
+### Added
+
+- **前台用户中心插件 `member`（社区插件，非内置）**：
+  - 会员体系独立于后台管理员：`members` 表（用户名/密码哈希/昵称/头像/邮箱/手机/性别/签名/状态/登录锁定）、`member_oauths` 表（微信/QQ 第三方绑定）、`member_sms_codes` 表（短信验证码哈希存储），session 键 `member_id` 与后台 Flask-Login 完全隔离。
+  - 前台功能页：注册（含协议弹窗）、登录（密码 + 短信验证码双 Tab）、找回密码（手机验证码重置）、会员中心、个人资料编辑（含头像上传）、修改密码、退出。
+  - 短信验证码三通道：日志通道（默认，验证码写日志）、阿里云短信（免 SDK，RPC HMAC-SHA1）、通用 Webhook（`{phone}`/`{code}` 占位符）；60 秒间隔 + 每日 10 条频控，码值 SHA-256 哈希存储、一次性消费。
+  - 微信/QQ 一键登录：`oauth/<provider>` 授权跳转，回调支持三种分支——已绑定直接登录、已登录则绑定、未绑定按配置自动建号；state 参数防 CSRF。
+  - 后台管理：会员列表（关键词/状态搜索、分页）、会员编辑（资料/状态/重置密码）、软删除、插件设置页（4 分组：注册开关与富文本注册协议 / 短信通道 / 微信 / QQ）、栏目可见性树形批量勾选，统一权限 `member:manage`。
+  - 右上角用户菜单：游客显示「登录/注册」按钮，已登录会员显示头像+昵称下拉菜单（会员中心/个人资料/修改密码/退出），不占用主导航位置。
+  - 前台模板内置于插件 `templates/frontend/`，直接 `render_template` 渲染，8 套主题 navbar 自动注入用户菜单。
+- **栏目会员可见性**（核心）：`Column` 模型新增 `member_only` 布尔字段（迁移 `0008`），栏目编辑页「仅会员可见」开关（仅 member 插件启用时显示）。前台未登录用户访问 `member_only` 栏目及其文章自动 302 跳登录页；主导航对游客隐藏会员栏目；已登录会员绕过整页缓存，避免缓存串页。
+- **插件守卫钩子**（核心）：`PluginBase.get_frontend_guard()` 返回 `{'is_authenticated': callable, 'login_url': callable}` 或 `None`，核心通过该钩子解耦会员鉴权，无插件守卫时 `member_only` 不生效。
+- **插件依赖 / 继承 / 最低版本强校验**（核心，详见 [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md)）：
+  - `manifest.json` 新增 `requires`（`string[]`，启用前必须已启用的依赖插件）、`extends`（`string`，父插件，须已安装且已启用）、`min_core_version`（`string`，最低核心版本）三个可选字段。
+  - `enable_plugin()` 启用前按「最低核心版本 → requires → extends」顺序强校验，不满足拒绝启用并返回明确错误信息。
+  - `disable_plugin()` 新增反向依赖校验：若有已启用插件依赖或继承该插件，拒绝禁用并提示需先禁用哪些。
+  - `discover_and_load()` 启动期校验 `extends` 父插件是否已安装，缺失则标红。
+  - 插件上传校验新增 `requires`/`extends`/`min_core_version` 字段类型校验。
+  - 后台插件列表以徽章展示最低核心版本（蓝）、依赖插件（黄）、父插件（紫）。
+  - `PluginBase` 新增 `requires` / `extends` / `min_core_version` 类属性（与 manifest 对应，类属性优先）。
+
+### Changed
+
+- 版本号 `CMS_VERSION` 由 `2.6.3` 升级为 `2.6.4`。
+- 8 套主题 `base.html` 在 navbar 右侧 `locale_switcher` 前注入 `{{ member_user_menu() }}`（插件未启用时输出空字符串）。
+- `app/plugin_system.py` 新增 `parse_version()` / `version_cmp()` / `current_core_version()` / `validate_enable()` / `reverse_dependents()` 函数。
+- `app/frontend/views.py` 新增前台访问守卫：`_frontend_authenticated()`、`_member_only_redirect(column)`，`_try_cache` 对已登录会员绕过整页缓存，`_build_nav()` 对游客过滤 `member_only` 栏目，`column_detail()` / `article_detail()` 加会员访问守卫。
+
+### Fixed
+
+- member 插件 `_render()` 函数重复拼接 `.html` 后缀导致 `TemplateNotFound`。
+- member 插件 `settings.py` 的 `cfg()` 默认值兜底失效（核心 `Setting.get` 对未知键返回 `''`，改用哨兵区分「无记录」与「显式关闭」）。
+- 禁用 member 插件时前台缓存可能残留会员栏目 302，新增 `on_disabled` 清空缓存。
+
+### Security
+
+- 会员密码使用 werkzeug `generate_password_hash`（与后台一致），短信验证码 SHA-256 哈希存储且一次性消费。
+- OAuth 回调使用 state 参数防 CSRF。
+- 会员头像上传走核心统一上传校验（扩展名 + MIME + 去重），非法类型拒绝。
+- 会员独立 session 键 `member_id`，与后台管理员会话互不干扰。
+
+### Upgrade
+
+- **数据库迁移**：执行 `flask db upgrade` 应用迁移 `0008`（给 `columns` 表补 `member_only` 列，默认 `FALSE`，存量栏目不受影响）。
+- **启用会员插件**（可选）：后台「插件管理」启用 `member` → 首次启用自动建 `members` / `member_oauths` / `member_sms_codes` 表 → 进入「前台用户中心 → 插件设置」配置短信通道与微信/QQ 密钥 → 进入「前台用户中心 → 栏目可见性」勾选需会员登录才能访问的栏目。
+- **短信通道**：默认日志通道（验证码写入应用日志），生产环境切换为阿里云或 Webhook 通道。
+- **插件依赖校验**：现有插件无需改动；自定义插件如需声明依赖，在 manifest.json 中添加 `requires` / `extends` 字段即可。
+
+## [2.6.3] - 2026-09-12
+
+**API 鉴权升级 + 行业模板扩充**版本。REST API 鉴权从单一静态 Token 升级为 JWT（access/refresh 双 token），支持 token/jwt/both 三模式双轨兼容，引入 flask-limiter 速率限制；新增教育（亮色调）与餐饮（暖色调）两套行业主题及配套演示数据。**新增 7 项 Setting，无数据库结构变更**，覆盖代码重启即可升级。
+
+### Added
+
+- **JWT 鉴权体系**（`app/api/auth.py`）：`POST /api/v1/auth/login` 签发 access_token（15min）+ refresh_token（7d）；`POST /api/v1/auth/refresh` 用 refresh_token 换新 access_token；`POST /api/v1/auth/logout` 客户端删 token。identity 为 `str(user.id)`，额外信息放 `additional_claims`。
+- **双轨鉴权模式**（`app/api/views.py` `_api_gate`）：`api_auth_mode` 支持 `token`（仅 X-API-Token）/ `jwt`（仅 Bearer JWT）/ `both`（默认，优先 JWT 回退 Token）。auth 端点免鉴权，refresh 由 `@jwt_required(refresh=True)` 自处理。
+- **速率限制**（`flask-limiter`）：登录端点 5 次/分钟，只读 GET 端点 120 次/分钟，超限返回 429；可在后台 API 设置页开关与调整阈值。
+- **后台 API 设置页**（`app/admin/templates/admin/setting/api.html`）：新增鉴权模式、JWT 密钥、access/refresh 过期时间、限流开关与阈值配置。
+- **教育行业主题**（`themes/education/`）：天蓝 #42a5f5 + 活力橙 #ff9800 亮色调，背景 #f5fafd，展现青少年朝气。
+- **餐饮行业主题**（`themes/catering/`）：暖红 #c0392b + 橙 #e67e22 暖色调，营造食欲氛围。
+- **setup 向导行业联动**：新增「教育行业」「餐饮行业」演示数据选项，自动切换对应主题与站点信息。
+- **行业演示数据**（`app/utils/bootstrap.py`）：`generate_demo_education`（启明教育培训学校：课程中心/师资力量/校园动态）、`generate_demo_catering`（鲜味居酒楼：招牌菜品/门店信息/美食资讯）。
+- **新增测试**：`tests/test_api_auth.py`（9 项：JWT 登录/刷新/双轨兼容/速率限制）、`tests/test_themes.py`（6 项：education/catering 主题完整性）。
+
+### Changed
+
+- `requirements.txt` 新增 `Flask-JWT-Extended>=4.6.0,<5.0`、`Flask-Limiter>=3.5.0,<4.0`。
+- CORS 响应头 `Access-Control-Allow-Headers` 增加 `Authorization`，Methods 增加 `POST`。
+- `Setting.DEFAULTS` 新增 7 项：`api_auth_mode`、`jwt_secret_key`、`jwt_access_expires_minutes`、`jwt_refresh_expires_days`、`api_rate_limit_enable`、`api_rate_limit_login`、`api_rate_limit_read`。
+
+### Fixed
+
+- JWT `InvalidSubjectError`：identity 必须为字符串，改用 `str(user.id)`，额外信息放 `additional_claims`。
+- 主题切换后各页面主题不一致：根因是后台 `theme_activate` 切换 `site_theme` 后未清空前台整页缓存，而缓存键不含主题标识，旧主题渲染的 HTML 在 TTL 内继续命中。修复为切换后无条件 `cache.clear()`，并在前台页面缓存键追加 `|theme=<slug>` 作为纵深防御（多 worker / 清理失败时仍不串页）。
+
 ## [2.6.2] - 2026-09-11
 
 **质量加固**版本。补齐 5 大测试域（RBAC 权限边界 / 插件全生命周期 / Alembic 迁移 / API 契约 / 存储驱动抽象），测试规模 34 → 113 项；`oss_storage` 存储驱动抽象升级：驱动自动发现 + 字节流上传契约 + 归属插件门控。**无数据库结构变更**，覆盖代码重启即可升级。

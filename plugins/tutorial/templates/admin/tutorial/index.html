@@ -1,0 +1,86 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('教程中心') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('教程中心') }}{% endblock %}
+{% set active_menu = 'tutorial' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">{{ _('教程中心') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{{ _('教程列表') }}</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.tutorial_category_create') }}" class="btn btn-default btn-sm"><i class="fas fa-folder-plus"></i> {{ _('分类管理') }}</a>
+      <a href="{{ url_for('admin.tutorial_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> {{ _('新增教程') }}</a>
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="get" class="form-inline mb-3">
+      <select name="category" class="form-control form-control-sm mr-2" style="max-width:180px;">
+        <option value="">{{ _('全部分类') }}</option>
+        {% for c in categories %}
+        <option value="{{ c.id }}" {{ 'selected' if current_category == c.id|string else '' }}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="keyword" value="{{ keyword }}" class="form-control form-control-sm mr-2" placeholder="{{ _('标题关键字') }}" style="max-width:200px;">
+      <button class="btn btn-primary btn-sm"><i class="fas fa-search"></i> {{ _('筛选') }}</button>
+    </form>
+
+    <table class="table table-hover table-sm">
+      <thead>
+        <tr>
+          <th width="60">ID</th>
+          <th>{{ _('标题') }}</th>
+          <th width="120">{{ _('分类') }}</th>
+          <th width="80">{{ _('难度') }}</th>
+          <th width="80">{{ _('时长') }}</th>
+          <th width="80">{{ _('浏览') }}</th>
+          <th width="80">{{ _('状态') }}</th>
+          <th width="160">{{ _('操作') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tutorials %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td>{{ t.title }}</td>
+          <td>{{ t.category.name }}</td>
+          <td><span class="badge badge-{{ 'success' if t.difficulty=='beginner' else 'warning' if t.difficulty=='intermediate' else 'danger' }}">{{ t.difficulty_label }}</span></td>
+          <td>{{ t.duration }}{{ _('分钟') }}</td>
+          <td>{{ t.view_count }}</td>
+          <td>
+            {% if t.is_enabled %}<span class="badge badge-success">{{ _('启用') }}</span>
+            {% else %}<span class="badge badge-secondary">{{ _('停用') }}</span>{% endif %}
+          </td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <a href="{{ url_for('admin.tutorial_edit', tid=t.id) }}" class="btn btn-default" title="{{ _('编辑') }}"><i class="fas fa-edit"></i></a>
+              <a href="{{ url_for('tutorial_frontend.tutorial_detail', slug=t.slug) }}" target="_blank" class="btn btn-default" title="{{ _('预览') }}"><i class="fas fa-eye"></i></a>
+              <form method="post" action="{{ url_for('admin.tutorial_delete', tid=t.id) }}" class="d-inline" onsubmit="return confirm('{{ _('确认删除？') }}')">
+                <button class="btn btn-danger" title="{{ _('删除') }}"><i class="fas fa-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" class="text-center text-muted py-4">{{ _('暂无教程') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if pagination.pages > 1 %}
+    <nav aria-label="Page navigation">
+      <ul class="pagination justify-content-center">
+        {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="?page={{ pagination.prev_num }}">{{ _('上一页') }}</a></li>{% endif %}
+        {% for p in pagination.iter_pages() %}
+        {% if p %}<li class="page-item {{ 'active' if p == pagination.page else '' }}"><a class="page-link" href="?page={{ p }}">{{ p }}</a></li>{% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+        {% endfor %}
+        {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="?page={{ pagination.next_num }}">{{ _('下一页') }}</a></li>{% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

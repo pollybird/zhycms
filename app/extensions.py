@@ -4,6 +4,9 @@ from flask_caching import Cache
 from flask_babel import Babel, lazy_gettext
 from flask_migrate import Migrate
 from flask_session import Session
+from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -23,6 +26,16 @@ babel = Babel()
 
 # v2.4.0：数据库迁移（Flask-Migrate / Alembic）
 migrate = Migrate()
+
+# v2.6.3：API JWT 鉴权（flask-jwt-extended），独立于后台 flask-login
+jwt = JWTManager()
+
+# v2.6.3：API 速率限制（flask-limiter），未配置 Redis 时用内存存储
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],
+    storage_uri="memory://",
+)
 
 # 调度器（APScheduler）在 app/__init__.py 中延迟初始化，避免与多进程环境冲突
 _scheduler_instance = {'scheduler': None}

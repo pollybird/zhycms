@@ -1,5 +1,13 @@
 """插件系统运行时（v2.2.0）：发现、加载、注册、启停门控。
 
+v2.6.4 新增：插件依赖（requires）、继承（extends）、最低核心版本
+（min_core_version）校验。manifest.json 可声明：
+  "requires": ["form", "oss_storage"]   启用前必须已启用的依赖插件
+  "extends":  "form"                    基于该父插件二次开发，父插件须安装且启用
+  "min_core_version": "2.6.3"           核心 CMS 版本不得低于此值
+启用时强校验，不满足则拒绝启用并返回明确错误。
+
+
 机制概要（详见 DESIGN-v2.2.0.md §2.3）：
   - 启动时全量导入 plugins/ 下所有插件并注册（蓝图/模板全局/菜单/API/sitemap 钩子），
     单个插件导入失败仅记录错误并在管理页标红，不拖垮启动；
@@ -24,6 +32,58 @@ import importlib
 from flask import g, has_app_context
 
 from .plugin_api import PluginBase  # noqa: F401  供类型提示与外部 import
+
+# ============================================================
+# 版本比较辅助
+# ============================================================
+
+def parse_version(version_str):
+    """把版本字符串解析为整数元组，用于比较。
+
+    '2.6.3' -> (2, 6, 3)，非数字段忽略，空串视为 (0,)。
+    """
+    if not version_str:
+        return (0,)
+    parts = []
+    for seg in str(version_str).split('.'):
+        seg = seg.strip()
+        if not seg:
+            continue
+        num = ''
+        for ch in seg:
+            if ch.isdigit():
+                num += ch
+            else:
+                break
+        parts.append(int(num) if num else 0)
+    return tuple(parts) if parts else (0,)
+
+
+def version_cmp(a, b):
+    """比较两个版本字符串：a<b 返回 -1，a==b 返回 0，a>b 返回 1。
+
+    缺位以 0 补齐（2.6 == 2.6.0）。
+    """
+    va = parse_version(a)
+    vb = parse_version(b)
+    n = max(len(va), len(vb))
+    va += (0,) * (n - len(va))
+    vb += (0,) * (n - len(vb))
+    if va < vb:
+        return -1
+    if va > vb:
+        return 1
+    return 0
+
+
+def current_core_version():
+    """当前核心 CMS 版本号。"""
+    try:
+        from .models.setting import Setting
+        return Setting.CMS_VERSION
+    except Exception:
+        return '0.0.0'
+
 
 # 插件根目录（项目根 plugins/）
 PLUGINS_DIR = os.path.join(
@@ -72,6 +132,30 @@ class PluginRecord:
     def author(self):
         return (self.instance.author if self.instance else '') \
             or self.manifest.get('author', '')
+
+    @property
+    def min_core_version(self):
+        return (getattr(self.instance, 'min_core_version', '') if self.instance else '') \
+            or self.manifest.get('min_core_version', '')
+
+    @property
+    def requires(self):
+        """依赖插件 slug 列表（启用前必须已启用）。"""
+        inst_requires = getattr(self.instance, 'requires', None) if self.instance else None
+        if inst_requires:
+            return list(inst_requires)
+        raw = self.manifest.get('requires', [])
+        if isinstance(raw, list):
+            return [str(s) for s in raw]
+        if isinstance(raw, str) and raw:
+            return [raw]
+        return []
+
+    @property
+    def extends(self):
+        """父插件 slug（基于其二次开发，父插件须安装且启用）。"""
+        inst_extends = getattr(self.instance, 'extends', '') if self.instance else ''
+        return inst_extends or self.manifest.get('extends', '') or ''
 
     @property
     def loaded(self):
@@ -252,7 +336,17 @@ def discover_and_load(app, import_models_only=False):
         用，不注册任何运行期钩子），用于启动期 pre-seed 场景。
     """
     discover()
+    # 启动期校验 extends 父插件是否已安装（不要求启用，仅安装）。
+    # 父插件缺失时标记错误，管理页标红，但不阻断其他插件加载。
     for rec in list(_registry):
+        parent = rec.manifest.get('extends', '') if rec.manifest else ''
+        if parent and parent not in _by_slug:
+            rec.error = f'父插件 {parent} 未安装'
+            app.logger.warning('插件 %s 的父插件 %s 未安装，已标记加载失败',
+                               rec.slug, parent)
+    for rec in list(_registry):
+        if rec.error and not rec.loaded:
+            continue
         if import_models_only:
             # 仅导入插件包（触发顶层 import）并递归导入 models 子模块
             try:
@@ -315,6 +409,9 @@ def get_plugin_records():
             'builtin': bool(rec.manifest.get('builtin')),
             'menu': menu,
             'permissions': getattr(rec.instance, 'permissions', []) if rec.instance else [],
+            'min_core_version': rec.min_core_version,
+            'requires': rec.requires,
+            'extends': rec.extends,
         })
     return result
 
@@ -343,13 +440,52 @@ def _seed_plugin_permissions(inst):
     db.session.commit()
 
 
-def enable_plugin(slug):
-    """启用插件：种子权限 + 兜底建表 + 写启用清单。返回错误信息或 None。"""
+def validate_enable(slug):
+    """启用前强校验：最低核心版本、依赖插件、父插件。
+
+    返回错误信息字符串；全部通过返回 None。
+    """
     rec = _by_slug.get(slug)
     if rec is None:
         return f'插件 {slug} 不存在'
     if not rec.loaded:
         return f'插件 {slug} 加载失败，无法启用：{rec.error or "未知原因"}'
+
+    # 1) 最低核心版本
+    min_ver = rec.min_core_version
+    if min_ver:
+        cur = current_core_version()
+        if version_cmp(cur, min_ver) < 0:
+            return (f'核心版本 {cur} 低于插件要求的最低版本 {min_ver}，'
+                    f'请先升级 CMS')
+
+    enabled = enabled_slugs()
+
+    # 2) 依赖插件：requires 列表中每个插件必须已启用
+    missing_deps = [d for d in rec.requires if d not in _by_slug]
+    if missing_deps:
+        return f'缺少依赖插件：{", ".join(missing_deps)}（请先安装）'
+    unmet_deps = [d for d in rec.requires if d not in enabled]
+    if unmet_deps:
+        return f'请先启用依赖插件：{", ".join(unmet_deps)}'
+
+    # 3) 父插件（extends）：必须安装且已启用
+    parent = rec.extends
+    if parent:
+        if parent not in _by_slug:
+            return f'父插件 {parent} 未安装，本插件基于其二次开发'
+        if parent not in enabled:
+            return f'请先启用父插件 {parent}，本插件基于其二次开发'
+
+    return None
+
+
+def enable_plugin(slug):
+    """启用插件：强校验 + 种子权限 + 兜底建表 + 写启用清单。返回错误信息或 None。"""
+    err = validate_enable(slug)
+    if err:
+        return err
+    rec = _by_slug.get(slug)
     try:
         from .extensions import db
         _seed_plugin_permissions(rec.instance)
@@ -364,12 +500,30 @@ def enable_plugin(slug):
     return None
 
 
+def reverse_dependents(slug):
+    """返回当前已启用插件中，依赖或继承 ``slug`` 的插件 slug 列表。"""
+    enabled = enabled_slugs()
+    dependents = []
+    for rec in _registry:
+        if rec.slug == slug or rec.slug not in enabled:
+            continue
+        if slug in rec.requires or rec.extends == slug:
+            dependents.append(rec.slug)
+    return dependents
+
+
 def disable_plugin(slug):
     """禁用插件：仅移出启用清单（不删表、不清数据、不回收权限绑定）。
 
-    禁用后调用插件 ``on_disabled()`` 回调（如 oss_storage 会把存储驱动
-    重置为本地，防止新上传指向已不可用的云端配置）；回调异常不影响禁用。
+    若有其他已启用插件依赖或继承本插件，拒绝禁用并返回错误信息字符串；
+    成功返回 None。禁用后调用插件 ``on_disabled()`` 回调（如 oss_storage
+    会把存储驱动重置为本地，防止新上传指向已不可用的云端配置）；回调异常
+    不影响禁用。
     """
+    dependents = reverse_dependents(slug)
+    if dependents:
+        return (f'插件 {slug} 被以下已启用插件依赖，无法禁用：'
+                f'{", ".join(dependents)}（请先禁用这些插件）')
     slugs = enabled_slugs()
     slugs.discard(slug)
     set_enabled_slugs(slugs)
@@ -379,6 +533,7 @@ def disable_plugin(slug):
             rec.instance.on_disabled()
         except Exception:
             pass
+    return None
 
 
 def remove_record(slug):
@@ -509,6 +664,25 @@ def plugin_frontend_menus():
         except Exception:
             pass
     return items
+
+
+def frontend_guard():
+    """前台访问守卫聚合（v2.6.4）：返回第一个启用插件贡献的守卫 dict 或 None。
+
+    守卫协议见 PluginBase.get_frontend_guard()。核心前台视图据此对
+    member_only 栏目做导航过滤与访问拦截；无守卫时不做任何限制。
+    """
+    current = enabled_slugs()
+    for rec in _registry:
+        if rec.slug not in current or rec.instance is None:
+            continue
+        try:
+            guard = rec.instance.get_frontend_guard()
+        except Exception:
+            continue
+        if isinstance(guard, dict) and callable(guard.get('is_authenticated')):
+            return guard
+    return None
 
 
 def collect_sitemap_urls():

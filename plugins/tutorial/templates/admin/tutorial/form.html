@@ -1,0 +1,139 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('编辑教程') if tutorial else _('新增教程') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('编辑教程') if tutorial else _('新增教程') }}{% endblock %}
+{% set active_menu = 'tutorial' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.tutorial_index') }}">{{ _('教程中心') }}</a></li>
+<li class="breadcrumb-item active">{{ _('编辑教程') if tutorial else _('新增教程') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" id="tutorial-form">
+      <div class="form-group">
+        <label>{{ _('标题') }} <span class="text-danger">*</span></label>
+        <input type="text" name="title" class="form-control" value="{{ tutorial.title if tutorial else '' }}" required>
+      </div>
+      <div class="row">
+        <div class="col-md-6 form-group">
+          <label>{{ _('标识(slug)') }} <span class="text-danger">*</span></label>
+          <input type="text" name="slug" class="form-control" value="{{ tutorial.slug if tutorial else '' }}" required>
+          <small class="text-muted">{{ _('URL 唯一标识，英文小写字母/数字/连字符') }}</small>
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ _('分类') }} <span class="text-danger">*</span></label>
+          <select name="category_id" class="form-control" required>
+            <option value="">{{ _('请选择分类') }}</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}" {{ 'selected' if tutorial and tutorial.category_id == c.id else '' }}>{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>{{ _('摘要') }}</label>
+        <textarea name="summary" class="form-control" rows="2">{{ tutorial.summary if tutorial else '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label>{{ _('正文内容') }} <span class="text-danger">*</span></label>
+        <textarea name="content" id="content" rows="12">{{ tutorial.content if tutorial else '' }}</textarea>
+      </div>
+      <div class="row">
+        <div class="col-md-3 form-group">
+          <label>{{ _('难度') }}</label>
+          <select name="difficulty" class="form-control">
+            {% for val, label in difficulties %}
+            <option value="{{ val }}" {{ 'selected' if tutorial and tutorial.difficulty == val else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 form-group">
+          <label>{{ _('时长(分钟)') }}</label>
+          <input type="number" name="duration" class="form-control" value="{{ tutorial.duration if tutorial else 0 }}" min="0">
+        </div>
+        <div class="col-md-3 form-group">
+          <label>{{ _('排序') }}</label>
+          <input type="number" name="sort_order" class="form-control" value="{{ tutorial.sort_order if tutorial else 0 }}">
+        </div>
+        <div class="col-md-3 form-group">
+          <label>{{ _('状态') }}</label>
+          <div class="mt-2">
+            <label class="mr-3"><input type="checkbox" name="is_enabled" value="on" {{ 'checked' if not tutorial or tutorial.is_enabled else '' }}> {{ _('启用') }}</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>{{ _('封面图') }}</label>
+        {% if tutorial and tutorial.cover %}
+        <div class="mb-2"><img src="{{ tutorial.cover }}" alt="cover" style="max-height:120px;"></div>
+        <label class="mr-3"><input type="checkbox" name="cover_remove" value="on"> {{ _('移除封面') }}</label>
+        {% endif %}
+        <input type="file" name="cover" class="form-control-file" accept="image/*">
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存') }}</button>
+      <a href="{{ url_for('admin.tutorial_index') }}" class="btn btn-default">{{ _('取消') }}</a>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
+<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
+<style>
+  .ck.ck-editor__editable_inline { min-height: 420px; }
+  .ck.ck-content { font-size: 15px; line-height: 1.8; }
+</style>
+<script>
+  // 教程正文使用与文章/单页一致的 CKEditor5 super-build（本地托管 + GPL）。
+  // super-build 内置的 AI/协作/云端等商业插件会强制校验 license，必须移除。
+  let tutorialEditor;
+  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), {
+    licenseKey: 'GPL',
+    language: 'zh-cn',
+    placeholder: '{{ _('在此输入教程正文……') }}',
+    toolbar: {
+      items: [
+        'undo', 'redo', '|',
+        'heading', '|',
+        'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
+        'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'code', '|',
+        'alignment', '|',
+        'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+        'link', 'imageUpload', 'insertTable', 'blockQuote', 'highlight',
+        'codeBlock', 'horizontalLine', 'specialCharacters', '|',
+        'removeFormat', 'sourceEditing'
+      ],
+      shouldNotGroupWhenFull: true
+    },
+    removePlugins: [
+      'AIAssistant', 'AITextAdapter', 'OpenAITextAdapter', 'AWSTextAdapter',
+      'CKBox', 'CKFinder', 'EasyImage', 'RealTimeCollaborativeComments',
+      'RealTimeCollaborativeTrackChanges', 'RealTimeCollaborativeRevisionHistory',
+      'PresenceList', 'Comments', 'TrackChanges', 'TrackChangesData', 'RevisionHistory',
+      'Pagination', 'WProofreader', 'MathType', 'SlashCommand', 'Template',
+      'DocumentOutline', 'FormatPainter', 'TableOfContents', 'PasteFromOfficeEnhanced',
+      'CaseChange'
+    ],
+    image: {
+      toolbar: ['imageTextAlternative', 'toggleImageCaption', '|',
+                'imageStyle:inline', 'imageStyle:block', 'imageStyle:side']
+    },
+    table: {
+      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties']
+    },
+    fontSize: {
+      options: [9, 10, 11, 12, 13, 'default', 15, 17, 19, 21, 24, 28, 32, 40]
+    },
+    simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=tutorial' }
+  }).then(e => { tutorialEditor = e; })
+    .catch(err => console.error(err));
+
+  // 提交前把编辑器 HTML 回写到 textarea
+  $('#tutorial-form').on('submit', function(){
+    if (tutorialEditor) document.querySelector('#content').value = tutorialEditor.getData();
+  });
+</script>
+{% endblock %}

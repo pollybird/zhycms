@@ -36,6 +36,12 @@ class PluginBase:
     version = '1.0.0'
     description = ''
     author = ''
+    # 最低核心版本（如 '2.6.3'），核心版本低于此值时拒绝启用
+    min_core_version = ''
+    # 依赖插件 slug 列表：启用前这些插件必须已启用
+    requires = []
+    # 父插件 slug：本插件基于其二次开发，父插件须安装且已启用
+    extends = ''
 
     # ---- 声明式注册信息 ----
     # [(code, label, desc)] 启用时幂等种子写入 permissions 表
@@ -164,6 +170,20 @@ class PluginBase:
         - 归属栏目的插件（如产品）栏目本身已进导航，无需实现本钩子
         """
         return []
+
+    def get_frontend_guard(self):
+        """前台访问守卫钩子（v2.6.4）：返回 dict 或 None。
+
+        插件需要引入「前台登录用户」概念（如会员插件）时实现，返回：
+          {
+            'is_authenticated': 无参可调用对象，返回当前访客是否已登录,
+            'login_url':        无参可调用对象，返回登录页地址（可带 next）,
+          }
+        核心在前台导航构建、栏目/文章访问时调用：栏目标记 member_only
+        且守卫存在、访客未登录时，导航隐藏该项、直接访问跳转登录页。
+        没有任何启用插件提供守卫时，前台行为与旧版完全一致。
+        """
+        return None
 
     def get_sitemap_urls(self):
         """yield {'loc', 'lastmod', 'changefreq', 'priority'}（loc 为完整 URL）。"""

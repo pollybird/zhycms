@@ -2,7 +2,12 @@
 
 约定（DESIGN-v2.2.0.md §五）：
   - 响应包：{"code":0,"message":"ok","data":...,"meta":...}
-  - api_enable=off → 所有端点 404；api_token 非空 → 校验 X-API-Token（恒时比较）
+  - api_enable=off → 所有端点 404
+  - 鉴权模式 api_auth_mode：
+      token = 旧 X-API-Token 静态令牌
+      jwt   = 仅 Bearer JWT
+      both  = 优先 Bearer JWT，回退 X-API-Token（默认，平滑过渡）
+  - /auth/login 免鉴权；/auth/refresh 由 jwt_required(refresh=True) 自处理
   - 接口缓存 api_cache_ttl 秒（0=不缓存）；CORS 由 api_cors_origins 控制
   - 只输出前台可见数据（启用/未删除/文章已发布），不输出敏感字段
 """
@@ -10,8 +15,9 @@ import hmac
 from functools import wraps
 
 from flask import request, jsonify, current_app
+from flask_jwt_extended import verify_jwt_in_request, JWTManager
 
-from ..extensions import db
+from ..extensions import db, limiter
 from ..models.column import Column, ColumnField
 from ..models.article import Article
 from ..models.setting import Setting
@@ -74,20 +80,69 @@ def _int_setting(key, default):
         return default
 
 
+def _read_limit():
+    """只读端点限流值（每 IP 每分钟），从 Setting 读取。"""
+    return f"{Setting.get('api_rate_limit_read', '120')} per minute"
+
+
+# 只读端点统一限流装饰器（v2.6.3）
+api_read_limit = limiter.limit(_read_limit)
+
+
 # ============================================================
-# 全局门控（api_enable / api_token）与 CORS
+# 全局门控（api_enable / api_auth_mode）与 CORS
 # ============================================================
+
+# 免鉴权端点（登录/登出；refresh 由 jwt_required 装饰器自处理）
+_AUTH_PUBLIC_ENDPOINTS = frozenset({'api.api_login', 'api.api_logout'})
+
 
 @api_bp.before_request
 def _api_gate():
     if Setting.get('api_enable') == 'off':
         return api_err(404, '资源不存在')
+
+    endpoint = request.endpoint or ''
+    # 登录/登出端点免鉴权；refresh 端点由 @jwt_required(refresh=True) 自处理
+    if endpoint in _AUTH_PUBLIC_ENDPOINTS or endpoint == 'api.api_refresh':
+        return None
+
+    auth_mode = (Setting.get('api_auth_mode') or 'both').lower()
+
+    # ---- 模式 1：仅旧 Token ----
+    if auth_mode == 'token':
+        return _check_api_token()
+
+    # ---- 模式 2：仅 JWT ----
+    if auth_mode == 'jwt':
+        return _check_jwt()
+
+    # ---- 模式 3：双轨（默认）：优先 JWT，回退 Token ----
+    # 有 Bearer token 时校验 JWT；否则尝试旧 X-API-Token
+    has_bearer = request.headers.get('Authorization', '').lower().startswith('bearer ')
+    if has_bearer:
+        return _check_jwt()
+    return _check_api_token()
+
+
+def _check_api_token():
+    """旧静态令牌校验：X-API-Token，恒时比较。"""
     token = Setting.get('api_token') or ''
-    if token:
-        provided = request.headers.get('X-API-Token', '')
-        if not provided or not hmac.compare_digest(token, provided):
-            return api_err(401, 'API Token 无效或缺失')
+    if not token:
+        return None  # 未配置 token 时免鉴权
+    provided = request.headers.get('X-API-Token', '')
+    if not provided or not hmac.compare_digest(token, provided):
+        return api_err(401, 'API Token 无效或缺失')
     return None
+
+
+def _check_jwt():
+    """JWT 校验：Authorization: Bearer <token>。"""
+    try:
+        verify_jwt_in_request()
+        return None
+    except Exception:
+        return api_err(401, 'JWT 无效或已过期')
 
 
 def _register_cors(app):
@@ -109,8 +164,8 @@ def _register_cors(app):
             else:
                 return resp
         resp.headers['Access-Control-Allow-Origin'] = allow
-        resp.headers['Access-Control-Allow-Headers'] = 'X-API-Token, Content-Type'
-        resp.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+        resp.headers['Access-Control-Allow-Headers'] = 'X-API-Token, Authorization, Content-Type'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
         if request.method == 'OPTIONS':
             return current_app.response_class('', 204, resp.headers)
         return resp
@@ -235,6 +290,7 @@ def _get_enabled_column(slug):
 # ============================================================
 
 @api_bp.route('/site')
+@api_read_limit
 @api_cache('site')
 def site_info():
     s = Setting.get_dict()
@@ -277,6 +333,7 @@ def columns_index():
 
 
 @api_bp.route('/columns/<slug>')
+@api_read_limit
 @api_cache('column')
 def column_detail(slug):
     col = _get_enabled_column(slug)

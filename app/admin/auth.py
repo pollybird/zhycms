@@ -173,30 +173,41 @@ def setup():
             flash(_gettext('初始化失败：已存在管理员账号'), 'danger')
             return redirect(url_for('admin_auth.login'))
 
-        if demo_type in ('manufacturing', 'service', 'manufacturing_en', 'default_en'):
+        if demo_type in ('manufacturing', 'service', 'manufacturing_en', 'default_en', 'education', 'catering'):
             # v2.2.0：行业演示数据与官方插件联动 —— 轮播图、友情链接在两个
             # 行业模板下均强制启用；制造业演示数据的产品页依赖 product 插件
             # （多图相册/规格参数/伪静态详情，演示钩子会把产品子栏目切换为
             # list_product 模板），同样强制启用。
             # 不生成演示数据时，仍按向导勾选启用。
             # v2.3.0：英文模板（manufacturing_en / default_en）同联动逻辑。
+            # v2.6.3：教育（education）/ 餐饮（catering）行业。
+            # v2.6.4：教育行业课程中心由社区插件 tutorial 提供，随安装自动启用
+            # 并生成课程示例数据（社区插件不在向导勾选白名单内，仅走行业联动）。
             from ..plugin_system import enable_plugin, run_demo_data_hooks
             auto_plugins = {'banner', 'friend_link', 'form'}
             if demo_type in ('manufacturing', 'manufacturing_en'):
                 auto_plugins.add('product')
+            elif demo_type == 'education':
+                auto_plugins.add('tutorial')
+            # 用户勾选插件限定在向导白名单内；行业联动插件由系统强制启用
             for slug in dict.fromkeys(list(ctx['plugins']) + sorted(auto_plugins)):
-                if slug not in SETUP_PLUGINS:
+                if slug not in SETUP_PLUGINS and slug not in auto_plugins:
                     continue
                 err = enable_plugin(slug)
                 if err:
                     flash(_gettext('插件启用失败：%(error)s') % {'error': err}, 'warning')
             try:
-                if demo_type in ('manufacturing', 'service'):
+                if demo_type in ('manufacturing', 'service', 'education', 'catering'):
                     generate_demo_data(industry=demo_type)
                     for slug, err in run_demo_data_hooks(demo_type):
                         flash(_gettext('插件 %(slug)s 演示数据生成失败：%(error)s') % {'slug': slug, 'error': err}, 'warning')
-                    label = _gettext('制造业') if demo_type == 'manufacturing' else _gettext('服务业')
-                    flash(_gettext('系统初始化完成，%(label)s演示数据已生成') % {'label': label}, 'success')
+                    label_map = {
+                        'manufacturing': _gettext('制造业'),
+                        'service': _gettext('服务业'),
+                        'education': _gettext('教育行业'),
+                        'catering': _gettext('餐饮行业'),
+                    }
+                    flash(_gettext('系统初始化完成，%(label)s演示数据已生成') % {'label': label_map[demo_type]}, 'success')
                 elif demo_type == 'manufacturing_en':
                     # v2.3.0：英文模板需启用 i18n 并设默认语言为 en
                     from ..models.setting import Setting

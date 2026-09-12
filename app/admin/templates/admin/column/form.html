@@ -274,6 +274,15 @@
               <label class="custom-control-label" for="is_enabled">{{ _('启用栏目') }}</label>
             </div>
           </div>
+          {% if member_plugin_enabled() %}
+          <div class="form-group">
+            <div class="custom-control custom-switch">
+              <input type="checkbox" name="member_only" class="custom-control-input" id="member_only" {{ 'checked' if column and column.member_only }}>
+              <label class="custom-control-label" for="member_only">{{ _('仅登录会员可见') }}</label>
+              <small class="form-text text-muted">{{ _('开启后，未登录的前台访客在导航中看不到本栏目，直接访问会跳转登录页') }}</small>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
 

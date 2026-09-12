@@ -22,16 +22,59 @@
           </div>
         </div>
         <div class="form-group">
-          <label>{{ _('API Token（留空 = 公开只读）') }}</label>
+          <label>{{ _('鉴权模式') }}</label>
+          <select name="api_auth_mode" class="form-control">
+            <option value="both" {{ 'selected' if settings.api_auth_mode == 'both' }}>{{ _('双轨兼容（默认）：JWT + 旧 Token，平滑过渡') }}</option>
+            <option value="jwt" {{ 'selected' if settings.api_auth_mode == 'jwt' }}>{{ _('仅 JWT：强制 Bearer Token 鉴权') }}</option>
+            <option value="token" {{ 'selected' if settings.api_auth_mode == 'token' }}>{{ _('仅旧 Token：X-API-Token 静态令牌') }}</option>
+          </select>
+          <small class="form-text text-muted">{{ _('v2.6.3 起支持 JWT 无状态鉴权，适合 Headless 与多实例部署。双轨模式下优先 JWT，回退旧 Token。') }}</small>
+        </div>
+        <div class="form-group">
+          <label>{{ _('API Token（旧鉴权方式，留空 = 公开只读）') }}</label>
           <input type="text" name="api_token" class="form-control" value="{{ settings.api_token or '' }}"
                  placeholder="{{ _('留空则任何人都可只读访问') }}" autocomplete="new-password">
-          <small class="form-text text-muted">{{ _('设置后，第三方请求须携带请求头 X-API-Token: 你的Token。仅只读接口，不提供写操作。') }}</small>
+          <small class="form-text text-muted">{{ _('仅当鉴权模式为「双轨」或「仅旧 Token」时生效。请求须携带 X-API-Token 头。') }}</small>
         </div>
         <div class="form-group">
           <label>{{ _('跨域白名单（CORS）') }}</label>
           <input type="text" name="api_cors_origins" class="form-control" value="{{ settings.api_cors_origins or '' }}"
                  placeholder="{{ _('如 https://mini.example.com,https://m.example.com（* 表示允许全部）') }}">
           <small class="form-text text-muted">{{ _('供小程序/H5 前端跨域调用，多个域名用英文逗号分隔，留空不允许跨域。') }}</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-outline card-warning">
+      <div class="card-header"><h3 class="card-title">{{ _('JWT 鉴权（v2.6.3）') }}</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <label>{{ _('JWT 签名密钥') }}</label>
+          <div class="input-group">
+            <input type="text" name="jwt_secret_key" class="form-control" value="{{ settings.jwt_secret_key or '' }}"
+                   placeholder="{{ _('留空则复用 SECRET_KEY') }}" autocomplete="new-password">
+            <div class="input-group-append">
+              <button type="button" class="btn btn-outline-secondary" onclick="document.querySelector('input[name=jwt_regenerate]').value='1';this.form.submit();">
+                <i class="fas fa-sync-alt"></i> {{ _('重新生成') }}
+              </button>
+            </div>
+          </div>
+          <input type="hidden" name="jwt_regenerate" value="0">
+          <small class="form-text text-muted">{{ _('用于签发与校验 JWT。更换后所有已签发的 token 立即失效。留空时复用应用 SECRET_KEY。') }}</small>
+        </div>
+        <div class="row">
+          <div class="col-6">
+            <div class="form-group">
+              <label>{{ _('Access Token 过期（分钟）') }}</label>
+              <input type="number" name="jwt_access_expires_minutes" class="form-control" min="1" max="1440" value="{{ settings.jwt_access_expires_minutes }}">
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="form-group">
+              <label>{{ _('Refresh Token 过期（天）') }}</label>
+              <input type="number" name="jwt_refresh_expires_days" class="form-control" min="1" max="365" value="{{ settings.jwt_refresh_expires_days }}">
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -49,12 +92,44 @@
       </div>
     </div>
 
+    <div class="card card-outline card-danger">
+      <div class="card-header"><h3 class="card-title">{{ _('速率限制（v2.6.3）') }}</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="api_rate_limit_enable" value="on" id="api_rate_limit_enable" {{ 'checked' if settings.api_rate_limit_enable != 'off' }}>
+            <label for="api_rate_limit_enable">{{ _('启用速率限制（防暴力调用）') }}</label>
+          </div>
+          <small class="form-text text-muted">{{ _('按 IP 限流。未配置 Redis 时使用内存计数器，多实例下不精确但可用。') }}</small>
+        </div>
+        <div class="row">
+          <div class="col-6">
+            <div class="form-group">
+              <label>{{ _('登录端点（次/分钟）') }}</label>
+              <input type="number" name="api_rate_limit_login" class="form-control" min="1" max="1000" value="{{ settings.api_rate_limit_login }}">
+              <small class="form-text text-muted">{{ _('POST /api/v1/auth/login，防暴力破解') }}</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="form-group">
+              <label>{{ _('只读端点（次/分钟）') }}</label>
+              <input type="number" name="api_rate_limit_read" class="form-control" min="1" max="10000" value="{{ settings.api_rate_limit_read }}">
+              <small class="form-text text-muted">{{ _('所有 GET /api/v1/* 端点') }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card card-outline card-secondary">
       <div class="card-header"><h3 class="card-title">{{ _('端点一览') }}</h3></div>
       <div class="card-body p-0">
         <table class="table table-sm mb-0">
           <thead><tr><th>{{ _('端点') }}</th><th>{{ _('说明') }}</th></tr></thead>
           <tbody>
+            <tr><td><code>POST /api/v1/auth/login</code></td><td>{{ _('JWT 登录，返回 access + refresh token') }}</td></tr>
+            <tr><td><code>POST /api/v1/auth/refresh</code></td><td>{{ _('刷新 access token') }}</td></tr>
+            <tr><td><code>POST /api/v1/auth/logout</code></td><td>{{ _('登出（客户端清除 token）') }}</td></tr>
             <tr><td><code>GET /api/v1/site</code></td><td>{{ _('站点信息与导航') }}</td></tr>
             <tr><td><code>GET /api/v1/columns</code></td><td>{{ _('栏目列表 / 树') }}</td></tr>
             <tr><td><code>GET /api/v1/columns/&lt;slug&gt;</code></td><td>{{ _('栏目详情') }}</td></tr>

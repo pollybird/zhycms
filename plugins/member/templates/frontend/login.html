@@ -1,0 +1,133 @@
+{% extends theme_base %}
+{% block title %}{{ _('登录') }} - {{ site_settings.site_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h3 class="text-center mb-4"><i class="fas fa-user-circle"></i> {{ _('会员登录') }}</h3>
+
+        <ul class="nav nav-pills justify-content-center mb-3" id="loginTabs">
+          <li class="nav-item">
+            <a class="nav-link active" href="#pwd" data-toggle="tab">{{ _('密码登录') }}</a>
+          </li>
+          {% if member_cfg('member_login_sms_enable') == 'on' %}
+          <li class="nav-item">
+            <a class="nav-link" href="#sms" data-toggle="tab">{{ _('短信登录') }}</a>
+          </li>
+          {% endif %}
+        </ul>
+
+        <div class="tab-content">
+          {# 密码登录 #}
+          <div class="tab-pane fade show active" id="pwd">
+            <form method="post">
+              <input type="hidden" name="login_type" value="password">
+              <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
+              <div class="form-group">
+                <div class="input-group">
+                  <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-user"></i></span></div>
+                  <input type="text" name="identifier" class="form-control" placeholder="{{ _('用户名 / 手机号 / 邮箱') }}" required>
+                </div>
+              </div>
+              <div class="form-group">
+                <div class="input-group">
+                  <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-lock"></i></span></div>
+                  <input type="password" name="password" class="form-control" placeholder="{{ _('密码') }}" required>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <label class="small"><input type="checkbox" name="remember"> {{ _('记住我') }}</label>
+                <a href="{{ url_for('member_frontend.forgot_password') }}" class="small">{{ _('忘记密码？') }}</a>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">{{ _('登 录') }}</button>
+            </form>
+          </div>
+
+          {# 短信登录 #}
+          {% if member_cfg('member_login_sms_enable') == 'on' %}
+          <div class="tab-pane fade" id="sms">
+            <form method="post" id="smsLoginForm">
+              <input type="hidden" name="login_type" value="sms">
+              <input type="hidden" name="next" value="{{ request.args.get('next','') }}">
+              <div class="form-group">
+                <input type="tel" name="phone" class="form-control" maxlength="11" placeholder="{{ _('手机号') }}" required>
+              </div>
+              <div class="form-group">
+                <div class="input-group">
+                  <input type="text" name="code" class="form-control" maxlength="6" placeholder="{{ _('短信验证码') }}" required>
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-primary" id="sendSmsBtn" data-purpose="login">{{ _('获取验证码') }}</button>
+                  </div>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">{{ _('登 录') }}</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+
+        {# 第三方一键登录 #}
+        {% set wechat_on = member_cfg('member_wechat_enable') == 'on' %}
+        {% set qq_on = member_cfg('member_qq_enable') == 'on' %}
+        {% if wechat_on or qq_on %}
+        <div class="text-center text-muted small my-3">—— {{ _('第三方一键登录') }} ——</div>
+        <div class="d-flex justify-content-center">
+          {% if wechat_on %}
+          <a href="{{ url_for('member_frontend.oauth_start', provider='wechat', next=request.args.get('next','')) }}"
+             class="btn btn-outline-success mx-2" title="{{ _('微信登录') }}">
+            <i class="fab fa-weixin fa-lg"></i> {{ _('微信') }}
+          </a>
+          {% endif %}
+          {% if qq_on %}
+          <a href="{{ url_for('member_frontend.oauth_start', provider='qq', next=request.args.get('next','')) }}"
+             class="btn btn-outline-primary mx-2" title="{{ _('QQ 登录') }}">
+            <i class="fab fa-qq fa-lg"></i> QQ
+          </a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if member_cfg('member_register_enable') == 'on' %}
+        <div class="text-center mt-4 small">
+          {{ _('还没有账号？') }}
+          <a href="{{ url_for('member_frontend.register', next=request.args.get('next','')) }}">{{ _('立即注册') }}</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if member_cfg('member_login_sms_enable') == 'on' %}
+<script>
+$(function(){
+  var btn = $('#sendSmsBtn');
+  var remain = 0, timer = null;
+  function tick(){
+    if (remain <= 0) { btn.prop('disabled', false).text('{{ _('获取验证码') }}'); clearInterval(timer); return; }
+    btn.text(remain + ' s'); remain--;
+  }
+  btn.on('click', function(){
+    var phone = $('#smsLoginForm input[name=phone]').val();
+    if (!/^1[3-9]\d{9}$/.test(phone)) { alert('{{ _('请输入正确的手机号') }}'); return; }
+    btn.prop('disabled', true);
+    $.post('{{ url_for("member_frontend.sms_send") }}',
+           {phone: phone, purpose: 'login'}, function(res){
+      if (res.ok) {
+        remain = 60; btn.text(remain + ' s');
+        timer = setInterval(tick, 1000);
+      } else {
+        alert(res.error || '{{ _('发送失败') }}');
+        btn.prop('disabled', false);
+      }
+    }).fail(function(xhr){
+      alert((xhr.responseJSON && xhr.responseJSON.error) || '{{ _('发送失败') }}');
+      btn.prop('disabled', false);
+    });
+  });
+});
+</script>
+{% endif %}
+{% endblock %}

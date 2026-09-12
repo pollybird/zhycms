@@ -191,12 +191,30 @@
               </small>
             </label>
           </div>
-          <div class="icheck-primary d-block">
+          <div class="icheck-primary d-block mb-2">
             <input type="radio" id="demo_svc" name="demo_type" value="service" {{ 'checked' if demo_type == 'service' else '' }}>
             <label for="demo_svc">
               <strong>{{ _('服务业演示数据') }}</strong>
               <small class="text-muted d-block">
                 {{ _('虚拟企业「云业咨询管理有限公司」：关于我们 / 新闻动态 / 服务项目（战略咨询、人力资源、企业培训）/ 客户案例 / 联系我们') }}
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="demo_edu" name="demo_type" value="education" {{ 'checked' if demo_type == 'education' else '' }}>
+            <label for="demo_edu">
+              <strong>{{ _('教育行业演示数据') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('虚拟机构「启明教育培训学校」：关于我们 / 课程中心（少儿编程、英语口语、数学思维）/ 师资力量 / 校园动态 / 联系我们') }}
+              </small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block">
+            <input type="radio" id="demo_cat" name="demo_type" value="catering" {{ 'checked' if demo_type == 'catering' else '' }}>
+            <label for="demo_cat">
+              <strong>{{ _('餐饮行业演示数据') }}</strong>
+              <small class="text-muted d-block">
+                {{ _('虚拟餐厅「鲜味居酒楼」：关于我们 / 招牌菜品（热菜、凉菜、汤品）/ 门店信息 / 美食资讯 / 联系我们') }}
               </small>
             </label>
           </div>

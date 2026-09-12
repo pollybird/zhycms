@@ -1,0 +1,90 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('会员列表') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('会员列表') }}{% endblock %}
+{% set active_menu = 'member_list' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">{{ _('会员列表') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{{ _('前台会员') }}</h3>
+  </div>
+  <div class="card-body">
+    <form method="get" class="form-inline mb-3">
+      <input type="text" name="keyword" value="{{ keyword }}" class="form-control form-control-sm mr-2"
+             placeholder="{{ _('用户名/昵称/手机/邮箱') }}" style="min-width:220px;">
+      <select name="status" class="form-control form-control-sm mr-2">
+        <option value="">{{ _('全部状态') }}</option>
+        <option value="enabled" {{ 'selected' if status == 'enabled' else '' }}>{{ _('启用') }}</option>
+        <option value="disabled" {{ 'selected' if status == 'disabled' else '' }}>{{ _('禁用') }}</option>
+      </select>
+      <button class="btn btn-primary btn-sm"><i class="fas fa-search"></i> {{ _('筛选') }}</button>
+    </form>
+
+    <table class="table table-hover table-sm">
+      <thead>
+        <tr>
+          <th width="60">ID</th>
+          <th>{{ _('用户名') }}</th>
+          <th>{{ _('昵称') }}</th>
+          <th>{{ _('手机号') }}</th>
+          <th>{{ _('邮箱') }}</th>
+          <th width="90">{{ _('第三方') }}</th>
+          <th width="150">{{ _('注册时间') }}</th>
+          <th width="70">{{ _('状态') }}</th>
+          <th width="140">{{ _('操作') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in members %}
+        <tr>
+          <td>{{ m.id }}</td>
+          <td>
+            {% if m.avatar %}<img src="{{ m.avatar }}" width="22" height="22" class="rounded-circle mr-1" style="object-fit:cover;">{% endif %}
+            {{ m.username }}
+          </td>
+          <td>{{ m.nickname or '-' }}</td>
+          <td>{{ m.phone or '-' }}</td>
+          <td>{{ m.email or '-' }}</td>
+          <td>
+            {% for b in m.oauths.all() %}
+            <span class="badge badge-info">{{ b.provider }}</span>
+            {% else %}<span class="text-muted">-</span>{% endfor %}
+          </td>
+          <td><small>{{ m.created_at.strftime('%Y-%m-%d %H:%M') }}</small></td>
+          <td>
+            {% if m.is_enabled %}<span class="badge badge-success">{{ _('启用') }}</span>
+            {% else %}<span class="badge badge-secondary">{{ _('禁用') }}</span>{% endif %}
+          </td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <a href="{{ url_for('admin.member_edit', mid=m.id) }}" class="btn btn-default" title="{{ _('编辑') }}"><i class="fas fa-edit"></i></a>
+              <form method="post" action="{{ url_for('admin.member_delete', mid=m.id) }}" class="d-inline"
+                    onsubmit="return confirm('{{ _('确认删除该会员？') }}')">
+                <button class="btn btn-danger" title="{{ _('删除') }}"><i class="fas fa-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-center text-muted py-4">{{ _('暂无会员') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if pagination.pages > 1 %}
+    <nav><ul class="pagination justify-content-center">
+      {% if pagination.has_prev %}<li class="page-item"><a class="page-link" href="?page={{ pagination.prev_num }}&keyword={{ keyword }}&status={{ status }}">{{ _('上一页') }}</a></li>{% endif %}
+      {% for p in pagination.iter_pages() %}
+      {% if p %}<li class="page-item {{ 'active' if p == pagination.page else '' }}"><a class="page-link" href="?page={{ p }}&keyword={{ keyword }}&status={{ status }}">{{ p }}</a></li>
+      {% else %}<li class="page-item disabled"><span class="page-link">...</span></li>{% endif %}
+      {% endfor %}
+      {% if pagination.has_next %}<li class="page-item"><a class="page-link" href="?page={{ pagination.next_num }}&keyword={{ keyword }}&status={{ status }}">{{ _('下一页') }}</a></li>{% endif %}
+    </ul></nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

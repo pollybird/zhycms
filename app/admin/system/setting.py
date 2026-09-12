@@ -393,7 +393,7 @@ def tool_image_alt():
 @admin_bp.route('/settings/api', methods=['GET', 'POST'])
 @permission_required('system:settings')
 def setting_api():
-    """内容 API：总开关、Token 鉴权、接口缓存 TTL、跨域白名单。"""
+    """内容 API：总开关、鉴权模式、JWT、接口缓存 TTL、跨域白名单、速率限制。"""
     if request.method == 'POST':
         changed = {}
         for key in ('api_enable',):
@@ -401,7 +401,7 @@ def setting_api():
             if Setting.get(key) != val:
                 Setting.set(key, val)
                 changed[key] = val
-        # Token：留空表示公开只读
+        # Token：留空表示公开只读（旧鉴权方式）
         val = (request.form.get('api_token') or '').strip()
         if Setting.get('api_token') != val:
             Setting.set('api_token', val)
@@ -414,6 +414,49 @@ def setting_api():
         if Setting.get('api_cors_origins') != val:
             Setting.set('api_cors_origins', val)
             changed['api_cors_origins'] = val
+
+        # v2.6.3：API 鉴权模式（token / jwt / both）
+        val = (request.form.get('api_auth_mode') or 'both').strip().lower()
+        if val not in ('token', 'jwt', 'both'):
+            val = 'both'
+        if Setting.get('api_auth_mode') != val:
+            Setting.set('api_auth_mode', val)
+            changed['api_auth_mode'] = val
+
+        # v2.6.3：JWT 密钥（可重新生成）
+        val = (request.form.get('jwt_secret_key') or '').strip()
+        if request.form.get('jwt_regenerate') == '1':
+            import secrets
+            val = secrets.token_urlsafe(32)
+            changed['jwt_secret_key'] = '已重新生成'
+        if Setting.get('jwt_secret_key') != val:
+            Setting.set('jwt_secret_key', val)
+            if 'jwt_secret_key' not in changed:
+                changed['jwt_secret_key'] = '已更新'
+        # JWT 过期时间
+        val = str(max(1, min(1440, _int_safe('jwt_access_expires_minutes', default=15))))
+        if Setting.get('jwt_access_expires_minutes') != val:
+            Setting.set('jwt_access_expires_minutes', val)
+            changed['jwt_access_expires_minutes'] = val
+        val = str(max(1, min(365, _int_safe('jwt_refresh_expires_days', default=7))))
+        if Setting.get('jwt_refresh_expires_days') != val:
+            Setting.set('jwt_refresh_expires_days', val)
+            changed['jwt_refresh_expires_days'] = val
+
+        # v2.6.3：速率限制
+        val = _onoff('api_rate_limit_enable')
+        if Setting.get('api_rate_limit_enable') != val:
+            Setting.set('api_rate_limit_enable', val)
+            changed['api_rate_limit_enable'] = val
+        val = str(max(1, min(1000, _int_safe('api_rate_limit_login', default=5))))
+        if Setting.get('api_rate_limit_login') != val:
+            Setting.set('api_rate_limit_login', val)
+            changed['api_rate_limit_login'] = val
+        val = str(max(1, min(10000, _int_safe('api_rate_limit_read', default=120))))
+        if Setting.get('api_rate_limit_read') != val:
+            Setting.set('api_rate_limit_read', val)
+            changed['api_rate_limit_read'] = val
+
         db.session.commit()
         flash(_gettext('内容 API 配置已保存'), 'success')
         if changed:
@@ -426,6 +469,12 @@ def setting_api():
         settings['api_cache_ttl'] = int(settings.get('api_cache_ttl', 60))
     except (TypeError, ValueError):
         settings['api_cache_ttl'] = 60
+    for k in ('jwt_access_expires_minutes', 'jwt_refresh_expires_days',
+              'api_rate_limit_login', 'api_rate_limit_read'):
+        try:
+            settings[k] = int(settings.get(k, Setting.DEFAULTS.get(k, '0')))
+        except (TypeError, ValueError):
+            settings[k] = 0
     return render_template('admin/setting/api.html', settings=settings)
 
 

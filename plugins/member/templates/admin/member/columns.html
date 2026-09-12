@@ -1,0 +1,57 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('栏目可见性') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('栏目会员可见性') }}{% endblock %}
+{% set active_menu = 'member_columns' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">{{ _('栏目可见性') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{{ _('栏目对前台用户的可见性') }}</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.member_settings') }}" class="btn btn-default btn-sm"><i class="fas fa-cog"></i> {{ _('会员设置') }}</a>
+    </div>
+  </div>
+  <form method="post">
+    <div class="card-body">
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        {{ _('勾选的栏目仅登录的前台会员可见：游客在导航中看不到，直接访问会跳转登录页。未勾选的栏目对所有访客公开。') }}
+      </div>
+
+      {% macro render_nodes(nodes, level) %}
+        {% for item in nodes %}
+        {% set col = item.node %}
+        <div class="form-check py-1" style="padding-left: {{ 1.5 + level * 1.6 }}rem;">
+          <input type="checkbox" class="form-check-input col-check" name="member_only" value="{{ col.id }}"
+                 id="col-{{ col.id }}" {{ 'checked' if col.member_only else '' }}
+                 {{ 'disabled' if col.is_deleted else '' }}>
+          <label class="form-check-label {{ 'text-muted' if col.is_deleted else '' }}" for="col-{{ col.id }}">
+            {{ col.name }}
+            <small class="text-muted">[{{ col.slug }}]</small>
+            {% if not col.is_enabled %}<span class="badge badge-secondary">{{ _('未启用') }}</span>{% endif %}
+            {% if col.is_deleted %}<span class="badge badge-danger">{{ _('已删除') }}</span>{% endif %}
+            {% if col.type == 'link' %}<span class="badge badge-light">{{ _('链接') }}</span>{% endif %}
+          </label>
+        </div>
+        {{ render_nodes(item.children, level + 1) }}
+        {% endfor %}
+      {% endmacro %}
+      {{ render_nodes(tree, 0) }}
+    </div>
+    <div class="card-footer">
+      <button type="button" class="btn btn-default btn-sm" id="checkAll">{{ _('全选') }}</button>
+      <button type="button" class="btn btn-default btn-sm" id="checkNone">{{ _('全不选') }}</button>
+      <button type="submit" class="btn btn-primary btn-sm float-right"><i class="fas fa-save"></i> {{ _('保存可见性') }}</button>
+    </div>
+  </form>
+</div>
+
+<script>
+$('#checkAll').on('click', function(){ $('.col-check:not(:disabled)').prop('checked', true); });
+$('#checkNone').on('click', function(){ $('.col-check').prop('checked', false); });
+</script>
+{% endblock %}

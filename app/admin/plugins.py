@@ -66,7 +66,10 @@ def plugin_toggle(slug):
 
     name = rec.name
     if plugin_system.plugin_enabled(slug):
-        plugin_system.disable_plugin(slug)
+        err = plugin_system.disable_plugin(slug)
+        if err:
+            flash(_gettext('插件「{0}」禁用失败：{1}').format(name, err), 'danger')
+            return redirect(url_for('admin.plugin_index'))
         action = 'disable'
         flash(_gettext('插件「{0}」已禁用').format(name), 'success')
     else:
@@ -379,6 +382,21 @@ def _validate_plugin_package(unpacked, archive_name, plugins_dir):
     if not _PLUGIN_SLUG_RE.match(slug):
         raise ValueError(
             _gettext('manifest.json 的 slug 格式不合法，只能包含字母/数字/连字符/下划线，长度 2-32 位（当前：{0}）').format(slug))
+
+    # v2.6.4：依赖 / 继承 / 最低核心版本字段校验
+    min_core = manifest.get('min_core_version', '')
+    if min_core and not isinstance(min_core, str):
+        raise ValueError(_gettext('manifest.json 的 min_core_version 必须是字符串'))
+    extends = manifest.get('extends', '')
+    if extends and not isinstance(extends, str):
+        raise ValueError(_gettext('manifest.json 的 extends 必须是字符串'))
+    requires = manifest.get('requires', [])
+    if requires is not None:
+        if not isinstance(requires, list):
+            raise ValueError(_gettext('manifest.json 的 requires 必须是字符串数组'))
+        for dep in requires:
+            if not isinstance(dep, str) or not dep.strip():
+                raise ValueError(_gettext('manifest.json 的 requires 数组元素必须是非空字符串'))
 
     # 形态 B 时根目录名可能与 slug 不一致：若根 = unpacked 本身（平铺），
     # 先把子项重命名到 unpacked/{slug}/，再让上层用新 root。

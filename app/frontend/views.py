@@ -26,7 +26,8 @@ from ..models.fragment import Fragment
 from ..models.setting import Setting
 from ..models.workflow import STATUS_PUBLISHED
 from ..utils.themes import (
-    theme_template, get_column_template, THEMES_DIR, THEME_SLUG_RE,
+    theme_template, get_column_template, get_active_theme,
+    THEMES_DIR, THEME_SLUG_RE,
 )
 from ..utils.captcha import generate_captcha
 from . import frontend_bp
@@ -58,6 +59,38 @@ def _cache_enabled():
     return Setting.get('cache_enable') == 'on'
 
 
+def _frontend_authenticated():
+    """当前访客是否为已登录的前台用户（由启用的插件守卫提供，无守卫恒 False）。"""
+    try:
+        from ..plugin_system import frontend_guard
+        guard = frontend_guard()
+        return bool(guard and guard['is_authenticated']())
+    except Exception:
+        return False
+
+
+def _member_only_redirect(column):
+    """member_only 栏目对未登录前台访客返回登录跳转 Response，否则 None。"""
+    if not getattr(column, 'member_only', False):
+        return None
+    try:
+        from ..plugin_system import frontend_guard
+        guard = frontend_guard()
+    except Exception:
+        guard = None
+    # 没有插件提供前台登录能力时该字段不生效（保持核心可独立运行）
+    if guard is None or guard['is_authenticated']():
+        return None
+    login_url = '/'
+    try:
+        login_url = guard['login_url']()
+    except Exception:
+        pass
+    nxt = request.full_path if request.query_string else request.path
+    sep = '&' if '?' in login_url else '?'
+    return redirect(f'{login_url}{sep}next={nxt}')
+
+
 def _try_cache(key, ttl_setting_key, default_ttl=600):
     """页面缓存装饰器（简易）：根据 Setting.cache_enable 开关决定是否走缓存。"""
     from ..extensions import cache
@@ -66,6 +99,10 @@ def _try_cache(key, ttl_setting_key, default_ttl=600):
         @wraps(view_func)
         def wrapper(*args, **kwargs):
             if not _cache_enabled():
+                return view_func(*args, **kwargs)
+            # v2.6.4：已登录的前台用户（如会员）不读不写整页缓存，
+            # 避免其可见的 member_only 栏目内容/导航与游客缓存串页
+            if _frontend_authenticated():
                 return view_func(*args, **kwargs)
             try:
                 ttl = int(Setting.get(ttl_setting_key, default_ttl))
@@ -78,6 +115,12 @@ def _try_cache(key, ttl_setting_key, default_ttl=600):
             try:
                 from ..i18n import select_locale
                 cache_key += '|loc=' + select_locale()
+            except Exception:
+                pass
+            # v2.6.3：缓存键包含当前主题，主题切换后新旧主题绝不串页
+            # （多 worker / 缓存清理失败时的纵深防御，正常切换仍由后台主动 cache.clear）
+            try:
+                cache_key += '|theme=' + get_active_theme()
             except Exception:
                 pass
             try:
@@ -136,6 +179,9 @@ def _build_nav():
     各主题无需为插件单独改造。
     """
     columns = Column.get_tree(enabled_only=True)
+    # v2.6.4：未登录的前台访客看不到 member_only 栏目（有插件守卫时生效）
+    if not _frontend_authenticated():
+        columns = [c for c in columns if not getattr(c, 'member_only', False)]
     tree = Column.build_nested(columns)
     try:
         from ..plugin_system import plugin_frontend_menus
@@ -245,6 +291,13 @@ def index():
     news_col, news = _home_column_articles('news', limit=6)
     cases_col, cases = _home_column_articles('cases', limit=4)
 
+    # v2.6.3：教育 / 餐饮行业主题首页数据（栏目 slug 与 bootstrap 演示数据对应）
+    courses_col, courses = _home_column_articles('courses', limit=8)
+    teachers_col, teachers = _home_column_articles('teachers', limit=6)
+    campus_news_col, campus_news = _home_column_articles('campus-news', limit=6)
+    dishes_col, dishes = _home_column_articles('dishes', limit=8)
+    food_news_col, food_news = _home_column_articles('food-news', limit=6)
+
     # 图片默认 ALT 注入（对内容型单页的 page_content，留空由单页渲染处处理）
     return render_template(
         theme_template('index'),
@@ -255,6 +308,11 @@ def index():
         services_col=services_col, services=services,
         news_col=news_col, news=news,
         cases_col=cases_col, cases=cases,
+        courses_col=courses_col, courses=courses,
+        teachers_col=teachers_col, teachers=teachers,
+        campus_news_col=campus_news_col, campus_news=campus_news,
+        dishes_col=dishes_col, dishes=dishes,
+        food_news_col=food_news_col, food_news=food_news,
         seo=_seo()
     )
 
@@ -313,6 +371,11 @@ def column_detail(slug, page=None):
     col = Column.query.filter_by(slug=slug, is_deleted=False).first_or_404()
     if not col.is_enabled:
         abort(404)
+
+    # v2.6.4：member_only 栏目仅登录前台会员可访问（跳转在父栏目/链接处理之前）
+    denied = _member_only_redirect(col)
+    if denied is not None:
+        return denied
 
     nav = _build_nav()
 
@@ -385,6 +448,11 @@ def article_detail(slug, aid):
     article = Article.query.get_or_404(aid)
     if article.column_id != col.id or article.is_deleted or article.status != STATUS_PUBLISHED:
         abort(404)
+
+    # v2.6.4：会员栏目的文章同样仅登录前台会员可访问
+    denied = _member_only_redirect(col)
+    if denied is not None:
+        return denied
 
     # 浏览量 +1（写库时暂时绕过缓存副作用）
     try:

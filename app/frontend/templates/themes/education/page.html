@@ -1,0 +1,42 @@
+{% extends theme_base %}
+{% block title %}{{ t(column, 'name') }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">首页</a></li>
+    <li class="breadcrumb-item active">{{ t(column, 'name') }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  <div class="col-md-12">
+    <h1>{{ t(column, 'name') }}</h1>
+    {% if t(column, 'summary') %}<p class="text-muted">{{ t(column, 'summary') }}</p>{% endif %}
+
+    {# 栏目自定义字段（仅前台可见字段，值在后台“单页字段内容”录入） #}
+    {% for f in fields %}
+      {% set v = column.get_field_value(f.id) %}
+      {% if v %}
+        {% if f.field_type == 'image' %}
+          <div class="mb-3"><img src="{{ v }}" class="img-fluid"></div>
+        {% elif f.field_type == 'file' %}
+          <div class="mb-3"><a href="{{ v }}" class="btn btn-success"><i class="fas fa-download"></i> {{ f.label }}</a></div>
+        {% elif f.field_type == 'url' %}
+          <div class="mb-3"><a href="{{ v }}" target="_blank">{{ f.label }}: {{ v }}</a></div>
+        {% elif f.field_type == 'richtext' %}
+          <div class="mb-3">{{ v|safe }}</div>
+        {% elif f.field_type in ('text','textarea','number') %}
+          <div class="mb-3"><strong>{{ f.label }}:</strong> {{ v }}</div>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+
+    <hr>
+
+    <div class="article-content">
+      {{ t(column, 'page_content')|safe }}
+    </div>
+  </div>
+</div>
+{% endblock %}

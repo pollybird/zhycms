@@ -1,0 +1,9 @@
+{
+  "slug": "catering",
+  "name": "餐饮行业",
+  "version": "2.6.3",
+  "description": "官方内置：餐饮行业主题，暖红橙色调，适合餐厅、酒楼、外卖店、美食品牌；首页含招牌菜品、门店信息、美食资讯。",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

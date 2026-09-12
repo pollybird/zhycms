@@ -77,12 +77,18 @@ def generate_demo_data(industry='manufacturing'):
 
     industry: 'manufacturing' 制造业 / 'service' 服务业
               'manufacturing_en' 英文制造业
+              'education' 教育行业（v2.6.3）
+              'catering' 餐饮行业（v2.6.3）
     """
     _clean_demo_data()
     if industry == 'service':
         _generate_service_demo()
     elif industry == 'manufacturing_en':
         _generate_manufacturing_demo_en()
+    elif industry == 'education':
+        _generate_education_demo()
+    elif industry == 'catering':
+        _generate_catering_demo()
     else:
         _generate_manufacturing_demo()
 
@@ -1076,3 +1082,221 @@ def _add_article(column, title, summary, content, published_at, sort_order=50, c
         cover=cover,
     )
     db.session.add(article)
+
+
+# ============================================================
+# 教育行业演示数据：虚构机构「启明教育培训学校」（v2.6.3）
+# ============================================================
+
+def _generate_education_demo():
+    """教育行业演示数据：K12 课外辅导与素质教育培训机构。"""
+    now = datetime.now()
+
+    school = '启明教育培训学校'
+    brand = '启明教育'
+
+    Setting.set('site_name', school)
+    Setting.set('site_subtitle', '用心做教育，用爱育未来')
+    Setting.set('footer_copyright', f'版权所有 © {school}')
+    Setting.set('site_theme', 'education')
+    Setting.set('seo_title', f'{brand} - 专注K12课外辅导与素质教育')
+    Setting.set('seo_keywords', '教育培训,课外辅导,少儿编程,英语口语,数学思维,素质教育')
+    Setting.set('seo_description', f'{brand}专注K12课外辅导，提供少儿编程、英语口语、数学思维等素质教育课程，助力孩子全面成长。')
+
+    # ============ 栏目结构 ============
+    about = Column(name='关于我们', slug='about', type='page', sort_order=100,
+                   is_enabled=True, parent_mode='first_child',
+                   summary=f'了解{brand}的办学理念与师资团队',
+                   page_content=f'<h3>关于{brand}</h3><p>{brand}成立于2010年，是一家专注于K12课外辅导与素质教育的综合性培训机构。'
+                               f'学校秉承"用心做教育，用爱育未来"的办学理念，致力于为6-18岁学生提供优质的教育服务。</p>'
+                               f'<p>我们拥有一支经验丰富、富有爱心的教师团队，开设少儿编程、英语口语、数学思维等特色课程，'
+                               f'采用小班教学与个性化辅导相结合的模式，关注每一位学生的成长。</p>')
+    db.session.add(about)
+
+    courses = Column(name='课程中心', slug='courses', type='list', sort_order=90,
+                     is_enabled=True, parent_mode='list_children',
+                     summary='丰富的素质教育课程', page_size=12)
+    db.session.add(courses)
+
+    coding = Column(name='少儿编程', slug='coding', type='list',
+                    sort_order=95, is_enabled=True,
+                    parent_mode='first_child', page_size=12,
+                    summary='Scratch / Python 编程启蒙')
+    english = Column(name='英语口语', slug='oral-english', type='list',
+                     sort_order=90, is_enabled=True,
+                     parent_mode='first_child', page_size=12,
+                     summary='外教口语与听力训练')
+    math = Column(name='数学思维', slug='math-thinking', type='list',
+                  sort_order=85, is_enabled=True,
+                  parent_mode='first_child', page_size=12,
+                  summary='逻辑思维与奥数启蒙')
+    db.session.add_all([coding, english, math])
+    db.session.flush()
+    coding.parent_id = courses.id
+    english.parent_id = courses.id
+    math.parent_id = courses.id
+
+    teachers = Column(name='师资力量', slug='teachers', type='list', sort_order=80,
+                      is_enabled=True, parent_mode='first_child',
+                      summary='优秀教师团队介绍', page_size=12)
+    db.session.add(teachers)
+
+    news = Column(name='校园动态', slug='campus-news', type='list', sort_order=70,
+                  is_enabled=True, parent_mode='first_child',
+                  summary='学校新闻与活动', page_size=10)
+    db.session.add(news)
+
+    contact = Column(name='联系我们', slug='contact', type='page', sort_order=60,
+                     is_enabled=True, parent_mode='first_child',
+                     summary='校区地址与联系方式',
+                     page_content=f'<h3>联系我们</h3><p><strong>校区地址：</strong>泰州市海陵区教育路88号</p>'
+                               f'<p><strong>咨询电话：</strong>0523-8888-6666</p>'
+                               f'<p><strong>电子邮箱：</strong>contact@qiming-edu.example.com</p>'
+                               f'<p><strong>营业时间：</strong>周一至周日 8:30 - 21:00</p>')
+    db.session.add(contact)
+
+    db.session.flush()
+
+    # ============ 课程文章 ============
+    _add_article(coding, 'Scratch 图形化编程启蒙班',
+                 '适合7-12岁，从零开始学习编程思维',
+                 f'<p>{brand}少儿编程课程采用 Scratch 图形化编程语言，让孩子在游戏化学习中掌握编程思维。</p>'
+                 f'<p>课程内容：动画制作、游戏设计、数学逻辑</p>',
+                 now, sort_order=100)
+    _add_article(coding, 'Python 青少年编程进阶',
+                 '适合12-16岁，Python语言基础与项目实践',
+                 f'<p>从Python基础语法到完整项目开发，培养孩子的逻辑思维与问题解决能力。</p>',
+                 now, sort_order=90)
+    _add_article(english, '外教英语口语精品班',
+                 '小班教学，纯外教沉浸式口语训练',
+                 f'<p>由经验丰富的外教授课，注重听说能力培养，让孩子敢说、会说、爱说英语。</p>',
+                 now, sort_order=100)
+    _add_article(math, '数学思维训练班',
+                 '逻辑思维培养，奥数启蒙',
+                 f'<p>通过趣味数学题与思维游戏，培养孩子的逻辑推理能力与数学兴趣。</p>',
+                 now, sort_order=100)
+
+    # ============ 师资文章 ============
+    _add_article(teachers, '金牌教师团队介绍',
+                 '经验丰富、富有爱心的教师队伍',
+                 f'<p>{brand}拥有一支由名校毕业生和资深教育工作者组成的教师团队，平均教龄8年以上。</p>',
+                 now, sort_order=100)
+
+    # ============ 校园动态文章 ============
+    _add_article(news, f'{brand}2026年春季招生开始啦',
+                 '新学期课程全面升级，报名享优惠',
+                 f'<p>{brand}2026年春季招生正式启动！少儿编程、英语口语、数学思维等课程全面升级。</p>',
+                 now, sort_order=100)
+    _add_article(news, '校园编程大赛圆满落幕',
+                 '我校学员在市级编程比赛中获奖',
+                 f'<p>在刚刚结束的泰州市青少年编程大赛中，我校学员取得了优异成绩。</p>',
+                 now, sort_order=90)
+
+    db.session.commit()
+
+
+# ============================================================
+# 餐饮行业演示数据：虚构餐厅「鲜味居酒楼」（v2.6.3）
+# ============================================================
+
+def _generate_catering_demo():
+    """餐饮行业演示数据：中餐馆/酒楼。"""
+    now = datetime.now()
+
+    restaurant = '鲜味居酒楼'
+    brand = '鲜味居'
+
+    Setting.set('site_name', restaurant)
+    Setting.set('site_subtitle', '传承经典味道，款待八方来客')
+    Setting.set('footer_copyright', f'版权所有 © {restaurant}')
+    Setting.set('site_theme', 'catering')
+    Setting.set('seo_title', f'{brand} - 经典本帮菜与特色餐饮')
+    Setting.set('seo_keywords', '中餐,本帮菜,特色菜,酒楼,宴席预订,餐饮')
+    Setting.set('seo_description', f'{brand}传承经典本帮菜，提供特色菜品与宴席预订服务，选用新鲜食材，匠心烹制。')
+
+    # ============ 栏目结构 ============
+    about = Column(name='关于我们', slug='about', type='page', sort_order=100,
+                   is_enabled=True, parent_mode='first_child',
+                   summary=f'了解{brand}的历史与特色',
+                   page_content=f'<h3>关于{brand}</h3><p>{brand}始创于1998年，是一家以本帮菜为主的特色酒楼。'
+                               f'二十余年来，我们坚持选用新鲜食材，传承经典烹饪技艺，为顾客呈现地道美味。</p>'
+                               f'<p>酒楼环境雅致，设有多个包间，适合家庭聚餐、商务宴请与各类宴席。</p>')
+    db.session.add(about)
+
+    dishes = Column(name='招牌菜品', slug='dishes', type='list', sort_order=90,
+                    is_enabled=True, parent_mode='list_children',
+                    summary='精选招牌菜式', page_size=12)
+    db.session.add(dishes)
+
+    hot = Column(name='热菜系列', slug='hot-dishes', type='list',
+                 sort_order=95, is_enabled=True,
+                 parent_mode='first_child', page_size=12,
+                 summary='招牌热菜')
+    cold = Column(name='凉菜系列', slug='cold-dishes', type='list',
+                  sort_order=90, is_enabled=True,
+                  parent_mode='first_child', page_size=12,
+                  summary='开胃凉菜')
+    soup = Column(name='汤品系列', slug='soups', type='list',
+                  sort_order=85, is_enabled=True,
+                  parent_mode='first_child', page_size=12,
+                  summary='滋补汤品')
+    db.session.add_all([hot, cold, soup])
+    db.session.flush()
+    hot.parent_id = dishes.id
+    cold.parent_id = dishes.id
+    soup.parent_id = dishes.id
+
+    stores = Column(name='门店信息', slug='stores', type='page', sort_order=80,
+                    is_enabled=True, parent_mode='first_child',
+                    summary='门店地址与营业时间',
+                    page_content=f'<h3>门店信息</h3><p><strong>总店地址：</strong>泰州市海陵区美食街18号</p>'
+                               f'<p><strong>订座电话：</strong>0523-8666-8888</p>'
+                               f'<p><strong>营业时间：</strong>10:00 - 22:00（全年无休）</p>'
+                               f'<p><strong>包间数量：</strong>12间（可容纳10-20人）</p>')
+    db.session.add(stores)
+
+    news = Column(name='美食资讯', slug='food-news', type='list', sort_order=70,
+                  is_enabled=True, parent_mode='first_child',
+                  summary='新品上市与优惠活动', page_size=10)
+    db.session.add(news)
+
+    contact = Column(name='联系我们', slug='contact', type='page', sort_order=60,
+                     is_enabled=True, parent_mode='first_child',
+                     summary='订座与联系方式',
+                     page_content=f'<h3>联系我们</h3><p><strong>订座热线：</strong>0523-8666-8888</p>'
+                               f'<p><strong>门店地址：</strong>泰州市海陵区美食街18号</p>'
+                               f'<p><strong>营业时间：</strong>10:00 - 22:00</p>'
+                               f'<p><strong>宴席预订：</strong>欢迎来电咨询各类宴席包桌服务</p>')
+    db.session.add(contact)
+
+    db.session.flush()
+
+    # ============ 菜品文章 ============
+    _add_article(hot, '红烧狮子头',
+                 '淮扬经典，肥而不腻',
+                 f'<p>{brand}招牌红烧狮子头，选用三分肥七分瘦五花肉，手工剁制，慢火细炖。</p>',
+                 now, sort_order=100)
+    _add_article(hot, '松鼠桂鱼',
+                 '外酥里嫩，酸甜可口',
+                 f'<p>经典苏帮菜，桂鱼改刀炸至金黄，浇上秘制酸甜酱汁。</p>',
+                 now, sort_order=90)
+    _add_article(cold, '水晶肴肉',
+                 '晶莹剔透，入口即化',
+                 f'<p>选用猪蹄髈肉，秘制腌制，切片晶莹剔透，蘸醋食用风味更佳。</p>',
+                 now, sort_order=100)
+    _add_article(soup, '佛跳墙',
+                 '山珍海味，滋补养生',
+                 f'<p>鲍鱼、海参、鱼翅等十余种食材，文火慢炖，汤浓味醇。</p>',
+                 now, sort_order=100)
+
+    # ============ 美食资讯文章 ============
+    _add_article(news, f'{brand}2026年夜饭预订开始',
+                 '除夕团圆饭，火热预订中',
+                 f'<p>{brand}2026年年夜饭预订正式开始！多种套餐可选，包间有限，先到先得。</p>',
+                 now, sort_order=100)
+    _add_article(news, '秋季时令新菜上市',
+                 '应季而食，尝鲜正当时',
+                 f'<p>秋季时令新菜已上市，蟹粉豆腐、板栗烧鸡等应季佳肴等您品尝。</p>',
+                 now, sort_order=90)
+
+    db.session.commit()

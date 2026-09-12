@@ -1,0 +1,187 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('会员设置') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('会员设置') }}{% endblock %}
+{% set active_menu = 'member_settings' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item active">{{ _('会员设置') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header p-0">
+    <ul class="nav nav-tabs m-0">
+      {% for g, glabel in groups %}
+      <li class="nav-item">
+        <a class="nav-link {{ 'active' if g == group else '' }}" href="{{ url_for('admin.member_settings', group=g) }}">{{ _(glabel) }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="card-body">
+    <form method="post" id="settings-form" style="max-width:760px;">
+      <input type="hidden" name="group" value="{{ group }}">
+
+      {% if group == 'basic' %}
+      <div class="form-group custom-switch">
+        <input type="checkbox" class="custom-control-input" id="member_register_enable"
+               name="member_register_enable" {{ 'checked' if values['member_register_enable'] == 'on' else '' }}>
+        <label class="custom-control-label" for="member_register_enable">{{ _('开放前台注册') }}</label>
+        <small class="form-text text-muted">{{ _('关闭后注册页提示未开放，仅后台可管理会员') }}</small>
+      </div>
+      <div class="form-group">
+        <label>{{ _('用户注册协议') }}</label>
+        <textarea name="member_agreement" id="member_agreement" class="form-control" rows="10">{{ values['member_agreement'] }}</textarea>
+        <small class="text-muted">{{ _('注册页弹窗展示，支持富文本；留空则不显示协议链接') }}</small>
+      </div>
+      <div class="form-group custom-switch">
+        <input type="checkbox" class="custom-control-input" id="member_login_sms_enable"
+               name="member_login_sms_enable" {{ 'checked' if values['member_login_sms_enable'] == 'on' else '' }}>
+        <label class="custom-control-label" for="member_login_sms_enable">{{ _('开启短信验证码登录') }}</label>
+      </div>
+      <div class="form-group custom-switch">
+        <input type="checkbox" class="custom-control-input" id="member_auto_register_sms"
+               name="member_auto_register_sms" {{ 'checked' if values['member_auto_register_sms'] == 'on' else '' }}>
+        <label class="custom-control-label" for="member_auto_register_sms">{{ _('短信登录时手机号未注册则自动创建账号') }}</label>
+      </div>
+      <div class="form-group custom-switch">
+        <input type="checkbox" class="custom-control-input" id="member_oauth_auto_register"
+               name="member_oauth_auto_register" {{ 'checked' if values['member_oauth_auto_register'] == 'on' else '' }}>
+        <label class="custom-control-label" for="member_oauth_auto_register">{{ _('微信/QQ 首次登录自动创建账号') }}</label>
+        <small class="form-text text-muted">{{ _('关闭后第三方账号需先注册并登录绑定') }}</small>
+      </div>
+
+      {% elif group == 'sms' %}
+      <div class="form-group">
+        <label>{{ _('短信发送通道') }}</label>
+        <select name="member_sms_provider" class="form-control">
+          <option value="log" {{ 'selected' if values['member_sms_provider'] == 'log' else '' }}>{{ _('日志通道（开发测试，验证码写入日志）') }}</option>
+          <option value="aliyun" {{ 'selected' if values['member_sms_provider'] == 'aliyun' else '' }}>{{ _('阿里云短信') }}</option>
+          <option value="webhook" {{ 'selected' if values['member_sms_provider'] == 'webhook' else '' }}>{{ _('通用 HTTP 接口') }}</option>
+        </select>
+      </div>
+      <h6 class="text-muted mt-4">{{ _('阿里云短信参数') }}</h6>
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label>AccessKey ID</label>
+          <input type="text" name="member_sms_aliyun_key_id" class="form-control" value="{{ values['member_sms_aliyun_key_id'] }}">
+        </div>
+        <div class="form-group col-md-6">
+          <label>AccessKey Secret</label>
+          <input type="password" name="member_sms_aliyun_key_secret" class="form-control" value="{{ values['member_sms_aliyun_key_secret'] }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label>{{ _('短信签名') }}</label>
+          <input type="text" name="member_sms_aliyun_sign" class="form-control" value="{{ values['member_sms_aliyun_sign'] }}" placeholder="{{ _('如：钟毓信息') }}">
+        </div>
+        <div class="form-group col-md-6">
+          <label>{{ _('模板 CODE') }}</label>
+          <input type="text" name="member_sms_aliyun_template" class="form-control" value="{{ values['member_sms_aliyun_template'] }}" placeholder="SMS_xxxxxxxx">
+          <small class="text-muted">{{ _('模板变量须为 ${code}') }}</small>
+        </div>
+      </div>
+      <h6 class="text-muted mt-4">{{ _('通用 HTTP 接口') }}</h6>
+      <div class="form-group">
+        <label>{{ _('接口地址') }}</label>
+        <input type="text" name="member_sms_webhook_url" class="form-control" value="{{ values['member_sms_webhook_url'] }}"
+               placeholder="https://example.com/sms?phone={phone}&code={code}">
+        <small class="text-muted">{{ _('支持占位符 {phone}、{code}') }}</small>
+      </div>
+      <div class="form-group">
+        <label>{{ _('请求方式') }}</label>
+        <select name="member_sms_webhook_method" class="form-control" style="max-width:160px;">
+          <option value="GET" {{ 'selected' if values['member_sms_webhook_method'] == 'GET' else '' }}>GET</option>
+          <option value="POST" {{ 'selected' if values['member_sms_webhook_method'] == 'POST' else '' }}>POST(JSON)</option>
+        </select>
+      </div>
+      <h6 class="text-muted mt-4">{{ _('验证码策略') }}</h6>
+      <div class="form-row">
+        <div class="form-group col-md-4">
+          <label>{{ _('有效期(秒)') }}</label>
+          <input type="number" name="member_sms_code_ttl" class="form-control" value="{{ values['member_sms_code_ttl'] }}">
+        </div>
+        <div class="form-group col-md-4">
+          <label>{{ _('发送间隔(秒)') }}</label>
+          <input type="number" name="member_sms_send_interval" class="form-control" value="{{ values['member_sms_send_interval'] }}">
+        </div>
+        <div class="form-group col-md-4">
+          <label>{{ _('每日上限(条)') }}</label>
+          <input type="number" name="member_sms_daily_limit" class="form-control" value="{{ values['member_sms_daily_limit'] }}">
+        </div>
+      </div>
+
+      {% elif group == 'wechat' %}
+      <div class="form-group custom-switch">
+        <input type="checkbox" class="custom-control-input" id="member_wechat_enable"
+               name="member_wechat_enable" {{ 'checked' if values['member_wechat_enable'] == 'on' else '' }}>
+        <label class="custom-control-label" for="member_wechat_enable">{{ _('开启微信一键登录（开放平台网站应用扫码）') }}</label>
+      </div>
+      <div class="form-group">
+        <label>AppID</label>
+        <input type="text" name="member_wechat_appid" class="form-control" value="{{ values['member_wechat_appid'] }}">
+      </div>
+      <div class="form-group">
+        <label>AppSecret</label>
+        <input type="password" name="member_wechat_secret" class="form-control" value="{{ values['member_wechat_secret'] }}">
+      </div>
+      <div class="alert alert-light border small">
+        {{ _('授权回调域请在微信开放平台配置为本站域名；回调地址由系统自动生成：') }}
+        <code>/oauth/wechat/callback</code>
+      </div>
+
+      {% elif group == 'qq' %}
+      <div class="form-group custom-switch">
+        <input type="checkbox" class="custom-control-input" id="member_qq_enable"
+               name="member_qq_enable" {{ 'checked' if values['member_qq_enable'] == 'on' else '' }}>
+        <label class="custom-control-label" for="member_qq_enable">{{ _('开启 QQ 一键登录（QQ 互联）') }}</label>
+      </div>
+      <div class="form-group">
+        <label>APP ID</label>
+        <input type="text" name="member_qq_appid" class="form-control" value="{{ values['member_qq_appid'] }}">
+      </div>
+      <div class="form-group">
+        <label>APP Key</label>
+        <input type="password" name="member_qq_secret" class="form-control" value="{{ values['member_qq_secret'] }}">
+      </div>
+      <div class="alert alert-light border small">
+        {{ _('请在 QQ 互联「回调地址」中配置：') }}
+        <code><span id="qq-cb">{{ request.host_url }}oauth/qq/callback</span></code>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-save"></i> {{ _('保存设置') }}</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+{% if group == 'basic' %}
+<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
+<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
+<style>.ck.ck-editor__editable_inline { min-height: 320px; }</style>
+<script>
+  let agreementEditor;
+  CKEDITOR.ClassicEditor.create(document.querySelector('#member_agreement'), {
+    licenseKey: 'GPL', language: 'zh-cn',
+    placeholder: '{{ _('在此编辑注册协议……') }}',
+    toolbar: {
+      items: ['undo','redo','|','heading','|','bold','italic','underline','|','alignment','|',
+              'bulletedList','numberedList','outdent','indent','|','link','insertTable',
+              'blockQuote','horizontalLine','|','removeFormat','sourceEditing'],
+      shouldNotGroupWhenFull: true
+    },
+    removePlugins: ['AIAssistant','AITextAdapter','OpenAITextAdapter','AWSTextAdapter','CKBox',
+      'CKFinder','EasyImage','RealTimeCollaborativeComments','RealTimeCollaborativeTrackChanges',
+      'RealTimeCollaborativeRevisionHistory','PresenceList','Comments','TrackChanges',
+      'TrackChangesData','RevisionHistory','Pagination','WProofreader','MathType','SlashCommand',
+      'Template','DocumentOutline','FormatPainter','TableOfContents','PasteFromOfficeEnhanced','CaseChange']
+  }).then(e => { agreementEditor = e; }).catch(err => console.error(err));
+  $('#settings-form').on('submit', function(){
+    if (agreementEditor) document.querySelector('#member_agreement').value = agreementEditor.getData();
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,89 @@
+{% extends theme_base %}
+{% block title %}{{ _('会员中心') }} - {{ site_settings.site_name }}{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">{{ _('首页') }}</a></li>
+      <li class="breadcrumb-item active">{{ _('会员中心') }}</li>
+    </ol>
+  </nav>
+
+  <div class="row">
+    <div class="col-md-4 mb-4">
+      <div class="card text-center">
+        <div class="card-body">
+          {% if member.avatar %}
+          <img src="{{ member.avatar }}" class="rounded-circle mb-3" width="96" height="96" style="object-fit:cover;" alt="avatar">
+          {% else %}
+          <div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center mb-3"
+               style="width:96px;height:96px;font-size:40px;">
+            <i class="fas fa-user"></i>
+          </div>
+          {% endif %}
+          <h5 class="mb-1">{{ member.display_name }}</h5>
+          <small class="text-muted">@{{ member.username }}</small>
+          <div class="list-group list-group-flush text-left mt-3">
+            <a href="{{ url_for('member_frontend.center') }}" class="list-group-item list-group-item-action active">
+              <i class="fas fa-tachometer-alt mr-2"></i>{{ _('会员中心') }}</a>
+            <a href="{{ url_for('member_frontend.profile') }}" class="list-group-item list-group-item-action">
+              <i class="fas fa-user-edit mr-2"></i>{{ _('资料编辑') }}</a>
+            <a href="{{ url_for('member_frontend.change_password') }}" class="list-group-item list-group-item-action">
+              <i class="fas fa-key mr-2"></i>{{ _('修改密码') }}</a>
+            <a href="{{ url_for('member_frontend.logout') }}" class="list-group-item list-group-item-action text-danger">
+              <i class="fas fa-sign-out-alt mr-2"></i>{{ _('退出登录') }}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-8">
+      <div class="card mb-4">
+        <div class="card-header">{{ _('账号信息') }}</div>
+        <div class="card-body">
+          <table class="table table-borderless table-sm mb-0">
+            <tr><th style="width:120px;">{{ _('用户名') }}</th><td>{{ member.username }}</td></tr>
+            <tr><th>{{ _('昵称') }}</th><td>{{ member.nickname or '-' }}</td></tr>
+            <tr><th>{{ _('手机号') }}</th><td>{{ member.phone or '-' }}</td></tr>
+            <tr><th>{{ _('邮箱') }}</th><td>{{ member.email or '-' }}</td></tr>
+            <tr><th>{{ _('注册时间') }}</th><td>{{ member.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+            <tr><th>{{ _('最近登录') }}</th><td>{{ member.last_login_at.strftime('%Y-%m-%d %H:%M') if member.last_login_at else '-' }}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">{{ _('第三方账号绑定') }}</div>
+        <div class="card-body">
+          {% set wechat_on = member_cfg('member_wechat_enable') == 'on' %}
+          {% set qq_on = member_cfg('member_qq_enable') == 'on' %}
+          <table class="table table-sm mb-0">
+            {% if wechat_on %}
+            <tr>
+              <td style="width:120px;"><i class="fab fa-weixin text-success"></i> {{ _('微信') }}</td>
+              <td>
+                {% if 'wechat' in bindings %}<span class="badge badge-success">{{ _('已绑定') }}</span>
+                {% else %}<a class="btn btn-sm btn-outline-success" href="{{ url_for('member_frontend.oauth_start', provider='wechat') }}">{{ _('去绑定') }}</a>{% endif %}
+              </td>
+            </tr>
+            {% endif %}
+            {% if qq_on %}
+            <tr>
+              <td><i class="fab fa-qq text-primary"></i> QQ</td>
+              <td>
+                {% if 'qq' in bindings %}<span class="badge badge-success">{{ _('已绑定') }}</span>
+                {% else %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('member_frontend.oauth_start', provider='qq') }}">{{ _('去绑定') }}</a>{% endif %}
+              </td>
+            </tr>
+            {% endif %}
+            {% if not wechat_on and not qq_on %}
+            <tr><td class="text-muted text-center">{{ _('暂未开启第三方登录') }}</td></tr>
+            {% endif %}
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -71,6 +71,7 @@
         {% endfor %}
       </ul>
 
+      {{ member_user_menu() }}
       {% block locale_switcher %}
       {% set _locales = available_locales() %}
       {% if _locales %}

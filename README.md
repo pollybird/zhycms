@@ -2,7 +2,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v2.6.2**（质量加固：权限边界 / 插件生命周期 / Alembic 迁移 / API 契约 / 存储驱动抽象 5 大测试域补齐，测试 34 → 113 项：详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v2.6.4**（前台会员体系 + 栏目会员可见性；插件依赖/继承/最低版本强校验。详见 [CHANGELOG](CHANGELOG.md)）
 
 ---
 
@@ -64,10 +64,16 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **SEO 优化** | 伪静态、sitemap、robots.txt、页面缓存、图片默认 ALT | v2.0 |
 | **表单收集** | 可视化表单设计，提交后邮件/企业微信实时通知 | v2.0 |
 | **备份恢复** | MySQL/PostgreSQL/JSON 三种方式，一键备份与恢复 | v2.0 |
+| **前台会员体系** | 社区插件 `member`：注册/登录/资料/改密/找回密码、微信/QQ 一键登录、短信验证码登录、注册协议、栏目会员可见性 | v2.6.4 |
+| **插件依赖治理** | `manifest.json` 支持 `requires`/`extends`/`min_core_version`，启用强校验 + 禁用反向依赖校验 | v2.6.4 |
 
 ---
 
 ## 版本速览
+
+### v2.6.4（2026-09-12）
+
+前台会员体系 + 插件依赖治理。新增社区插件 `member`（注册/登录/微信QQ一键登录/短信登录/找回密码/栏目会员可见性）；核心新增 `Column.member_only` 字段与前台访问守卫；插件系统新增 `requires`/`extends`/`min_core_version` 启用强校验与禁用反向依赖校验。数据库迁移 `0008`，无新增依赖。
 
 ### v2.6.0（2026-09-10）
 
@@ -249,6 +255,7 @@ zhycms/
 - **零侵入扩展**：`plugins/<slug>/` 目录 + `manifest.json` + `PluginBase` 基类
 - **运行时门控**：以 `site_settings.enabled_plugins` 控制启停，禁用即隐身、不删数据
 - **能力扩展**：可扩展后台页面、前台路由/模板函数、数据表、REST API、sitemap、全站搜索内容贡献（SearchProvider）、审计模块、演示数据钩子
+- **依赖/继承/最低版本校验（v2.6.4）**：`manifest.json` 支持 `requires` / `extends` / `min_core_version`，启用时强校验、禁用时反向依赖校验，详见 [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md)
 - **官方内置插件**：轮播图、产品展示、友情链接、自定义表单、统计代码、对象存储、招聘管理、一键翻译
 
 ### 国际化

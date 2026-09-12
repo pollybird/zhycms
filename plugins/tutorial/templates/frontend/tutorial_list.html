@@ -1,0 +1,110 @@
+{# 教程插件内置列表模板：当前主题未提供 tutorial_list.html 时回退使用。
+   仅依赖 Bootstrap4 通用类与 theme_base，任何主题均可渲染。 #}
+{% extends theme_base %}
+{% block title %}{{ _('教程中心') }} - {{ site_settings.site_name }}{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('frontend.index') }}">{{ _('首页') }}</a></li>
+    <li class="breadcrumb-item active">{{ _('教程中心') }}</li>
+  </ol>
+</nav>
+
+<div class="row">
+  {# 侧栏：分类 + 难度筛选 #}
+  <div class="col-md-3 mb-4">
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white"><i class="fas fa-folder"></i> {{ _('教程分类') }}</div>
+      <div class="list-group list-group-flush">
+        <a href="{{ url_for('tutorial_frontend.tutorial_list') }}"
+           class="list-group-item list-group-item-action {{ 'active' if not current_category else '' }}">
+          {{ _('全部教程') }}
+        </a>
+        {% for c in categories %}
+        <a href="{{ url_for('tutorial_frontend.tutorial_category', slug=c.slug) }}"
+           class="list-group-item list-group-item-action {{ 'active' if current_category and current_category.id == c.id else '' }}">
+          {{ c.name }}
+          <span class="badge badge-light float-right">{{ c.tutorials.filter_by(is_deleted=False, is_enabled=True).count() }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header bg-primary text-white"><i class="fas fa-signal"></i> {{ _('难度') }}</div>
+      <div class="card-body p-2">
+        {% set diffs = [('', _('全部')), ('beginner', _('入门')), ('intermediate', _('进阶')), ('advanced', _('高级'))] %}
+        {% for val, label in diffs %}
+        <a href="{{ url_for('tutorial_frontend.tutorial_list', difficulty=val, category=current_category.slug if current_category else '') }}"
+           class="btn btn-sm {{ 'btn-primary' if difficulty == val else 'btn-outline-secondary' }} mb-1 mr-1">{{ label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# 主区：教程卡片网格 #}
+  <div class="col-md-9">
+    {% if current_category %}
+    <div class="mb-3">
+      <h3 class="mb-1">{{ current_category.name }}</h3>
+      {% if current_category.description %}<p class="text-muted">{{ current_category.description }}</p>{% endif %}
+    </div>
+    {% endif %}
+
+    <form method="get" class="form-inline mb-3">
+      <input type="text" name="keyword" value="{{ keyword }}" class="form-control form-control-sm mr-2" placeholder="{{ _('搜索教程...') }}" style="max-width:240px;">
+      {% if current_category %}<input type="hidden" name="category" value="{{ current_category.slug }}">{% endif %}
+      {% if difficulty %}<input type="hidden" name="difficulty" value="{{ difficulty }}">{% endif %}
+      <button class="btn btn-primary btn-sm"><i class="fas fa-search"></i> {{ _('搜索') }}</button>
+    </form>
+
+    <div class="row">
+      {% for t in tutorials %}
+      <div class="col-md-6 col-lg-4 mb-4">
+        <a href="{{ url_for('tutorial_frontend.tutorial_detail', slug=t.slug) }}" class="card h-100 text-decoration-none">
+          {% if t.cover %}
+          <img src="{{ t.cover }}" class="card-img-top" alt="{{ t.title }}" style="height:160px;object-fit:cover;">
+          {% else %}
+          <div class="d-flex align-items-center justify-content-center" style="height:160px;background:linear-gradient(135deg,#667eea,#764ba2);">
+            <i class="fas fa-book-open fa-3x text-white"></i>
+          </div>
+          {% endif %}
+          <div class="card-body">
+            <h6 class="card-title text-truncate">{{ t.title }}</h6>
+            <p class="text-muted small text-truncate mb-2">{{ t.summary or '' }}</p>
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="badge badge-{{ 'success' if t.difficulty=='beginner' else 'warning' if t.difficulty=='intermediate' else 'danger' }}">{{ t.difficulty_label }}</span>
+              <small class="text-muted"><i class="fas fa-clock"></i> {{ t.duration }}{{ _('分钟') }} · <i class="fas fa-eye"></i> {{ t.view_count }}</small>
+            </div>
+          </div>
+        </a>
+      </div>
+      {% else %}
+      <div class="col-12 text-center text-muted py-5">{{ _('暂无教程') }}</div>
+      {% endfor %}
+    </div>
+
+    {# 分页 #}
+    {% if pagination.pages > 1 %}
+    <nav aria-label="Page navigation">
+      <ul class="pagination justify-content-center">
+        {% if pagination.has_prev %}
+        <li class="page-item"><a class="page-link" href="?page={{ pagination.prev_num }}{% if keyword %}&keyword={{ keyword }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if current_category %}&category={{ current_category.slug }}{% endif %}">{{ _('上一页') }}</a></li>
+        {% endif %}
+        {% for p in pagination.iter_pages() %}
+        {% if p %}
+        <li class="page-item {{ 'active' if p == pagination.page else '' }}"><a class="page-link" href="?page={{ p }}{% if keyword %}&keyword={{ keyword }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if current_category %}&category={{ current_category.slug }}{% endif %}">{{ p }}</a></li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        {% endfor %}
+        {% if pagination.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ pagination.next_num }}{% if keyword %}&keyword={{ keyword }}{% endif %}{% if difficulty %}&difficulty={{ difficulty }}{% endif %}{% if current_category %}&category={{ current_category.slug }}{% endif %}">{{ _('下一页') }}</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends theme_base %}
+{% block title %}{{ _('找回密码') }} - {{ site_settings.site_name }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-4">
+  <div class="col-md-6 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <h3 class="text-center mb-4"><i class="fas fa-key"></i> {{ _('手机找回密码') }}</h3>
+        <form method="post" id="forgotForm">
+          <div class="form-group">
+            <input type="tel" name="phone" class="form-control" maxlength="11" placeholder="{{ _('注册时填写的手机号') }}" required>
+          </div>
+          <div class="form-group">
+            <div class="input-group">
+              <input type="text" name="code" class="form-control" maxlength="6" placeholder="{{ _('短信验证码') }}" required>
+              <div class="input-group-append">
+                <button type="button" class="btn btn-outline-primary" id="sendSmsBtn" data-purpose="reset">{{ _('获取验证码') }}</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <input type="password" name="password" class="form-control" placeholder="{{ _('新密码（至少 6 位）') }}" required>
+          </div>
+          <div class="form-group">
+            <input type="password" name="password_confirm" class="form-control" placeholder="{{ _('确认新密码') }}" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">{{ _('重置密码') }}</button>
+        </form>
+        <div class="text-center mt-3 small">
+          <a href="{{ url_for('member_frontend.login') }}">{{ _('返回登录') }}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+$(function(){
+  var btn = $('#sendSmsBtn');
+  var remain = 0, timer = null;
+  function tick(){
+    if (remain <= 0) { btn.prop('disabled', false).text('{{ _('获取验证码') }}'); clearInterval(timer); return; }
+    btn.text(remain + ' s'); remain--;
+  }
+  btn.on('click', function(){
+    var phone = $('#forgotForm input[name=phone]').val();
+    if (!/^1[3-9]\d{9}$/.test(phone)) { alert('{{ _('请输入正确的手机号') }}'); return; }
+    btn.prop('disabled', true);
+    $.post('{{ url_for("member_frontend.sms_send") }}',
+           {phone: phone, purpose: 'reset'}, function(res){
+      if (res.ok) { remain = 60; btn.text(remain + ' s'); timer = setInterval(tick, 1000); }
+      else { alert(res.error || '{{ _('发送失败') }}'); btn.prop('disabled', false); }
+    }).fail(function(xhr){
+      alert((xhr.responseJSON && xhr.responseJSON.error) || '{{ _('发送失败') }}');
+      btn.prop('disabled', false);
+    });
+  });
+});
+</script>
+{% endblock %}

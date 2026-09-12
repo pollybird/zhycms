@@ -1,0 +1,67 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('编辑会员') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('编辑会员') }}{% endblock %}
+{% set active_menu = 'member_list' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.member_index') }}">{{ _('会员列表') }}</a></li>
+<li class="breadcrumb-item active">{{ _('编辑会员') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <form method="post" style="max-width:640px;">
+      <div class="form-group">
+        <label>{{ _('用户名') }}</label>
+        <input type="text" class="form-control" value="{{ member.username }}" disabled>
+      </div>
+      <div class="form-group">
+        <label>{{ _('昵称') }} <span class="text-danger">*</span></label>
+        <input type="text" name="nickname" class="form-control" value="{{ member.nickname or '' }}" required>
+      </div>
+      <div class="row">
+        <div class="col-md-6 form-group">
+          <label>{{ _('手机号') }}</label>
+          <input type="tel" name="phone" class="form-control" value="{{ member.phone or '' }}" maxlength="11">
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ _('邮箱') }}</label>
+          <input type="email" name="email" class="form-control" value="{{ member.email or '' }}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>{{ _('性别') }}</label>
+        <select name="gender" class="form-control" style="max-width:200px;">
+          <option value="" {{ 'selected' if not member.gender else '' }}>{{ _('保密') }}</option>
+          <option value="male" {{ 'selected' if member.gender == 'male' else '' }}>{{ _('男') }}</option>
+          <option value="female" {{ 'selected' if member.gender == 'female' else '' }}>{{ _('女') }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>{{ _('重置密码') }}</label>
+        <input type="text" name="new_password" class="form-control" style="max-width:300px;"
+               placeholder="{{ _('留空则不修改密码') }}">
+        <small class="text-muted">{{ _('填写后将覆盖会员当前密码（至少 6 位）') }}</small>
+      </div>
+      <div class="form-group">
+        <div class="custom-control custom-switch">
+          <input type="checkbox" name="is_enabled" class="custom-control-input" id="is_enabled"
+                 {{ 'checked' if member.is_enabled else '' }}>
+          <label class="custom-control-label" for="is_enabled">{{ _('账号启用') }}</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="mb-1">{{ _('已绑定第三方账号') }}</label>
+        <div>
+          {% for b in member.oauths.all() %}
+          <span class="badge badge-info mr-1">{{ b.provider }}: {{ b.nickname or b.openid[:12] }}</span>
+          {% else %}<span class="text-muted">{{ _('无') }}</span>{% endfor %}
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存') }}</button>
+      <a href="{{ url_for('admin.member_index') }}" class="btn btn-default">{{ _('取消') }}</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

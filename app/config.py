@@ -99,6 +99,19 @@ class Config:
     # 后台每页显示条数
     ADMIN_PAGE_SIZE = 15
 
+    # v2.6.3：API JWT 鉴权配置
+    # JWT_SECRET_KEY 默认复用 SECRET_KEY，可通过 Setting 'jwt_secret_key' 独立配置
+    JWT_TOKEN_LOCATION = ['headers']
+    JWT_HEADER_NAME = 'Authorization'
+    JWT_HEADER_TYPE = 'Bearer'
+    JWT_ACCESS_TOKEN_EXPIRES = 15 * 60       # 15 分钟（秒）
+    JWT_REFRESH_TOKEN_EXPIRES = 7 * 24 * 3600  # 7 天（秒）
+    JWT_ERROR_MESSAGE_KEY = 'message'
+
+    # v2.6.3：API 速率限制默认值（可在后台覆盖）
+    API_RATE_LIMIT_LOGIN = '5 per minute'       # 登录端点每 IP
+    API_RATE_LIMIT_READ = '120 per minute'      # 只读端点每 IP
+
     # 模块8：Flask-Caching 配置（默认 SimpleCache，create_app 中按 Setting 切 Redis）
     CACHE_TYPE = 'SimpleCache'
     CACHE_DEFAULT_TIMEOUT = 3600

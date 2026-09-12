@@ -21,6 +21,10 @@ class Column(db.Model):
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
 
+    # 前台访问范围：False=所有访客可见；True=仅登录的前台会员可见
+    # （由 member 前台用户插件解释；插件未启用时不产生限制）
+    member_only = db.Column(db.Boolean, default=False, nullable=False)
+
     # 单页内容（仅 type=page 且为叶子栏目时使用）
     page_content = db.Column(db.Text)
 

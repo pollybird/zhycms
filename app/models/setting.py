@@ -28,7 +28,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '2.6.2'
+    CMS_VERSION = '2.6.4'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -101,9 +101,18 @@ class Setting(db.Model):
 
         # ===== v2.2.0：内容 API =====
         'api_enable': 'on',                  # on=启用 / off=整体 404
-        'api_token': '',                     # 非空时要求请求头 X-API-Token
+        'api_token': '',                     # 非空时要求请求头 X-API-Token（旧鉴权方式）
         'api_cache_ttl': '60',               # 接口缓存秒数（0=不缓存）
         'api_cors_origins': '',              # 跨域白名单，逗号分隔，* 全部
+
+        # ===== v2.6.3：API JWT 鉴权 + 速率限制 =====
+        'api_auth_mode': 'both',             # token=旧令牌 / jwt=仅JWT / both=双轨兼容（默认）
+        'jwt_secret_key': '',                # JWT 签名密钥，空则复用 SECRET_KEY
+        'jwt_access_expires_minutes': '15',  # access token 过期时间（分钟）
+        'jwt_refresh_expires_days': '7',     # refresh token 过期时间（天）
+        'api_rate_limit_enable': 'on',       # on=开启速率限制
+        'api_rate_limit_login': '5',         # 登录端点每 IP 每分钟次数
+        'api_rate_limit_read': '120',        # 只读端点每 IP 每分钟次数
 
         # ===== v2.3.0：第三方统计代码（plugins/analytics，键值存储零迁移）=====
         'analytics_enable': '0',             # 1=启用前台注入 / 0=关闭

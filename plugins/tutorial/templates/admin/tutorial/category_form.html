@@ -1,0 +1,48 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('编辑分类') if category else _('新增分类') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('编辑分类') if category else _('新增分类') }}{% endblock %}
+{% set active_menu = 'tutorial' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.tutorial_index') }}">{{ _('教程中心') }}</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('admin.tutorial_categories') }}">{{ _('分类管理') }}</a></li>
+<li class="breadcrumb-item active">{{ _('编辑分类') if category else _('新增分类') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      <div class="row">
+        <div class="col-md-6 form-group">
+          <label>{{ _('名称') }} <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" value="{{ category.name if category else '' }}" required>
+        </div>
+        <div class="col-md-6 form-group">
+          <label>{{ _('标识(slug)') }} <span class="text-danger">*</span></label>
+          <input type="text" name="slug" class="form-control" value="{{ category.slug if category else '' }}" required>
+          <small class="text-muted">{{ _('英文小写字母/数字/连字符') }}</small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>{{ _('描述') }}</label>
+        <textarea name="description" class="form-control" rows="2">{{ category.description if category else '' }}</textarea>
+      </div>
+      <div class="row">
+        <div class="col-md-3 form-group">
+          <label>{{ _('排序') }}</label>
+          <input type="number" name="sort_order" class="form-control" value="{{ category.sort_order if category else 0 }}">
+        </div>
+        <div class="col-md-3 form-group">
+          <label>{{ _('状态') }}</label>
+          <div class="mt-2">
+            <label><input type="checkbox" name="is_enabled" value="on" {{ 'checked' if not category or category.is_enabled else '' }}> {{ _('启用') }}</label>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存') }}</button>
+      <a href="{{ url_for('admin.tutorial_categories') }}" class="btn btn-default">{{ _('取消') }}</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

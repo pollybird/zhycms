@@ -7,7 +7,7 @@ from flask import Flask, redirect, url_for, request, g, abort
 from flask_login import current_user
 
 from .config import config
-from .extensions import db, login_manager, cache, set_scheduler, babel, migrate, server_session
+from .extensions import db, login_manager, cache, set_scheduler, babel, migrate, server_session, jwt, limiter
 from .i18n import select_locale, available_locales, current_locale, _p
 
 
@@ -408,6 +408,31 @@ def create_app(config_name=None):
     # v2.3.0 国际化：初始化 Babel 并注册 locale 选择器
     # （须在 db 之后：selector 内读 Setting；在蓝图注册之前）
     babel.init_app(app, locale_selector=select_locale)
+
+    # v2.6.3：API JWT 鉴权初始化
+    # JWT_SECRET_KEY 优先用 Setting 'jwt_secret_key'，空则复用 SECRET_KEY
+    with app.app_context():
+        try:
+            from .models.setting import Setting
+            jwt_secret = Setting.get('jwt_secret_key') or app.config.get('SECRET_KEY')
+            app.config['JWT_SECRET_KEY'] = jwt_secret
+            # 过期时间从 Setting 读取（分钟/天）
+            try:
+                app.config['JWT_ACCESS_TOKEN_EXPIRES'] = int(
+                    Setting.get('jwt_access_expires_minutes', '15')) * 60
+            except (TypeError, ValueError):
+                pass
+            try:
+                app.config['JWT_REFRESH_TOKEN_EXPIRES'] = int(
+                    Setting.get('jwt_refresh_expires_days', '7')) * 24 * 3600
+            except (TypeError, ValueError):
+                pass
+        except Exception:
+            app.config['JWT_SECRET_KEY'] = app.config.get('SECRET_KEY')
+    jwt.init_app(app)
+
+    # v2.6.3：API 速率限制初始化（未配置 Redis 时用内存存储，多实例下不精确但可用）
+    limiter.init_app(app)
 
     # 兜底编译核心翻译（.mo 不入库；开发环境未 pybabel compile 时自动生成，
     # 避免英文等语种下全站 _() 文案回退中文）

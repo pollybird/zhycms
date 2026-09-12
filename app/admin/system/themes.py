@@ -17,7 +17,7 @@ from flask import (render_template, redirect, url_for, request, flash,
                    send_file)
 
 from flask_babel import gettext as _gettext
-from ...extensions import db
+from ...extensions import db, cache
 from ...models.audit import (OP_UPDATE, OP_UPLOAD, OP_DELETE, OP_EXPORT,
                             MODULE_SETTING)
 from ...models.setting import Setting
@@ -274,6 +274,16 @@ def theme_activate(slug):
 
     Setting.set('site_theme', slug)
     db.session.commit()
+
+    # v2.6.3 修复：切换主题后必须清空前台整页缓存。
+    # 前台页面缓存键不含主题标识（见 frontend/views.py _try_cache），
+    # 否则旧主题渲染的 HTML 会在 TTL 内继续命中，导致各页面主题不一致。
+    # 这里无条件清空（不经过 clear_content_cache 的 cache_enable 早退判断），
+    # 覆盖「先开缓存产生页面、再关缓存切主题」的边缘场景。
+    try:
+        cache.clear()
+    except Exception:
+        pass
 
     name = (mf.get('name') or '').strip() or slug
     audit_log(OP_UPDATE, MODULE_SETTING, target_id='site_theme',

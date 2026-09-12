@@ -1,0 +1,9 @@
+{
+  "slug": "education",
+  "name": "教育行业",
+  "version": "2.6.3",
+  "description": "官方内置：教育行业主题，明亮天蓝色调，展现青少年朝气，适合学校、培训机构、教育机构；首页含课程展示、师资力量、校园动态。",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "template_required": ["index.html", "list.html", "article.html", "page.html", "base.html", "404.html", "500.html"]
+}

@@ -72,6 +72,8 @@ def save_column(column, *, form_data, files_data):
     column.summary = (form_data.get('summary') or '').strip()
     column.sort_order = int(form_data.get('sort_order') or 0)
     column.is_enabled = (form_data.get('is_enabled') == 'on')
+    # 前台会员可见性（member 插件启用时后台表单才展示本项；未启用时恒为 False）
+    column.member_only = (form_data.get('member_only') == 'on')
 
     column.seo_title = (form_data.get('seo_title') or '').strip()
     column.seo_keywords = (form_data.get('seo_keywords') or '').strip()

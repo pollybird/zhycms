@@ -1,0 +1,12 @@
+{% extends theme_base %}
+{% block title %}页面未找到{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6 text-center py-5">
+    <h1 class="display-1 text-muted">404</h1>
+    <p class="lead">抱歉，您访问的页面不存在。</p>
+    <a href="{{ url_for('frontend.index') }}" class="btn btn-primary"><i class="fas fa-home"></i> 返回首页</a>
+  </div>
+</div>
+{% endblock %}
