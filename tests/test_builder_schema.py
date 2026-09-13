@@ -89,11 +89,17 @@ class TestValidateBasic:
 
     def test_repeater_subkey_whitelist(self):
         good = _node('carousel', props={'items': [
-            {'image': '/a.jpg', 'title': 't', 'link': '', 'subtitle': ''}]})
+            {'image': '/a.jpg', 'title': 't', 'subtitle': '', 'link': ''}]})
         validate_layout({'root': [good]})
         bad = _node('carousel', props={'items': [{'hack': 1}]})
         with pytest.raises(LayoutError):
             validate_layout({'root': [bad]})
+
+    def test_fragment_prop_must_be_str(self):
+        validate_layout({'root': [_node('fragment', props={'slug': 'contact'})]})
+        validate_layout({'root': [_node('fragment', props={'slug': ''})]})
+        with pytest.raises(LayoutError):
+            validate_layout({'root': [_node('fragment', props={'slug': 123})]})
 
     def test_localized_dict_locales(self):
         validate_layout({'root': [_node('heading', props={

@@ -19,7 +19,7 @@ _registry = {}
 # 属性表单字段允许的类型（编辑器与 schema 校验共用）
 PROP_FIELD_TYPES = {
     'text', 'textarea', 'richtext', 'number', 'select', 'toggle',
-    'color', 'image', 'icon', 'url', 'column', 'repeater',
+    'color', 'image', 'icon', 'url', 'column', 'repeater', 'fragment',
 }
 
 # repeater 子字段允许的简单类型

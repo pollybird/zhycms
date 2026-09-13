@@ -155,15 +155,35 @@ def builder_api_widgets():
 @admin_bp.route('/builder/api/columns')
 @permission_required('builder:manage')
 def builder_api_columns():
-    """栏目选择器数据：list 类型用于文章列表绑定。"""
+    """栏目选择器数据：list 用于文章列表绑定；all 用于链接选择器。"""
     ctype = request.args.get('type', 'list')
-    if ctype not in ('list', 'page'):
-        ctype = 'list'
-    cols = Column.query.filter_by(
-        type=ctype, is_enabled=True, is_deleted=False
-    ).order_by(Column.sort_order.desc(), Column.id.asc()).all()
+    q = Column.query.filter_by(is_enabled=True, is_deleted=False)
+    if ctype == 'all':
+        q = q.filter(Column.type.in_(('list', 'page')))
+    else:
+        if ctype not in ('list', 'page'):
+            ctype = 'list'
+        q = q.filter_by(type=ctype)
+    cols = q.order_by(Column.sort_order.desc(), Column.id.asc()).all()
     return jsonify({'ok': True, 'columns': [
-        {'id': c.id, 'name': c.name, 'slug': c.slug} for c in cols
+        {'id': c.id, 'name': c.name, 'slug': c.slug, 'type': c.type}
+        for c in cols
+    ]})
+
+
+@admin_bp.route('/builder/api/fragments')
+@permission_required('builder:manage')
+def builder_api_fragments():
+    """碎片选择器数据：属性面板下拉选择替代手工填 slug。"""
+    from ...models.fragment import Fragment, FragmentGroup
+    group_names = {g.id: g.name for g in FragmentGroup.query.all()}
+    frags = Fragment.query.filter_by(
+        is_enabled=True, is_deleted=False
+    ).order_by(Fragment.sort_order.desc(), Fragment.id.asc()).all()
+    return jsonify({'ok': True, 'fragments': [
+        {'slug': f.slug, 'name': f.name, 'field_type': f.field_type,
+         'group': group_names.get(f.group_id, '')}
+        for f in frags
     ]})
 
 

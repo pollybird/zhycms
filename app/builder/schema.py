@@ -139,7 +139,7 @@ def _check_props(ntype, props, widget):
                     if sk not in sub_keys:
                         raise LayoutError(
                             f'组件 {ntype}.{key} 含非法子字段 {sk}')
-        elif ftype in ('image', 'url'):
+        elif ftype in ('image', 'url', 'fragment'):
             if not isinstance(val, str):
                 raise LayoutError(f'组件 {ntype}.{key} 必须是字符串')
         elif ftype in ('text', 'textarea', 'richtext', 'color', 'icon'):

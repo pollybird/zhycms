@@ -68,6 +68,34 @@
 }
 .zbw-repeater-item-head { display: flex; justify-content: space-between; margin-bottom: 6px; }
 
+/* 图片上传字段 */
+.zbw-img-preview {
+  border: 1px solid #dee2e6; border-radius: 4px; background: #fff;
+  padding: 6px; display: flex; align-items: center; justify-content: center;
+  min-height: 96px; margin-bottom: 4px;
+}
+.zbw-img-preview-sm { min-height: 72px; }
+.zbw-img-thumb {
+  max-width: 100%; max-height: 120px; border-radius: 3px; object-fit: contain;
+}
+.zbw-rep-image .zbw-img-thumb { max-height: 84px; }
+.zbw-img-empty {
+  color: #adb5bd; font-size: 22px; line-height: 1; padding: 18px 0;
+}
+.zbw-img-actions { display: flex; gap: 4px; margin-bottom: 4px; }
+.zbw-rep-color { width: 56px; height: 31px; padding: 2px 4px; }
+
+/* 图标选择字段 */
+.zbw-icon-field { display: flex; gap: 6px; align-items: stretch; }
+.zbw-icon-field .zbw-icon-preview {
+  flex: 0 0 38px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid #ced4da; border-radius: 4px; background: #fff;
+  font-size: 16px; color: #495057; min-width: 38px;
+}
+.zbw-icon-field select { flex: 1 1 auto; }
+.zbw-icon-field .zbw-icon-custom { flex: 1 1 auto; margin-top: 4px; }
+.zbw-rep-link { margin-bottom: 4px !important; }
+
 /* 图层树 */
 .zbw-outline-tree { font-size: 13px; }
 .zbw-outline-node { display: flex; align-items: center; gap: 4px; padding: 3px 4px;

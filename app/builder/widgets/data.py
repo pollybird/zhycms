@@ -177,11 +177,11 @@ class FragmentBlock(Widget):
     category = _B.CAT_DATA
     label = '全站碎片'
     icon = 'fa-puzzle-piece'
-    description = '按 slug 引用「碎片管理」中的 HTML 内容块'
+    description = '引用「碎片管理」中的内容块（下拉选择）'
     default_props = {'slug': ''}
     prop_schema = [
-        {'key': 'slug', 'label': '碎片标识（slug）', 'type': 'text',
-         'help': '如 home_notice / contact_phone'},
+        {'key': 'slug', 'label': '选择碎片', 'type': 'fragment',
+         'help': '内容在「内容 → 碎片管理」中维护'},
     ]
 
     def context(self, node, page_ctx):

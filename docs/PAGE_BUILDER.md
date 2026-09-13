@@ -146,9 +146,12 @@ class MyWidget(Widget):
 | `select` | 下拉 | `options: [['值','显示名'], ...]`（值按字符串双向兼容，数字值 2 与 '2' 等价） |
 | `toggle` | 布尔开关 | — |
 | `color` | 颜色选择器 | — |
-| `image` / `url` / `icon` | 图片上传 / 链接 / 图标 | — |
+| `image` | 图片上传器（缩略图预览 + 上传/更换/清除，可粘贴外部 URL 兜底；repeater 子项同样支持上传） | — |
+| `url` | 链接输入框，附「站内页面快捷选择」下拉（首页/栏目页，选中自动填入 `/column/slug`） | — |
+| `icon` | FontAwesome 图标：常用图标预设下拉 + 实时预览，可切「自定义类名」输入 `fab fa-*` / `far fa-*` | — |
 | `column` | 栏目选择器（存栏目 id） | — |
-| `repeater` | 重复项 | `itemLabel`、`fields: [...]`（子字段仅支持简单类型） |
+| `fragment` | 碎片选择器：下拉列出「碎片管理」中启用的碎片（按分组 optgroup），值存碎片 slug | — |
+| `repeater` | 重复项 | `itemLabel`、`fields: [...]`（子字段支持 text/textarea/number/select/toggle/color/image/url） |
 
 ### 5. 组件模板可用变量
 

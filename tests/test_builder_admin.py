@@ -211,3 +211,59 @@ class TestCreateAndPreview:
             db.session.commit()
         html = c.get('/admin/builder').get_data(as_text=True)
         assert marker in html
+
+
+class TestSelectorApis:
+    """属性面板选择器数据源：栏目（链接选择器）/ 碎片下拉。"""
+
+    def test_columns_all_returns_list_and_page(self, app):
+        c = _role_client(app, 'content_editor')
+        marker_list = 'ZBL' + uuid.uuid4().hex[:8]
+        marker_page = 'ZBP' + uuid.uuid4().hex[:8]
+        with app.app_context():
+            make_column(name=marker_list, slug='zbl_' + uuid.uuid4().hex[:8],
+                        col_type='list')
+            make_column(name=marker_page, slug='zbp_' + uuid.uuid4().hex[:8],
+                        col_type='page')
+            db.session.commit()
+        data = c.get('/admin/builder/api/columns?type=all').get_json()
+        names = {x['name'] for x in data['columns']}
+        assert marker_list in names and marker_page in names
+        assert all(x['type'] in ('list', 'page') for x in data['columns'])
+        # 旧行为不变：type=list 不含 page 栏目
+        data_list = c.get('/admin/builder/api/columns?type=list').get_json()
+        assert marker_page not in {x['name'] for x in data_list['columns']}
+
+    def test_fragments_listing_and_rbac(self, app):
+        from app.models.fragment import Fragment, FragmentGroup
+        # 匿名 302、无权限 403
+        anon = app.test_client()
+        assert anon.get('/admin/builder/api/fragments').status_code == 302
+        assert _role_client(app, 'readonly_viewer').get(
+            '/admin/builder/api/fragments').status_code == 403
+
+        c = _role_client(app, 'content_editor')
+        slug = 'zbf_' + uuid.uuid4().hex[:8]
+        with app.app_context():
+            grp = FragmentGroup(name='ZB组' + uuid.uuid4().hex[:6])
+            db.session.add(grp)
+            db.session.flush()
+            db.session.add(Fragment(
+                name='测试碎片', slug=slug, field_type='text', value='v',
+                group_id=grp.id, is_enabled=True, is_deleted=False,
+                sort_order=0))
+            # 禁用/删除碎片不应出现
+            db.session.add(Fragment(
+                name='禁用碎片', slug='zbf_off_' + uuid.uuid4().hex[:8],
+                field_type='text', value='x', is_enabled=False,
+                is_deleted=False, sort_order=0))
+            db.session.commit()
+
+        data = c.get('/admin/builder/api/fragments').get_json()
+        assert data['ok'] is True
+        row = next(x for x in data['fragments'] if x['slug'] == slug)
+        assert row['name'] == '测试碎片'
+        assert row['field_type'] == 'text'
+        assert row['group'].startswith('ZB组')
+        assert not any(x['slug'].startswith('zbf_off_')
+                       for x in data['fragments'])

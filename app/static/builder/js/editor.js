@@ -18,6 +18,8 @@ const API = {
   page: `/admin/builder/api/pages/${PAGE_ID}`,
   widgets: '/admin/builder/api/widgets',
   columns: '/admin/builder/api/columns?type=list',
+  columnsAll: '/admin/builder/api/columns?type=all',
+  fragments: '/admin/builder/api/fragments',
   draft: `/admin/builder/api/pages/${PAGE_ID}/draft`,
   publish: `/admin/builder/api/pages/${PAGE_ID}/publish`,
   revisions: `/admin/builder/api/pages/${PAGE_ID}/revisions`,
@@ -29,12 +31,46 @@ const CAT_LABELS = { layout: '布局组件', basic: '基础组件', data: '数�
 const CAT_ORDER = ['layout', 'basic', 'data'];
 const LOCALES = [['zh', '中文'], ['en', 'English']];
 
+/* 常用 FontAwesome 实心图标预设（图标字段下拉选择，无需手填类名） */
+const ICON_PRESETS = [
+  ['fa-star', '星星'], ['fa-heart', '爱心'], ['fa-thumbs-up', '点赞'],
+  ['fa-check', '对勾'], ['fa-check-circle', '勾选圆'], ['fa-plus-circle', '加号圆'],
+  ['fa-info-circle', '信息'], ['fa-exclamation-circle', '感叹圆'], ['fa-bell', '通知铃'],
+  ['fa-phone', '电话'], ['fa-envelope', '信封'], ['fa-map-marker-alt', '定位'],
+  ['fa-clock', '时钟'], ['fa-calendar-alt', '日历'], ['fa-headset', '客服耳机'],
+  ['fa-comment-dots', '对话'], ['fa-comments', '评论'], ['fa-paper-plane', '纸飞机'],
+  ['fa-user', '用户'], ['fa-users', '用户群'], ['fa-user-tie', '商务用户'],
+  ['fa-user-graduate', '毕业生用户'], ['fa-cog', '齿轮'], ['fa-cogs', '齿轮组'],
+  ['fa-tools', '工具'], ['fa-wrench', '扳手'], ['fa-sliders-h', '滑块'],
+  ['fa-industry', '工厂'], ['fa-building', '大楼'], ['fa-store', '店铺'],
+  ['fa-truck', '卡车'], ['fa-shipping-fast', '快运'], ['fa-box', '箱子'],
+  ['fa-shield-alt', '盾牌'], ['fa-lock', '锁'], ['fa-key', '钥匙'],
+  ['fa-award', '奖章'], ['fa-medal', '奖牌'], ['fa-certificate', '证书'],
+  ['fa-trophy', '奖杯'], ['fa-gem', '宝石'], ['fa-crown', '皇冠'],
+  ['fa-rocket', '火箭'], ['fa-lightbulb', '灯泡'], ['fa-bullseye', '靶心'],
+  ['fa-chart-line', '折线图'], ['fa-chart-bar', '柱状图'], ['fa-pie-chart', '饼图'],
+  ['fa-handshake', '握手'], ['fa-tags', '标签组'], ['fa-tag', '标签'],
+  ['fa-leaf', '叶子'], ['fa-globe', '地球'], ['fa-mobile-alt', '手机'],
+  ['fa-desktop', '桌面电脑'], ['fa-laptop', '笔记本'], ['fa-cloud', '云'],
+  ['fa-shopping-cart', '购物车'], ['fa-credit-card', '信用卡'],
+  ['fa-file-alt', '文档'], ['fa-images', '图片组'], ['fa-image', '图片'],
+  ['fa-play-circle', '播放圆'], ['fa-video', '视频'], ['fa-camera', '相机'],
+  ['fa-graduation-cap', '学位帽'], ['fa-book', '书本'], ['fa-book-open', '翻开的书'],
+  ['fa-utensils', '餐具'], ['fa-coffee', '咖啡'], ['fa-fire', '火焰'],
+  ['fa-bolt', '闪电'], ['fa-infinity', '无限'], ['fa-link', '链接'],
+  ['fa-quote-left', '引用'], ['fa-magic', '魔法'], ['fa-gift', '礼物'],
+];
+const ICON_PRESET_SET = new Set(ICON_PRESETS.map(([cls]) => 'fas ' + cls));
+const CUSTOM_ICON = '__custom_icon__';
+
 const state = {
   scope: 'home',
   layout: { version: 1, root: [] },
   catalog: {},
   widgets: new Map(),
   listColumns: [],
+  linkColumns: [],
+  fragments: [],
   selectedId: null,
   dirty: false,
   saving: false,
@@ -460,16 +496,10 @@ function renderField(node, field) {
         </div>`;
       break;
     case 'image':
-      inner = `<input type="text" class="form-control form-control-sm mb-1" value="${esc(val)}" placeholder="/static/... 或 https://" ${inputAttrs}>
-        <div><input type="file" accept="image/*" data-upload="${key}" class="d-none">
-        <button class="btn btn-default btn-sm" data-upload-btn="${key}"><i class="fas fa-upload"></i> 上传图片</button></div>
-        ${val ? `<img src="${esc(val)}" class="zbw-image-preview" data-imgprev="${key}">` : ''}`;
+      inner = renderImageField(key, val, false);
       break;
     case 'icon':
-      inner = `<div class="input-group input-group-sm zbw-icon-picker-wrap">
-          <div class="input-group-prepend"><span class="input-group-text"><i class="${esc(val || 'fas fa-star')}"></i></span></div>
-          <input type="text" class="form-control" value="${esc(val)}" placeholder="fas fa-star" ${inputAttrs}>
-        </div>`;
+      inner = renderIconField(key, val);
       break;
     case 'column':
       inner = `<select class="form-control form-control-sm" ${inputAttrs}>
@@ -477,15 +507,110 @@ function renderField(node, field) {
         ${state.listColumns.map(c => `<option value="${c.id}" ${String(c.id) === String(val) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
       </select>`;
       break;
+    case 'fragment':
+      inner = renderFragmentField(key, val);
+      break;
     case 'repeater':
       inner = renderRepeater(node, field, val);
       break;
     case 'url':
+      inner = `<input type="text" class="form-control form-control-sm zbw-url-input"
+          value="${esc(val)}" placeholder="https://… 或 /column/slug" ${inputAttrs}>
+        ${renderInternalLinkSelect(key, val, false)}`;
+      break;
     case 'text':
     default:
       inner = `<input type="text" class="form-control form-control-sm" value="${esc(val)}" ${inputAttrs}>`;
   }
   return `<div class="zbw-field"><label>${label}</label>${inner}${help}</div>`;
+}
+
+/* ---- 图片上传字段（主操作是上传，URL 输入降级为次要入口） ---- */
+function renderImageField(key, val, repeater) {
+  const rep = repeater ? ' data-rep-img="1"' : ` data-upload-key="${esc(key)}"`;
+  const thumb = val
+    ? `<img src="${esc(val)}" alt="" class="zbw-img-thumb">`
+    : '<div class="zbw-img-empty"><i class="fas fa-image"></i><span>未选择图片</span></div>';
+  return `<div class="zbw-image-field"${rep}>
+      <div class="zbw-img-preview">${thumb}</div>
+      <div class="zbw-img-actions">
+        <button type="button" class="btn btn-primary btn-sm" data-upload-btn="${esc(key)}">
+          <i class="fas fa-upload"></i> ${val ? '更换图片' : '上传图片'}</button>
+        ${val ? `<button type="button" class="btn btn-outline-secondary btn-sm" data-img-clear="${esc(key)}">
+          <i class="fas fa-times"></i> 清除</button>` : ''}
+      </div>
+      <input type="text" class="form-control form-control-sm zbw-img-url"
+        value="${esc(val)}" placeholder="或粘贴外部图片 URL（https://…）"
+        data-img-url="${esc(key)}">
+      <input type="file" accept="image/*" class="d-none" data-upload="${esc(key)}">
+    </div>`;
+}
+
+/* ---- 图标字段：常用图标下拉 + 自定义类名 ---- */
+function renderIconField(key, val) {
+  val = val || '';
+  const isPreset = ICON_PRESET_SET.has(val);
+  let opts = '<option value="">无图标</option>';
+  for (const [cls, name] of ICON_PRESETS) {
+    const full = 'fas ' + cls;
+    opts += `<option value="${esc(full)}" ${full === val ? 'selected' : ''}>${esc(name)}（${esc(cls)}）</option>`;
+  }
+  if (val && !isPreset) {
+    opts += `<option value="${esc(val)}" selected>${esc(val)}（当前）</option>`;
+  }
+  opts += `<option value="${CUSTOM_ICON}">✎ 自定义图标类名…</option>`;
+  const custom = val && !isPreset;
+  return `<div class="zbw-icon-field">
+      <div class="input-group input-group-sm">
+        <div class="input-group-prepend"><span class="input-group-text zbw-icon-preview"><i class="${esc(val || 'fas fa-star')}"></i></span></div>
+        <select class="form-control" data-icon-select="${esc(key)}">${opts}</select>
+      </div>
+      <input type="text" spellcheck="false" class="form-control form-control-sm mt-1 zbw-icon-custom${custom ? '' : ' d-none'}"
+        value="${custom ? esc(val) : ''}" placeholder="如 fab fa-weixin / far fa-bell"
+        data-key="${esc(key)}" data-type="icon">
+    </div>`;
+}
+
+/* ---- 碎片字段：下拉选择已配置的碎片 ---- */
+function renderFragmentField(key, val) {
+  // 按分组聚合（保留首次出现顺序），未分组碎片排在最后
+  const groups = new Map();
+  const noGroup = [];
+  for (const f of state.fragments) {
+    if (f.group) {
+      if (!groups.has(f.group)) groups.set(f.group, []);
+      groups.get(f.group).push(f);
+    } else {
+      noGroup.push(f);
+    }
+  }
+  const optRow = f =>
+    `<option value="${esc(f.slug)}" ${f.slug === val ? 'selected' : ''}>${esc(f.name)}（${esc(f.slug)}）</option>`;
+  let opts = '<option value="">— 请选择碎片 —</option>';
+  for (const [gname, list] of groups) {
+    opts += `<optgroup label="${esc(gname)}">${list.map(optRow).join('')}</optgroup>`;
+  }
+  if (noGroup.length) opts += noGroup.map(optRow).join('');
+  if (val && !state.fragments.some(f => f.slug === val)) {
+    opts += `<option value="${esc(val)}" selected>${esc(val)}（已失效/未找到）</option>`;
+  }
+  return `<select class="form-control form-control-sm" data-key="${esc(key)}" data-type="fragment">${opts}</select>`
+    + (state.fragments.length === 0
+      ? '<div class="zbw-field-help">还没有可用碎片，请到「内容 → 碎片管理」添加</div>' : '');
+}
+
+/* ---- 链接字段附加的站内页面快捷选择 ---- */
+function renderInternalLinkSelect(key, val, repeater) {
+  const attrs = repeater
+    ? `data-rep-link-key="${esc(key)}"`
+    : `data-link-for="${esc(key)}"`;
+  let opts = '<option value="">站内页面快捷选择…</option>';
+  opts += `<option value="/" ${val === '/' ? 'selected' : ''}>首页</option>`;
+  for (const c of state.linkColumns) {
+    const u = '/column/' + c.slug;
+    opts += `<option value="${esc(u)}" ${u === val ? 'selected' : ''}>${esc(c.name)}</option>`;
+  }
+  return `<select class="form-control form-control-sm mt-1 zbw-link-select" ${attrs}>${opts}</select>`;
 }
 
 function renderRepeater(node, field, items) {
@@ -501,28 +626,66 @@ function renderRepeater(node, field, items) {
     for (const sf of field.fields || []) {
       const sv = item[sf.key] == null ? (sf.default || '') : item[sf.key];
       html += `<label class="small text-muted">${esc(sf.label || sf.key)}</label>`;
-      if (sf.type === 'textarea') {
-        html += `<textarea class="form-control form-control-sm mb-1" rows="2"
-          data-rep-key="${esc(field.key)}" data-rep-index="${i}" data-subkey="${esc(sf.key)}">${esc(sv)}</textarea>`;
-      } else if (sf.type === 'toggle') {
-        html += `<input type="checkbox" class="mb-1" ${sv ? 'checked' : ''}
-          data-rep-key="${esc(field.key)}" data-rep-index="${i}" data-subkey="${esc(sf.key)}">`;
-      } else if (sf.type === 'image') {
-        html += `<input type="text" class="form-control form-control-sm mb-1" value="${esc(sv)}"
-          data-rep-key="${esc(field.key)}" data-rep-index="${i}" data-subkey="${esc(sf.key)}">`;
-      } else if (sf.type === 'number') {
-        html += `<input type="number" class="form-control form-control-sm mb-1" value="${esc(sv)}"
-          data-rep-key="${esc(field.key)}" data-rep-index="${i}" data-subkey="${esc(sf.key)}">`;
-      } else {
-        html += `<input type="text" class="form-control form-control-sm mb-1" value="${esc(sv)}"
-          data-rep-key="${esc(field.key)}" data-rep-index="${i}" data-subkey="${esc(sf.key)}">`;
-      }
+      html += renderRepeaterSubField(field.key, i, sf, sv);
     }
     html += '</div>';
   });
   html += `<button class="btn btn-outline-primary btn-sm btn-block" data-rep-add="${esc(field.key)}">
     <i class="fas fa-plus"></i> 添加一项</button></div>`;
   return html;
+}
+
+const REP_ATTR = (rkey, i, subkey) =>
+  `data-rep-key="${esc(rkey)}" data-rep-index="${i}" data-subkey="${esc(subkey)}"`;
+
+function renderRepeaterSubField(rkey, i, sf, sv) {
+  const attr = REP_ATTR(rkey, i, sf.key);
+  switch (sf.type) {
+    case 'textarea':
+      return `<textarea class="form-control form-control-sm mb-1" rows="2" ${attr}>${esc(sv)}</textarea>`;
+    case 'number':
+      return `<input type="number" class="form-control form-control-sm mb-1" value="${esc(sv)}" ${attr}>`;
+    case 'toggle':
+      return `<input type="checkbox" class="mb-1" ${sv ? 'checked' : ''} ${attr}>`;
+    case 'select': {
+      let o = '<select class="form-control form-control-sm mb-1" ' + attr + '>';
+      for (const opt of sf.options || []) {
+        const ov = Array.isArray(opt) ? opt[0] : opt;
+        const ol = Array.isArray(opt) ? opt[1] : opt;
+        o += `<option value="${esc(ov)}" ${String(ov) === String(sv) ? 'selected' : ''}>${esc(ol)}</option>`;
+      }
+      return o + '</select>';
+    }
+    case 'color':
+      return `<input type="color" class="form-control zbw-rep-color mb-1" value="${esc(sv || '#333333')}" ${attr}>`;
+    case 'image':
+      return `<div class="zbw-rep-image" data-rep-img="1">
+          <div class="zbw-img-preview zbw-img-preview-sm">${sv
+            ? `<img src="${esc(sv)}" class="zbw-img-thumb" alt="">`
+            : '<div class="zbw-img-empty"><i class="fas fa-image"></i></div>'}</div>
+          <div class="zbw-img-actions">
+            <button type="button" class="btn btn-primary btn-xs" data-rep-upload-btn
+              data-rkey="${esc(rkey)}" data-rindex="${i}" data-rsubkey="${esc(sf.key)}">
+              <i class="fas fa-upload"></i> ${sv ? '更换' : '上传'}</button>
+            ${sv ? `<button type="button" class="btn btn-outline-secondary btn-xs" data-rep-img-clear
+              data-rkey="${esc(rkey)}" data-rindex="${i}" data-rsubkey="${esc(sf.key)}">
+              <i class="fas fa-times"></i></button>` : ''}
+          </div>
+          <input type="text" class="form-control form-control-sm zbw-img-url" value="${esc(sv)}"
+            placeholder="或图片 URL" ${attr}>
+          <input type="file" accept="image/*" class="d-none" data-rep-upload
+            data-rkey="${esc(rkey)}" data-rindex="${i}" data-rsubkey="${esc(sf.key)}">
+        </div>`;
+    case 'url':
+      return `<input type="text" class="form-control form-control-sm zbw-url-input"
+          value="${esc(sv)}" placeholder="https://… 或站内路径" ${attr}>`
+        + renderInternalLinkSelect(sf.key, sv, true)
+              .replace('data-rep-link-key="', `data-rep-link-key="${esc(rkey)}" data-rep-link-index="${i}" data-rep-link-subkey="`)
+              .replace('form-control form-control-sm mt-1 zbw-link-select',
+                       'form-control form-control-sm zbw-link-select zbw-rep-link');
+    default:
+      return `<input type="text" class="form-control form-control-sm mb-1" value="${esc(sv)}" ${attr}>`;
+  }
 }
 
 function bindProps(box, node, widget) {
@@ -566,38 +729,89 @@ function bindProps(box, node, widget) {
     });
   });
 
-  // 图片上传
+  // ---- 图片字段（顶层）：上传 / URL / 清除 ----
   box.querySelectorAll('[data-upload-btn]').forEach(btn => {
     btn.addEventListener('click', () => {
-      box.querySelector(`[data-upload="${btn.dataset.uploadBtn}"]`).click();
+      const fileEl = btn.closest('.zbw-image-field')
+        ? btn.closest('.zbw-image-field').querySelector('[data-upload]')
+        : box.querySelector(`[data-upload="${btn.dataset.uploadBtn}"]`);
+      if (fileEl) fileEl.click();
     });
   });
   box.querySelectorAll('[data-upload]').forEach(fileEl => {
     fileEl.addEventListener('change', async () => {
       const key = fileEl.dataset.upload;
-      const f = fileEl.files[0];
-      if (!f) return;
-      const fd = new FormData();
-      fd.append('file', f);
-      fd.append('type', 'builder');
-      btnBusy(fileEl, true);
-      try {
-        const res = await fetch(API.upload, { method: 'POST', body: fd, credentials: 'same-origin' });
-        const data = await res.json();
-        if (!res.ok || !data.url) throw new Error(data.error || '上传失败');
-        node.props[key] = data.url;
-        markDirty();
-        renderProps();
-        scheduleRender();
-      } catch (e) {
-        alert('上传失败：' + e.message);
-      } finally {
-        btnBusy(fileEl, false);
-      }
+      const url = await pickAndUpload(fileEl);
+      if (url == null) return;
+      node.props[key] = url;
+      markDirty(); renderProps(); scheduleRender();
+    });
+  });
+  box.querySelectorAll('[data-img-url]').forEach(el => {
+    el.addEventListener('input', () => {
+      node.props[el.dataset.imgUrl] = el.value.trim();
+      markDirty(); scheduleRender();
+    });
+  });
+  box.querySelectorAll('[data-img-clear]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      node.props[btn.dataset.imgClear] = '';
+      markDirty(); renderProps(); scheduleRender();
     });
   });
 
-  // repeater
+  // ---- 图标预设选择 ----
+  box.querySelectorAll('[data-icon-select]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const key = sel.dataset.iconSelect;
+      if (sel.value === CUSTOM_ICON) {
+        const custom = box.querySelector(`.zbw-icon-custom[data-key="${CSS.escape(key)}"]`);
+        if (custom) { custom.classList.remove('d-none'); custom.focus(); }
+        sel.value = node.props[key] && ICON_PRESET_SET.has(node.props[key])
+          ? node.props[key] : (node.props[key] || '');
+        return;
+      }
+      node.props[key] = sel.value;
+      markDirty(); renderProps(); scheduleRender();
+    });
+  });
+
+  // 图标自定义输入：实时同步预览与下拉显示（避免两个控件状态不一致）
+  box.querySelectorAll('.zbw-icon-custom').forEach(el => {
+    el.addEventListener('input', () => {
+      const wrap = el.closest('.zbw-icon-field');
+      if (!wrap) return;
+      const v = el.value.trim();
+      const sel = wrap.querySelector('[data-icon-select]');
+      const ico = wrap.querySelector('.zbw-icon-preview i');
+      if (sel) {
+        if (v) {
+          if (!Array.from(sel.options).some(o => o.value === v)) {
+            sel.add(new Option(`${v}（当前）`, v));
+          }
+          sel.value = v;
+        } else {
+          sel.value = '';
+        }
+      }
+      if (ico) ico.className = v || 'fas fa-star';
+    });
+  });
+
+  // ---- 顶层链接字段：站内页面快捷选择 ----
+  box.querySelectorAll('[data-link-for]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      if (!sel.value) return;
+      const input = box.querySelector(`[data-key="${CSS.escape(sel.dataset.linkFor)}"]`);
+      if (input) {
+        input.value = sel.value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      sel.value = '';
+    });
+  });
+
+  // ---- repeater 增删 ----
   box.querySelectorAll('[data-rep-add]').forEach(btn => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.repAdd;
@@ -618,21 +832,71 @@ function bindProps(box, node, widget) {
       markDirty(); renderProps(); scheduleRender();
     });
   });
+
+  // ---- repeater 子字段（text/textarea/number/select/toggle/color/url） ----
   box.querySelectorAll('[data-rep-key]').forEach(el => {
-    el.addEventListener('input', () => {
+    const handler = () => {
       const items = node.props[el.dataset.repKey] || [];
       const item = items[Number(el.dataset.repIndex)];
       if (!item) return;
-      let v = el.value;
+      const field = (widget.prop_schema || []).find(f => f.key === el.dataset.repKey);
+      const sf = field && (field.fields || []).find(f => f.key === el.dataset.subkey);
+      let v;
       if (el.type === 'checkbox') v = el.checked;
+      else if (sf && sf.type === 'number') v = el.value === '' ? '' : Number(el.value);
+      else v = el.value;
       item[el.dataset.subkey] = v;
       markDirty();
       scheduleRender();
+    };
+    el.addEventListener('input', handler);
+    el.addEventListener('change', handler);
+  });
+
+  // ---- repeater 图片上传 / 清除 ----
+  box.querySelectorAll('[data-rep-upload-btn]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const wrap = btn.closest('.zbw-rep-image');
+      const fileEl = wrap && wrap.querySelector('[data-rep-upload]');
+      if (fileEl) fileEl.click();
     });
-    el.addEventListener('change', () => {
-      const items = node.props[el.dataset.repKey] || [];
-      const item = items[Number(el.dataset.repIndex)];
-      if (item && el.type === 'checkbox') item[el.dataset.subkey] = el.checked;
+  });
+  box.querySelectorAll('[data-rep-upload]').forEach(fileEl => {
+    fileEl.addEventListener('change', async () => {
+      const url = await pickAndUpload(fileEl);
+      if (url == null) return;
+      const items = node.props[fileEl.dataset.rkey] || [];
+      const item = items[Number(fileEl.dataset.rindex)];
+      if (item) {
+        item[fileEl.dataset.rsubkey] = url;
+        markDirty(); renderProps(); scheduleRender();
+      }
+    });
+  });
+  box.querySelectorAll('[data-rep-img-clear]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const items = node.props[btn.dataset.rkey] || [];
+      const item = items[Number(btn.dataset.rindex)];
+      if (item) {
+        item[btn.dataset.rsubkey] = '';
+        markDirty(); renderProps(); scheduleRender();
+      }
+    });
+  });
+
+  // ---- repeater 链接：站内页面快捷选择 ----
+  box.querySelectorAll('[data-rep-link-key]').forEach(sel => {
+    sel.addEventListener('change', () => {
+      if (!sel.value) return;
+      const input = box.querySelector(
+        `[data-rep-key="${CSS.escape(sel.dataset.repLinkKey)}"]`
+        + `[data-rep-index="${sel.dataset.repLinkIndex}"]`
+        + `[data-subkey="${CSS.escape(sel.dataset.repLinkSubkey)}"]`);
+      if (input) {
+        input.value = sel.value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      sel.value = '';
     });
   });
 
@@ -661,11 +925,36 @@ function bindProps(box, node, widget) {
   });
 }
 
-function btnBusy(fileEl, on) {
-  const btn = document.querySelector(`[data-upload-btn="${fileEl.dataset.upload}"]`);
-  if (!btn) return;
-  btn.disabled = on;
-  btn.innerHTML = on ? '<i class="fas fa-spinner fa-spin"></i> 上传中' : '<i class="fas fa-upload"></i> 上传图片';
+/**
+ * 通用图片上传：读取 file input 选中的文件并 POST /admin/upload。
+ * 成功返回 URL；未选文件返回 null；失败弹提示并返回 null。
+ * 上传期间就近禁用触发按钮并显示 spinner。
+ */
+async function pickAndUpload(fileEl) {
+  const f = fileEl.files && fileEl.files[0];
+  if (!f) return null;
+  const wrap = fileEl.closest('.zbw-image-field, .zbw-rep-image');
+  const btn = wrap && wrap.querySelector('[data-upload-btn], [data-rep-upload-btn]');
+  const oldHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 上传中';
+  }
+  try {
+    const fd = new FormData();
+    fd.append('file', f);
+    fd.append('type', 'builder');
+    const res = await fetch(API.upload, { method: 'POST', body: fd, credentials: 'same-origin' });
+    const data = await res.json();
+    if (!res.ok || !data.url) throw new Error(data.error || '上传失败');
+    return data.url;
+  } catch (e) {
+    alert('上传失败：' + e.message);
+    return null;
+  } finally {
+    fileEl.value = '';
+    if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+  }
 }
 
 /* ============================================================
@@ -917,12 +1206,16 @@ async function bootstrap() {
   state.scope = data.page.scope;
   state.layout = data.layout || { version: 1, root: [] };
 
-  const [catData, colData] = await Promise.all([
+  const [catData, colData, allColData, fragData] = await Promise.all([
     api(API.widgets + '?scope=' + state.scope),
     api(API.columns).catch(() => ({ columns: [] })),
+    api(API.columnsAll).catch(() => ({ columns: [] })),
+    api(API.fragments).catch(() => ({ fragments: [] })),
   ]);
   state.catalog = catData.categories;
   state.listColumns = colData.columns || [];
+  state.linkColumns = allColData.columns || [];
+  state.fragments = fragData.fragments || [];
   for (const list of Object.values(state.catalog)) {
     for (const w of list) state.widgets.set(w.type, w);
   }
