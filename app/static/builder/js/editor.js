@@ -77,9 +77,12 @@ const state = {
   saveTimer: null,
   renderTimer: null,
   activeLocale: 'zh',
+  pvOpen: false,
+  pvWidth: 1320,
 };
 
 const iframe = document.getElementById('zbw-canvas');
+const pvFrame = document.getElementById('zbw-pv-frame');
 const saveStatus = document.getElementById('zbw-save-status');
 
 /* ============================================================
@@ -159,9 +162,12 @@ function scheduleRender() {
   state.renderTimer = setTimeout(reloadCanvas, 350);
 }
 
+function previewUrlFresh() {
+  return PREVIEW_URL + (PREVIEW_URL.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
+}
+
 function reloadCanvas() {
-  const url = PREVIEW_URL + (PREVIEW_URL.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now();
-  iframe.src = url;
+  iframe.src = previewUrlFresh();
 }
 
 function selectNode(id) {
@@ -311,6 +317,8 @@ async function saveDraft() {
     saveStatus.textContent = `草稿已保存 ${r.saved_at || ''}`;
     saveStatus.className = 'zbw-save-status saved';
     scheduleRender();
+    // 全屏预览模态框打开时，草稿落库后再刷新，确保看到最新内容
+    if (state.pvOpen) pvFrame.src = previewUrlFresh();
   } catch (e) {
     saveStatus.textContent = '保存失败：' + e.message;
     saveStatus.className = 'zbw-save-status error';
@@ -1156,6 +1164,40 @@ document.querySelectorAll('[data-device]').forEach(btn => {
       iframe.classList.add('device-' + btn.dataset.device);
     }
   });
+});
+
+/* ============================================================
+ * 全屏预览模态框（真实设备宽度，不受左右面板挤压）
+ * ============================================================ */
+
+function applyPvWidth(w) {
+  state.pvWidth = w;
+  pvFrame.style.width = w + 'px';
+  document.getElementById('zbw-pv-width-label').textContent = w;
+  document.querySelectorAll('#zbw-pv-devices [data-pv-width]').forEach(b => {
+    b.classList.toggle('active', Number(b.dataset.pvWidth) === w);
+  });
+}
+
+$('#zbw-preview-modal').on('shown.bs.modal', () => {
+  state.pvOpen = true;
+  applyPvWidth(state.pvWidth);
+  document.getElementById('zbw-pv-newtab').href = PREVIEW_URL;
+  pvFrame.src = previewUrlFresh();
+}).on('hidden.bs.modal', () => {
+  state.pvOpen = false;
+});
+
+document.getElementById('zbw-btn-fullpreview').addEventListener('click', () => {
+  $('#zbw-preview-modal').modal('show');
+});
+
+document.querySelectorAll('#zbw-pv-devices [data-pv-width]').forEach(btn => {
+  btn.addEventListener('click', () => applyPvWidth(Number(btn.dataset.pvWidth)));
+});
+
+document.getElementById('zbw-pv-refresh').addEventListener('click', () => {
+  pvFrame.src = previewUrlFresh();
 });
 
 /* ============================================================

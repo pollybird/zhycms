@@ -20,13 +20,18 @@
       <strong class="zbw-page-name">{{ page.name }}</strong>
       <span id="zbw-save-status" class="zbw-save-status text-muted">未修改</span>
     </div>
-    <div class="zbw-toolbar-center btn-group btn-group-sm">
-      <button type="button" class="btn btn-default active" data-device="desktop" title="桌面端">
-        <i class="fas fa-desktop"></i></button>
-      <button type="button" class="btn btn-default" data-device="tablet" title="平板">
-        <i class="fas fa-tablet-alt"></i></button>
-      <button type="button" class="btn btn-default" data-device="mobile" title="手机">
-        <i class="fas fa-mobile-alt"></i></button>
+    <div class="zbw-toolbar-center">
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-default active" data-device="desktop" title="画布宽度：桌面端">
+          <i class="fas fa-desktop"></i></button>
+        <button type="button" class="btn btn-default" data-device="tablet" title="画布宽度：平板">
+          <i class="fas fa-tablet-alt"></i></button>
+        <button type="button" class="btn btn-default" data-device="mobile" title="画布宽度：手机">
+          <i class="fas fa-mobile-alt"></i></button>
+      </div>
+      <button type="button" class="btn btn-primary btn-sm ml-2" id="zbw-btn-fullpreview"
+              title="在大窗口模态框中按真实设备宽度预览（不受左右面板挤压）">
+        <i class="fas fa-expand-alt"></i> 全屏预览</button>
     </div>
     <div class="zbw-toolbar-right">
       <button type="button" class="btn btn-default btn-sm" id="zbw-btn-revisions">
@@ -103,6 +108,37 @@
             <tr><td colspan="4" class="text-center text-muted">加载中…</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 全屏预览弹窗：真实设备宽度，不受左右面板挤压 -->
+<div class="modal fade" id="zbw-preview-modal" tabindex="-1">
+  <div class="modal-dialog zbw-preview-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-tv"></i> 全屏预览
+          <small class="text-muted">（当前草稿 · 宽度 <span id="zbw-pv-width-label">1320</span>px）</small></h5>
+        <div class="zbw-pv-tools">
+          <div class="btn-group btn-group-sm" id="zbw-pv-devices">
+            <button type="button" class="btn btn-default active" data-pv-width="1320">桌面 1320</button>
+            <button type="button" class="btn btn-default" data-pv-width="1200">桌面 1200</button>
+            <button type="button" class="btn btn-default" data-pv-width="992">平板 992</button>
+            <button type="button" class="btn btn-default" data-pv-width="768">平板 768</button>
+            <button type="button" class="btn btn-default" data-pv-width="390">手机 390</button>
+          </div>
+          <a class="btn btn-default btn-sm" id="zbw-pv-newtab" target="_blank" rel="noopener"
+             title="在新标签页打开预览"><i class="fas fa-external-link-alt"></i></a>
+          <button type="button" class="btn btn-default btn-sm" id="zbw-pv-refresh"
+                  title="重新加载"><i class="fas fa-sync-alt"></i></button>
+        </div>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="zbw-pv-stage">
+          <iframe id="zbw-pv-frame" title="全屏预览"></iframe>
+        </div>
       </div>
     </div>
   </div>
