@@ -18,7 +18,7 @@
           "type": "article-list",
           "props": {
             "bind": "auto", "column_id": null, "include_children": false,
-            "limit": 10, "layout": "card", "card_cols": 3,
+            "limit": 10, "layout": "list", "card_cols": 3, "show_title": true,
             "show_cover": true, "show_date": true, "show_summary": true,
             "show_more": false, "show_pagination": true
           },

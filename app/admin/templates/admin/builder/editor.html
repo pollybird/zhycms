@@ -34,6 +34,13 @@
         <i class="fas fa-expand-alt"></i> 全屏预览</button>
     </div>
     <div class="zbw-toolbar-right">
+      <form method="post" class="d-inline"
+            action="{{ url_for('admin.builder_page_init_default', pid=page.id) }}"
+            onsubmit="return confirm('将用与手写模板等价的系统默认布局覆盖当前草稿（已发布内容不受影响），确定继续？');"
+            title="丢弃当前草稿，重新载入与手写模板等价的默认布局">
+        <button type="submit" class="btn btn-default btn-sm">
+          <i class="fas fa-undo"></i> 默认布局</button>
+      </form>
       <button type="button" class="btn btn-default btn-sm" id="zbw-btn-revisions">
         <i class="fas fa-history"></i> 修订历史</button>
       <button type="button" class="btn btn-info btn-sm" id="zbw-btn-front">

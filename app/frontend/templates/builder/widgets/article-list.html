@@ -1,4 +1,9 @@
 <div class="zbw-article-list" {{ node_attrs() }}>
+  {% if zbw_p('show_title', False) and list_column %}
+  <h1 class="zbw-list-title">{{ t(list_column, 'name') }}</h1>
+  {% if t(list_column, 'summary') %}<p class="text-muted">{{ t(list_column, 'summary') }}</p>{% endif %}
+  <hr>
+  {% endif %}
   {% if list_articles %}
   {% if zbw_p('layout', 'card') == 'card' %}
   <div class="row">
@@ -28,15 +33,21 @@
   {% elif zbw_p('layout') == 'list' %}
   {% for a in list_articles %}
   <div class="media zbw-article-row mb-3">
-    {% if zbw_p('show_cover', True) and a.cover %}
+    {% if zbw_p('show_cover', True) %}
+    {% if a.cover %}
     <a href="{{ url_for('frontend.article_detail', slug=list_column.slug if list_column else a.column.slug, aid=a.id) }}">
       <img src="{{ a.cover }}" class="mr-3 zbw-cover-sm" alt="{{ a.title }}">
     </a>
+    {% else %}
+    <div class="mr-3 zbw-cover-sm zbw-cover-empty bg-light rounded d-flex align-items-center justify-content-center">
+      <i class="fas fa-image text-muted"></i>
+    </div>
+    {% endif %}
     {% endif %}
     <div class="media-body">
       <h5><a href="{{ url_for('frontend.article_detail', slug=list_column.slug if list_column else a.column.slug, aid=a.id) }}">{{ a.title }}</a></h5>
-      {% if zbw_p('show_date', True) %}<small class="text-muted"><i class="far fa-calendar-alt"></i> {{ a.published_at|date }}</small>{% endif %}
       {% if zbw_p('show_summary', True) and a.summary %}<p class="zbw-article-summary mb-1">{{ a.summary }}</p>{% endif %}
+      {% if zbw_p('show_date', True) %}<small class="text-muted"><i class="far fa-calendar-alt"></i> {{ a.published_at|date }}</small>{% endif %}
     </div>
   </div>
   {% endfor %}

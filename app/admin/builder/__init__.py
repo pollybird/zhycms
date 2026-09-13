@@ -82,10 +82,20 @@ def builder_page_create():
     if existing is not None:
         return redirect(url_for('admin.builder_editor', pid=existing.id))
 
-    page, _created = svc.get_or_create_page(
+    # 新建即载入与手写模板等价的默认布局：编辑器开箱即按当前主题样式呈现
+    # （面包屑/栏目标题/正文或列表/详情），用户在此基础上修改而非面对空白画布。
+    page, init_err = svc.init_default_layout(
         scope, column_id,
-        name=SCOPE_LABELS.get(scope, scope),
+        author_id=current_user.id if current_user.is_authenticated else None,
     )
+    if page is None:
+        # fixture 异常时退化为空白草稿，保证新建流程不被阻断
+        page, _created = svc.get_or_create_page(
+            scope, column_id,
+            name=SCOPE_LABELS.get(scope, scope),
+        )
+        flash(_gettext('默认布局载入失败：%s，已创建空白页面') % init_err,
+              'warning')
     audit_log(OP_CREATE, MODULE_BUILDER, target_id=page.id,
               target_name=page.name, detail={'scope': scope,
                                               'column_id': column_id})

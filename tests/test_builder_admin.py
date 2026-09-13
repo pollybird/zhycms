@@ -191,6 +191,102 @@ class TestCreateAndPreview:
         assert resp.status_code == 302
         assert resp.headers['Location'].endswith('/admin/builder')
 
+    def test_new_page_auto_loads_handwritten_equivalent_layout(self, app):
+        """新建构建页应自动载入与手写模板等价的默认布局，而非空白画布。"""
+        c = _role_client(app, 'content_editor')
+
+        def _create(scope, column_id=None):
+            data = {'scope': scope}
+            if column_id is not None:
+                data['column_id'] = column_id
+            resp = c.post('/admin/builder/pages/create', data=data)
+            assert resp.status_code == 302
+            pid = resp.headers['Location'].rstrip('/').split('/')[-1]
+            return c.get(f'/admin/builder/api/pages/{pid}').get_json()['layout']
+
+        def _types(nodes):
+            found = set()
+            stack = list(nodes)
+            while stack:
+                node = stack.pop()
+                found.add(node.get('type'))
+                stack.extend(node.get('children') or [])
+            return found
+
+        # 列表栏目页：面包屑 + 文章列表
+        with app.app_context():
+            col_list = make_column(slug='zadl_' + uuid.uuid4().hex[:8],
+                                   col_type='list')
+            col_page = make_column(slug='zadp_' + uuid.uuid4().hex[:8],
+                                   col_type='page')
+            db.session.commit()
+            cid_list, cid_page = col_list.id, col_page.id
+
+        layout = _create('list', cid_list)
+        assert len(layout['root']) > 0
+        assert {'section', 'breadcrumb', 'article-list'} <= _types(layout['root'])
+
+        # 单页栏目：面包屑 + 栏目标题/正文
+        layout = _create('page', cid_page)
+        assert {'section', 'breadcrumb', 'page-content'} <= _types(layout['root'])
+
+        # 首页与全局文章详情（测试库为共享库，先清掉其他用例留下的全局记录）
+        from app.models.builder import BuilderPage
+        with app.app_context():
+            BuilderPage.query.filter(
+                BuilderPage.scope.in_(['home', 'article']),
+                BuilderPage.column_id.is_(None)).delete(synchronize_session=False)
+            db.session.commit()
+
+        layout = _create('home')
+        assert 'section' in _types(layout['root']) and len(layout['root']) > 0
+        layout = _create('article')
+        assert {'section', 'breadcrumb', 'article-detail'} <= _types(
+            layout['root'])
+
+        # 草稿对前台仍不可见：未发布前回退手写模板
+        from app.builder import service
+        with app.app_context():
+            assert service.get_published_layout('list', cid_list) is None
+
+    def test_init_default_route_reloads_fixture(self, app):
+        """编辑器工具栏「默认布局」：覆盖草稿为 fixture，受 builder:manage 保护。"""
+        # 无权限 403
+        denied = _role_client(app, 'readonly_viewer')
+        pid0 = _make_page(app, scope='home')
+        assert denied.post(
+            f'/admin/builder/pages/{pid0}/init-default').status_code == 403
+
+        c = _role_client(app, 'content_editor')
+        with app.app_context():
+            col = make_column(slug='zadi_' + uuid.uuid4().hex[:8],
+                              col_type='list')
+            db.session.commit()
+            cid = col.id
+        # 先建空记录并写入自定义草稿
+        pid = _make_page(app, scope='list', column_id=cid)
+        resp = c.post(f'/admin/builder/api/pages/{pid}/draft',
+                      json={'layout': _heading('自定义内容')})
+        assert resp.status_code == 200
+
+        # 重新载入默认布局 → 302 回编辑器，草稿被 fixture 覆盖
+        resp = c.post(f'/admin/builder/pages/{pid}/init-default')
+        assert resp.status_code == 302
+        assert f'/admin/builder/editor/{pid}' in resp.headers['Location']
+        layout = c.get(f'/admin/builder/api/pages/{pid}').get_json()['layout']
+        types = set()
+        stack = list(layout['root'])
+        while stack:
+            node = stack.pop()
+            types.add(node.get('type'))
+            stack.extend(node.get('children') or [])
+        assert {'section', 'breadcrumb', 'article-list'} <= types
+        assert 'heading' not in types
+        # 仅覆盖草稿，未产生发布
+        from app.builder import service
+        with app.app_context():
+            assert service.get_published_layout('list', cid) is None
+
     def test_preview_requires_login_and_renders_markers(self, app):
         anon = app.test_client()
         pid = _make_page(app)

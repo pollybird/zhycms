@@ -103,6 +103,11 @@ class TestDualTrack:
         assert b'zbw-section' in resp.data
         # 文章数据真实渲染
         assert f'ZBW文章{slug[-4:]}-02号'.encode() in resp.data
+        # 默认布局对齐手写列表页：栏目标题 H1 + 图文行式列表（非卡片网格）
+        assert ('构建测试栏目-' + slug).encode() in resp.data
+        assert b'zbw-list-title' in resp.data
+        assert b'zbw-article-row' in resp.data
+        assert b'zbw-article-card' not in resp.data
 
     def test_published_page_scope(self, app, client):
         cid, slug = _page_column(app)

@@ -80,6 +80,7 @@ class ArticleList(Widget):
     default_props = {
         'bind': 'auto', 'column_id': None, 'include_children': False,
         'limit': 6, 'layout': 'card', 'card_cols': 3,
+        'show_title': False,
         'show_cover': True, 'show_date': True, 'show_summary': True,
         'show_more': True, 'show_pagination': False,
     }
@@ -93,6 +94,8 @@ class ArticleList(Widget):
         {'key': 'layout', 'label': '展示布局', 'type': 'select', 'options': [
             ['card', '卡片网格'], ['list', '图文列表'], ['simple', '简洁标题列表'],
         ]},
+        {'key': 'show_title', 'label': '显示栏目标题（H1+简介）',
+         'type': 'toggle', 'help': '对齐手写列表页的栏目标题区'},
         {'key': 'card_cols', 'label': '卡片每行数量', 'type': 'select', 'options':
          [[str(i), f'{i} 列'] for i in (2, 3, 4)]},
         {'key': 'show_cover', 'label': '显示封面', 'type': 'toggle'},
