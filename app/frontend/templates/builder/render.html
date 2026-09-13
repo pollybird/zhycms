@@ -19,6 +19,17 @@
 {% endblock %}
 
 {% block js %}
+{# 根级通栏 section 突围用：clientWidth 不含纵向滚动条，避免 100vw 两侧偏差 #}
+<script>
+(function () {
+  function zbwFitCw() {
+    document.documentElement.style.setProperty(
+      '--zbw-cw', document.documentElement.clientWidth + 'px');
+  }
+  zbwFitCw();
+  window.addEventListener('resize', zbwFitCw);
+})();
+</script>
 {% if preview %}
 <script src="{{ url_for('static', filename='builder/js/preview_bridge.js') }}"></script>
 {% endif %}

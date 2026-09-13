@@ -1,0 +1,244 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_cat_dishes_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_cat_dishes_h",
+          "type": "heading",
+          "props": {"text": "招牌美食 · 匠心烹制", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_cat_dishes_t",
+          "type": "text",
+          "props": {"content": "精选新鲜食材，传承经典烹饪技艺", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_cat_dishes_list",
+          "type": "article-list",
+          "props": {
+            "bind": "select", "column_id": null, "include_children": false,
+            "limit": 8, "offset": 0, "layout": "card", "card_cols": 4,
+            "show_title": false,
+            "show_cover": true, "show_date": false, "show_summary": true,
+            "show_more": true, "show_pagination": false
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_cat_adv_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_cat_adv_h",
+          "type": "heading",
+          "props": {"text": "为什么选择我们", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_cat_adv_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_cat_adv_c1",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_adv_b1",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-leaf", "title": "新鲜食材", "text": "每日采购，原产地直供，保证新鲜", "color": "#28a745", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_cat_adv_c2",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_adv_b2",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-fire", "title": "匠心工艺", "text": "传承经典技法，大厨亲自掌勺", "color": "#dc3545", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_cat_adv_c3",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_adv_b3",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-couch", "title": "雅致环境", "text": "包间雅致，适合宴请聚餐", "color": "#6f42c1", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_cat_adv_c4",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_adv_b4",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-concierge-bell", "title": "贴心服务", "text": "全程微笑服务，宾至如归", "color": "#007bff", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_cat_store_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_cat_store_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_cat_store_left",
+              "type": "grid-col",
+              "props": {"span_md": 6, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_store_h",
+                  "type": "heading",
+                  "props": {"text": "门店信息", "level": 2, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_cat_store_t",
+                  "type": "text",
+                  "props": {"content": "坚持选用新鲜食材，传承经典烹饪技艺，为顾客呈现地道美味。环境雅致，适合家庭聚餐、商务宴请与各类宴席。", "align": "left"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_cat_contact",
+                  "type": "contact-card",
+                  "props": {"title": "门店信息"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_cat_store_b",
+                  "type": "button",
+                  "props": {"text": "门店详情", "href": "/about-us", "style": "primary", "size": "md", "align": "left", "icon": "", "target_blank": false},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_cat_store_right",
+              "type": "grid-col",
+              "props": {"span_md": 6, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_store_icon",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-store", "title": "欢迎光临", "text": "期待您的到来", "color": "#c0392b", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_cat_news_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_cat_news_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_cat_news_left",
+              "type": "grid-col",
+              "props": {"span_md": 8, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_news_h",
+                  "type": "heading",
+                  "props": {"text": "美食资讯", "level": 3, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_cat_news_list",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 6, "offset": 0, "layout": "simple", "card_cols": 3,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": false,
+                    "show_more": true, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_cat_news_right",
+              "type": "grid-col",
+              "props": {"span_md": 4, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_cat_vip",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-gift", "title": "会员专享", "text": "注册会员，享菜品 9 折优惠", "color": "#c0392b", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_cat_cta",
+      "type": "cta-banner",
+      "props": {
+        "title": "美食热线 · 一键订餐",
+        "subtitle": "家庭聚餐 · 商务宴请 · 各类宴席包桌，欢迎来电预订",
+        "button_text": "立即订餐", "button_url": "/about-us",
+        "bg_color": "#c0392b", "text_color": "#ffffff"
+      },
+      "visibility": {}, "children": []
+    }
+  ]
+}

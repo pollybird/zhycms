@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_svc_about_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_svc_about_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_svc_about_col",
+              "type": "grid-col",
+              "props": {"span_md": 7, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_svc_about_h",
+                  "type": "heading",
+                  "props": {"text": "关于我们", "level": 2, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_svc_about_t",
+                  "type": "text",
+                  "props": {"content": "以专业、务实的服务态度，与客户共创价值，助力企业持续成长。", "align": "left"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_svc_about_b",
+                  "type": "button",
+                  "props": {"text": "查看详情", "href": "/about-us", "style": "primary", "size": "md", "align": "left", "icon": "", "target_blank": false},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_svc_services_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_svc_services_h",
+          "type": "heading",
+          "props": {"text": "经营范围", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_svc_services_t",
+          "type": "text",
+          "props": {"content": "专业·务实·共创价值", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_svc_services_list",
+          "type": "article-list",
+          "props": {
+            "bind": "select", "column_id": null, "include_children": false,
+            "limit": 6, "offset": 0, "layout": "card", "card_cols": 3,
+            "show_title": false,
+            "show_cover": true, "show_date": false, "show_summary": true,
+            "show_more": true, "show_pagination": false
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_svc_news_cases_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_svc_news_cases_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_svc_news_col",
+              "type": "grid-col",
+              "props": {"span_md": 7, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_svc_news_h",
+                  "type": "heading",
+                  "props": {"text": "行业动态", "level": 3, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_svc_news_list",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 8, "offset": 0, "layout": "simple", "card_cols": 3,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": false,
+                    "show_more": true, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_svc_cases_col",
+              "type": "grid-col",
+              "props": {"span_md": 5, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_svc_cases_h",
+                  "type": "heading",
+                  "props": {"text": "客户案例", "level": 3, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_svc_cases_list",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 6, "offset": 0, "layout": "list", "card_cols": 3,
+                    "show_title": false,
+                    "show_cover": false, "show_date": false, "show_summary": true,
+                    "show_more": true, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_svc_links",
+      "type": "friend-links",
+      "props": {},
+      "visibility": {}, "children": []
+    }
+  ]
+}

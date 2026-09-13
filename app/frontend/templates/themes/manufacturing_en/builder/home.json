@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_mfge_prod_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_mfge_prod_h",
+          "type": "heading",
+          "props": {"text": "Products", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfge_prod_t",
+          "type": "text",
+          "props": {"content": "Providing trusted industry solutions", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfge_prod_list",
+          "type": "article-list",
+          "props": {
+            "bind": "select", "column_id": null, "include_children": false,
+            "limit": 8, "offset": 0, "layout": "card", "card_cols": 4,
+            "show_title": false,
+            "show_cover": true, "show_date": false, "show_summary": false,
+            "show_more": true, "show_pagination": false
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_mfge_news_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_mfge_news_h",
+          "type": "heading",
+          "props": {"text": "News", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfge_news_t",
+          "type": "text",
+          "props": {"content": "Industry insights and company updates", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfge_news_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_mfge_news_feat_col",
+              "type": "grid-col",
+              "props": {"span_md": 5, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_mfge_news_feat",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 1, "offset": 0, "layout": "card", "card_cols": 1,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": true,
+                    "show_more": false, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_mfge_news_rest_col",
+              "type": "grid-col",
+              "props": {"span_md": 7, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_mfge_news_rest",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 6, "offset": 1, "layout": "simple", "card_cols": 3,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": false,
+                    "show_more": false, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_mfge_about_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_mfge_about_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_mfge_about_col",
+              "type": "grid-col",
+              "props": {"span_md": 8, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_mfge_about_h",
+                  "type": "heading",
+                  "props": {"text": "About Us", "level": 2, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_mfge_about_t",
+                  "type": "text",
+                  "props": {"content": "With years of manufacturing expertise, we deliver reliable products and solutions backed by professional technology and dedicated service.", "align": "left"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_mfge_about_b",
+                  "type": "button",
+                  "props": {"text": "Learn More", "href": "/about-us", "style": "primary", "size": "md", "align": "left", "icon": "", "target_blank": false},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_mfge_links",
+      "type": "friend-links",
+      "props": {},
+      "visibility": {}, "children": []
+    }
+  ]
+}

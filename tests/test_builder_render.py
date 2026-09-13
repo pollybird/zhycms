@@ -150,6 +150,42 @@ class TestDualTrack:
             from app.extensions import cache
             cache.clear()
 
+    def test_article_list_offset_partitions_articles(self, app, client):
+        """offset 实现手写首页"首条大图 + 其余列表"：两条列表互不重叠。"""
+        from app.models.builder import BuilderPage
+        cid, _ = _list_column(app, n_articles=3)
+
+        def _alist(nid, limit, offset):
+            return {'id': nid, 'type': 'article-list', 'props': {
+                'bind': 'select', 'column_id': cid, 'limit': limit,
+                'offset': offset, 'layout': 'simple',
+                'show_cover': False, 'show_date': False, 'show_summary': False,
+                'show_more': False, 'show_pagination': False},
+                'children': [], 'visibility': {}}
+
+        with app.app_context():
+            rows = db.session.execute(
+                db.text('SELECT title FROM articles WHERE column_id=:c '
+                        'ORDER BY sort_order DESC, published_at DESC, id DESC'),
+                {'c': cid}).fetchall()
+            titles = [r[0] for r in rows]
+            _publish('home', None, {'root': [
+                _alist('al_feat', 1, 0), _alist('al_rest', 5, 1)]})
+        try:
+            html = client.get('/').get_data(as_text=True)
+            # 最新 1 条只在首条列表；其余列表从第 2 条开始，不重复
+            assert html.count(titles[0]) == 1
+            assert html.count(titles[1]) == 1
+            assert titles[0] in html and titles[1] in html
+        finally:
+            with app.app_context():
+                BuilderPage.query.filter_by(scope='home').delete()
+                db.session.commit()
+                db.session.execute(db.text('DELETE FROM builder_revisions'))
+                db.session.commit()
+            from app.extensions import cache
+            cache.clear()
+
     def test_publish_clears_page_cache(self, app, client):
         cid, slug = _list_column(app, n_articles=1)
         marker_a = 'ZBW标记A-' + uuid.uuid4().hex[:6]
@@ -248,6 +284,37 @@ def test_theme_matrix_render(theme, app, client, theme_switch):
     resp = client.get(f'/column/{slug}')
     assert resp.status_code == 200, f'{theme} 主题渲染失败'
     assert b'zbw-section' in resp.data
+
+
+# 每个主题手写首页的特征文案：发布该主题自身 fixture 后必须出现在首页
+THEME_HOME_MARKERS = {
+    'default': '欢迎访问我们的企业官网',
+    'blue': '欢迎访问我们的企业官网',  # blue 首页同 default，回退核心
+    'manufacturing': '产品展示',
+    'manufacturing_en': 'Products',
+    'catering': '招牌美食',
+    'education': '让孩子赢在起跑线',
+    'service': '经营范围',
+    'default_en': 'Welcome to Our Company Website',
+}
+
+
+@pytest.mark.parametrize('theme', THEMES)
+def test_theme_home_fixture_renders(theme, app, client, theme_switch):
+    """各主题自己的 home fixture 必须在该主题下完整渲染（结构等价手写首页）。"""
+    from app.builder import service
+    with app.app_context():
+        path = service.resolve_fixture_path('home', theme)
+        with open(path, encoding='utf-8') as f:
+            layout = json.load(f)
+        _publish('home', None, layout)
+    theme_switch(theme)
+    resp = client.get('/')
+    assert resp.status_code == 200, f'{theme} 主题首页 fixture 渲染失败'
+    html = resp.get_data(as_text=True)
+    assert 'zbw-page-root' in html
+    assert THEME_HOME_MARKERS[theme] in html, \
+        f'{theme} 主题首页缺少特征内容：{THEME_HOME_MARKERS[theme]}'
 
 
 # ------------------------------------------------------------

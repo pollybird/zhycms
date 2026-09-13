@@ -6,6 +6,7 @@ from datetime import datetime
 from ..constants import Builder as _B
 from ..extensions import db
 from ..models.builder import BuilderPage, BuilderRevision
+from ..utils.themes import THEMES_DIR, get_active_theme
 from .schema import (
     validate_layout, loads_layout, dumps_layout, LayoutError,
 )
@@ -188,13 +189,35 @@ def rollback_revision(page, revision_id, author_id=None, commit=True):
     return new_rev, None
 
 
-def init_default_layout(scope, column_id=None, author_id=None, commit=True):
-    """从核心 fixture 初始化草稿（等价旧手写模板结构）。返回 (page, error)。"""
+def resolve_fixture_path(scope, theme=None):
+    """解析某作用域的默认布局文件路径。
+
+    优先当前启用主题自带的 themes/<theme>/builder/<scope>.json（与该主题
+    手写模板等价）；主题未覆写时回退核心 fixture（等价 default 主题）。
+    返回 None 表示作用域非法或文件缺失。
+    """
     fname = _FIXTURE_FILES.get(scope)
     if not fname:
-        return None, f'非法作用域：{scope}'
-    path = os.path.join(FIXTURES_DIR, fname)
-    if not os.path.isfile(path):
+        return None
+    theme = (theme or '').strip() or get_active_theme()
+    if theme:
+        theme_path = os.path.join(THEMES_DIR, theme, 'builder', fname)
+        if os.path.isfile(theme_path):
+            return theme_path
+    core_path = os.path.join(FIXTURES_DIR, fname)
+    return core_path if os.path.isfile(core_path) else None
+
+
+def init_default_layout(scope, column_id=None, author_id=None, commit=True,
+                        theme=None):
+    """按当前启用主题的手写模板结构初始化草稿。返回 (page, error)。
+
+    主题可在 themes/<theme>/builder/ 下提供自己的 fixture 覆写核心默认值。
+    """
+    path = resolve_fixture_path(scope, theme)
+    if path is None:
+        if scope not in _FIXTURE_FILES:
+            return None, f'非法作用域：{scope}'
         return None, '默认布局文件缺失'
     with open(path, 'r', encoding='utf-8') as f:
         layout = json.load(f)

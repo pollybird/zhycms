@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_en_hero",
+      "type": "section",
+      "props": {"bg_color": "#f5f7fa", "text_color": "", "padding": "py-8", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_en_hero_h",
+          "type": "heading",
+          "props": {"text": "Welcome to Our Company Website", "level": 1, "align": "center", "color": "#2c3e50"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_en_hero_t",
+          "type": "text",
+          "props": {"content": "A professional, reliable and trusted partner. Learn more about our products and services below.", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_en_hero_b",
+          "type": "button",
+          "props": {"text": "Learn More", "href": "/about-us", "style": "primary", "size": "lg", "align": "center", "icon": "", "target_blank": false},
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_en_row",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_en_grid",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_en_col_main",
+              "type": "grid-col",
+              "props": {"span_md": 8, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_en_news_title",
+                  "type": "heading",
+                  "props": {"text": "Latest News", "level": 3, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_en_news",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 6, "offset": 0, "layout": "list", "card_cols": 3,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": true,
+                    "show_more": true, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_en_col_side",
+              "type": "grid-col",
+              "props": {"span_md": 4, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_en_contact",
+                  "type": "contact-card",
+                  "props": {"title": "Contact Us"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_en_links",
+                  "type": "friend-links",
+                  "props": {},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_en_cta",
+      "type": "cta-banner",
+      "props": {
+        "title": "Ready to Work With Us?",
+        "subtitle": "Contact us today for a tailored solution",
+        "button_text": "Contact Us", "button_url": "/about-us",
+        "bg_color": "#34495e", "text_color": "#ffffff"
+      },
+      "visibility": {}, "children": []
+    }
+  ]
+}

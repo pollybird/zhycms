@@ -11,9 +11,9 @@ from app.builder.schema import (
 )
 from app.constants import Builder as B
 
-FIXTURES_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    'app', 'builder', 'fixtures')
+_APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FIXTURES_DIR = os.path.join(_APP_DIR, 'app', 'builder', 'fixtures')
+THEMES_DIR = os.path.join(_APP_DIR, 'app', 'frontend', 'templates', 'themes')
 
 
 def _node(t, **kw):
@@ -38,6 +38,16 @@ class TestFixtures:
         files = sorted(os.path.basename(p) for p in
                        glob.glob(os.path.join(FIXTURES_DIR, '*.json')))
         assert files == ['article.json', 'home.json', 'list.json', 'page.json']
+
+    def test_theme_fixture_overrides_valid(self):
+        """themes/<theme>/builder/*.json 主题级默认布局必须全部合法。"""
+        paths = sorted(glob.glob(os.path.join(
+            THEMES_DIR, '*', 'builder', '*.json')))
+        assert paths, '至少应有一个主题级 fixture 覆写'
+        for path in paths:
+            with open(path, encoding='utf-8') as f:
+                layout = json.load(f)
+            validate_layout(layout)
 
 
 class TestValidateBasic:

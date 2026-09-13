@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_edu_quick_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_edu_quick_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_edu_quick_c1",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_quick_b1",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-book-open", "title": "课程中心", "text": "少儿编程 / 口语 / 思维", "color": "#42a5f5", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_edu_quick_c2",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_quick_b2",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-user-graduate", "title": "师资力量", "text": "名校毕业 · 经验丰富", "color": "#fb8c00", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_edu_quick_c3",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_quick_b3",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-newspaper", "title": "校园动态", "text": "新闻 · 活动 · 赛事", "color": "#43a047", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_edu_quick_c4",
+              "type": "grid-col",
+              "props": {"span_md": 3, "span_sm": 6, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_quick_b4",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-phone-volume", "title": "报名咨询", "text": "免费试听 · 一对一", "color": "#8e24aa", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_edu_about_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_edu_about_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_edu_about_left",
+              "type": "grid-col",
+              "props": {"span_md": 6, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_about_h",
+                  "type": "heading",
+                  "props": {"text": "关于我们", "level": 2, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_edu_about_t",
+                  "type": "text",
+                  "props": {"content": "秉承“用心做教育，用爱育未来”的办学理念，专注 K12 课外辅导与素质教育，开设少儿编程、英语口语、数学思维等特色课程，助力每一位孩子全面成长。", "align": "left"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_edu_about_b",
+                  "type": "button",
+                  "props": {"text": "了解更多", "href": "/about-us", "style": "primary", "size": "md", "align": "left", "icon": "", "target_blank": false},
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_edu_about_right",
+              "type": "grid-col",
+              "props": {"span_md": 6, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_about_icon",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-school", "title": "用心做教育", "text": "用爱育未来", "color": "#42a5f5", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_edu_courses_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_edu_courses_h",
+          "type": "heading",
+          "props": {"text": "精品课程 · 因材施教", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_edu_courses_t",
+          "type": "text",
+          "props": {"content": "小班教学 + 个性化辅导，关注每一位学生的成长", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_edu_courses_list",
+          "type": "article-list",
+          "props": {
+            "bind": "select", "column_id": null, "include_children": false,
+            "limit": 8, "offset": 0, "layout": "card", "card_cols": 4,
+            "show_title": false,
+            "show_cover": true, "show_date": false, "show_summary": true,
+            "show_more": true, "show_pagination": false
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_edu_stats",
+      "type": "stat-numbers",
+      "props": {
+        "bg_color": "#1565c0", "text_color": "#ffffff",
+        "items": [
+          {"number": "10+", "label": "年办学经验"},
+          {"number": "5000+", "label": "累计学员"},
+          {"number": "80+", "label": "资深教师"},
+          {"number": "30+", "label": "精品课程"}
+        ]
+      },
+      "visibility": {}, "children": []
+    },
+    {
+      "id": "n_edu_teachers_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_edu_teachers_h",
+          "type": "heading",
+          "props": {"text": "名师团队 · 匠心育人", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_edu_teachers_t",
+          "type": "text",
+          "props": {"content": "平均教龄 8 年以上，名校毕业，富有爱心", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_edu_teachers_list",
+          "type": "article-list",
+          "props": {
+            "bind": "select", "column_id": null, "include_children": false,
+            "limit": 8, "offset": 0, "layout": "card", "card_cols": 4,
+            "show_title": false,
+            "show_cover": false, "show_date": false, "show_summary": true,
+            "show_more": false, "show_pagination": false
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_edu_news_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_edu_news_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_edu_news_left",
+              "type": "grid-col",
+              "props": {"span_md": 8, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_news_h",
+                  "type": "heading",
+                  "props": {"text": "校园动态", "level": 3, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_edu_news_list",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 6, "offset": 0, "layout": "simple", "card_cols": 3,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": false,
+                    "show_more": true, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_edu_news_right",
+              "type": "grid-col",
+              "props": {"span_md": 4, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_edu_news_icon",
+                  "type": "icon-box",
+                  "props": {"icon": "fas fa-calendar-alt", "title": "近期活动", "text": "春季招生进行中，报名即享优惠", "color": "#1e88e5", "align": "center"},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_edu_cta",
+      "type": "cta-banner",
+      "props": {
+        "title": "让孩子赢在起跑线",
+        "subtitle": "免费试听课程 · 一对一学习规划 · 不满意全额退款",
+        "button_text": "立即报名", "button_url": "/about-us",
+        "bg_color": "#fb8c00", "text_color": "#ffffff"
+      },
+      "visibility": {}, "children": []
+    }
+  ]
+}

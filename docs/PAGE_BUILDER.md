@@ -238,9 +238,23 @@ schema.validate_layout(layout)                     # 非法抛 LayoutError
 schema.normalize_layout(raw)                       # 容错规整（丢弃坏节点）
 ```
 
-### 8. 默认布局 fixtures
+### 8. 默认布局 fixtures（按当前启用主题解析）
 
 `app/builder/fixtures/{home,page,list,article}.json` 是「载入默认布局」使用的
-初始布局，修改后请确保：通过 `validate_layout`、节点 id 固定且唯一、
-四套作用域与组件 `scopes` 一致，并运行
-`pytest tests/test_builder_schema.py tests/test_builder_render.py`。
+核心初始布局（等价 default 主题手写模板）。新建构建页与工具栏「默认布局」都会
+调用 `service.init_default_layout(scope)`，经 `resolve_fixture_path` 按
+**当前启用主题**（`Setting.site_theme`）解析：
+
+1. 优先 `app/frontend/templates/themes/<当前主题>/builder/<scope>.json`；
+2. 主题未覆写该作用域时回退核心 `app/builder/fixtures/<scope>.json`。
+
+因此某主题的手写模板（如 `index.html`）与 default 结构不同时，可在该主题目录下
+提供 `builder/home.json` 镜像其结构（manufacturing/catering/education/service/
+default_en 已覆写；page/list/article 四主题结构一致，回退核心即可）。fixture 在
+创建时按当时主题快照入草稿，之后切换主题不会回填已有草稿，用户可点「默认布局」
+手动重置。
+
+修改或新增 fixture 后请确保：通过 `validate_layout`、节点 id 固定且唯一（建议带
+主题前缀，如 `n_mfg_*`）、四套作用域与组件 `scopes` 一致，并运行
+`pytest tests/test_builder_schema.py tests/test_builder_render.py`
+（含主题级 fixture 扫描与 8 主题首页渲染矩阵）。

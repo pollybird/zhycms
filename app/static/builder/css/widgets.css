@@ -5,6 +5,17 @@
 
 /* ---- 布局 ---- */
 .zbw-section { width: 100%; }
+/* 根级「通栏区块」突围主题 .container，背景色/内边距铺满整行，
+   与手写模板中负边距通栏 section 观感一致；嵌套在容器/栅格内的
+   section 不受影响。该 CSS 仅在构建器接管的页面加载；clip 用于
+   消除 100vw 含滚动条宽度带来的微量横向溢出（不影响 sticky）。 */
+body { overflow-x: clip; }
+/* --zbw-cw 由 render.html 注入（不含滚动条的视口宽），无 JS 时回退 100vw */
+.zbw-page-root > .zbw-section {
+  width: var(--zbw-cw, 100vw);
+  margin-left: calc(50% - var(--zbw-cw, 100vw) / 2);
+  margin-right: calc(50% - var(--zbw-cw, 100vw) / 2);
+}
 .zbw-gutter-lg > div > [class*="zbw-col"] { margin-bottom: 1.5rem; }
 .zbw-spacer { width: 100%; }
 .zbw-divider { border-top-width: 2px; margin-left: auto; margin-right: auto; }

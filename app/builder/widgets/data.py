@@ -30,11 +30,12 @@ def _query_articles(node, page_ctx, column):
     """
     props = node.get('props') or {}
     limit = int(props.get('limit') or 6)
+    offset = max(int(props.get('offset') or 0), 0)
     include_children = bool(props.get('include_children'))
     cache = page_ctx.setdefault('_qcache', {})
 
     if column is None:
-        key = ('latest', limit)
+        key = ('latest', limit, offset)
         if key in cache:
             return cache[key]
         from ...models.article import Article
@@ -43,11 +44,11 @@ def _query_articles(node, page_ctx, column):
             is_deleted=False, status=STATUS_PUBLISHED
         ).order_by(
             Article.sort_order.desc(), Article.published_at.desc()
-        ).limit(limit).all()
+        ).offset(offset).limit(limit).all()
         cache[key] = items
         return items
 
-    key = ('articles', column.id, limit, include_children)
+    key = ('articles', column.id, limit, offset, include_children)
     if key in cache:
         return cache[key]
 
@@ -65,7 +66,7 @@ def _query_articles(node, page_ctx, column):
         Article.status == STATUS_PUBLISHED,
     ).order_by(
         Article.sort_order.desc(), Article.published_at.desc()
-    ).limit(limit).all()
+    ).offset(offset).limit(limit).all()
     cache[key] = items
     return items
 
@@ -79,7 +80,7 @@ class ArticleList(Widget):
     scopes = (_B.SCOPE_HOME, _B.SCOPE_PAGE, _B.SCOPE_LIST)
     default_props = {
         'bind': 'auto', 'column_id': None, 'include_children': False,
-        'limit': 6, 'layout': 'card', 'card_cols': 3,
+        'limit': 6, 'offset': 0, 'layout': 'card', 'card_cols': 3,
         'show_title': False,
         'show_cover': True, 'show_date': True, 'show_summary': True,
         'show_more': True, 'show_pagination': False,
@@ -91,13 +92,15 @@ class ArticleList(Widget):
         {'key': 'column_id', 'label': '指定栏目', 'type': 'column'},
         {'key': 'include_children', 'label': '包含子栏目文章', 'type': 'toggle'},
         {'key': 'limit', 'label': '显示条数（不分页时生效）', 'type': 'number'},
+        {'key': 'offset', 'label': '跳过前 N 条（首页“首条大图+其余列表”排版）',
+         'type': 'number', 'help': '分页模式下该值不生效'},
         {'key': 'layout', 'label': '展示布局', 'type': 'select', 'options': [
             ['card', '卡片网格'], ['list', '图文列表'], ['simple', '简洁标题列表'],
         ]},
         {'key': 'show_title', 'label': '显示栏目标题（H1+简介）',
          'type': 'toggle', 'help': '对齐手写列表页的栏目标题区'},
         {'key': 'card_cols', 'label': '卡片每行数量', 'type': 'select', 'options':
-         [[str(i), f'{i} 列'] for i in (2, 3, 4)]},
+         [[str(i), f'{i} 列'] for i in (1, 2, 3, 4)]},
         {'key': 'show_cover', 'label': '显示封面', 'type': 'toggle'},
         {'key': 'show_date', 'label': '显示日期', 'type': 'toggle'},
         {'key': 'show_summary', 'label': '显示摘要', 'type': 'toggle'},

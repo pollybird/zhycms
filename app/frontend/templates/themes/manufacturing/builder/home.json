@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "root": [
+    {
+      "id": "n_mfg_prod_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_mfg_prod_h",
+          "type": "heading",
+          "props": {"text": "产品展示", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfg_prod_t",
+          "type": "text",
+          "props": {"content": "提供值得信赖的行业解决方案", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfg_prod_list",
+          "type": "article-list",
+          "props": {
+            "bind": "select", "column_id": null, "include_children": false,
+            "limit": 8, "offset": 0, "layout": "card", "card_cols": 4,
+            "show_title": false,
+            "show_cover": true, "show_date": false, "show_summary": false,
+            "show_more": true, "show_pagination": false
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    },
+    {
+      "id": "n_mfg_news_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_mfg_news_h",
+          "type": "heading",
+          "props": {"text": "新闻资讯", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfg_news_t",
+          "type": "text",
+          "props": {"content": "聚焦行业动态，传递企业声音", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_mfg_news_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_mfg_news_feat_col",
+              "type": "grid-col",
+              "props": {"span_md": 5, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_mfg_news_feat",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 1, "offset": 0, "layout": "card", "card_cols": 1,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": true,
+                    "show_more": false, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            },
+            {
+              "id": "n_mfg_news_rest_col",
+              "type": "grid-col",
+              "props": {"span_md": 7, "span_sm": 12, "align_self": "auto"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_mfg_news_rest",
+                  "type": "article-list",
+                  "props": {
+                    "bind": "select", "column_id": null, "include_children": false,
+                    "limit": 6, "offset": 1, "layout": "simple", "card_cols": 3,
+                    "show_title": false,
+                    "show_cover": true, "show_date": true, "show_summary": false,
+                    "show_more": false, "show_pagination": false
+                  },
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_mfg_about_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_mfg_about_row",
+          "type": "grid-row",
+          "props": {"gutter": "normal"},
+          "visibility": {},
+          "children": [
+            {
+              "id": "n_mfg_about_col",
+              "type": "grid-col",
+              "props": {"span_md": 8, "span_sm": 12, "align_self": "center"},
+              "visibility": {},
+              "children": [
+                {
+                  "id": "n_mfg_about_h",
+                  "type": "heading",
+                  "props": {"text": "关于我们", "level": 2, "align": "left", "color": ""},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_mfg_about_t",
+                  "type": "text",
+                  "props": {"content": "多年深耕制造行业，以可靠品质、专业技术与用心服务，为客户提供值得信赖的产品与解决方案。", "align": "left"},
+                  "visibility": {}, "children": []
+                },
+                {
+                  "id": "n_mfg_about_b",
+                  "type": "button",
+                  "props": {"text": "了解更多", "href": "/about-us", "style": "primary", "size": "md", "align": "left", "icon": "", "target_blank": false},
+                  "visibility": {}, "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "n_mfg_links",
+      "type": "friend-links",
+      "props": {},
+      "visibility": {}, "children": []
+    }
+  ]
+}

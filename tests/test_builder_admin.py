@@ -316,6 +316,121 @@ class TestCreateAndPreview:
         assert marker in html
 
 
+class TestThemeFixtureResolution:
+    """默认布局按「当前启用主题」解析：主题级 fixture 优先，核心回退。"""
+
+    def test_resolve_fixture_path_priority(self, app):
+        from app.builder import service
+        with app.app_context():
+            # 主题有覆写 → 命中主题文件
+            p = service.resolve_fixture_path('home', 'manufacturing')
+            assert p.replace('\\', '/').endswith(
+                'themes/manufacturing/builder/home.json')
+            # blue/blue 未覆写任何作用域 → 全部回退核心
+            for scope in ('home', 'page', 'list', 'article'):
+                p = service.resolve_fixture_path(scope, 'blue')
+                assert p.replace('\\', '/').endswith(
+                    f'app/builder/fixtures/{scope}.json')
+            # 仅有 home 覆写的主题，其他作用域仍回退核心
+            for theme in ('catering', 'education', 'service',
+                          'default_en', 'manufacturing_en'):
+                assert service.resolve_fixture_path(
+                    'home', theme).replace('\\', '/').endswith(
+                    f'themes/{theme}/builder/home.json')
+                assert service.resolve_fixture_path(
+                    'list', theme).replace('\\', '/').endswith(
+                    'app/builder/fixtures/list.json')
+            # 未知主题 / 空主题安全回退核心
+            assert 'app/builder/fixtures/home.json' in \
+                service.resolve_fixture_path('home', 'not-a-theme').replace('\\', '/')
+            assert 'app/builder/fixtures/home.json' in \
+                service.resolve_fixture_path('home', '  ').replace('\\', '/')
+            # 非法作用域
+            assert service.resolve_fixture_path('evil', 'manufacturing') is None
+
+    def test_init_default_layout_follows_active_theme(self, app):
+        from app.builder import service
+        from app.builder.schema import loads_layout
+        from app.models.builder import BuilderPage
+        from app.models.setting import Setting
+
+        def _ids(page):
+            return {n['id'] for n in
+                    service.iter_layout_nodes(loads_layout(page.draft_json))}
+
+        with app.app_context():
+            old_theme = Setting.get('site_theme') or 'default'
+            try:
+                BuilderPage.query.filter_by(
+                    scope='home', column_id=None).delete(
+                    synchronize_session=False)
+                db.session.commit()
+
+                Setting.set('site_theme', 'manufacturing')
+                page, err = service.init_default_layout('home')
+                assert err is None
+                assert 'n_mfg_prod_sec' in _ids(page)
+                assert 'n_mfg_news_feat' in _ids(page)
+
+                # 切换主题后重新初始化 → 载入新主题结构（旧草稿被覆盖）
+                Setting.set('site_theme', 'catering')
+                page, err = service.init_default_layout('home')
+                assert err is None
+                assert 'n_cat_dishes_sec' in _ids(page)
+                assert 'n_mfg_prod_sec' not in _ids(page)
+
+                # 显式 theme 参数优先于当前启用主题
+                page, err = service.init_default_layout('home', theme='service')
+                assert err is None
+                assert 'n_svc_services_list' in _ids(page)
+
+                # 未覆写主题（blue）回退核心 fixture
+                page, err = service.init_default_layout('home', theme='blue')
+                assert err is None
+                ids = _ids(page)
+                assert 'n_cat_dishes_sec' not in ids
+                assert len(ids) > 0
+            finally:
+                Setting.set('site_theme', old_theme)
+
+    def test_editor_create_route_uses_active_theme(self, app):
+        """后台新建首页走当前启用主题的手写等价布局。"""
+        from app.builder import service
+        from app.models.builder import BuilderPage
+        from app.models.setting import Setting
+        from app.extensions import cache
+
+        c = _role_client(app, 'content_editor')
+        with app.app_context():
+            old_theme = Setting.get('site_theme') or 'default'
+            try:
+                BuilderPage.query.filter_by(
+                    scope='home', column_id=None).delete(
+                    synchronize_session=False)
+                db.session.commit()
+                Setting.set('site_theme', 'education')
+                cache.clear()
+
+                resp = c.post('/admin/builder/pages/create',
+                              data={'scope': 'home'})
+                assert resp.status_code == 302
+                pid = resp.headers['Location'].rstrip('/').split('/')[-1]
+                layout = c.get(
+                    f'/admin/builder/api/pages/{pid}').get_json()['layout']
+                types = set()
+                stack = list(layout['root'])
+                while stack:
+                    node = stack.pop()
+                    types.add(node.get('type'))
+                    stack.extend(node.get('children') or [])
+                # 教育主题首页特征：数据统计条（手写 edu-stats 段）
+                assert 'stat-numbers' in types
+                assert 'cta-banner' in types
+            finally:
+                Setting.set('site_theme', old_theme)
+                cache.clear()
+
+
 class TestSelectorApis:
     """属性面板选择器数据源：栏目（链接选择器）/ 碎片下拉。"""
 
