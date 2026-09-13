@@ -5,25 +5,32 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
-## [3.0.0] - 2026-09-12
+## [3.0.0] - 2026-09-15
 
-**可视化页面构建器**版本。新增自研轻量拖拽式页面构建器（原生 HTML5 拖拽 + JSON Schema 组件注册 + iframe 内服务端真实渲染），覆盖首页、单页、列表页、文章详情页四种全页面类型；内置 24 个 Bootstrap4 组件（布局 6 + 基础 8 + 数据 10），支持草稿/发布/修订回滚、中英双语文案、语言白名单与会员可见性、桌面/平板/手机三端预览。插件可通过 `get_builder_widgets()` 钩子注册自有组件，插件禁用/卸载时前台静默降级、后台卸载前做布局引用拦截。采用「构建器为主、手写模板永久兜底」双轨策略：只有已发布布局的页面才走构建器，老站升级后零行为变化。**数据库结构变更**：新增迁移 `0009`（`builder_pages` / `builder_revisions` 两张表）。无 Node 构建链、无新增 Python 依赖（编辑器为原生 ES module）。
+**可视化页面构建器**版本。新增自研轻量拖拽式页面构建器（原生 HTML5 拖拽 + JSON Schema 组件注册 + iframe 内服务端真实渲染），覆盖首页、单页、列表页、文章详情页四种全页面类型；内置 24 个 Bootstrap4 组件（布局 6 + 基础 8 + 数据 10），支持草稿/发布/修订回滚、中英双语文案、语言白名单与会员可见性、桌面/平板/手机三端预览、全局页面样式设置（背景/页脚/标题色/圆角/边框/阴影）。**默认布局三层合并**：新建构建页按「当前启用主题 fixture → 核心回退」解析基础布局，再叠加已启用插件贡献的布局片段（`get_builder_layouts()` + `builder/<scope>.json`，启用强校验、撞 id 自动重写、卸载清理）；轮播图/产品/招聘/教程四个内容型插件启用后新首页开箱即用。插件还可通过 `get_builder_widgets()` 钩子注册自有组件，插件禁用/卸载时前台静默降级、后台卸载前做布局引用拦截。采用「构建器为主、手写模板永久兜底」双轨策略：只有已发布布局的页面才走构建器，老站升级后零行为变化。**数据库结构变更**：新增迁移 `0009`（`builder_pages` / `builder_revisions` 两张表）。无 Node 构建链、无新增 Python 依赖（编辑器为原生 ES module）。
 
 ### Added
 
 - **可视化页面构建器（核心）**：
   - 四作用域：网站首页 / 单页（page 栏目）/ 列表页（list 栏目）/ 文章详情页（支持栏目级布局 + 全局默认回退）。
   - 24 个内置组件：section/container/grid-row/grid-col/spacer/divider；heading/text/richtext/image/button/icon-box/alert/video-embed；article-list/article-detail/page-content/breadcrumb/fragment/carousel/contact-card/cta-banner/friend-links/stat-numbers。
-  - 编辑器：组件库、iframe 真实主题画布（服务端渲染，非模拟）、属性面板（文本/多行/富文本/数字/下拉/开关/颜色/图片上传/图标/栏目选择/重复项）、图层树、拖拽排序与嵌套、复制/删除/上移下移、三端设备切换、CKEditor5 富文本、800ms 防抖自动存草稿、未保存离开提示。
+  - 编辑器：组件库、iframe 真实主题画布（服务端渲染，非模拟）、属性面板（文本/多行/富文本/数字/下拉/开关/颜色/图片上传/图标预设/栏目选择/站内链接选择/碎片下拉/重复项）、图层树、拖拽排序与嵌套、复制/删除/上移下移、三端设备切换与全屏预览模态框（按真实设备宽度）、CKEditor5 富文本、800ms 防抖自动存草稿、未保存离开提示。
   - 发布工作流：草稿/已发布双版本隔离（匿名访客只见已发布版）、每次发布生成修订快照、一键回滚（回滚即发布并再记快照）、从默认布局初始化向导、页面管理四分组列表与未构建栏目快捷入口。
   - 预览：`/admin/builder/preview/<id>` 仅登录可访问，注入真实导航/SEO/栏目/文章/分页/上下篇数据，禁用组件显示黄色占位，单组件取数或渲染异常不拖垮整页。
   - 主题适配：8 套主题（default/blue/manufacturing/service/catering/education/default_en/manufacturing_en）全部验证可渲染；组件支持 `themes/<theme>/builder/widgets/*.html` 主题级覆写。
 - **布局 JSON Schema v1**：服务端 allowlist 校验（组件类型/props 白名单/select 双向类型兼容/repeater 子字段/localized 语言键）、最大嵌套深度 8、单页节点上限 300、文档体积上限 256KB；非法草稿/发布返回 400。
+- **全局页面样式**：`layout.styles` 页面级背景/页脚配色/标题色/圆角/边框/阴影，服务端白名单生成 CSS，预览与生产共用同一规则。
+- **默认布局三层解析（v3.0.0 开发周期迭代）**：
+  - 新建构建页与「默认布局」按**当前启用主题**解析：优先 `themes/<theme>/builder/<scope>.json`，主题未覆写回退核心 fixture，快照入草稿后切主题不回填。
+  - **第三方上传主题**可自带 `builder/<scope>.json`，上传时按同一套 `validate_layout` 校验，非法整包拒绝；resolve 带 slug 正则 + realpath 纵深防护。
+  - **8 套官方主题必备 `builder/home.json`** 成为官方主题规范（测试逐主题强制），default/blue 主题补齐首套首页 fixture。
+- **插件贡献默认布局片段**：插件包内 `builder/<scope>.json`（scope 仅 home/page/list/article，`position` prepend/append + 可选 `after` 锚点），`PluginBase.get_builder_layouts()` 默认自动扫描；启用插件前对片段跑同一套 `validate_layout` 强校验（非法拒绝启用）；快照合并按 slug 升序、撞 id 自动加 owner 前缀重写、单片段失败隔离跳过、卸载同步清理；只做一次性快照，已有草稿/已发布页绝不被改写。
+- **四内容型插件构建器开箱即用**：banner 新增 `banner-hero` 首屏轮播组件（home 片段 prepend）；product/recruit/tutorial 各新增 `product-list` / `job-list` / `tutorial-list` 数据组件与「标题 + 组件」首页区块（append），模板放插件 `templates/builder/widgets/`。
 - **多语言与可见性**：文本类 props 支持 `{zh, en}` 多值并按当前语言回退；节点支持 `visibility.locales` 语言白名单与 `member_only` 会员限定。
 - **插件联动**：`PluginBase.get_builder_widgets()` 注册钩子（owner=插件 slug，随插件启用状态门控）；插件卸载前若仍有页面引用其组件则拒绝卸载并列出引用页面；插件被禁用后生产渲染空、预览标黄占位、完全未知类型静默跳过。
 - **权限与审计**：新增权限点 `builder:manage`（content_auditor/content_editor）与 `builder:publish`（仅 content_auditor）；创建/发布/回滚/删除写入审计日志（`audit` 模块新增 `builder` 分类）。
-- **文档**：新增 [docs/PAGE_BUILDER.md](docs/PAGE_BUILDER.md)（用户手册 + 组件开发 API）；[docs/PLUGIN_DEV.md](docs/PLUGIN_DEV.md) 补充 `get_builder_widgets` 章节。
-- **测试**：新增 65 个用例（组件注册表与插件门控、Schema 校验边界、四作用域双轨 HTTP、8 主题渲染矩阵、分页/伪静态/发布清缓存、i18n/会员可见性、后台 RBAC 角色矩阵与发布工作流），全量 206 项通过。
+- **文档**：新增 [docs/PAGE_BUILDER.md](docs/PAGE_BUILDER.md)（用户手册 + 组件开发 API + 插件贡献片段约定）；[docs/PLUGIN_DEV.md](docs/PLUGIN_DEV.md) 补充 `get_builder_widgets` / `get_builder_layouts` 章节；wiki.html、SECURITY.md、UPGRADE.md 同步 v3.0.0。
+- **测试**：v3.0.0 开发周期新增 139 个用例（组件注册表与插件门控、Schema 校验边界、四作用域双轨 HTTP、8 主题渲染矩阵、主题 fixture 解析与第三方主题校验、插件布局片段合并/启用拦截/四插件真实数据端到端、分页/伪静态/发布清缓存、i18n/会员可见性、后台 RBAC 角色矩阵与发布工作流），全量 280 项通过。
 
 ### Changed
 

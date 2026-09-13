@@ -176,8 +176,8 @@
 <h2>特性一览</h2>
 <table>
   <tr><th>能力</th><th>说明</th><th>版本</th></tr>
-  <tr><td>多主题模板系统</td><td>6 套内置主题（含 2 套英文），后台一键切换，栏目级模板选择</td><td>v1.0</td></tr>
-  <tr><td>插件机制</td><td>零侵入扩展，启停即时生效，内置 6 个官方插件</td><td>v2.2</td></tr>
+  <tr><td>多主题模板系统</td><td>8 套内置主题（含 2 套英文），后台一键切换，栏目级模板选择</td><td>v1.0</td></tr>
+  <tr><td>插件机制</td><td>零侵入扩展，启停即时生效，内置 7 个官方插件 + 3 个社区插件</td><td>v2.2</td></tr>
   <tr><td>国际化 i18n</td><td>Flask-Babel 中英文切换，插件独立翻译域</td><td>v2.3</td></tr>
   <tr><td>数据库迁移</td><td>Flask-Migrate (Alembic)，支持回滚与插件迁移脚本</td><td>v2.4</td></tr>
   <tr><td>全文搜索</td><td>默认 Whoosh + jieba，可选 Meilisearch，SQL LIKE 兜底</td><td>v2.4</td></tr>
@@ -189,7 +189,7 @@
   <tr><td>SEO 优化</td><td>伪静态、sitemap、robots.txt、页面缓存、图片默认 ALT</td><td>v2.0</td></tr>
   <tr><td>表单收集</td><td>可视化表单设计，提交后邮件/企微实时通知</td><td>v2.0</td></tr>
   <tr><td>备份恢复</td><td>MySQL/PostgreSQL/JSON 三种方式，一键备份与恢复</td><td>v2.0</td></tr>
-  <tr><td>可视化页面构建器</td><td>拖拽搭建首页/单页/列表/文章详情：24 组件、草稿/发布/修订回滚、双语与会员可见性、插件可扩展；无布局永久回退手写模板</td><td>v3.0.0</td></tr>
+  <tr><td>可视化页面构建器</td><td>拖拽搭建首页/单页/列表/文章详情：24 组件、草稿/发布/修订回滚、双语与会员可见性、默认布局按主题 fixture + 插件片段三层合并；插件可注册组件并贡献默认布局；无布局永久回退手写模板</td><td>v3.0.0</td></tr>
 </table>
 </section>
 
@@ -199,7 +199,7 @@
 ├── app/
 │   ├── admin/              # 后台模块
 │   ├── frontend/           # 前台模块
-│   │   └── templates/themes/   # 主题目录（6 套内置主题）
+│   │   └── templates/themes/   # 主题目录（8 套内置主题）
 │   ├── models/             # 数据模型
 │   ├── translations/       # 核心国际化翻译文件
 │   ├── utils/              # 工具模块（上传、通知、存储、主题等）
@@ -209,7 +209,7 @@
 │   ├── plugin_system.py    # 插件运行时
 │   ├── plugin_api.py       # PluginBase 基类
 │   └── extensions.py       # 扩展初始化
-├── plugins/                # 插件目录（6 个官方内置）
+├── plugins/                # 插件目录（7 个官方内置 + 3 个社区插件）
 ├── migrations/             # Alembic 迁移脚本
 ├── docker/                 # Docker 部署辅助
 ├── instance/               # 实例数据（数据库、配置、备份等）
@@ -460,8 +460,18 @@ docker compose -f docker-compose.postgresql.yml up -d
   <tr><td>数据 ×10</td><td>article-list、article-detail、page-content、breadcrumb、fragment、carousel、contact-card、cta-banner、friend-links、stat-numbers</td></tr>
 </table>
 
+<h3 id="builder-layouts">默认布局三层合并 <span class="tag tag-new">v3.0.0</span></h3>
+<p>「新建构建页 / 载入默认布局」时按三层合并成初始草稿（<b>一次性快照</b>，之后切主题、启停插件均不回填已有草稿）：</p>
+<table>
+  <tr><th>层级</th><th>来源</th><th>说明</th></tr>
+  <tr><td>① 主题 fixture</td><td><code>themes/&lt;主题&gt;/builder/&lt;scope&gt;.json</code></td><td>主题未提供时回退核心 fixture；8 套官方主题必备首页布局，第三方上传主题可自带（上传时校验，非法整包拒绝）</td></tr>
+  <tr><td>② 插件贡献片段</td><td><code>plugins/&lt;slug&gt;/builder/&lt;scope&gt;.json</code></td><td>仅合并<b>当前已启用</b>插件的片段；<code>position</code> 支持 prepend（插最前）/append（追加，默认）+ 可选 <code>after</code> 锚点；多插件按 slug 升序</td></tr>
+  <tr><td>③ 校验与容错</td><td>—</td><td>撞节点 id 自动加 <code>n_&lt;插件&gt;__</code> 前缀重写；单片段失败只跳过自身；插件启用前片段强校验，非法拒绝启用</td></tr>
+</table>
+<p>轮播图（首屏轮播 prepend）、产品展示、招聘管理、教程中心四个内容型插件启用后，新首页默认布局自动带上对应区块，可在编辑器中调整或删除。</p>
+
 <h3 id="builder-dev">组件开发 API</h3>
-<p>组件 = <code>Widget</code> 子类（元数据 + <code>prop_schema</code> + <code>context()</code> 取数）+ Jinja partial。模板解析链：<code>themes/&lt;主题&gt;/builder/widgets/&lt;type&gt;.html</code> → <code>builder/widgets/&lt;type&gt;.html</code>。核心代码位于 <code>app/builder/</code>（registry/schema/renderer/service/widgets）。插件经 <code>get_builder_widgets()</code> 钩子注册（owner=插件 slug，随启用状态门控）。完整 API 与模板变量见仓库 <a href="https://github.com/pollybird/zhycms/blob/main/docs/PAGE_BUILDER.md">docs/PAGE_BUILDER.md</a>。</p>
+<p>组件 = <code>Widget</code> 子类（元数据 + <code>prop_schema</code> + <code>context()</code> 取数）+ Jinja partial。模板解析链：<code>themes/&lt;主题&gt;/builder/widgets/&lt;type&gt;.html</code> → <code>builder/widgets/&lt;type&gt;.html</code>（含插件模板目录）。核心代码位于 <code>app/builder/</code>（registry/schema/renderer/service/contrib/widgets）。插件经 <code>get_builder_widgets()</code> 钩子注册组件（owner=插件 slug，随启用状态门控），经 <code>get_builder_layouts()</code> 贡献默认布局片段（默认自动扫描插件包内 <code>builder/*.json</code>）。完整 API 与模板变量见仓库 <a href="https://github.com/pollybird/zhycms/blob/main/docs/PAGE_BUILDER.md">docs/PAGE_BUILDER.md</a>。</p>
 <pre><code>from app.builder.registry import Widget
 from app.constants import Builder as B
 
@@ -714,8 +724,9 @@ default 主题兜底  themes/default/&lt;name&gt;.html</code></pre>
   <tr><td>form</td><td>自定义表单</td><td>后台 <code>/forms</code>；前台 <code>/form/&lt;slug&gt;</code>；v2.3 由核心转插件</td></tr>
   <tr><td>analytics</td><td>统计代码</td><td><code>analytics_head()|safe</code> / <code>analytics_body()|safe</code>；v2.3 新增</td></tr>
   <tr><td>oss_storage</td><td>对象存储</td><td>阿里云/腾讯云/七牛云；v2.4 新增</td></tr>
-  <tr><td>recruit</td><td>招聘管理</td><td><code>recruit_jobs()</code>；<code>/job-&lt;id&gt;.html</code>；简历上传；全站搜索提供者</td></tr>
+  <tr><td>recruit</td><td>招聘管理</td><td><code>recruit_jobs()</code>；<code>/job-&lt;id&gt;.html</code>；简历上传；全站搜索提供者；v3.0.0 起含构建器组件与默认布局片段（社区插件）</td></tr>
   <tr><td>auto_translate</td><td>一键翻译</td><td>编辑页多语言 Tab 一键调用百度/有道/Google/DeepSeek 翻译；v2.5.2 新增</td></tr>
+  <tr><td>tutorial</td><td>教程中心</td><td><code>/tutorials</code> 前台教程列表与详情、难度/时长、分类管理；v3.0.0 新增，含构建器组件与默认布局片段（社区插件）</td></tr>
   <tr><td>member</td><td>前台用户中心</td><td>注册/登录/资料/改密/找回密码、微信/QQ 一键登录、短信验证码登录、注册协议、栏目会员可见性；v2.6.4 新增（社区插件，<code>builtin=false</code>）</td></tr>
 </table>
 
@@ -1105,6 +1116,7 @@ def notice_page():
   <tr><td><code>get_frontend_menu()</code></td><td>前台导航 <code>{'label','url','target'}</code>，仅启用时聚合</td></tr>
   <tr><td><code>get_frontend_guard()</code></td><td>v2.6.4 前台登录守卫（会员体系）：<code>{'is_authenticated': fn, 'login_url': fn}</code></td></tr>
   <tr><td><code>get_builder_widgets()</code></td><td>v3.0.0 返回 <code>Widget</code> 子类列表，向页面构建器注册组件（owner=插件 slug，禁用门控、卸载引用拦截）</td></tr>
+  <tr><td><code>get_builder_layouts()</code></td><td>v3.0.0 返回 <code>{scope: [片段, ...]}</code> 贡献默认布局片段；默认自动扫描插件包内 <code>builder/&lt;scope&gt;.json</code>，启用前强校验、仅快照合并</td></tr>
   <tr><td><code>get_sitemap_urls()</code></td><td>yield <code>{'loc','lastmod','changefreq','priority'}</code></td></tr>
   <tr><td><code>get_search_provider()</code></td><td>v2.5.2 全站搜索提供者（SearchProvider 子类实例）</td></tr>
   <tr><td><code>get_migration_files()</code></td><td>自动发现 migrations/versions/*.py，一般无需覆写</td></tr>
@@ -1471,8 +1483,9 @@ PY</code></pre>
 <ul>
   <li><code>TemplateNotFound</code>：查双后缀拼接错误 → 文件是否在正确目录 → 自定义主题缺必备模板被拒启用 → default 主题文件是否完整。</li>
   <li>主题上传被拒：按 8 步校验排查（格式/完整性/路径穿越/symlink/manifest/必备模板/形态归一化/覆盖保护），报错指明失败步骤。</li>
-  <li>插件启用失败：v2.6.4 按 min_core_version → requires → extends 强校验，按提示升级核心或先启用依赖；禁用被依赖插件会被反向拦截并列出依赖方。</li>
+  <li>插件启用失败：v2.6.4 按 min_core_version → requires → extends 强校验，按提示升级核心或先启用依赖；禁用被依赖插件会被反向拦截并列出依赖方。v3.0.0 起还会校验插件自带的构建器布局片段（builder/*.json），片段非法会拒绝启用并提示具体错误。</li>
   <li>插件「加载失败」：启动日志该插件的 traceback 即原因（模型字段不匹配/依赖缺失/忘写 <code>plugin = XxxPlugin()</code>）。</li>
+  <li>页面构建器相关：页面发布后前台未生效 → 确认点的是「发布」而非仅存草稿（匿名访客只见已发布版）；删除构建记录即回退手写模板；新建页默认布局与当前主题不一致 → 默认布局按启用主题 fixture 解析，切主题只影响之后新建的页面；启停插件不回填已有草稿（v3.0.0）。</li>
   <li>删除需验证码：危险操作独立一次性验证码（/captcha/delete-confirm）；内置或启用中的对象拒绝删除。</li>
 </ul>
 
