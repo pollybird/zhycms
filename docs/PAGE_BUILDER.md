@@ -249,10 +249,12 @@ schema.normalize_layout(raw)                       # 容错规整（丢弃坏节
 2. 主题未覆写该作用域时回退核心 `app/builder/fixtures/<scope>.json`。
 
 因此某主题的手写模板（如 `index.html`）与 default 结构不同时，可在该主题目录下
-提供 `builder/home.json` 镜像其结构（manufacturing/catering/education/service/
-default_en 已覆写；page/list/article 四主题结构一致，回退核心即可）。**第三方
-上传主题同理**：主题包内可携带 `builder/<scope>.json`，上传时即按同一套
-`validate_layout` 校验，非法整包拒绝；不携带则运行时自动回退核心默认布局。
+提供 `builder/home.json` 镜像其结构。**8 套官方主题（blue/default/
+default_en/manufacturing/manufacturing_en/catering/education/service）均携带
+`builder/home.json`，这是官方主题规范（测试逐主题强制）**；page/list/article
+各主题结构一致，缺省回退核心即可。**第三方上传主题不强制**：包内可携带
+`builder/<scope>.json`，上传时即按同一套 `validate_layout` 校验，非法整包拒绝；
+不携带则运行时自动回退核心默认布局。
 fixture 在创建时按当时主题快照入草稿，之后切换主题不会回填已有草稿，用户可点
 「默认布局」手动重置。主题开发约定见 THEME_TEMPLATE_API.md §12。
 

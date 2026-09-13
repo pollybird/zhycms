@@ -326,12 +326,17 @@ class TestThemeFixtureResolution:
             p = service.resolve_fixture_path('home', 'manufacturing')
             assert p.replace('\\', '/').endswith(
                 'themes/manufacturing/builder/home.json')
-            # blue/blue 未覆写任何作用域 → 全部回退核心
-            for scope in ('home', 'page', 'list', 'article'):
-                p = service.resolve_fixture_path(scope, 'blue')
-                assert p.replace('\\', '/').endswith(
-                    f'app/builder/fixtures/{scope}.json')
-            # 仅有 home 覆写的主题，其他作用域仍回退核心
+            # 官方主题均携带 home.json（规范必备）；
+            # page/list/article 未覆写 → 回退核心
+            for theme in ('default', 'blue'):
+                assert service.resolve_fixture_path(
+                    'home', theme).replace('\\', '/').endswith(
+                    f'themes/{theme}/builder/home.json')
+                for scope in ('page', 'list', 'article'):
+                    p = service.resolve_fixture_path(scope, theme)
+                    assert p.replace('\\', '/').endswith(
+                        f'app/builder/fixtures/{scope}.json')
+            # 其余仅有 home 覆写的主题，其他作用域同样回退核心
             for theme in ('catering', 'education', 'service',
                           'default_en', 'manufacturing_en'):
                 assert service.resolve_fixture_path(
@@ -340,11 +345,12 @@ class TestThemeFixtureResolution:
                 assert service.resolve_fixture_path(
                     'list', theme).replace('\\', '/').endswith(
                     'app/builder/fixtures/list.json')
-            # 未知主题 / 空主题安全回退核心
+            # 未知主题 → 安全回退核心
             assert 'app/builder/fixtures/home.json' in \
                 service.resolve_fixture_path('home', 'not-a-theme').replace('\\', '/')
-            assert 'app/builder/fixtures/home.json' in \
-                service.resolve_fixture_path('home', '  ').replace('\\', '/')
+            # 空主题 → 等价于「当前启用主题」解析（不报错、不拼空路径）
+            assert service.resolve_fixture_path('home', '  ') == \
+                service.resolve_fixture_path('home')
             # 第三方主题 slug 被污染（路径穿越/分隔符/超长）时不得拼接读文件，
             # 一律安全回退核心
             for bad in ('../default', '..', 'a/b', 'a\\b', 'x', 'x' * 33):
@@ -389,7 +395,7 @@ class TestThemeFixtureResolution:
                 assert err is None
                 assert 'n_svc_services_list' in _ids(page)
 
-                # 未覆写主题（blue）回退核心 fixture
+                # blue 自带 home.json（与核心同构）：不得出现 catering 节点
                 page, err = service.init_default_layout('home', theme='blue')
                 assert err is None
                 ids = _ids(page)

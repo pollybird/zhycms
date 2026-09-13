@@ -16,6 +16,20 @@ FIXTURES_DIR = os.path.join(_APP_DIR, 'app', 'builder', 'fixtures')
 THEMES_DIR = os.path.join(_APP_DIR, 'app', 'frontend', 'templates', 'themes')
 
 
+def _builtin_themes():
+    """仓库内置（官方）主题：manifest.builtin == true。"""
+    names = []
+    for mf in sorted(glob.glob(os.path.join(THEMES_DIR, '*',
+                                            'manifest.json'))):
+        with open(mf, encoding='utf-8') as f:
+            if json.load(f).get('builtin') is True:
+                names.append(os.path.basename(os.path.dirname(mf)))
+    return names
+
+
+_BUILTIN_THEMES = _builtin_themes()
+
+
 def _node(t, **kw):
     n = {'id': kw.pop('id', 'n_' + t), 'type': t,
          'props': kw.pop('props', {}), 'children': kw.pop('children', [])}
@@ -48,6 +62,24 @@ class TestFixtures:
             with open(path, encoding='utf-8') as f:
                 layout = json.load(f)
             validate_layout(layout)
+
+    def test_builtin_themes_known_set(self):
+        """锁定官方主题清单：新增/下线官方主题时显式更新此列表。"""
+        assert _BUILTIN_THEMES == [
+            'blue', 'catering', 'default', 'default_en', 'education',
+            'manufacturing', 'manufacturing_en', 'service']
+
+    @pytest.mark.parametrize('theme', _BUILTIN_THEMES)
+    def test_builtin_theme_ships_home_fixture(self, theme):
+        """官方主题规范：必须随包携带 builder/home.json 镜像手写首页。
+
+        page/list/article 结构与核心一致时允许缺省（运行时回退核心）。
+        第三方上传主题不强制，见 test_themes.py 的上传校验用例。
+        """
+        path = os.path.join(THEMES_DIR, theme, 'builder', 'home.json')
+        assert os.path.isfile(path), f'官方主题 {theme} 缺少 builder/home.json'
+        with open(path, encoding='utf-8') as f:
+            validate_layout(json.load(f))
 
 
 class TestValidateBasic:

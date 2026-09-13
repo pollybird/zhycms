@@ -33,8 +33,11 @@ themes/<slug>/
 ├── column_children.html   # 父栏目子列表页（可选）
 ├── search.html            # 搜索结果页（建议）
 ├── list_card.html …       # 栏目级备选模板（可选，命名见 §9）
-├── builder/               # v3.0.0 页面构建器适配（可选，见 §12）
-│   ├── home.json          # 首页「默认布局」镜像（page/list/article 同理）
+├── builder/               # v3.0.0 页面构建器适配（见 §12）
+│   ├── home.json          # 首页「默认布局」镜像；官方主题必备，第三方主题可选
+│   ├── page.json          # 单页默认布局（可选，缺省回退核心）
+│   ├── list.json          # 列表页默认布局（可选，缺省回退核心）
+│   ├── article.json       # 详情页默认布局（可选，缺省回退核心）
 │   └── widgets/           # 组件模板主题级覆写（<type>.html，可选）
 ├── css/ js/ images/ fonts/  # 静态资源（仅这四个子目录对外可访问）
 └── (其他任意 .html 备选模板)
@@ -294,7 +297,7 @@ themes/<slug>/
 - [ ] `closed.html` / `search.html` / `403.html` 已适配
 - [ ] 伪静态开关两种模式下列表/详情链接均正确
 - [ ] 静态资源仅放四个白名单目录
-- [ ] 若提供 `builder/*.json`，结构与手写模板等价且本地通过布局校验（§12）
+- [ ] **官方主题必备** `builder/home.json`（镜像手写 index.html，仓库测试锁定）；第三方主题可省略（回退核心默认）；`page/list/article.json` 仅在结构与核心不同时覆写，所有 JSON 必须通过布局校验（§12）
 
 ## 12. 页面构建器兼容约定（v3.0.0）
 
@@ -309,7 +312,9 @@ themes/<slug>/
    app/builder/fixtures/<scope>.json        # 系统核心默认（default 等价）
    ```
 
-   作用域仅四种：`home`（首页）、`page`（单页）、`list`（列表页）、`article`（详情页）。第三方主题若首页结构与 default 差异大，建议仿照内置 manufacturing/education/catering 主题，在包内提供 `builder/home.json` 镜像手写 `index.html`，用户新建首页即可得到与手写模板一致的骨架；不提供则自动回退核心默认，功能不受影响。
+   作用域仅四种：`home`（首页）、`page`（单页）、`list`（列表页）、`article`（详情页）。
+
+   **规范要求**：**官方主题（`manifest.builtin = true`）必须携带 `builder/home.json`**，内容镜像手写 `index.html`，仓库测试套件逐主题强制；`page/list/article.json` 结构与核心一致时缺省即可。**第三方上传主题**不强制提供 `builder/` 目录——不带时运行时自动回退核心默认布局，功能不受影响；若其首页结构与 default 差异大，仍建议仿照内置 manufacturing/education/catering 主题提供 `builder/home.json`，使用户新建首页即得到与手写模板一致的骨架。
 3. **组件模板覆写**：可在 `builder/widgets/<type>.html` 覆写单个组件的渲染（解析优先级：主题 → 核心/插件），覆写模板与核心组件模板拿到相同上下文。
 4. **校验与约束**：
    - 主题包上传时，`builder/*.json` 与系统执行同一套 schema 校验（组件必须已注册、props 键白名单、嵌套层级/节点数上限）；引用未安装插件的组件会导致整包被拒绝，请先安装依赖插件再传主题；

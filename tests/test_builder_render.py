@@ -289,7 +289,7 @@ def test_theme_matrix_render(theme, app, client, theme_switch):
 # 每个主题手写首页的特征文案：发布该主题自身 fixture 后必须出现在首页
 THEME_HOME_MARKERS = {
     'default': '欢迎访问我们的企业官网',
-    'blue': '欢迎访问我们的企业官网',  # blue 首页同 default，回退核心
+    'blue': '欢迎访问我们的企业官网',  # blue 首页结构同 default，fixture 同构
     'manufacturing': '产品展示',
     'manufacturing_en': 'Products',
     'catering': '招牌美食',
