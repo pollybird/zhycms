@@ -538,6 +538,62 @@ class MyPlugin(PluginBase):
 - props 校验与核心组件同一套规则：未知 prop 键、非法 select/toggle/number、repeater 非法子字段、超深/超节点/超体积的布局一律拒绝保存（400）。
 - 完整用户手册与组件 API 见 [PAGE_BUILDER.md](PAGE_BUILDER.md)。
 
+### 8.8 贡献默认布局片段（v3.0.0）
+
+插件如果自带前台模板/数据（如轮播、产品、岗位、教程），启用后用户新建首页时
+理应开箱即用。为此插件除注册组件（§8.7）外，还可提供**布局片段**，在
+「新建构建页 / 点默认布局」时随快照合并进草稿：
+
+```
+plugins/<slug>/
+├── builder_widgets.py            # Widget 子类（get_builder_widgets 返回）
+├── builder/
+│   └── home.json                 # 片段文件，仅允许 home/page/list/article.json
+└── templates/builder/widgets/
+    └── <widget-type>.html        # 组件渲染模板
+```
+
+`builder/home.json` 示例（尾部追加一个带标题的区块）：
+
+```json
+{
+  "version": 1,
+  "position": "append",
+  "root": [
+    {
+      "id": "n_myplugin_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {"id": "n_myplugin_h", "type": "heading",
+         "props": {"text": "我的插件区块", "level": 2, "align": "center"},
+         "visibility": {}, "children": []},
+        {"id": "n_myplugin_list", "type": "myplugin-list",
+         "props": {"limit": 6}, "visibility": {}, "children": []}
+      ]
+    }
+  ]
+}
+```
+
+约定与注意事项：
+
+- `position`：`append`（默认，根节点尾部）或 `prepend`（根节点最前，适合横幅）；
+  可选 `after: "<基础布局根节点 id>"` 精确插入，锚点缺失回退 position。
+- 不需要任何接线：`PluginBase.get_builder_layouts()` 默认实现会自动扫描包内
+  `builder/*.json`；也可重写该钩子直接返回 `{scope: [fragment, ...]}`。
+- 片段里的 props 必须与组件 `prop_schema` 的键完全对应（白名单校验）；节点 id
+  统一带 `n_<slug>_` 前缀，撞 id 会被自动重写。
+- **启用即校验**：片段坏 JSON / 引用未注册组件 / 违反父子与 props 规则时，
+  插件启用会被拒绝并提示具体错误；因此上线前务必本地启用一遍验证。
+- **只做一次性快照**：片段只影响之后新建或手动重置的默认布局，不会改写用户已有
+  草稿/已发布页；禁用插件后已入页的组件按 §8.7 门控隐藏。
+- 多片段/多插件顺序按 slug 升序确定；单片段失败只跳过自身，不阻断其余合并。
+- 可参考内置实现：banner（prepend 轮播）、product/recruit/tutorial
+  （append 区块），测试范例见 `tests/test_builder_contrib.py`，
+  完整机制说明见 [PAGE_BUILDER.md](PAGE_BUILDER.md) §9。
+
 ## 9. 打包、上传与生命周期
 
 | 事项 | 规则 |

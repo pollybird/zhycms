@@ -218,7 +218,10 @@ def init_default_layout(scope, column_id=None, author_id=None, commit=True,
                         theme=None):
     """按当前启用主题的手写模板结构初始化草稿。返回 (page, error)。
 
-    主题可在 themes/<theme>/builder/ 下提供自己的 fixture 覆写核心默认值。
+    布局快照由两层合并而成：
+      1. 基础布局：themes/<theme>/builder/<scope>.json，缺省回退核心 fixture；
+      2. 已启用插件的贡献片段（plugins/<slug>/builder/<scope>.json），
+         见 builder/contrib.py，仅在本次初始化时快照合并。
     """
     path = resolve_fixture_path(scope, theme)
     if path is None:
@@ -231,6 +234,9 @@ def init_default_layout(scope, column_id=None, author_id=None, commit=True,
         validate_layout(layout)
     except LayoutError as e:
         return None, f'默认布局非法：{e}'
+    # 叠加已启用插件的默认布局片段（prepend/锚点/append，内部故障隔离）
+    from .contrib import compose_layout
+    layout = compose_layout(layout, scope)
     page, _created = get_or_create_page(
         scope, column_id, commit=False)
     page.author_id = author_id

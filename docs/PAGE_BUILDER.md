@@ -262,3 +262,51 @@ fixture 在创建时按当时主题快照入草稿，之后切换主题不会回
 主题前缀，如 `n_mfg_*`）、四套作用域与组件 `scopes` 一致，并运行
 `pytest tests/test_builder_schema.py tests/test_builder_render.py`
 （含主题级 fixture 扫描与 8 主题首页渲染矩阵）。
+
+### 9. 第三层：插件贡献的默认布局片段（v3.0.0）
+
+`init_default_layout` 的快照在主题 fixture（第一层）之上，再合并**当前已启用
+插件**贡献的布局片段（`app/builder/contrib.py`）。插件包内可放置：
+
+```
+plugins/<slug>/builder/<scope>.json     # scope 仅 home/page/list/article
+```
+
+片段格式：
+
+```json
+{
+  "version": 1,
+  "position": "append",
+  "after": "n_home_cta",
+  "root": [ { "id": "n_xxx_*", "type": "...", "props": {}, "visibility": {}, "children": [] } ]
+}
+```
+
+- `position`：`prepend`（插到根节点最前）或 `append`（默认，追加到末尾）。
+- `after`（可选）：锚点为基础布局（或已插入片段）的**根节点 id**，插入到其后；
+  锚点找不到时回退 `position` 语义。
+- 多个插件同时贡献时按 slug 升序确定顺序；`prepend` 多插件最终仍呈 slug 升序。
+- 片段节点 id 建议带插件前缀（`n_<slug>_*`）；与现有节点撞 id 时自动重写为
+  `n_<owner>__<原id>`，绝不覆盖或串联已有节点。
+- 片段也可以由插件入口 `get_builder_layouts()` 直接以 Python dict 返回
+  （默认实现即扫描包内 `builder/*.json`）。
+
+生命周期语义：
+
+1. **发现与注册**：插件加载期登记片段（不论启用与否）；坏 JSON、非法文件名、
+   结构错误登记为该插件的加载错误。
+2. **启用校验**：启用插件前对全部片段跑同一套 `validate_layout`
+   （组件类型必须已注册、props 白名单、父子约束、节点上限等），非法则拒绝启用；
+   片段引用的组件随 `get_builder_widgets()` 在加载期注册，禁用不影响校验。
+3. **仅快照合并**：只有「新建构建页 / 点默认布局」时合并进草稿，已有草稿与
+   已发布页绝不被自动改写；之后禁用插件，历史页面里的插件组件走既有门控静默
+   隐藏，用户可在编辑器里手动删除。
+4. **故障隔离**：单个片段合并失败只跳过该片段并写 warning 日志，其余片段与
+   基础布局照常；合并层整体异常时回退基础布局。
+5. **卸载清理**：`remove_record(slug)` 同时清除组件注册与片段登记。
+
+内置范例：banner（`home.json` prepend 一个 `banner-hero`）、product /
+recruit / tutorial（各 append 一个带标题的 section，内嵌 `product-list` /
+`job-list` / `tutorial-list` 组件）。开发细节见 [PLUGIN_DEV.md](PLUGIN_DEV.md)
+§8.8；测试见 `tests/test_builder_contrib.py`。

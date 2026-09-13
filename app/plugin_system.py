@@ -312,6 +312,16 @@ def _register_instance(app, rec):
     except Exception as e:
         app.logger.warning('插件 %s 构建器组件注册失败： %s', rec.slug, e)
 
+    # 7) v3.0.0 页面构建器默认布局片段（builder/<scope>.json 自动发现）
+    try:
+        from .builder import contrib
+        contrib.register_owner_layouts(rec.slug,
+                                        inst.get_builder_layouts() or {})
+    except Exception as e:
+        from .builder import contrib
+        contrib.register_owner_error(rec.slug, str(e))
+        app.logger.warning('插件 %s 构建器布局片段登记失败： %s', rec.slug, e)
+
 
 def _import_plugin_models_recursive(base_module):
     """把插件包内的模型模块导入 metadata（仅用于 db.create_all()
@@ -485,6 +495,15 @@ def validate_enable(slug):
         if parent not in enabled:
             return f'请先启用父插件 {parent}，本插件基于其二次开发'
 
+    # 4) 页面构建器布局片段（builder/<scope>.json）必须通过布局校验
+    try:
+        from .builder import contrib
+        berr = contrib.validation_error(slug)
+    except Exception as e:
+        berr = str(e)
+    if berr:
+        return f'页面构建器布局片段不合法：{berr}'
+
     return None
 
 
@@ -548,6 +567,17 @@ def remove_record(slug):
     """卸载插件后从运行期注册表移除记录（列表/菜单/聚合钩子立即消失），
     并清理 sys.modules 缓存，便于同进程内重新上传同名插件。"""
     import sys
+    # 清理页面构建器贡献（组件 + 默认布局片段）
+    try:
+        from .builder.registry import unregister_owner as _unreg_widgets
+        _unreg_widgets(slug)
+    except Exception:
+        pass
+    try:
+        from .builder.contrib import unregister_owner as _unreg_layouts
+        _unreg_layouts(slug)
+    except Exception:
+        pass
     rec = _by_slug.pop(slug, None)
     if rec is not None:
         try:

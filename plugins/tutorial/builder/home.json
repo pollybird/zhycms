@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "position": "append",
+  "root": [
+    {
+      "id": "n_tut_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_tut_heading",
+          "type": "heading",
+          "props": {"text": "教程中心", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_tut_text",
+          "type": "text",
+          "props": {"content": "体系化课程与实战教程，助力快速上手", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_tut_list",
+          "type": "tutorial-list",
+          "props": {
+            "category": "", "limit": 6, "card_cols": 3,
+            "show_cover": true, "show_summary": true, "show_meta": true,
+            "show_more": true
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    }
+  ]
+}

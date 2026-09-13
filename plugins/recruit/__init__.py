@@ -76,6 +76,10 @@ class RecruitPlugin(PluginBase):
         from .frontend_routes import recruit_frontend
         return recruit_frontend
 
+    def get_builder_widgets(self):
+        from .builder_widgets import JobList
+        return [JobList]
+
     def get_jinja_globals(self):
         from .frontend import recruit_job_url, recruit_jobs
         return {

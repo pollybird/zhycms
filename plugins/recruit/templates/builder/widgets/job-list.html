@@ -1,0 +1,35 @@
+{# 招聘插件：构建器 job-list 组件 #}
+<div class="zbw-job-list" {{ node_attrs() }}>
+  {% if job_items %}
+  <ul class="list-group">
+    {% for j in job_items %}
+    <li class="list-group-item d-flex flex-wrap justify-content-between align-items-center zbw-job-row">
+      <a href="{{ j.url }}" class="zbw-job-title">
+        <i class="fas fa-briefcase mr-1 text-muted"></i>{{ j.title }}
+        {% if j.department %}<small class="text-muted ml-2">{{ j.department }}</small>{% endif %}
+      </a>
+      <span class="small text-muted">
+        {% if zbw_p('show_location', True) and j.location %}
+        <span class="mr-3"><i class="fas fa-map-marker-alt"></i> {{ j.location }}</span>
+        {% endif %}
+        {% if zbw_p('show_salary', True) and j.salary %}
+        <span class="mr-3 text-danger">{{ j.salary }}</span>
+        {% endif %}
+        {% if zbw_p('show_deadline', False) and j.deadline %}
+        <span class="mr-3">截止 {{ j.deadline }}</span>
+        {% endif %}
+        <a href="{{ j.url }}" class="btn btn-outline-primary btn-sm">详情</a>
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if zbw_p('show_more', True) %}
+  <div class="text-center mt-3">
+    <a class="btn btn-outline-secondary btn-sm"
+       href="{{ url_for('recruit_frontend.job_list') }}">更多职位 <i class="fas fa-angle-right"></i></a>
+  </div>
+  {% endif %}
+  {% elif preview %}
+  <div class="zbw-placeholder"><i class="fas fa-briefcase"></i>暂无开放中的招聘岗位</div>
+  {% endif %}
+</div>

@@ -1,0 +1,39 @@
+{# 产品插件：构建器 product-list 组件（Bootstrap 卡片网格，样式类随构建器体系） #}
+<div class="zbw-product-list" {{ node_attrs() }}>
+  {% if product_items %}
+  <div class="row">
+    {% for p in product_items %}
+    <div class="col-6 col-md-{{ 12 // zbw_p('card_cols', 4)|int }} mb-4">
+      <div class="card h-100 zbw-product-card">
+        <a href="{{ p.url }}">
+          {% if p.cover %}
+          <img src="{{ p.cover }}" class="card-img-top zbw-cover" alt="{{ p.title }}">
+          {% else %}
+          <div class="card-img-top zbw-cover zbw-cover-empty bg-light d-flex align-items-center justify-content-center" style="height:160px;">
+            <i class="fas fa-box-open fa-2x text-muted"></i>
+          </div>
+          {% endif %}
+        </a>
+        <div class="card-body text-center">
+          <h6 class="card-title mb-1"><a href="{{ p.url }}">{{ p.title }}</a></h6>
+          {% if zbw_p('show_summary', False) and p.summary %}
+          <p class="card-text text-muted small zbw-product-summary">{{ p.summary }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if zbw_p('show_more', True) and product_column %}
+  <div class="text-center mt-2">
+    <a class="btn btn-outline-secondary btn-sm"
+       href="{{ url_for('frontend.column_detail', slug=product_column.slug) }}">查看更多 <i class="fas fa-angle-right"></i></a>
+  </div>
+  {% endif %}
+  {% elif preview %}
+  <div class="zbw-placeholder"><i class="fas fa-box-open"></i>
+    {% if zbw_p('bind') == 'select' and not product_column %}请在属性面板选择产品栏目
+    {% else %}暂无已发布产品{% endif %}
+  </div>
+  {% endif %}
+</div>

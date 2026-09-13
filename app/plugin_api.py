@@ -159,6 +159,25 @@ class PluginBase:
         """
         return []
 
+    def get_builder_layouts(self):
+        """v3.0.0：返回贡献给页面构建器「默认布局」的片段
+        {scope: [{'position': 'prepend'|'append', 'after': 锚点id|None,
+                  'root': [节点...], 'source': 文件名}, ...]}。
+
+        默认实现自动发现插件包内 ``builder/<scope>.json``（scope 仅
+        home/page/list/article）；插件也可覆写本方法以编程方式提供。
+        片段仅在用户新建构建页/点「默认布局」时与主题 fixture 快照合并，
+        启用插件时通过 validate_layout 强校验。
+        """
+        import os
+        from .builder.contrib import discover_package_layouts
+        try:
+            mod = importlib.import_module(type(self).__module__)
+            base = os.path.dirname(os.path.abspath(mod.__file__))
+        except Exception:
+            return {}
+        return discover_package_layouts(base)
+
     def get_jinja_fallbacks(self):
         """返回 {函数名: 未启用时的返回值}，未声明的默认 None。"""
         return {}

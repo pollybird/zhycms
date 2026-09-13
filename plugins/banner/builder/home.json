@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "position": "prepend",
+  "root": [
+    {
+      "id": "n_bnr_hero",
+      "type": "banner-hero",
+      "props": {
+        "group": "home-hero",
+        "height": "420px",
+        "show_caption": true,
+        "autoplay": true
+      },
+      "visibility": {},
+      "children": []
+    }
+  ]
+}

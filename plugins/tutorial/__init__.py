@@ -59,6 +59,10 @@ class TutorialPlugin(PluginBase):
     def get_frontend_blueprint(self):
         return tutorial_frontend
 
+    def get_builder_widgets(self):
+        from .builder_widgets import TutorialList
+        return [TutorialList]
+
     def get_frontend_menu(self):
         # 前台导航追加「教程中心」入口（与 /tutorials 路由对应）
         return [{'label': self._('教程中心'), 'url': '/tutorials', 'target': ''}]

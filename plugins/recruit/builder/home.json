@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "position": "append",
+  "root": [
+    {
+      "id": "n_job_sec",
+      "type": "section",
+      "props": {"bg_color": "#ffffff", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_job_heading",
+          "type": "heading",
+          "props": {"text": "招贤纳士", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_job_text",
+          "type": "text",
+          "props": {"content": "加入我们，与优秀的团队共同成长", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_job_list",
+          "type": "job-list",
+          "props": {
+            "limit": 6, "only_open": true,
+            "show_location": true, "show_salary": true,
+            "show_deadline": false, "show_more": true
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    }
+  ]
+}

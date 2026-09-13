@@ -62,6 +62,10 @@ class BannerPlugin(PluginBase):
         # 进入 Jinja 分发加载器搜索路径
         return Blueprint('banner_frontend', __name__, template_folder='templates')
 
+    def get_builder_widgets(self):
+        from .builder_widgets import BannerHero
+        return [BannerHero]
+
     def get_jinja_globals(self):
         return {'banner_items': banner_items}
 

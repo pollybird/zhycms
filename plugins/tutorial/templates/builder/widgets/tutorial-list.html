@@ -1,0 +1,42 @@
+{# 教程插件：构建器 tutorial-list 组件 #}
+<div class="zbw-tutorial-list" {{ node_attrs() }}>
+  {% if tutorial_items %}
+  <div class="row">
+    {% for t in tutorial_items %}
+    <div class="col-6 col-md-{{ 12 // zbw_p('card_cols', 3)|int }} mb-4">
+      <div class="card h-100 zbw-tutorial-card">
+        <a href="{{ t.url }}">
+          {% if zbw_p('show_cover', True) and t.cover %}
+          <img src="{{ t.cover }}" class="card-img-top zbw-cover" alt="{{ t.title }}">
+          {% else %}
+          <div class="card-img-top zbw-cover zbw-cover-empty bg-light d-flex align-items-center justify-content-center" style="height:160px;">
+            <i class="fas fa-graduation-cap fa-2x text-muted"></i>
+          </div>
+          {% endif %}
+        </a>
+        <div class="card-body">
+          <h6 class="card-title mb-1"><a href="{{ t.url }}">{{ t.title }}</a></h6>
+          {% if zbw_p('show_meta', True) %}
+          <p class="card-text small text-muted mb-1">
+            <span class="badge badge-light">{{ t.difficulty_label }}</span>
+            {% if t.duration %}<span><i class="far fa-clock"></i> {{ t.duration }} 分钟</span>{% endif %}
+          </p>
+          {% endif %}
+          {% if zbw_p('show_summary', True) and t.summary %}
+          <p class="card-text small zbw-tutorial-summary">{{ t.summary }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if zbw_p('show_more', True) %}
+  <div class="text-center mt-2">
+    <a class="btn btn-outline-secondary btn-sm"
+       href="{{ url_for('tutorial_frontend.tutorial_list') }}">进入教程中心 <i class="fas fa-angle-right"></i></a>
+  </div>
+  {% endif %}
+  {% elif preview %}
+  <div class="zbw-placeholder"><i class="fas fa-graduation-cap"></i>暂无已发布教程</div>
+  {% endif %}
+</div>

@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "position": "append",
+  "root": [
+    {
+      "id": "n_prd_sec",
+      "type": "section",
+      "props": {"bg_color": "#f8f9fa", "text_color": "", "padding": "py-5", "container": true},
+      "visibility": {},
+      "children": [
+        {
+          "id": "n_prd_heading",
+          "type": "heading",
+          "props": {"text": "产品中心", "level": 2, "align": "center", "color": ""},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_prd_text",
+          "type": "text",
+          "props": {"content": "精选优质产品，提供值得信赖的行业解决方案", "align": "center"},
+          "visibility": {}, "children": []
+        },
+        {
+          "id": "n_prd_list",
+          "type": "product-list",
+          "props": {
+            "bind": "all", "column_id": null, "include_children": true,
+            "limit": 8, "card_cols": 4,
+            "show_summary": false, "show_more": false
+          },
+          "visibility": {}, "children": []
+        }
+      ]
+    }
+  ]
+}

@@ -64,6 +64,10 @@ class ProductPlugin(PluginBase):
         from .frontend_routes import product_frontend
         return product_frontend
 
+    def get_builder_widgets(self):
+        from .builder_widgets import ProductList
+        return [ProductList]
+
     def get_jinja_globals(self):
         return {
             'frontend_product_url': frontend_product_url,
