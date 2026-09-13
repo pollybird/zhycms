@@ -345,6 +345,11 @@ class TestThemeFixtureResolution:
                 service.resolve_fixture_path('home', 'not-a-theme').replace('\\', '/')
             assert 'app/builder/fixtures/home.json' in \
                 service.resolve_fixture_path('home', '  ').replace('\\', '/')
+            # 第三方主题 slug 被污染（路径穿越/分隔符/超长）时不得拼接读文件，
+            # 一律安全回退核心
+            for bad in ('../default', '..', 'a/b', 'a\\b', 'x', 'x' * 33):
+                p = service.resolve_fixture_path('home', bad).replace('\\', '/')
+                assert p.endswith('app/builder/fixtures/home.json'), bad
             # 非法作用域
             assert service.resolve_fixture_path('evil', 'manufacturing') is None
 

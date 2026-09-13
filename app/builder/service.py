@@ -6,7 +6,7 @@ from datetime import datetime
 from ..constants import Builder as _B
 from ..extensions import db
 from ..models.builder import BuilderPage, BuilderRevision
-from ..utils.themes import THEMES_DIR, get_active_theme
+from ..utils.themes import THEMES_DIR, THEME_SLUG_RE, get_active_theme
 from .schema import (
     validate_layout, loads_layout, dumps_layout, LayoutError,
 )
@@ -200,9 +200,15 @@ def resolve_fixture_path(scope, theme=None):
     if not fname:
         return None
     theme = (theme or '').strip() or get_active_theme()
-    if theme:
+    # 第三方上传主题的 slug 在上传时已过 THEME_SLUG_RE，这里再做一次
+    # 纵深校验（含 realpath 防 symlink 逃逸），非法值一律按核心回退处理，
+    # 绝不拼接 Setting 中的原始值去访问文件系统。
+    if theme and THEME_SLUG_RE.match(theme):
         theme_path = os.path.join(THEMES_DIR, theme, 'builder', fname)
-        if os.path.isfile(theme_path):
+        real_base = os.path.realpath(THEMES_DIR)
+        real_path = os.path.realpath(theme_path)
+        if (os.path.isfile(theme_path)
+                and real_path.startswith(real_base + os.sep)):
             return theme_path
     core_path = os.path.join(FIXTURES_DIR, fname)
     return core_path if os.path.isfile(core_path) else None

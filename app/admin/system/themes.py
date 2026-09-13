@@ -114,6 +114,47 @@ def _extract_archive(stream, ext, unpacked):
         return f'写临时目录失败：{e}'
 
 
+BUILDER_FIXTURE_FILES = frozenset(('home.json', 'page.json', 'list.json',
+                                   'article.json'))
+
+
+def _validate_builder_fixtures(root):
+    """校验主题包内可选的 builder/<scope>.json。
+
+    - 无 builder/ 目录：直接通过（构建器回退核心默认布局）；
+    - builder/ 顶层只允许 home/page/list/article 四个 JSON，其余拒绝
+      （组件覆写模板是 builder/widgets/*.html，不接受其他 JSON）；
+    - 每个 JSON 必须可解析且通过与后台同一套 validate_layout 校验
+      （组件类型必须已注册——依赖可选插件组件的主题需先安装插件）。
+    """
+    builder_dir = os.path.join(root, 'builder')
+    if not os.path.isdir(builder_dir):
+        return
+    # 延迟导入：避免 admin ↔ builder 模块在导入期相互引用
+    from ...builder.schema import validate_layout, LayoutError
+
+    for name in sorted(os.listdir(builder_dir)):
+        fp = os.path.join(builder_dir, name)
+        if not os.path.isfile(fp) or not name.endswith('.json'):
+            continue
+        if name not in BUILDER_FIXTURE_FILES:
+            raise ValueError(_gettext(
+                'builder/{0} 不被识别：构建器默认布局仅允许 '
+                'home.json / page.json / list.json / article.json'
+            ).format(name))
+        try:
+            with open(fp, 'r', encoding='utf-8') as f:
+                layout = json.load(f)
+        except (ValueError, OSError) as e:
+            raise ValueError(_gettext(
+                'builder/{0} 不是合法 JSON：{1}').format(name, e))
+        try:
+            validate_layout(layout)
+        except LayoutError as e:
+            raise ValueError(_gettext(
+                'builder/{0} 构建器默认布局校验失败：{1}').format(name, e))
+
+
 def _find_root(unpacked):
     if os.path.isfile(os.path.join(unpacked, 'manifest.json')):
         return unpacked
@@ -162,6 +203,11 @@ def _validate_theme_package(unpacked, themes_dir):
     if missing:
         raise ValueError(_gettext('缺少必备模板文件：') + '、'.join(missing)
                          + _gettext('（主题需包含 index/list/article/page/base/404/500 等基础模板）'))
+
+    # 2.1) 可选的页面构建器默认布局 builder/<scope>.json：随包即校验。
+    # 第三方主题不带该目录时，构建器自动回退核心默认布局（default 等价）；
+    # 一旦携带就必须合法，避免启用后用户点「默认布局」才得到空白页。
+    _validate_builder_fixtures(root)
 
     # 3) 形态 B（平铺）→ 包一层
     if root == unpacked:
@@ -237,6 +283,11 @@ def theme_activate(slug):
 
     启用前校验：目录必须存在且必备模板齐全；否则拒绝。
     """
+    # slug 来自 URL，严格校验（与删除/下载路由一致），防路径穿越
+    if not THEME_SLUG_RE.match(slug or ''):
+        flash(_gettext('非法的主题标识'), 'danger')
+        return redirect(url_for('admin.theme_index'))
+
     target_dir = os.path.join(THEMES_DIR, slug)
     if not os.path.isdir(target_dir):
         flash(_gettext('主题目录不存在：themes/{0}/').format(slug), 'danger')
@@ -265,6 +316,13 @@ def theme_activate(slug):
     if missing:
         flash(_gettext('主题 {0} 缺少必备模板：{1}，无法启用').format(slug, "、".join(missing)),
               'danger')
+        return redirect(url_for('admin.theme_index'))
+
+    # 构建器默认布局复检：拦截上传校验上线前遗留的脏主题目录
+    try:
+        _validate_builder_fixtures(target_dir)
+    except ValueError as e:
+        flash(_gettext('主题 {0} 无法启用：{1}').format(slug, e), 'danger')
         return redirect(url_for('admin.theme_index'))
 
     old_theme = Setting.get('site_theme') or 'default'

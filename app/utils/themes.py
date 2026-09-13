@@ -85,6 +85,12 @@ def list_theme_records(active=None):
         present = [f for f in required if os.path.isfile(os.path.join(d, f))]
         missing = [f for f in required if f not in present]
         tpl_count = sum(1 for f in os.listdir(d) if f.endswith('.html'))
+        builder_dir = os.path.join(d, 'builder')
+        builder_fixtures = sorted(
+            f[:-5] for f in os.listdir(builder_dir)
+            if f.endswith('.json') and f[:-5] in
+            ('home', 'page', 'list', 'article')
+        ) if os.path.isdir(builder_dir) else []
         records.append({
             'slug': mf_slug,
             'dir_name': slug,  # 目录名（与 slug 不一致时的真实路径来源）
@@ -99,6 +105,8 @@ def list_theme_records(active=None):
             'missing_required_files': missing,
             'template_count': tpl_count,
             'has_list_product': os.path.isfile(os.path.join(d, 'list_product.html')),
+            # v3.0.0：主题自带的页面构建器默认布局作用域（空=回退系统核心）
+            'builder_fixtures': builder_fixtures,
         })
     return records
 

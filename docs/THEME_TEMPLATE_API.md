@@ -33,6 +33,9 @@ themes/<slug>/
 ├── column_children.html   # 父栏目子列表页（可选）
 ├── search.html            # 搜索结果页（建议）
 ├── list_card.html …       # 栏目级备选模板（可选，命名见 §9）
+├── builder/               # v3.0.0 页面构建器适配（可选，见 §12）
+│   ├── home.json          # 首页「默认布局」镜像（page/list/article 同理）
+│   └── widgets/           # 组件模板主题级覆写（<type>.html，可选）
 ├── css/ js/ images/ fonts/  # 静态资源（仅这四个子目录对外可访问）
 └── (其他任意 .html 备选模板)
 ```
@@ -277,6 +280,7 @@ themes/<slug>/
 | slug | 合法 JSON、slug 匹配正则且与目录名一致 |
 | 形态 | 形态 A（根目录即主题）/ 形态 B（单层子目录）自动归一化 |
 | 覆盖 | 内置主题（`builtin: true`）禁止覆盖；同名自定义主题需先删除再传，删除需验证码 |
+| 构建器默认布局 | 若携带 `builder/{home,page,list,article}.json`，上传时逐个执行与后台同一套布局校验（JSON 合法、组件类型已注册、props 在白名单内）；非法直接拒绝整包。不携带则构建器回退系统核心默认布局（见 §12） |
 | 启用 | 启用动作写 OP_CONFIG_CHANGE 审计日志，并无条件清空整页缓存 |
 
 ## 11. 主题制作检查清单
@@ -290,3 +294,26 @@ themes/<slug>/
 - [ ] `closed.html` / `search.html` / `403.html` 已适配
 - [ ] 伪静态开关两种模式下列表/详情链接均正确
 - [ ] 静态资源仅放四个白名单目录
+- [ ] 若提供 `builder/*.json`，结构与手写模板等价且本地通过布局校验（§12）
+
+## 12. 页面构建器兼容约定（v3.0.0）
+
+可视化页面构建器接管页面后，渲染壳 `builder/render.html` 仍然 `{% extends theme_base %}` 继承当前主题 base.html，导航/页脚/SEO 与手写模板完全一致。因此第三方主题要正确承载构建页面，须满足：
+
+1. **Bootstrap 4 栅格可用**：构建内容使用 `.container / .row / .col-md-*` 与 Bootstrap 工具类组织（与 §2 base.html 契约同一前提）；主题 CSS 不设破坏性的全局 `overflow` 即可。
+2. **默认布局回退链**：新建构建页或点编辑器「默认布局」时，系统按**当前启用主题**解析初始布局：
+
+   ```
+   themes/<当前主题>/builder/<scope>.json   # 主题自带（可选）
+      ↓ 缺失
+   app/builder/fixtures/<scope>.json        # 系统核心默认（default 等价）
+   ```
+
+   作用域仅四种：`home`（首页）、`page`（单页）、`list`（列表页）、`article`（详情页）。第三方主题若首页结构与 default 差异大，建议仿照内置 manufacturing/education/catering 主题，在包内提供 `builder/home.json` 镜像手写 `index.html`，用户新建首页即可得到与手写模板一致的骨架；不提供则自动回退核心默认，功能不受影响。
+3. **组件模板覆写**：可在 `builder/widgets/<type>.html` 覆写单个组件的渲染（解析优先级：主题 → 核心/插件），覆写模板与核心组件模板拿到相同上下文。
+4. **校验与约束**：
+   - 主题包上传时，`builder/*.json` 与系统执行同一套 schema 校验（组件必须已注册、props 键白名单、嵌套层级/节点数上限）；引用未安装插件的组件会导致整包被拒绝，请先安装依赖插件再传主题；
+   - 默认布局按启用当时主题快照写入草稿，之后切换主题不回填已有草稿，用户可随时点「默认布局」重新载入；
+   - 主题正在启用中不可删除；启用后被物理移除时系统自动兜底回 default 主题，构建器随之回退核心默认布局。
+
+   布局 JSON 的完整结构与组件清单见 [页面构建器文档](PAGE_BUILDER.md)。

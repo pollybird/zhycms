@@ -250,9 +250,11 @@ schema.normalize_layout(raw)                       # 容错规整（丢弃坏节
 
 因此某主题的手写模板（如 `index.html`）与 default 结构不同时，可在该主题目录下
 提供 `builder/home.json` 镜像其结构（manufacturing/catering/education/service/
-default_en 已覆写；page/list/article 四主题结构一致，回退核心即可）。fixture 在
-创建时按当时主题快照入草稿，之后切换主题不会回填已有草稿，用户可点「默认布局」
-手动重置。
+default_en 已覆写；page/list/article 四主题结构一致，回退核心即可）。**第三方
+上传主题同理**：主题包内可携带 `builder/<scope>.json`，上传时即按同一套
+`validate_layout` 校验，非法整包拒绝；不携带则运行时自动回退核心默认布局。
+fixture 在创建时按当时主题快照入草稿，之后切换主题不会回填已有草稿，用户可点
+「默认布局」手动重置。主题开发约定见 THEME_TEMPLATE_API.md §12。
 
 修改或新增 fixture 后请确保：通过 `validate_layout`、节点 id 固定且唯一（建议带
 主题前缀，如 `n_mfg_*`）、四套作用域与组件 `scopes` 一致，并运行

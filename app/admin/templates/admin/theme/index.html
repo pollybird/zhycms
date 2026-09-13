@@ -52,6 +52,17 @@
           {% endif %}
           <div class="card-footer">
             <p class="text-muted small mb-2">{{ theme.description or _('暂无描述') }}</p>
+            <p class="small mb-2" title="{{ _('该主题为页面构建器「默认布局」提供的初始模板；未列出的页面类型自动使用系统核心默认布局') }}">
+              {% if theme.builder_fixtures %}
+              <span class="badge badge-info"><i class="fas fa-puzzle-piece"></i>
+                {{ _('构建器布局：%(scopes)s', scopes=theme.builder_fixtures|join(' · ')) }}</span>
+              {% else %}
+              <span class="badge badge-light">{{ _('构建器布局：系统默认') }}</span>
+              {% endif %}
+              {% if theme.missing_required_files %}
+              <span class="badge badge-danger">{{ _('缺模板：%(files)s', files=theme.missing_required_files|join('、')) }}</span>
+              {% endif %}
+            </p>
             <div class="btn-group btn-group-sm w-100">
               {% if theme.slug != active %}
               <form method="post" action="{{ url_for('admin.theme_activate', slug=theme.slug) }}" class="d-inline w-50">
