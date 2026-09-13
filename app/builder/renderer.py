@@ -17,6 +17,7 @@ from ..constants import Builder as _B
 from ..utils.themes import get_active_theme
 from .registry import get_widget, widget_owner
 from .schema import normalize_layout
+from .styles import build_global_css
 
 
 def _current_locale():
@@ -214,9 +215,12 @@ def render_builder_page(layout, page_ctx=None, template='builder/render.html'):
     builder_html = Markup(
         ''.join(render_node(n, page_ctx) for n in layout.get('root', []))
     )
+    # 全局自定义样式（layout.styles）：白名单拼接，空配置返回空串
+    builder_styles = Markup(build_global_css(layout.get('styles')))
     return render_template(
         template,
         builder_html=builder_html,
+        builder_styles=builder_styles,
         builder_scope=page_ctx.get('scope', ''),
         preview=bool(page_ctx.get('preview')),
         **{k: v for k, v in page_ctx.items()

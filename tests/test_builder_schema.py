@@ -180,3 +180,62 @@ class TestHelpers:
         section = new_node('section')
         section['children'].append(new_node('heading'))
         validate_layout({'root': [section]})
+
+
+class TestGlobalStyles:
+    def _layout(self, styles):
+        return {'root': [_node('heading', props={'text': 'x', 'level': 2})],
+                'styles': styles}
+
+    def test_valid_styles_accepted(self):
+        out = validate_layout(self._layout({
+            'page_bg': '#ffffff', 'footer_bg': '#2C3E50',
+            'heading_color': '#222222', 'radius': '8px',
+            'border_width': '1px', 'border_color': '#dee2e6',
+            'shadow': 'md',
+        }))
+        assert out['styles']['footer_bg'] == '#2C3E50'
+        assert out['styles']['shadow'] == 'md'
+
+    def test_empty_values_dropped(self):
+        out = validate_layout(self._layout({'page_bg': '  ', 'shadow': ''}))
+        assert out['styles'] == {}
+
+    def test_bad_color_rejected(self):
+        with pytest.raises(LayoutError, match='page_bg'):
+            validate_layout(self._layout({'page_bg': 'red'}))
+        with pytest.raises(LayoutError, match='颜色'):
+            validate_layout(self._layout({'page_bg': '#fff'}))
+        with pytest.raises(LayoutError):
+            validate_layout(self._layout({'page_bg': '<script>'}))
+
+    def test_bad_enum_rejected(self):
+        with pytest.raises(LayoutError, match='radius'):
+            validate_layout(self._layout({'radius': '99px'}))
+        with pytest.raises(LayoutError, match='shadow'):
+            validate_layout(self._layout({'shadow': 'huge'}))
+
+    def test_unknown_style_key_rejected(self):
+        with pytest.raises(LayoutError, match='不支持的全局样式项'):
+            validate_layout(self._layout({'evil': '#000000'}))
+
+    def test_styles_must_be_object(self):
+        layout = self._layout(None)
+        layout['styles'] = []
+        with pytest.raises(LayoutError):
+            validate_layout(layout)
+
+    def test_normalize_passes_styles_through(self):
+        out = normalize_layout(self._layout({'page_bg': '#f5f5f5'}))
+        assert out['styles'] == {'page_bg': '#f5f5f5'}
+
+    def test_normalize_drops_invalid_styles(self):
+        out = normalize_layout(self._layout({'page_bg': 'red'}))
+        assert 'styles' not in out
+
+    def test_old_layout_without_styles_still_works(self):
+        out = validate_layout({'root': [
+            _node('heading', props={'text': 'x', 'level': 2})]})
+        assert 'styles' not in out
+        assert 'styles' not in normalize_layout(
+            {'root': [_node('heading', props={'text': 'x', 'level': 2})]})

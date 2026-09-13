@@ -10,6 +10,7 @@ import json
 
 from ..constants import Builder as _B
 from ..constants import Locales
+from .styles import validate_styles, StyleError
 
 
 class LayoutError(ValueError):
@@ -102,6 +103,13 @@ def validate_layout(layout, check_widgets=True):
     for node in root:
         walk(node, 1, None)
 
+    # 全局页面样式（layout.styles）：白名单键 + 颜色/枚举约束
+    if 'styles' in layout:
+        try:
+            layout['styles'] = validate_styles(layout.get('styles'))
+        except StyleError as e:
+            raise LayoutError(str(e))
+
     layout['version'] = _B.SCHEMA_VERSION
     return layout
 
@@ -174,7 +182,17 @@ def normalize_layout(layout):
         return node
 
     cleaned = [n for n in (clean(x) for x in root) if n]
-    return {'version': _B.SCHEMA_VERSION, 'root': cleaned}
+    result = {'version': _B.SCHEMA_VERSION, 'root': cleaned}
+    # 透传全局样式（容错：非法或空则省略，保持主题默认）
+    styles = layout.get('styles')
+    if isinstance(styles, dict):
+        try:
+            styles = validate_styles(styles)
+        except StyleError:
+            styles = {}
+        if styles:
+            result['styles'] = styles
+    return result
 
 
 def loads_layout(raw):

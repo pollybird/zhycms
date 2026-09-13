@@ -311,3 +311,134 @@ class TestRendererUnit:
                 'children': [], 'visibility': {}}
         html = self._html(app, [node])
         assert 'zbw-contact-card' in html
+
+
+# ------------------------------------------------------------
+# 全局样式：CSS 生成 + 预览/生产注入
+# ------------------------------------------------------------
+
+class TestGlobalStylesCss:
+    def test_empty_styles_output_nothing(self):
+        from app.builder.styles import build_global_css
+        assert build_global_css(None) == ''
+        assert build_global_css({}) == ''
+        assert build_global_css({'page_bg': ''}) == ''
+
+    def test_page_and_footer_rules(self):
+        from app.builder.styles import build_global_css
+        css = build_global_css({
+            'page_bg': '#f0f0f0', 'content_bg': '#ffffff',
+            'text_color': '#333333', 'heading_color': '#222222',
+            'link_color': '#0066cc',
+            'footer_bg': '#2c3e50', 'footer_color': '#ffffff',
+        })
+        assert 'body { background-color: #f0f0f0; }' in css
+        assert '.zbw-page-root {' in css
+        assert 'color: #333333' in css
+        assert '.zbw-heading' in css and 'h1' in css
+        assert '.zbw-page-root a { color: #0066cc; }' in css
+        # 渐变主题也需覆盖：去背景图 + !important
+        assert 'footer.footer {' in css
+        assert 'background-image: none !important' in css
+        assert '#2c3e50 !important' in css
+        assert 'footer.footer a' in css and '#ffffff' in css
+
+    def test_container_decorations(self):
+        from app.builder.styles import build_global_css
+        css = build_global_css({
+            'radius': '8px', 'border_width': '2px',
+            'border_color': '#cccccc', 'shadow': 'lg',
+        })
+        assert '.zbw-page-root .zbw-container {' in css
+        assert 'border-radius: 8px' in css
+        assert 'border: 2px solid #cccccc' in css
+        assert 'box-shadow:' in css
+        # 设了边框宽度但没给颜色 → 使用安全的默认灰
+        css2 = build_global_css({'border_width': '1px'})
+        assert 'border: 1px solid #dee2e6' in css2
+        # 无边框 / 无阴影 → 不输出对应声明
+        css3 = build_global_css({'border_width': '0px', 'shadow': 'none',
+                                 'radius': '0px'})
+        assert 'border:' not in css3
+        assert 'box-shadow' not in css3
+
+    def test_garbage_styles_neutralized(self):
+        from app.builder.styles import build_global_css
+        # 非法输入不产生任何 CSS（渲染层防御，不抛异常）
+        assert build_global_css({'page_bg': 'red'}) == ''
+        assert build_global_css('not-a-dict') == ''
+
+
+class TestGlobalStylesRender:
+    def test_styles_injected_in_production_page(self, app, client):
+        cid, slug = _page_column(app)
+        layout = _fixture('page')
+        layout['styles'] = {
+            'page_bg': '#f8f8f8', 'footer_bg': '#34495e',
+            'heading_color': '#111111', 'border_width': '1px',
+            'border_color': '#dddddd', 'radius': '8px',
+        }
+        with app.app_context():
+            _publish('page', cid, layout)
+        resp = client.get(f'/column/{slug}')
+        html = resp.get_data(as_text=True)
+        assert resp.status_code == 200
+        assert 'data-zbw-global-styles="1"' in html
+        assert 'body { background-color: #f8f8f8; }' in html
+        assert '#34495e !important' in html
+        # 生产内容被 .zbw-page-root 包裹
+        assert 'class="zbw-page-root"' in html
+
+    def test_no_style_tag_when_unset(self, app, client):
+        cid, slug = _page_column(app)
+        with app.app_context():
+            _publish('page', cid, _fixture('page'))
+        resp = client.get(f'/column/{slug}')
+        html = resp.get_data(as_text=True)
+        assert 'data-zbw-global-styles' not in html
+        # 生产仍有根包裹（统一结构），预览态 data-zbw-root 属性不受影响
+        assert 'class="zbw-page-root"' in html
+
+    def test_styles_survive_draft_save_and_preview(self, app, client):
+        """编辑器保存草稿：校验通过 + 预览页立即可见。"""
+        from app.builder import service
+        with app.app_context():
+            page, _ = service.get_or_create_page('home')
+            pid = page.id
+        admin = _admin_client(app, client)
+        layout = _fixture('home')
+        layout['styles'] = {'page_bg': '#123456'}
+        resp = admin.post(f'/admin/builder/api/pages/{pid}/draft',
+                          json={'layout': layout})
+        assert resp.status_code == 200
+        preview = admin.get(f'/admin/builder/preview/{pid}')
+        text = preview.get_data(as_text=True)
+        assert 'data-zbw-global-styles="1"' in text
+        assert '#123456' in text
+
+    def test_invalid_color_draft_rejected(self, app, client):
+        from app.builder import service
+        with app.app_context():
+            page, _ = service.get_or_create_page('home')
+            pid = page.id
+        admin = _admin_client(app, client)
+        layout = _fixture('home')
+        layout['styles'] = {'page_bg': 'expression(alert(1))'}
+        resp = admin.post(f'/admin/builder/api/pages/{pid}/draft',
+                          json={'layout': layout})
+        assert resp.status_code == 400
+        assert resp.get_json()['ok'] is False
+
+
+def _admin_client(app, client):
+    """注入一个超级管理员会话（绕验证码）。"""
+    from tests.factories import make_user
+    with app.app_context():
+        user = make_user(username='zbw_style_admin_' + uuid.uuid4().hex[:8],
+                         is_super=True)
+        db.session.commit()
+        uid = user.id
+    with client.session_transaction() as sess:
+        sess['_user_id'] = str(uid)
+        sess['_fresh'] = True
+    return client

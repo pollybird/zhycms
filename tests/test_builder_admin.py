@@ -99,6 +99,13 @@ class TestAccessControl:
         assert resp.status_code == 400
         assert resp.get_json()['ok'] is False
 
+    def test_widgets_api_serves_style_schema(self, app):
+        c = _role_client(app, 'content_editor')
+        data = c.get('/admin/builder/api/widgets?scope=home').get_json()
+        keys = {f['key'] for f in data['style_schema']}
+        assert {'page_bg', 'footer_bg', 'heading_color',
+                'border_width', 'shadow'} <= keys
+
 
 class TestPublishWorkflow:
     def test_auditor_publish_revisions_rollback(self, app):

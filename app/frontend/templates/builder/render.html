@@ -6,13 +6,15 @@
 {% if preview %}
 <link rel="stylesheet" href="{{ url_for('static', filename='builder/css/preview.css') }}">
 {% endif %}
+{# 全局自定义样式（layout.styles，服务端白名单拼接，空配置不输出） #}
+{% if builder_styles %}<style data-zbw-global-styles="1">{{ builder_styles }}</style>{% endif %}
 {% endblock %}
 
 {% block content %}
 {% if preview %}
-<div data-zbw-children="__root__" data-zbw-root="1">{{ builder_html }}</div>
+<div class="zbw-page-root" data-zbw-children="__root__" data-zbw-root="1">{{ builder_html }}</div>
 {% else %}
-{{ builder_html }}
+<div class="zbw-page-root">{{ builder_html }}</div>
 {% endif %}
 {% endblock %}
 

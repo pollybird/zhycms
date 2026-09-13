@@ -138,3 +138,19 @@
 .zbw-ol-placeholder { color: #adb5bd; font-size: 12px; text-align: center; padding: 16px 4px; }
 
 .zbw-icon-picker-wrap .input-group-append .btn { font-size: 12px; }
+
+/* 全局样式面板 */
+.zbw-styles-tip {
+  font-size: 12px; color: #6c757d; background: #f8f9fa;
+  border: 1px solid #e9ecef; border-radius: 4px;
+  padding: 6px 8px; margin-bottom: 10px; line-height: 1.5;
+}
+.zbw-style-group { margin-bottom: 12px; }
+.zbw-style-group .zbw-widget-group-title { margin-top: 2px; }
+.zbw-style-group .zbw-field label { display: flex; align-items: center; }
+.zbw-style-clear {
+  border: none; background: none; padding: 0 2px; margin-left: 4px;
+  color: #adb5bd; cursor: pointer; font-size: 11px; line-height: 1;
+}
+.zbw-style-clear:hover { color: #dc3545; }
+.zbw-styles-form .is-invalid { border-color: #dc3545; }

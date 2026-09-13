@@ -149,7 +149,12 @@ def builder_editor(pid):
 @permission_required('builder:manage')
 def builder_api_widgets():
     scope = (request.args.get('scope') or '').strip() or None
-    return jsonify({'ok': True, 'categories': registry.widget_catalog(scope)})
+    from ...builder.styles import STYLE_SCHEMA
+    return jsonify({
+        'ok': True,
+        'categories': registry.widget_catalog(scope),
+        'style_schema': STYLE_SCHEMA,
+    })
 
 
 @admin_bp.route('/builder/api/columns')

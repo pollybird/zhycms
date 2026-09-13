@@ -68,6 +68,7 @@ const state = {
   layout: { version: 1, root: [] },
   catalog: {},
   widgets: new Map(),
+  styleSchema: [],
   listColumns: [],
   linkColumns: [],
   fragments: [],
@@ -1082,6 +1083,130 @@ $('#zbw-richtext-modal').on('hidden.bs.modal', async () => {
 });
 
 /* ============================================================
+ * 全局样式面板（layout.styles：整页风格自定义）
+ * ============================================================ */
+
+const STYLE_GROUPS = [
+  { title: '页面', icon: 'fa-file-alt',
+    keys: ['page_bg', 'content_bg', 'text_color', 'heading_color', 'link_color'] },
+  { title: '底部（页脚）', icon: 'fa-grip-lines',
+    keys: ['footer_bg', 'footer_color'] },
+  { title: '容器', icon: 'fa-square',
+    keys: ['radius', 'border_width', 'border_color', 'shadow'] },
+];
+const STYLE_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+function currentStyles() {
+  if (!state.layout.styles || typeof state.layout.styles !== 'object') {
+    state.layout.styles = {};
+  }
+  return state.layout.styles;
+}
+
+function renderStyles() {
+  const box = document.getElementById('zbw-styles-form');
+  if (!box) return;
+  if (!state.styleSchema || !state.styleSchema.length) {
+    box.innerHTML = '<p class="text-muted text-center py-4">样式配置不可用</p>';
+    return;
+  }
+  const styles = currentStyles();
+  const byKey = {};
+  state.styleSchema.forEach(f => { byKey[f.key] = f; });
+
+  let html = '<div class="zbw-styles-tip"><i class="fas fa-palette"></i> '
+    + '自定义整页风格；留空项沿用当前主题默认样式</div>';
+  for (const g of STYLE_GROUPS) {
+    html += `<div class="zbw-style-group">
+      <div class="zbw-widget-group-title"><i class="fas ${g.icon}"></i> ${g.title}</div>`;
+    for (const key of g.keys) {
+      const f = byKey[key];
+      if (!f) continue;
+      const val = styles[key] || '';
+      const help = f.help ? `<div class="zbw-field-help">${esc(f.help)}</div>` : '';
+      html += `<div class="zbw-field"><label>${esc(f.label || key)}`;
+      if (val) {
+        html += ` <button type="button" class="zbw-style-clear" data-style-clear="${key}"
+                   title="恢复默认"><i class="fas fa-times"></i></button>`;
+      }
+      html += '</label>';
+      if (f.type === 'color') {
+        html += `<div class="input-group input-group-sm">
+            <input type="color" class="form-control zbw-style-color"
+                   style="max-width:42px;padding:2px"
+                   data-style-key="${key}" value="${esc(val || '#000000')}">
+            <input type="text" class="form-control" data-style-text="${key}"
+                   value="${esc(val)}" placeholder="未设置（主题默认）">
+          </div>`;
+      } else {
+        html += `<select class="form-control form-control-sm" data-style-key="${key}">
+            <option value="">默认（不修改）</option>`;
+        for (const opt of f.options || []) {
+          const ov = Array.isArray(opt) ? opt[0] : opt;
+          const ol = Array.isArray(opt) ? opt[1] : opt;
+          html += `<option value="${esc(ov)}" ${ov === val ? 'selected' : ''}>${esc(ol)}</option>`;
+        }
+        html += '</select>';
+      }
+      html += help + '</div>';
+    }
+    html += '</div>';
+  }
+  html += `<button type="button" class="btn btn-outline-secondary btn-sm btn-block"
+      id="zbw-styles-reset"><i class="fas fa-undo"></i> 全部恢复主题默认</button>`;
+  box.innerHTML = html;
+  bindStyles(box);
+}
+
+function setStyleValue(key, v) {
+  const styles = currentStyles();
+  if (v) styles[key] = v;
+  else delete styles[key];
+  markDirty();
+  scheduleRender();
+  // 全屏预览模态框打开时，草稿落库后由 saveDraft 自动刷新 pvFrame
+}
+
+function bindStyles(box) {
+  // 取色器 / 下拉
+  box.querySelectorAll('[data-style-key]').forEach(el => {
+    const evt = el.tagName === 'SELECT' ? 'change' : 'input';
+    el.addEventListener(evt, () => setStyleValue(el.dataset.styleKey, el.value.trim()));
+  });
+  // 颜色文本框（空或合法 #RRGGBB 才写入，非法只标红，避免触发服务端保存失败）
+  box.querySelectorAll('[data-style-text]').forEach(el => {
+    el.addEventListener('input', () => {
+      const key = el.dataset.styleText;
+      const v = el.value.trim();
+      const ok = v === '' || STYLE_COLOR_RE.test(v);
+      el.classList.toggle('is-invalid', !ok);
+      const picker = box.querySelector(
+        `[data-style-key="${key}"][type="color"]`);
+      if (picker && v && STYLE_COLOR_RE.test(v)) picker.value = v;
+      if (ok) setStyleValue(key, v);
+    });
+  });
+  // 单项清除
+  box.querySelectorAll('[data-style-clear]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setStyleValue(btn.dataset.styleClear, '');
+      renderStyles();
+    });
+  });
+  // 全部重置
+  const reset = document.getElementById('zbw-styles-reset');
+  if (reset) {
+    reset.addEventListener('click', () => {
+      if (!confirm('清除本页全部自定义样式，恢复主题默认？')) return;
+      state.layout.styles = {};
+      markDirty();
+      scheduleRender();
+      renderStyles();
+    });
+  }
+}
+
+/* ============================================================
  * 修订历史 / 发布弹窗
  * ============================================================ */
 
@@ -1113,6 +1238,7 @@ document.getElementById('zbw-btn-revisions').addEventListener('click', async () 
           state.selectedId = null;
           $('#zbw-revisions-modal').modal('hide');
           renderProps();
+          renderStyles();
           renderOutline();
           reloadCanvas();
           alert('回滚已立即发布，线上已更新到该版本');
@@ -1255,6 +1381,7 @@ async function bootstrap() {
     api(API.fragments).catch(() => ({ fragments: [] })),
   ]);
   state.catalog = catData.categories;
+  state.styleSchema = catData.style_schema || [];
   state.listColumns = colData.columns || [];
   state.linkColumns = allColData.columns || [];
   state.fragments = fragData.fragments || [];
@@ -1263,6 +1390,7 @@ async function bootstrap() {
   }
   renderCatalog();
   renderProps();
+  renderStyles();
   renderOutline();
   iframe.src = PREVIEW_URL;
 }
