@@ -140,8 +140,10 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ### 本地开发
 
 ```bash
-# 克隆代码
-git clone https://gitee.com/pollybird/zhycms
+# 克隆代码（三平台镜像同步，任选其一）
+git clone https://gitee.com/pollybird/zhycms          # Gitee（国内推荐）
+# git clone https://gitcode.com/pollybird/ZhyCMS       # GitCode
+# git clone https://github.com/pollybird/zhycms        # GitHub
 cd zhycms
 
 # 创建虚拟环境
@@ -360,7 +362,7 @@ zhycms/
 | [docs/OPERATIONS_FAQ.md](docs/OPERATIONS_FAQ.md) | 运维故障排查 FAQ：常见报错、数据库迁移失败处理、缓存/主题/插件/伪静态/Docker 排障速查 |
 | [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) | 插件依赖 / 继承 / 最低核心版本校验详解 |
 
-单页版文档见 [wiki.html](wiki.html)，在线 Wiki 见 Gitee / GitHub 仓库 Wiki 页。
+单页版文档见 [wiki.html](wiki.html)，在线 Wiki 见 Gitee / GitCode / GitHub 仓库 Wiki 页（三平台镜像同步）。
 
 ---
 

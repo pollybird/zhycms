@@ -49,6 +49,7 @@
 - [ ] `git tag vX.Y.Z`
 - [ ] `git push origin main --tags`
 - [ ] `git push github main --tags`（GitHub 如需代理：`git -c http.https://github.com/.proxy= push github main --tags`）
+- [ ] `git push gitcode main --tags`（GitCode 镜像：https://gitcode.com/pollybird/ZhyCMS）
 - [ ] 两平台 Release / 发行版附 CHANGELOG 摘录
 
 ## 七、发布后验证
