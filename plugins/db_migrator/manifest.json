@@ -1,0 +1,9 @@
+{
+  "slug": "db_migrator",
+  "name": "数据库迁移",
+  "version": "1.0.0",
+  "description": "数据库类型迁移：把 SQLite 开发库整体迁移到 MySQL / PostgreSQL（建表、复制数据、重置序列），支持迁移后即时切换免重启；默认不启用",
+  "author": "ZhyCMS 官方",
+  "builtin": true,
+  "min_core_version": "3.0.0"
+}

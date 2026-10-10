@@ -34,31 +34,30 @@
           <td>{{ u.id }}</td>
           <td>
             <strong>{{ u.username }}</strong>
-            {% if u.is_superadmin %}<span class="badge badge-danger ml-1">{{ _('超管') }}</span>{% endif %}
-            {% if u.is_preset %}<span class="badge badge-info ml-1">{{ _('预设') }}</span>{% endif %}
+            {% if u.is_super %}<span class="badge badge-danger ml-1">{{ _('超管') }}</span>{% endif %}
           </td>
-          <td>{{ u.display_name or '-' }}</td>
-          <td><span class="badge badge-secondary">{{ u.role.name if u.role else '-' }}</span></td>
+          <td>{{ u.nickname or '-' }}</td>
+          <td>
+            {% for r in u._roles %}<span class="badge badge-secondary mr-1">{{ r.name }}</span>{% endfor %}
+          </td>
           <td><code>{{ u.last_login_ip or '-' }}</code></td>
           <td>{{ u.last_login_at|datetime_format if u.last_login_at else '-' }}</td>
           <td>
-            {% if u.is_active %}<span class="badge badge-success">{{ _('正常') }}</span>
-            {% else %}<span class="badge badge-warning">{{ _('锁定') }}</span>{% endif %}
+            {% if u.is_active_flag %}<span class="badge badge-success">{{ _('启用') }}</span>
+            {% else %}<span class="badge badge-warning">{{ _('禁用') }}</span>{% endif %}
           </td>
           <td>
             <div class="btn-group btn-group-sm">
               <a href="{{ url_for('admin.user_edit', uid=u.id) }}" class="btn btn-default"><i class="fas fa-edit"></i> {{ _('编辑') }}</a>
               <button type="button" class="btn btn-warning" onclick="reset_password({{ u.id }}, '{{ u.username }}')"><i class="fas fa-key"></i> {{ _('重置密码') }}</button>
-              {% if not u.is_preset %}
               <form method="post" action="{{ url_for('admin.user_toggle', uid=u.id) }}" class="d-inline">
-                <button class="btn {{ 'btn-success' if not u.is_active else 'btn-secondary' }}" title="{{ _('解锁') if not u.is_active else _('锁定') }}">
-                  <i class="fas {{ 'fa-lock-open' if not u.is_active else 'fa-lock' }}"></i>
+                <button class="btn {{ 'btn-secondary' if u.is_active_flag else 'btn-success' }}" title="{{ _('启用') if not u.is_active_flag else _('禁用') }}">
+                  <i class="fas {{ 'fa-user-slash' if u.is_active_flag else 'fa-user-check' }}"></i>
                 </button>
               </form>
               <form method="post" action="{{ url_for('admin.user_delete', uid=u.id) }}" class="d-inline" onsubmit="return confirm('{{ _('确认删除该账号？') }}');">
                 <button class="btn btn-danger"><i class="fas fa-trash"></i></button>
               </form>
-              {% endif %}
             </div>
           </td>
         </tr>
@@ -77,11 +76,11 @@
       <div class="modal-body">
         <div class="form-group">
           <label class="required-mark">{{ _('新密码') }}</label>
-          <input type="password" name="password" id="pwd-input" class="form-control" minlength="6" required>
+          <input type="password" name="new_password" id="pwd-input" class="form-control" minlength="6" required autocomplete="new-password">
         </div>
         <div class="form-group">
           <label class="required-mark">{{ _('确认密码') }}</label>
-          <input type="password" name="password2" id="pwd2-input" class="form-control" minlength="6" required>
+          <input type="password" name="new_password2" id="pwd2-input" class="form-control" minlength="6" required autocomplete="new-password">
         </div>
         <p class="text-muted small mb-0">{{ _('密码至少 6 位，建议包含字母、数字和符号') }}</p>
       </div>

@@ -27,6 +27,7 @@ from ...models.workflow import (
 from ...utils.helpers import (
     permission_required, audit_log, clear_content_cache,
 )
+from ...utils.search import reindex_article
 from ...utils.word_import import convert_docx_to_html
 from ...models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_PUBLISH, OP_ARCHIVE,
@@ -520,6 +521,13 @@ def article_batch(cid):
 
     db.session.commit()
     clear_content_cache(column_id=cid)
+    # 批量操作逐篇更新搜索索引（clear_content_cache 仅在传 article_id 时
+    # 才触发单篇索引，批量路径此前漏更新，导致 Whoosh 等索引与库不一致）
+    for a in articles:
+        try:
+            reindex_article(a.id)
+        except Exception:
+            current_app.logger.exception('批量操作更新文章 %s 索引失败', a.id)
     flash(msg, 'success')
     audit_log(audit_op if audit_op else OP_BATCH, MODULE_ARTICLE,
               None, None,

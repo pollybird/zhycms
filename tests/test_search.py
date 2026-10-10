@@ -47,3 +47,48 @@ class TestSearch:
         resp = client.get('/search?q=焊接')
         assert resp.status_code == 200
         assert '焊接'.encode() in resp.data
+
+    def test_batch_ops_update_index(self, app, admin_client):
+        """批量发布/删除操作逐篇更新搜索索引。
+
+        此前批量路径只清栏目缓存、未触发单篇索引，导致 Whoosh 等
+        索引型后端与数据库状态不一致（v3.0.1 修复）。
+        """
+        from app.extensions import db
+        from app.models.workflow import STATUS_DRAFT
+        from app.utils.search import search_articles
+
+        with app.app_context():
+            col = make_column(name='批量索引栏目', slug='batch-idx-col')
+            ids = []
+            for i in range(3):
+                a = make_article(
+                    title=f'批量索引目标{i}', column_id=col.id,
+                    status=STATUS_DRAFT, content='批量索引正文')
+                ids.append(a.id)
+            db.session.commit()
+            cid = col.id
+
+        want = {f'article:{i}' for i in ids}
+
+        # 批量发布 → 三篇均应进入索引且可被搜出
+        resp = admin_client.post(
+            f'/admin/columns/{cid}/articles/batch',
+            data={'action': 'publish', 'ids[]': ids}, follow_redirects=False)
+        assert resp.status_code == 302
+
+        with app.app_context():
+            items, total = search_articles('批量索引目标')
+            got = {it['uid'] for it in items}
+            assert want <= got
+
+        # 批量删除 → 三篇均应从索引移除
+        resp = admin_client.post(
+            f'/admin/columns/{cid}/articles/batch',
+            data={'action': 'delete', 'ids[]': ids}, follow_redirects=False)
+        assert resp.status_code == 302
+
+        with app.app_context():
+            items, _ = search_articles('批量索引目标')
+            got = {it['uid'] for it in items}
+            assert not (want & got)

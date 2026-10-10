@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.0.0 使用手册</title>
+<title>ZhyCMS v3.1.0 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -160,7 +160,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.0.0</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.1.0</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -177,9 +177,10 @@
 <table>
   <tr><th>能力</th><th>说明</th><th>版本</th></tr>
   <tr><td>多主题模板系统</td><td>8 套内置主题（含 2 套英文），后台一键切换，栏目级模板选择</td><td>v1.0</td></tr>
-  <tr><td>插件机制</td><td>零侵入扩展，启停即时生效，内置 7 个官方插件 + 3 个社区插件</td><td>v2.2</td></tr>
+  <tr><td>插件机制</td><td>零侵入扩展，启停即时生效，内置 8 个官方插件 + 3 个社区插件</td><td>v2.2</td></tr>
   <tr><td>国际化 i18n</td><td>Flask-Babel 中英文切换，插件独立翻译域</td><td>v2.3</td></tr>
   <tr><td>数据库迁移</td><td>Flask-Migrate (Alembic)，支持回滚与插件迁移脚本</td><td>v2.4</td></tr>
+  <tr><td>数据库迁移插件</td><td>内置插件 <code>db_migrator</code>（默认不启用）：后台一键把 SQLite 开发库迁移到 MySQL/PostgreSQL，支持免重启热切换</td><td>v3.1.0</td></tr>
   <tr><td>全文搜索</td><td>默认 Whoosh + jieba，可选 Meilisearch，SQL LIKE 兜底</td><td>v2.4</td></tr>
   <tr><td>对象存储 OSS</td><td>阿里云/腾讯云/七牛云，一键迁移，默认本地零变化</td><td>v2.4</td></tr>
   <tr><td>Docker 部署</td><td>官方镜像 pollybird/zhycms 已发布，MySQL/PostgreSQL 一键启动，支持本地构建</td><td>v2.4</td></tr>
@@ -726,6 +727,7 @@ default 主题兜底  themes/default/&lt;name&gt;.html</code></pre>
   <tr><td>oss_storage</td><td>对象存储</td><td>阿里云/腾讯云/七牛云；v2.4 新增</td></tr>
   <tr><td>recruit</td><td>招聘管理</td><td><code>recruit_jobs()</code>；<code>/job-&lt;id&gt;.html</code>；简历上传；全站搜索提供者；v3.0.0 起含构建器组件与默认布局片段（社区插件）</td></tr>
   <tr><td>auto_translate</td><td>一键翻译</td><td>编辑页多语言 Tab 一键调用百度/有道/Google/DeepSeek 翻译；v2.5.2 新增</td></tr>
+  <tr><td>db_migrator</td><td>数据库迁移</td><td>后台把 SQLite 开发库一键迁移到 MySQL/PostgreSQL：建表、按外键依赖逐表复制、PostgreSQL 重置序列、同步 Alembic 版本号；目标库非空保护、连接测试、迁移后免重启热切换；v3.1.0 新增（默认不启用）</td></tr>
   <tr><td>tutorial</td><td>教程中心</td><td><code>/tutorials</code> 前台教程列表与详情、难度/时长、分类管理；v3.0.0 新增，含构建器组件与默认布局片段（社区插件）</td></tr>
   <tr><td>member</td><td>前台用户中心</td><td>注册/登录/资料/改密/找回密码、微信/QQ 一键登录、短信验证码登录、注册协议、栏目会员可见性；v2.6.4 新增（社区插件，<code>builtin=false</code>）</td></tr>
 </table>
@@ -1263,6 +1265,15 @@ flask db migrate -m "xxx" # 新建迁移脚本（开发用）</code></pre>
     mig_dir = Path(self.get_plugin_dir()) / 'migrations' / 'versions'
     return sorted(str(p) for p in mig_dir.glob('*.py') if not p.name.startswith('__'))</code></pre>
 <div class="note">无迁移文件的插件仍由 <code>db.create_all()</code> 兜底建表；迁移钩子仅用于表结构变更场景。</div>
+
+<h3>数据库类型一键迁移 <span class="tag tag-new">v3.1.0</span></h3>
+<p>官方内置插件 <code>db_migrator</code>（<b>默认不启用</b>），解决「本地用 SQLite 开发、上线换 MySQL/PostgreSQL」的迁移需求。后台 <b>插件管理</b> 启用后，<b>系统设置 → 数据库迁移</b>：</p>
+<ol>
+  <li>填写目标库类型（MySQL / PostgreSQL）、主机、端口、库名、账号密码，先在数据库服务器上建好空库；点「测试连接」确认可达。</li>
+  <li>点「开始迁移」：目标库建表 → 按 <code>metadata.sorted_tables</code> 拓扑序逐表复制行数据（每批 500 行、单事务失败整体回滚）→ PostgreSQL 自动重置自增序列（<code>setval</code>）→ 同步源库 <code>alembic_version</code> 版本号（重启时不重复执行增量迁移）。</li>
+  <li>生效方式二选一：勾选「迁移后立即切换」复用安装向导同款 <code>switch_engine</code> 热切换引擎，免重启即时生效（失败自动回滚配置继续用旧库）；不勾选则写入 <code>instance/db_config.json</code>，重启后生效，删除该文件即可放弃切换。</li>
+</ol>
+<div class="warn">高危操作：迁移会读取当前库全部业务表并写入目标库，请在维护时段执行并提前备份；目标库与本系统同名的表已有数据时拒绝迁移，确认清空重迁需勾选「覆盖目标库已有数据」（<code>drop_all</code> 仅删除本系统已知表）。搜索引擎索引与上传文件不受迁移影响，无需重新处理。权限点 <code>db_migrator:manage</code> 不向预设角色默认授权，仅超管或显式授权角色可用。</div>
 </section>
 
 <section id="search">

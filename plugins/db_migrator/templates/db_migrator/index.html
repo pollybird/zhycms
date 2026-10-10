@@ -1,0 +1,143 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _p('db_migrator', '数据库迁移') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _p('db_migrator', '数据库迁移') }}{% endblock %}
+{% set active_menu = 'db-migrator' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">{{ _p('db_migrator', '插件') }}</li>
+<li class="breadcrumb-item active">{{ _p('db_migrator', '数据库迁移') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning">
+  <h5><i class="fas fa-exclamation-triangle"></i> {{ _p('db_migrator', '高危操作，请谨慎执行') }}</h5>
+  <ul class="mb-0 pl-3">
+    <li>{{ _p('db_migrator', '迁移会读取当前数据库的全部业务表并写入目标库，建议在暂停内容编辑的维护时段执行。') }}</li>
+    <li>{{ _p('db_migrator', '目标库与本系统同名的表已有数据时将拒绝迁移；确认覆盖请勾选「覆盖目标库已有数据」。') }}</li>
+    <li>{{ _p('db_migrator', '迁移前请备份当前数据库（如 SQLite 的 .db 文件）。') }}</li>
+  </ul>
+</div>
+
+<div class="card card-outline card-primary">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-info-circle"></i> {{ _p('db_migrator', '当前数据库') }}</h3>
+  </div>
+  <div class="card-body">
+    <p class="mb-0">
+      <code>{{ current_db }}</code>
+      <small class="text-muted d-block mt-1">
+        {{ _p('db_migrator', '迁移将以当前正在使用的数据库为数据源，把全部业务表的结构与数据复制到下方填写的目标库。') }}
+      </small>
+    </p>
+  </div>
+</div>
+
+<div class="card card-outline card-success">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-server"></i> {{ _p('db_migrator', '目标数据库') }}</h3>
+  </div>
+  <div class="card-body">
+    <form id="migrate-form" method="post" action="{{ url_for('admin.db_migrator_migrate') }}">
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label>{{ _p('db_migrator', '数据库类型') }} <span class="text-danger">*</span></label>
+            <select name="db_type" class="form-control" required>
+              {% for value, label in db_types %}
+              <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>{{ _p('db_migrator', '主机地址') }} <span class="text-danger">*</span></label>
+            <input type="text" name="host" class="form-control" placeholder="127.0.0.1" required>
+          </div>
+          <div class="form-group">
+            <label>{{ _p('db_migrator', '端口') }}</label>
+            <input type="number" name="port" class="form-control" placeholder="{{ _p('db_migrator', '留空自动使用默认端口') }}">
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label>{{ _p('db_migrator', '数据库名') }} <span class="text-danger">*</span></label>
+            <input type="text" name="database" class="form-control" placeholder="zhycms" required>
+            <small class="form-text text-muted">{{ _p('db_migrator', '请先在目标数据库服务器上创建好该库。') }}</small>
+          </div>
+          <div class="form-group">
+            <label>{{ _p('db_migrator', '用户名') }} <span class="text-danger">*</span></label>
+            <input type="text" name="user" class="form-control" autocomplete="off" required>
+          </div>
+          <div class="form-group">
+            <label>{{ _p('db_migrator', '密码') }}</label>
+            <input type="password" name="password" class="form-control" autocomplete="new-password">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="icheck-primary">
+          <input type="checkbox" name="overwrite" value="on" id="dm-overwrite">
+          <label for="dm-overwrite">{{ _p('db_migrator', '覆盖目标库已有数据（先删除本系统同名表再重建，目标库中其它无关表不受影响）') }}</label>
+        </div>
+        <div class="icheck-primary">
+          <input type="checkbox" name="switch_now" value="on" id="dm-switch">
+          <label for="dm-switch">{{ _p('db_migrator', '迁移后立即切换到新数据库（免重启即时生效；不勾选则重启后生效）') }}</label>
+        </div>
+      </div>
+
+      <div class="d-flex">
+        <button type="button" id="btn-test" class="btn btn-outline-info mr-2">
+          <i class="fas fa-plug"></i> {{ _p('db_migrator', '测试连接') }}
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-exchange-alt"></i> {{ _p('db_migrator', '开始迁移') }}
+        </button>
+      </div>
+      <div id="test-result" class="mt-2" style="display:none;"></div>
+    </form>
+  </div>
+</div>
+
+<div class="card card-outline card-secondary">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-question-circle"></i> {{ _p('db_migrator', '迁移说明') }}</h3>
+  </div>
+  <div class="card-body">
+    <ul class="mb-0 pl-3">
+      <li>{{ _p('db_migrator', '流程：目标库建表 → 逐表复制数据（失败整体回滚）→ PostgreSQL 自动重置自增序列。') }}</li>
+      <li>{{ _p('db_migrator', 'MySQL 需保证账号有建表和写入权限；建议使用 utf8mb4 字符集。') }}</li>
+      <li>{{ _p('db_migrator', '迁移完成后配置写入 instance/db_config.json，应用重启后自动使用新库；删除该文件即可放弃切换。') }}</li>
+      <li>{{ _p('db_migrator', '搜索引擎索引、上传文件均不受数据库迁移影响，无需重新处理。') }}</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+$(function () {
+  // 测试连接（AJAX，不提交表单）
+  $('#btn-test').on('click', function () {
+    var $btn = $(this).prop('disabled', true);
+    var $box = $('#test-result').show().html(
+      '<div class="alert alert-info py-2 mb-0">{{ _p('db_migrator', '正在测试连接…') }}</div>');
+    $.post('{{ url_for("admin.db_migrator_test") }}', $('#migrate-form').serialize())
+      .done(function (res) {
+        $box.html($('<div class="alert py-2 mb-0">')
+          .addClass(res.ok ? 'alert-success' : 'alert-danger')
+          .text(res.message));
+      })
+      .fail(function () {
+        $box.html('<div class="alert alert-danger py-2 mb-0">{{ _p('db_migrator', '请求失败，请重试') }}</div>');
+      })
+      .always(function () { $btn.prop('disabled', false); });
+  });
+
+  // 提交前确认（高危操作）
+  $('#migrate-form').on('submit', function () {
+    return confirm('{{ _p('db_migrator', '确认开始迁移？迁移会读取当前库全部数据并写入目标库。') }}');
+  });
+});
+</script>
+{% endblock %}

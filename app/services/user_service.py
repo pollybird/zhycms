@@ -2,6 +2,7 @@
 
 从 app/admin/system/users.py 的 user_create / user_edit 内联逻辑抽离而来。
 """
+from flask_login import current_user
 from flask_babel import gettext as _gettext
 
 from ..extensions import db
@@ -9,6 +10,13 @@ from ..models.user import User
 from ..models.rbac import Role, UserRole, UserColumnPermission
 from ..utils.helpers import audit_log
 from ..models.audit import OP_CREATE, OP_UPDATE, MODULE_USER
+
+
+def _requested_super(form_data):
+    """表单是否勾选了超管标志；非超管操作者一律视为 False（防提权）。"""
+    if form_data.get('is_super') != 'on':
+        return False
+    return bool(current_user.is_super)
 
 
 def create_user(*, form_data):
@@ -29,7 +37,7 @@ def create_user(*, form_data):
     confirm = form_data.get('confirm_password') or ''
     role_ids = form_data.getlist('role_ids[]')
     is_active = form_data.get('is_active_flag') == 'on'
-    is_super = form_data.get('is_super') == 'on'
+    is_super = _requested_super(form_data)
 
     if not username or len(username) < 3:
         _flash(_gettext('用户名至少 3 位'), 'danger')
@@ -97,7 +105,7 @@ def update_user(user, *, form_data):
     confirm = form_data.get('confirm_password') or ''
     role_ids = form_data.getlist('role_ids[]')
     is_active = form_data.get('is_active_flag') == 'on'
-    is_super = form_data.get('is_super') == 'on'
+    is_super = _requested_super(form_data)
 
     if password and len(password) < 6:
         _flash(_gettext('密码至少 6 位'), 'danger')
