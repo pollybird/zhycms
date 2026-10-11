@@ -313,7 +313,13 @@
     fontSize: {
       options: [9, 10, 11, 12, 13, 'default', 15, 17, 19, 21, 24, 28, 32, 40]
     },
-    simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=article' }
+    simpleUpload: {
+      uploadUrl: '{{ url_for("admin.upload_file") }}?type=article',
+      headers: (function () {
+        var m = document.querySelector('meta[name="csrf-token"]');
+        return m && m.content ? { 'X-CSRF-Token': m.content } : {};
+      })()
+    }
   };
 
   let mainEditor, fieldEditors = [];
@@ -356,7 +362,7 @@
       btn.disabled = true;
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> {{ _('导入中…') }}';
 
-      fetch(importUrl, { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'} })
+      fetch(importUrl, { method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': window.csrfToken || (document.querySelector('meta[name="csrf-token"]')||{}).content || ''} })
         .then(r => r.json().then(data => ({ok: r.ok, data})))
         .then(({ok, data}) => {
           if (!ok || data.error) throw new Error(data.error || '{{ _('导入失败') }}');

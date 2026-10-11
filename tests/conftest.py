@@ -33,6 +33,63 @@ os.environ.setdefault('ZHYCMS_SECRET_KEY', 'test-secret-key-for-pytest-only')
 _SEARCH_INDEX_DIR = os.path.join(_TMP_INSTANCE, 'search_index')
 os.makedirs(_SEARCH_INDEX_DIR, exist_ok=True)
 
+# v3.1.1 CSRF：测试客户端统一使用的 Session CSRF Token
+TEST_CSRF_TOKEN = 'test-csrf-token'
+# v3.1.1 H1 API fail-closed：测试客户端统一使用的 API 静态令牌
+TEST_API_TOKEN = 'test-api-token'
+
+
+def make_client(app):
+    """构造带自动注入的测试客户端（供 fixture 与需要裸客户端的测试复用）。
+
+    自动注入：
+      - Session 预置 _csrf_token，POST/PUT/PATCH/DELETE 自动附加
+        X-CSRF-Token 头（v3.1.1 全站 CSRF 校验）；
+      - 所有请求自动附加 X-API-Token 头（v3.1.1 API fail-closed），
+        且每个用例开始时把 Setting.api_token 重置为该值；调用方显式
+        传入 X-API-Token 时不再覆盖。
+    """
+    c = app.test_client()
+    with c.session_transaction() as sess:
+        sess['_csrf_token'] = TEST_CSRF_TOKEN
+    orig_open = c.open
+
+    def open_with_auto(*args, **kwargs):
+        method = kwargs.get('method')
+        if method is None and len(args) >= 2:
+            method = args[1]
+        state_changed = isinstance(method, str) and method.upper() in (
+            'POST', 'PUT', 'PATCH', 'DELETE')
+        headers = kwargs.get('headers')
+        if headers is None:
+            items = []
+        elif isinstance(headers, dict):
+            items = list(headers.items())
+        else:
+            items = [tuple(p) for p in headers]
+        names = {str(k).lower() for k, _ in items}
+        if state_changed and 'x-csrf-token' not in names:
+            items.append(('X-CSRF-Token', TEST_CSRF_TOKEN))
+        if 'x-api-token' not in names:
+            items.append(('X-API-Token', TEST_API_TOKEN))
+        kwargs['headers'] = dict(items)
+        return orig_open(*args, **kwargs)
+
+    c.open = open_with_auto
+    return c
+
+
+@pytest.fixture
+def client(app):
+    """未登录测试客户端（自动携带 CSRF Token 与 API Token）。"""
+    # 每用例重置 api_token，避免前序用例（如门控测试）残留空值/私值
+    from app.extensions import db
+    from app.models.setting import Setting
+    with app.app_context():
+        Setting.set('api_token', TEST_API_TOKEN)
+        db.session.commit()
+    return make_client(app)
+
 
 @pytest.fixture(scope='session')
 def app():
@@ -76,12 +133,6 @@ def app():
     # 清理
     import shutil
     shutil.rmtree(_TMP_INSTANCE, ignore_errors=True)
-
-
-@pytest.fixture
-def client(app):
-    """未登录测试客户端。"""
-    return app.test_client()
 
 
 @pytest.fixture

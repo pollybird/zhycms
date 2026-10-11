@@ -140,7 +140,12 @@ _JS_TEMPLATE = r"""
 
     fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: (function () {
+        var h = { 'Content-Type': 'application/json' };
+        var m = document.querySelector('meta[name="csrf-token"]');
+        if (m && m.content) h['X-CSRF-Token'] = m.content;
+        return h;
+      })(),
       credentials: 'same-origin',
       body: JSON.stringify({ target: loc, fields: fields, html_fields: htmlFields })
     }).then(function (r) { return r.json(); }).then(function (res) {

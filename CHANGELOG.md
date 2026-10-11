@@ -5,6 +5,25 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.1] - 2026-10-11
+
+**安全修复**版本（GitCode issue #1 高危项 H1 + H2）。API 鉴权改为默认拒绝（fail-closed），全站引入 CSRF 同步 Token 校验。无数据库结构变更、无新增 Python 依赖。
+
+### Fixed
+
+- **API 默认免鉴权（H1，高危）**：内容 API 静态令牌校验此前在「未配置令牌」时匿名放行，而默认安装 `api_token` 为空，导致 `/api/v1/*` 全部端点可被任意匿名读取。现改为 **fail-closed**：未配置令牌时一律返回 401（提示到后台「内容 API」生成），配置令牌后校验 `X-API-Token`（恒时比较）。`api_enable=off` 站点不受影响；JWT 鉴权路径行为不变。
+- **全站缺失 CSRF Token（H2，高危）**：此前全站仅有 Origin/Referer 同源校验（且无头请求放行），无会话绑定 Token。现新增 CSRF 同步 Token 机制：
+  - 新增 `app/utils/csrf.py`：Token 与用户 Session 绑定，`before_request` 对 POST/PUT/PATCH/DELETE 强制恒时比较校验，未携带/错误 → 403；
+  - 前后台所有主题/后台模板统一注入 `<meta name="csrf-token">` 与自动提交捕获脚本（`app/static/js/csrf.js`）：普通表单提交自动附加 `_csrf_token` 隐藏字段，jQuery `$.post/$.ajax` 全局附加 `X-CSRF-Token` 请求头；
+  - 手写 fetch/XHR 请求（文章 Word 导入、CKEditor 图片上传、页面构建器保存/发布/回滚/上传、一键翻译）逐处补齐 `X-CSRF-Token` 头；
+  - 豁免范围：`/api/*`（以 `X-API-Token` / Bearer JWT 头鉴权，不依赖 Cookie，无 CSRF 风险）与 `/healthz`；Session 尚无 Token 的首个匿名 POST（如登录表单首次提交）放行并开始建立 Token；
+  - 与既有 Origin/Referer 同源校验互为纵深，两者同时保留。
+
+### Changed
+
+- **升级注意**：升级到 v3.1.1 后，使用内容 API 的调用方必须在后台「内容 API」设置中生成令牌并以 `X-API-Token` 请求头携带，否则返回 401（详见 UPGRADE.md）。
+- **测试**：新增 CSRF 防护 9 项、API fail-closed 5 项用例；测试脚手架 `client` fixture 统一自动携带 CSRF Token 与 API Token。全量 309 项通过。
+
 ## [3.1.0] - 2026-10-10
 
 **数据库迁移插件**版本。新增官方内置插件 `db_migrator`（默认不启用）：在后台把 SQLite 开发库一键迁移到 MySQL / PostgreSQL——目标库建表 → 按外键依赖逐表复制数据（单事务失败整体回滚）→ PostgreSQL 自动重置自增序列 → 同步 Alembic 版本号（重启时不重复执行增量迁移）；支持连接测试、目标库非空保护（需显式勾选覆盖）、迁移后立即热切换引擎免重启。同时修复文章批量操作不更新搜索索引的问题，并修复后台用户管理表单字段与业务层脱节导致的多项账号管理异常。无数据库结构变更、无新增 Python 依赖。

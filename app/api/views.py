@@ -126,11 +126,17 @@ def _api_gate():
 
 
 def _check_api_token():
-    """旧静态令牌校验：X-API-Token，恒时比较。"""
+    """旧静态令牌校验：X-API-Token，恒时比较。
+
+    v3.1.1 安全修复（fail-closed）：未配置令牌时默认拒绝所有请求，
+    避免默认安装（api_token 为空）导致内容 API 全匿名可读。
+    """
     token = Setting.get('api_token') or ''
-    if not token:
-        return None  # 未配置 token 时免鉴权
     provided = request.headers.get('X-API-Token', '')
+    if not token:
+        if not provided:
+            return api_err(401, 'API 未配置访问令牌，请在后台「内容 API」中生成')
+        return api_err(401, 'API Token 无效或缺失')
     if not provided or not hmac.compare_digest(token, provided):
         return api_err(401, 'API Token 无效或缺失')
     return None

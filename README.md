@@ -2,7 +2,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v3.1.0**（数据库迁移插件：后台一键把 SQLite 开发库迁移到 MySQL/PostgreSQL，支持免重启热切换。详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v3.1.1**（安全修复：API 鉴权默认拒绝（fail-closed）+ 全站 CSRF Token 校验。详见 [CHANGELOG](CHANGELOG.md)）
 
 ---
 

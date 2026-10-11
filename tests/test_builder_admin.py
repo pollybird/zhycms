@@ -18,7 +18,8 @@ from tests.factories import make_user, make_column
 def _role_client(app, role_code):
     """新客户端 + 指定预设角色用户（session 注入绕验证码）。"""
     from app.models.rbac import Role
-    client = app.test_client()
+    from tests.conftest import make_client
+    client = make_client(app)
     with app.app_context():
         user = make_user(
             username='bu_' + uuid.uuid4().hex[:10],

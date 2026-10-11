@@ -289,8 +289,13 @@ function shiftNode(id, delta) {
  * ============================================================ */
 
 async function api(url, opts) {
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  const csrfHeaders = Object.assign(
+    { 'Content-Type': 'application/json' },
+    csrfMeta && csrfMeta.content ? { 'X-CSRF-Token': csrfMeta.content } : {}
+  );
   const res = await fetch(url, Object.assign({
-    headers: { 'Content-Type': 'application/json' },
+    headers: csrfHeaders,
     credentials: 'same-origin',
   }, opts));
   let data = {};
@@ -953,7 +958,9 @@ async function pickAndUpload(fileEl) {
     const fd = new FormData();
     fd.append('file', f);
     fd.append('type', 'builder');
-    const res = await fetch(API.upload, { method: 'POST', body: fd, credentials: 'same-origin' });
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    const csrfHeaders = csrfMeta && csrfMeta.content ? { 'X-CSRF-Token': csrfMeta.content } : {};
+    const res = await fetch(API.upload, { method: 'POST', body: fd, credentials: 'same-origin', headers: csrfHeaders });
     const data = await res.json();
     if (!res.ok || !data.url) throw new Error(data.error || '上传失败');
     return data.url;

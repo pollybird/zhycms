@@ -518,6 +518,10 @@ def create_app(config_name=None):
     from .utils.i18n_content import t as i18n_t
     app.jinja_env.globals['t'] = i18n_t
 
+    # v3.1.1 CSRF 同步 Token：模板中 {{ csrf_token() }} 生成/复用 Session Token
+    from .utils.csrf import csrf_token
+    app.jinja_env.globals['csrf_token'] = csrf_token
+
     # 初始化数据库表结构
     #
     # v2.4.0 兼容旧插件 db.create_all()：
@@ -629,6 +633,12 @@ def create_app(config_name=None):
         source_host = (urlparse(source).netloc or '').lower()
         if source_host and source_host != (request.host or '').lower():
             abort(403, description='跨站请求被拒绝（CSRF origin check failed）')
+
+    # CSRF 同步 Token（v3.1.1，GitCode issue #1 H2）：全站状态变更请求
+    # 强制校验 Session 绑定 Token（表单 _csrf_token 字段或 X-CSRF-Token 头）。
+    # /api/*（头鉴权无 CSRF 风险）与 /healthz 豁免；与上方同源校验互为纵深。
+    from .utils.csrf import validate_csrf
+    app.before_request(validate_csrf)
 
     # 未初始化拦截：后台与前台除初始化页外，都跳转
     @app.before_request
