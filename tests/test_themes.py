@@ -57,6 +57,31 @@ class TestIndustryThemes:
         assert cat['template_count'] >= 10
 
 
+@pytest.mark.themes
+class TestDeleteConfirmCaptcha:
+    """删除主题/卸载插件确认弹窗必须渲染验证码 UI（v3.1.1 线上回归）。
+
+    后端 theme_delete / plugin_delete 均校验一次性图片验证码
+    （/captcha/delete-confirm），但两个页面此前均未渲染验证码图片与
+    输入框，导致弹窗无码可看、提交必报「验证码已过期」。
+    """
+
+    def test_theme_page_renders_delete_captcha(self, admin_client):
+        html = admin_client.get('/admin/themes').get_data(as_text=True)
+        assert 'name="captcha"' in html
+        assert '/captcha/delete-confirm' in html
+
+    def test_plugin_page_renders_delete_captcha(self, admin_client):
+        html = admin_client.get('/admin/plugins').get_data(as_text=True)
+        assert 'name="captcha"' in html
+        assert '/captcha/delete-confirm' in html
+
+    def test_delete_captcha_image_endpoint(self, admin_client):
+        resp = admin_client.get('/admin/captcha/delete-confirm')
+        assert resp.status_code == 200
+        assert resp.content_type == 'image/png'
+
+
 # ------------------------------------------------------------
 # v3.0.0 第三方主题包：builder 默认布局 fixture 随包校验
 # ------------------------------------------------------------

@@ -114,6 +114,12 @@
         <i class="fas fa-exclamation-triangle"></i>
         {{ _('卸载将删除插件目录，数据库表保留。重新上传同名插件可恢复使用。') }}
       </div>
+      <div class="input-group mt-3">
+        <input type="text" name="captcha" class="form-control" placeholder="{{ _('验证码（不区分大小写）') }}" required>
+        <div class="input-group-append">
+          <img id="delete-captcha-img" src="" alt="{{ _('验证码') }}" title="{{ _('点击刷新') }}" style="cursor:pointer;height:38px;border-radius:0 .25rem .25rem 0;">
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <form method="post" id="delete-form">
@@ -138,5 +144,11 @@
     $('#delete-form').attr('action', baseUrl);
     $('#delete-modal').modal('show');
   }
+  // 每次打开弹窗 / 点击图片都取新验证码（一次性，校验后即作废）
+  function refresh_delete_captcha(){
+    $('#delete-captcha-img').attr('src', "{{ url_for('admin.delete_captcha_image') }}?t=" + Date.now());
+  }
+  $('#delete-modal').on('show.bs.modal', refresh_delete_captcha);
+  $('#delete-captcha-img').on('click', refresh_delete_captcha);
 </script>
 {% endblock %}
