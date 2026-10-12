@@ -83,3 +83,36 @@ class TestCSRF:
         """GET 请求不做 CSRF 校验。"""
         assert raw_client.get('/').status_code == 200
         assert raw_client.get('/admin/login').status_code == 200
+
+    # ---- v3.1.1a 回归：独立模板（不继承 base）的表单页 ----
+
+    def test_login_page_renders_csrf_meta(self, raw_client):
+        """登录页为独立模板，必须渲染 csrf-token meta（否则二次提交 403）。"""
+        resp = raw_client.get('/admin/login')
+        assert resp.status_code == 200
+        assert _META_RE.search(resp.get_data(as_text=True)), \
+            'login.html 未渲染 csrf-token meta'
+
+    def test_login_retry_not_blocked_by_csrf(self, raw_client):
+        """复现线上 bug：验证码输错一次（产生 Session Token）后，
+        再次提交登录必须仍可携带 Token 通过 CSRF 校验。"""
+        resp = raw_client.get('/admin/login')
+        token = _META_RE.search(resp.get_data(as_text=True)).group(1)
+
+        # 第一次提交：验证码错误（服务端渲染登录页，同时把 Token 写入 Session）
+        resp1 = raw_client.post('/admin/login', data={
+            'username': 'admin', 'password': 'x', 'captcha': '0000',
+            '_csrf_token': token})
+        assert resp1.status_code != 403
+
+        # 第二次提交（此前独立登录页无 meta + 无注入脚本，必然 403）
+        resp2 = raw_client.post('/admin/login', data={
+            'username': 'admin', 'password': 'x', 'captcha': '0000',
+            '_csrf_token': token})
+        assert resp2.status_code != 403
+
+    def test_setup_page_contains_csrf_meta(self):
+        """初始化页同为独立模板，模板必须包含 csrf meta 与脚本。"""
+        html = open('app/admin/templates/admin/setup.html',
+                    encoding='utf-8').read()
+        assert 'csrf-token' in html and 'js/csrf.js' in html
