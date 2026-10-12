@@ -190,25 +190,36 @@ def audit_export():
 @admin_bp.route('/audit-logs/clean', methods=['POST'])
 @permission_required('system:audit_log')
 def audit_clean():
-    """手动清理过期审计日志。"""
-    keep_days_raw = request.form.get('keep_days') or ''
+    """手动清理审计日志：days>0 保留最近 N 天，days=0 清空全部。
+
+    历史缺陷：前端表单字段名为 days，后端却读 keep_days，导致用户
+    选择的清理范围被无视、永远按 Setting 默认值（90 天）清理；
+    「清空全部」（days=0）也从未被处理。现两个名字都兼容。
+    """
+    raw = (request.form.get('days')
+           or request.form.get('keep_days') or '').strip()
     try:
-        keep_days = int(keep_days_raw)
+        keep_days = int(raw)
     except (TypeError, ValueError):
         try:
             keep_days = int(Setting.get('audit_log_keep_days', '90'))
         except ValueError:
             keep_days = 90
-    if keep_days <= 0:
-        flash(_gettext('保留天数必须为正整数'), 'danger')
+    if keep_days < 0:
+        flash(_gettext('保留天数必须为非负整数'), 'danger')
         return redirect(url_for('admin.audit_index'))
+    # keep_days=0 → cutoff 为当前时刻，等价于清空全部
     count = AuditLog.clean_expired(keep_days=keep_days)
     try:
         db.session.commit()
     except Exception:
         db.session.rollback()
         count = 0
-    flash(_gettext('已清理 {0} 天前的审计日志，共删除 {1} 条记录').format(keep_days, count), 'success')
+    if keep_days == 0:
+        flash(_gettext('已清空全部审计日志，共删除 {0} 条记录').format(count), 'success')
+    else:
+        flash(_gettext('已清理 {0} 天前的审计日志，共删除 {1} 条记录').format(keep_days, count), 'success')
     audit_log(OP_BATCH, MODULE_AUDIT, None, None,
-              {'action': 'clean_expired', 'keep_days': keep_days, 'deleted_count': count})
+              {'action': 'clear_all' if keep_days == 0 else 'clean_expired',
+               'keep_days': keep_days, 'deleted_count': count})
     return redirect(url_for('admin.audit_index'))
