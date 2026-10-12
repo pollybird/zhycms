@@ -28,6 +28,35 @@ class MigrationError(Exception):
     """迁移失败（信息可直接展示给用户）。"""
 
 
+def _cap_mysql_index_columns(tgt_engine, metadata):
+    """老版 MySQL（5.6/Antelope 或 innodb_large_prefix=OFF）单列索引前缀上限
+    767 字节；utf8mb4 每字符占 4 字节，String(N) 的 N>191 时建索引即报
+    1709「Index column size too large」。SQLite/PostgreSQL 无此限制，因此
+    开发库一切正常、迁移建表时才暴露。
+
+    在 create_all 前统一把超限的索引/唯一列降到 191 字符（191×4=764≤767），
+    覆盖 index=True / unique=True / 组合索引 / 组合唯一约束四种形态，仅
+    影响目标库 DDL。极端边界：源库该列存在超过 191 字符的行会在数据复制
+    阶段报错；实际业务数据（文件名/slug/邮箱等）不会触达该长度。
+    """
+    if tgt_engine.dialect.name != 'mysql':
+        return
+    from sqlalchemy import String, UniqueConstraint
+    for table in metadata.tables.values():
+        indexed_keys = set()
+        for idx in table.indexes:
+            indexed_keys.update(c.key for c in idx.columns)
+        for cons in table.constraints:
+            if isinstance(cons, UniqueConstraint):
+                indexed_keys.update(c.key for c in cons.columns)
+        for col in table.columns:
+            if not (col.index or col.unique or col.key in indexed_keys):
+                continue
+            length = getattr(col.type, 'length', None)
+            if isinstance(col.type, String) and length and length > 191:
+                col.type.length = 191
+
+
 def run_migration(target_uri, overwrite=False):
     """把当前库全部业务表迁移到目标库。
 
@@ -46,6 +75,7 @@ def run_migration(target_uri, overwrite=False):
         # 1. 目标库建表（覆盖模式先删本系统已知表再建）
         if overwrite:
             metadata.drop_all(tgt_engine)
+        _cap_mysql_index_columns(tgt_engine, metadata)
         metadata.create_all(tgt_engine)
 
         # 2. 安全检查：目标库同名表已有数据 → 拒绝（防重复导入）

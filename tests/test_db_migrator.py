@@ -6,7 +6,10 @@ MySQL/PostgreSQL 目标需真实服务器，不纳入单测。
 import os
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import (
+    Column, Integer, MetaData, String, Table, UniqueConstraint,
+    create_engine, text,
+)
 from sqlalchemy import inspect as sa_inspect
 
 PLUGIN = 'db_migrator'
@@ -146,3 +149,64 @@ class TestDbMigratorRoutes:
         finally:
             tgt.dispose()
         assert os.path.exists(str(tmp_path / 'db_config.json'))
+
+
+class TestCapMysqlIndexColumns:
+    """_cap_mysql_index_columns：老版 MySQL 767 字节索引前缀限制（utf8mb4）。"""
+
+    @staticmethod
+    def _fake_engine(dialect_name):
+        class _Dialect:
+            name = dialect_name
+        class _Engine:
+            dialect = _Dialect()
+        return _Engine()
+
+    def test_caps_indexed_and_unique_over_191(self):
+        from plugins.db_migrator.migrate import _cap_mysql_index_columns
+        md = MetaData()
+        Table('t1', md,
+              Column('id', Integer, primary_key=True),
+              Column('fn', String(255), index=True),    # 索引列 → 191
+              Column('uq', String(255), unique=True),   # 唯一列 → 191
+              Column('plain', String(255)),             # 无索引 → 保持 255
+              Column('ok', String(191), index=True))    # 已合规 → 不动
+        _cap_mysql_index_columns(self._fake_engine('mysql'), md)
+        t1 = md.tables['t1']
+        assert t1.c.fn.type.length == 191
+        assert t1.c.uq.type.length == 191
+        assert t1.c.plain.type.length == 255
+        assert t1.c.ok.type.length == 191
+
+    def test_caps_composite_unique_constraint_columns(self):
+        from plugins.db_migrator.migrate import _cap_mysql_index_columns
+        md = MetaData()
+        Table('t2', md,
+              Column('id', Integer, primary_key=True),
+              Column('a', String(300)),
+              Column('b', String(255)),
+              UniqueConstraint('a', 'b', name='uq_ab'))
+        _cap_mysql_index_columns(self._fake_engine('mysql'), md)
+        t2 = md.tables['t2']
+        assert t2.c.a.type.length == 191
+        assert t2.c.b.type.length == 191
+
+    def test_non_mysql_target_untouched(self):
+        from plugins.db_migrator.migrate import _cap_mysql_index_columns
+        md = MetaData()
+        Table('t', md, Column('x', String(255), index=True))
+        _cap_mysql_index_columns(self._fake_engine('sqlite'), md)
+        _cap_mysql_index_columns(self._fake_engine('postgresql'), md)
+        assert md.tables['t'].c.x.type.length == 255
+
+    def test_real_model_backup_records_filename_capped(self):
+        """线上报错场景回归：backup_records.filename 在 MySQL 目标下降到 191。"""
+        from plugins.db_migrator.migrate import _cap_mysql_index_columns
+        from app import create_app
+        from app.extensions import db
+        app = create_app()
+        with app.app_context():
+            md = db.Model.metadata
+            assert md.tables['backup_records'].c.filename.type.length == 255
+            _cap_mysql_index_columns(self._fake_engine('mysql'), md)
+            assert md.tables['backup_records'].c.filename.type.length == 191
