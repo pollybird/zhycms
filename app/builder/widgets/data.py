@@ -1,5 +1,6 @@
 """数据组件：与栏目/文章/碎片等真实内容绑定的动态组件。"""
 from ...constants import Builder as _B
+from ...utils.helpers import safe_int
 from ..registry import Widget, register_widget
 
 
@@ -29,8 +30,8 @@ def _query_articles(node, page_ctx, column):
     使首页默认布局开箱即有内容。
     """
     props = node.get('props') or {}
-    limit = int(props.get('limit') or 6)
-    offset = max(int(props.get('offset') or 0), 0)
+    limit = max(safe_int(props.get('limit'), 6), 1)
+    offset = max(safe_int(props.get('offset'), 0), 0)
     include_children = bool(props.get('include_children'))
     cache = page_ctx.setdefault('_qcache', {})
 

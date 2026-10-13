@@ -4,6 +4,16 @@ import json
 import re
 from datetime import datetime
 
+
+def safe_int(value, default=0):
+    """安全整数转换（v3.1.2 M1，GitCode issue #2）：非数字/空串回退默认值，杜绝 ValueError→500。"""
+    if value is None:
+        return default
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
 from flask import request, redirect, url_for, abort, flash, current_app
 from flask_login import current_user
 
@@ -165,6 +175,7 @@ AUDIT_SETTING_KEY_LABELS = {
     'upload_max_size': '上传大小上限（KB）', 'upload_max_size_kb': '上传大小上限（KB）',
     'upload_max_mb': '上传大小上限（MB）',
     'upload_allowed_exts': '允许上传后缀',
+    'upload_allow_svg': '允许上传 SVG',
     'upload_enable_mime_check': 'MIME 双重校验', 'upload_mime_check': 'MIME 双重校验',
     'upload_enable_dedup': '重复上传去重', 'upload_dedup_enable': '重复上传去重',
     'upload_single_max_size_mb': '单文件大小上限（MB）',

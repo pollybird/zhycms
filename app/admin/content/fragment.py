@@ -8,7 +8,7 @@ from ...extensions import db
 from ...constants import Upload as _U
 from ...models.fragment import Fragment, FragmentGroup, FragmentTranslation
 from ...utils.i18n_content import get_available_locales, get_default_locale
-from ...utils.helpers import permission_required, audit_log, clear_content_cache
+from ...utils.helpers import permission_required, audit_log, clear_content_cache, safe_int
 from ...utils.uploads import save_upload_file
 from ...models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRAGMENT
 from .. import admin_bp
@@ -43,7 +43,7 @@ def fragment_group_create():
     if not name:
         flash(_gettext('分组名称必填'), 'danger')
         return redirect(url_for('admin.fragment_group_index'))
-    g = FragmentGroup(name=name, sort_order=int(request.form.get('sort_order') or 0))
+    g = FragmentGroup(name=name, sort_order=safe_int(request.form.get('sort_order'), 0))
     db.session.add(g)
     db.session.commit()
     flash(_gettext('分组已创建'), 'success')
@@ -55,7 +55,7 @@ def fragment_group_create():
 def fragment_group_edit(gid):
     g = FragmentGroup.query.get_or_404(gid)
     g.name = (request.form.get('name') or '').strip() or g.name
-    g.sort_order = int(request.form.get('sort_order') or 0)
+    g.sort_order = safe_int(request.form.get('sort_order'), 0)
     db.session.commit()
     flash(_gettext('分组已更新'), 'success')
     return redirect(url_for('admin.fragment_group_index'))
@@ -145,7 +145,10 @@ def _save_fragment(fragment):
 
     gid = request.form.get('group_id') or None
     if gid:
-        gid = int(gid)
+        gid = safe_int(gid, None)
+        if gid is None:
+            flash(_gettext('分组无效'), 'danger')
+            return None
 
     is_new = fragment is None
     if is_new:
@@ -155,7 +158,7 @@ def _save_fragment(fragment):
     fragment.name = name
     fragment.group_id = gid
     fragment.field_type = field_type
-    fragment.sort_order = int(request.form.get('sort_order') or 0)
+    fragment.sort_order = safe_int(request.form.get('sort_order'), 0)
     fragment.is_enabled = (request.form.get('is_enabled') == 'on')
 
     # 处理值

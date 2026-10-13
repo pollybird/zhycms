@@ -27,6 +27,15 @@
             value="{{ settings.upload_single_max_size_mb }}" required>
           <small class="form-text text-muted">{{ _('超过该尺寸的文件直接拒绝上传。') }}</small>
         </div>
+        <div class="form-group">
+          <div class="icheck-danger">
+            <input type="checkbox" name="upload_allow_svg" value="on" id="svg" {{ 'checked' if settings.upload_allow_svg == 'on' }}>
+            <label for="svg">{{ _('允许上传 SVG 图片（默认关闭，含脚本/事件处理器的 SVG 会被拒）') }}</label>
+          </div>
+          <small class="form-text text-muted">
+            {{ _('SVG 可携带 <script>/onload=/href="javascript:" 等存储型 XSS 向量；仅在确认受信任的录入场景下开启，且会做内容嗅探与 512KB 大小上限。') }}
+          </small>
+        </div>
       </div>
     </div>
 

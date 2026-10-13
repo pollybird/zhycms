@@ -687,6 +687,14 @@ def create_app(config_name=None):
             " style-src 'self' 'unsafe-inline';"
             " img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'self'"
         )
+        # v3.1.2 M4（GitCode issue #2 兜底）：SVG 响应附加 sandbox CSP + 强制
+        # image/svg+xml Content-Type，防止历史遗留 SVG 中嵌入脚本在浏览器执行
+        # （即便上传校验已拒绝危险片段，对存量 SVG 也做兜底防护）。
+        req_path = request.path.lower()
+        if req_path.endswith('.svg'):
+            response.headers['Content-Type'] = 'image/svg+xml; charset=utf-8'
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            response.headers['Content-Security-Policy'] = "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:"
         return response
 
     # 调度器初始化（模块4 自动备份 + 清理）

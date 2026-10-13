@@ -6,8 +6,10 @@
 - v2.4：文件发布走存储抽象层（app/utils/storage.py），支持本地磁盘与
   云端对象存储（阿里云 OSS / 腾讯云 COS / 七牛云，由 oss_storage 插件注册）；
   校验/压缩/缩略图仍在本地临时文件上完成，发布后云驱动自动清理本地副本。
+- v3.1.2 M2：子目录白名单 + 二次校验 _safe_sub_dir()，拒绝路径穿越。
 """
 import os
+import re
 import io
 import hashlib
 import uuid
@@ -24,6 +26,43 @@ from .storage import (
 from ..constants import Upload as _U
 
 IMAGE_EXTS = set(_U.IMAGE_EXTS)
+
+# v3.1.2 M2（GitCode issue #2）：上传子目录白名单。任一未登记的子目录均回退到
+# 'common'，杜绝通过 type 参数构造 ../ 路径穿越到任意目录写文件。
+# 单层白名单 + 多段 sub_dir 的二级段必须匹配 _SAFE_SUB_SEGMENT_RE。
+ALLOWED_SUB_DIRS = frozenset({
+    'common', 'image', 'file', 'avatar', 'editor', 'article', 'theme',
+    'site', 'column', 'fragment',
+})
+
+# 子目录段格式：1-32 个字母/数字/下划线/中横线（与 plugins/form slug 规则一致）
+_SAFE_SUB_SEGMENT_RE = re.compile(r'^[a-zA-Z0-9_-]{1,32}$')
+
+
+def _safe_sub_dir(sub_dir):
+    """二次校验并归一化上传子目录（v3.1.2 M2）。
+
+    规则：
+      1. 空值 → 'common'
+      2. 剥离两侧 / 与 \\\\；
+      3. 含 '..' 段或绝对路径特征 → 'common'；
+      4. 多段拆分后，首段必须在 ALLOWED_SUB_DIRS 内，其余段匹配 _SAFE_SUB_SEGMENT_RE；
+      5. 任一不通过 → 'common'。
+    """
+    if not sub_dir:
+        return 'common'
+    s = str(sub_dir).strip().replace('\\', '/').strip('/')
+    if not s or '..' in s.split('/'):
+        return 'common'
+    parts = [p for p in s.split('/') if p]
+    if not parts:
+        return 'common'
+    if parts[0] not in ALLOWED_SUB_DIRS:
+        return 'common'
+    for p in parts[1:]:
+        if not _SAFE_SUB_SEGMENT_RE.match(p):
+            return 'common'
+    return '/'.join(parts)
 
 
 def _detect_mime(file_stream, original_name=''):
@@ -213,6 +252,9 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
     from ..models.user import User as _U  # noqa 仅保证模型可导入
     from flask_login import current_user
 
+    # 0. v3.1.2 M2：子目录二次校验（防 ../ 穿越到任意目录写文件）
+    sub_dir = _safe_sub_dir(sub_dir)
+
     # 1. 大小限制（优先级：参数 > 后台配置单文件MB > Setting.upload_max_size）
     try:
         cfg_mb = int(Setting.get('upload_single_max_size_mb', '0') or 0)
@@ -238,7 +280,30 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
 
     if allowed_exts is None:
         allowed_exts = Setting.get_allowed_exts()
-    if not allowed_file(original_name, allowed_exts):
+
+    # v3.1.2 M4：SVG 上传管控。SVG 不在默认 upload_allowed_exts 白名单内，
+    # 即便用户在后台把 svg 加入允许后缀也必须经 upload_allow_svg 开关二次
+    # 授权；开启后做内容嗅探（拒绝 <script>/onload=/onclick=/href="javascript:"
+    # /<foreignObject）+ 512KB 大小上限，阻断存储型 XSS 向量。
+    if ext == 'svg':
+        if Setting.get('upload_allow_svg') != 'on':
+            return None, None, 'SVG 上传默认关闭，请到「上传安全」开启后再上传'
+        SVG_MAX_SIZE = 512 * 1024
+        if size > SVG_MAX_SIZE:
+            return None, None, f'SVG 文件过大（最大 {SVG_MAX_SIZE // 1024} KB）'
+        file_storage.stream.seek(0)
+        try:
+            head = file_storage.stream.read(SVG_MAX_SIZE).decode('utf-8', errors='ignore').lower()
+        finally:
+            file_storage.stream.seek(0)
+        danger_tokens = ('<script', 'onload=', 'onclick=',
+                         'href="javascript:', 'href=\'javascript:',
+                         '<foreignobject', 'onerror=', 'onmouseover=')
+        if any(tok in head for tok in danger_tokens):
+            return None, None, 'SVG 含危险脚本片段，已拒绝上传'
+        # 通过 SVG 专属校验，后续按图片处理
+        allowed_exts = list(allowed_exts) + ['svg']
+    elif not allowed_file(original_name, allowed_exts):
         return None, None, f'文件类型不允许，仅支持：{", ".join(allowed_exts)}'
 
     # 3. MIME 二次校验（模块6）

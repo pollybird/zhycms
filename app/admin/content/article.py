@@ -25,7 +25,7 @@ from ...models.workflow import (
     STATUS_CHOICES, ArticleVersion,
 )
 from ...utils.helpers import (
-    permission_required, audit_log, clear_content_cache,
+    permission_required, audit_log, clear_content_cache, safe_int,
 )
 from ...utils.search import reindex_article
 from ...utils.word_import import convert_docx_to_html
@@ -72,7 +72,7 @@ def article_index(cid):
         flash(_gettext('该栏目不是列表栏目，无法管理文章'), 'warning')
         return redirect(url_for('admin.column_index'))
 
-    page = max(int(request.args.get('page', 1)), 1)
+    page = max(safe_int(request.args.get('page'), 1), 1)
     keyword = (request.args.get('keyword') or '').strip()
     status = request.args.get('status', '')
 
@@ -353,7 +353,7 @@ def article_versions(cid, aid):
     article = Article.query.get_or_404(aid)
     if article.column_id != col.id or article.is_deleted:
         abort(404)
-    page = max(int(request.args.get('page', 1)), 1)
+    page = max(safe_int(request.args.get('page'), 1), 1)
     versions = ArticleVersion.query.filter_by(article_id=aid).order_by(
         ArticleVersion.version_no.desc()
     ).paginate(page=page, per_page=20, error_out=False)

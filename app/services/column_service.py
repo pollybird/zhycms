@@ -8,7 +8,7 @@ from flask_babel import gettext as _gettext
 from ..extensions import db
 from ..constants import Upload as _U
 from ..models.column import Column, ColumnField, ColumnFieldValue, ColumnTranslation
-from ..utils.helpers import audit_log, clear_content_cache
+from ..utils.helpers import audit_log, clear_content_cache, safe_int
 from ..utils.uploads import save_upload_file
 from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..models.audit import OP_CREATE, OP_UPDATE, MODULE_COLUMN
@@ -46,9 +46,8 @@ def save_column(column, *, form_data, files_data):
         return None, messages
 
     if parent_id:
-        try:
-            parent_id = int(parent_id)
-        except (TypeError, ValueError):
+        parent_id = safe_int(parent_id, None)
+        if parent_id is None:
             _flash(_gettext('父栏目无效'), 'danger')
             return None, messages
 
@@ -70,7 +69,7 @@ def save_column(column, *, form_data, files_data):
     column.parent_id = parent_id
     column.type = col_type
     column.summary = (form_data.get('summary') or '').strip()
-    column.sort_order = int(form_data.get('sort_order') or 0)
+    column.sort_order = safe_int(form_data.get('sort_order'), 0)
     column.is_enabled = (form_data.get('is_enabled') == 'on')
     # 前台会员可见性（member 插件启用时后台表单才展示本项；未启用时恒为 False）
     column.member_only = (form_data.get('member_only') == 'on')
@@ -83,10 +82,8 @@ def save_column(column, *, form_data, files_data):
     if col_type == 'page':
         column.page_content = form_data.get('page_content') or ''
     elif col_type == 'list':
-        try:
-            column.page_size = int(form_data.get('page_size') or 10)
-        except ValueError:
-            column.page_size = 10
+        ps = safe_int(form_data.get('page_size'), 10)
+        column.page_size = ps if ps > 0 else 10
     elif col_type == 'link':
         column.link_url = (form_data.get('link_url') or '').strip()
         column.link_target = form_data.get('link_target') or '_self'

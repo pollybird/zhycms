@@ -4,7 +4,7 @@
 
 | 版本 | 支持状态 | 说明 |
 | --- | --- | --- |
-| 3.1.x | ✅ 完整支持 | 当前发布线，**最新安全版本 v3.1.1**（API 鉴权 fail-closed + 全站 CSRF Token 校验），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
+| 3.1.x | ✅ 完整支持 | 当前发布线，**最新安全版本 v3.1.2**（表单输入保护 + 上传子目录白名单 + CKEditor 反射型 XSS 防护 + SVG 上传管控 + 登录验证码一次性消费），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
 | 3.0.x | ✅ 完整支持 | 可视化页面构建器 + 插件默认布局贡献，建议升级至 3.1.x |
 | 2.6.x | ✅ 完整支持 | 前台会员体系 + 插件依赖强校验，建议升级至 3.1.x |
 | 2.5.x | ✅ 完整支持 | 内容级多语言 + Redis 缓存与 Session，建议升级至 3.1.x |
@@ -55,6 +55,11 @@
 - **权限**：RBAC 逐接口校验（视图装饰器 + 菜单逐项过滤），栏目级授权优先于全局角色。
 - **页面构建器（v3.0.0）**：编辑/发布/回滚全部后台端点受 RBAC 权限点门控（`builder:manage` / `builder:publish`）并写审计日志；预览页 `/admin/builder/preview/<id>` 仅登录后可访问，不产生可匿名访问的渲染端点；布局 JSON 服务端 allowlist 校验（组件类型/props 白名单/深度 ≤ 8/节点 ≤ 300/体积 ≤ 256KB），非法输入返回 400，拒绝存储与渲染；富文本组件复用 CKEditor5 受控录入，纯文本 props 服务端转义；组件图片/图标上传复用统一上传校验（MIME + 后缀 + 内容嗅探）；插件贡献的布局片段在插件启用前经同一套校验，非法片段拒绝启用；插件卸载前扫描布局引用，防止残留悬空组件；`<style>` 全局样式经服务端白名单键生成，不接受任意 CSS 注入。
 - **第三方主题上传（v3.0.0）**：主题包内 `builder/<scope>.json` 上传时按同一套布局校验，非法整包拒绝；默认布局文件解析带 slug 正则 + realpath 防护，杜绝路径穿越读取任意文件。
+- **表单输入保护（v3.1.2 M1）**：文章/栏目/碎片/搜索/分页等表单参数全部经 `safe_int()` 安全转换，非数字输入回退默认值而非 500；`page`/`limit`/`per_page` 同步加 `max(1, ...)` 拒负数。
+- **上传子目录白名单（v3.1.2 M2）**：`save_upload_file` 与 `/admin/upload` 入口对 `sub_dir/type` 参数做双层校验（白名单 `common/image/file/avatar/editor/article/theme/site/column/fragment` + 段格式正则），任一 `../` 或绝对路径均回退到 `common`，杜绝路径穿越到任意目录写文件。
+- **CKEditorFuncNum 反射型 XSS（v3.1.2 M3）**：富文本上传回调的 `CKEditorFuncNum` 仅接受 `^\d{1,6}$`，非法 400；`file_url`/`err` 经 `html.escape(..., quote=True)` 后再拼入 `<script>` 字符串。
+- **SVG 上传管控（v3.1.2 M4）**：默认 `upload_allow_svg=off`，开启后做内容嗅探（拒绝 `<script>`/`onload=`/`onclick=`/`href="javascript:"`/`<foreignObject>`/`onerror=`/`onmouseover=`）+ 512KB 大小上限；`.svg` 静态响应强制 `Content-Type: image/svg+xml` + `nosniff` + `CSP: sandbox; default-src 'none'`，兜底防护存量 SVG。
+- **登录验证码一次性消费（v3.1.2 M5）**：登录提交后**无论密码比对结果**先 `session.pop('captcha', None)`，杜绝同码复用枚举密码。
 
 ## 安全配置基线（部署方自查）
 

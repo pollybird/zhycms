@@ -28,7 +28,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.1.1'
+    CMS_VERSION = '3.1.2'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -44,6 +44,10 @@ class Setting(db.Model):
         'seo_description': '',
         'upload_max_size': str(10 * 1024 * 1024),  # 10MB
         'upload_allowed_exts': 'jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,zip,rar,txt',
+        # v3.1.2 M4（GitCode issue #2）：SVG 上传管控默认关闭。SVG 可携带
+        # <script>/onload=/href="javascript:" 等存储型 XSS 向量，仅在管理员
+        # 显式开启后允许上传，且会做内容嗅探拒绝危险片段并施加大小上限。
+        'upload_allow_svg': 'off',
         'site_theme': 'default',  # 前台主题
 
         # ===== 模块5：登录安全 =====

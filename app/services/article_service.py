@@ -15,7 +15,7 @@ from ..models.workflow import (
     STATUS_DRAFT, STATUS_REVIEW, STATUS_PUBLISHED, STATUS_ARCHIVED,
     ArticleVersion,
 )
-from ..utils.helpers import audit_log, clear_content_cache
+from ..utils.helpers import audit_log, clear_content_cache, safe_int
 from ..utils.uploads import save_upload_file
 from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..models.audit import OP_CREATE, OP_UPDATE, MODULE_ARTICLE
@@ -55,7 +55,7 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
     article.content = form_data.get('content') or ''
     article.author = (form_data.get('author') or '').strip()
     article.source = (form_data.get('source') or '').strip()
-    article.sort_order = int(form_data.get('sort_order') or 0)
+    article.sort_order = safe_int(form_data.get('sort_order'), 0)
 
     # 工作流状态（优先新的 status，兼容旧的 is_enabled）
     status = form_data.get('status') or ''

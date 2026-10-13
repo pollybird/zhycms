@@ -30,6 +30,7 @@ from ..utils.themes import (
     THEMES_DIR, THEME_SLUG_RE,
 )
 from ..utils.captcha import generate_captcha
+from ..utils.helpers import safe_int
 from . import frontend_bp
 
 
@@ -605,8 +606,8 @@ def theme_asset(slug, filename):
 def search():
     """全站搜索（全文搜索 + 中文分词，v2.5.1 起按当前语言检索）。"""
     keyword = (request.args.get('q') or '').strip()
-    page = max(int(request.args.get('page', 1)), 1)
-    per_page = int(Setting.get('search_results_per_page', '20'))
+    page = max(safe_int(request.args.get('page'), 1), 1)
+    per_page = max(safe_int(Setting.get('search_results_per_page'), 20), 1)
     results = []
     total = 0
     if keyword:

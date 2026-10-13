@@ -5,6 +5,23 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.2] - 2026-10-13
+
+**安全修复**版本（GitCode issue #2 五项中危 M1-M5）。表单整数输入保护、上传子目录路径白名单、CKEditor 反射型 XSS 防护、SVG 上传管控、登录验证码一次性消费。无数据库结构变更、无新增 Python 依赖。
+
+### Fixed
+
+- **表单 int() 输入保护（M1，中危）**：文章/栏目/碎片管理视图对 `sort_order`、`page_size`、`parent_id`、`gid`、`page`、`limit` 等表单参数直接 `int(...)` 转换，非数字输入触发 `ValueError` 返回 500。现新增 `app/utils/helpers.py::safe_int(value, default=0)`（strip + try/except 回退默认值），替换 `article_service` / `column_service` / `fragment` / `article` / `frontend.views` / `builder/widgets/data` 全部裸 `int()` 调用点；`page`/`limit`/`per_page` 同步加 `max(1, safe_int(...))` 拒负数。
+- **上传子目录路径穿越（M2，中危）**：通用上传接口 `app/admin/upload.py` 的 `type` 参数此前无白名单，`app/utils/uploads.py::save_upload_file` 内 `os.path.join(UPLOAD_FOLDER, sub_dir, date_dir)` 存在 `../` 穿越面。现新增 `ALLOWED_SUB_DIRS` 白名单 + `_safe_sub_dir()` 归一化（剥离两侧 `/` 与 `\\`、含 `..` 段直接回退、首段必须在白名单内、其余段匹配 `^[a-zA-Z0-9_-]{1,32}$`）；上传入口先归一化、`save_upload_file` 内二次校验，纵深防御。
+- **CKEditorFuncNum 反射型 XSS（M3，中危）**：`app/admin/upload.py` 把用户输入的 `CKEditorFuncNum` 直接拼到 `<script>` 字符串里返回，可注入 `</script><script>alert(1)</script>`。现 `func_num` 仅接受 `^\d{1,6}$`，非法直接 400；`file_url` 与 `err` 经 `html.escape(..., quote=True)` 转义后再拼入 JS 字符串。
+- **SVG 上传管控（M4，中危）**：LOGO 上传表单 `allowed_exts` 含 `svg`，全站 CSP 允许 `script-src 'unsafe-inline'`，构成存储型 XSS 向量。现默认 `upload_allow_svg=off`，开启后做内容嗅探（拒绝 `<script` / `onload=` / `onclick=` / `href="javascript:"` / `<foreignObject` / `onerror=` / `onmouseover=`）+ 512KB 大小上限；`.svg` 静态响应附加 `Content-Type: image/svg+xml` + `nosniff` + `CSP: sandbox; default-src 'none'`，兜底防护存量 SVG。后台「上传安全」页新增 SVG 开关。
+- **登录验证码不随失败失效（M5，中危）**：`app/admin/auth.py` 在密码错误分支不 `session.pop('captcha')`，导致同一验证码可被反复复用，密码错误计数失效。现校验通过后**无论密码比对结果**先 `session.pop('captcha', None)` 一次性消费，再走后续锁定/比对流程。
+
+### Changed
+
+- **升级注意**：v3.1.2 不改业务行为，仅补安全修复。若曾依赖 SVG 上传（如 LOGO）需到后台「上传安全」打开「允许上传 SVG」开关，且 SVG 内容会做嗅探。
+- **测试**：新增 26 项中危安全修复用例（`tests/test_security_m.py`，覆盖 M1-M5 各场景）；全量 346 项通过。
+
 ## [3.1.1] - 2026-10-11
 
 **安全修复**版本（GitCode issue #1 高危项 H1 + H2）。API 鉴权改为默认拒绝（fail-closed），全站引入 CSRF 同步 Token 校验。无数据库结构变更、无新增 Python 依赖。

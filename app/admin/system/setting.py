@@ -73,8 +73,14 @@ def setting_site():
         # LOGO
         logo_file = request.files.get('site_logo')
         if logo_file and logo_file.filename:
+            # v3.1.2 M4：SVG 仅在 upload_allow_svg=on 时允许上传，且 save_upload_file
+            # 内会做内容嗅探（拒绝 <script>/onload=/href="javascript:"/<foreignObject）
+            # 与 512KB 大小上限。默认 off，杜绝存储型 XSS 向量。
+            logo_exts = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+            if Setting.get('upload_allow_svg') == 'on':
+                logo_exts.append('svg')
             rel, url, err = save_upload_file(logo_file, sub_dir='site',
-                                             allowed_exts=['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'])
+                                             allowed_exts=logo_exts)
             if err:
                 flash(_gettext('LOGO 上传失败：{0}').format(err), 'danger')
             else:
@@ -218,7 +224,8 @@ def setting_upload_security():
         changed = {}
         # 开关类
         for key in ('upload_enable_mime_check', 'upload_image_auto_compress',
-                    'upload_image_thumb_enable', 'upload_enable_dedup'):
+                    'upload_image_thumb_enable', 'upload_enable_dedup',
+                    'upload_allow_svg'):
             val = _onoff(key)
             if Setting.get(key) != val:
                 Setting.set(key, val)

@@ -265,7 +265,9 @@ def login():
         username = (request.form.get('username') or '').strip()
         password = request.form.get('password') or ''
         captcha = (request.form.get('captcha') or '').strip().lower()
-        session_captcha = (session.get('captcha') or '').lower()
+        # v3.1.2 M5（GitCode issue #2）：验证码一次性消费，无论比对结果先 pop，
+        # 防止密码错误分支未失效验证码导致同码可复用暴力枚举密码。
+        session_captcha = (session.pop('captcha', None) or '').lower()
 
         if not captcha or captcha != session_captcha:
             flash(_gettext('验证码错误'), 'danger')
@@ -331,7 +333,6 @@ def login():
         if city:
             user.last_login_city = city
         db.session.commit()
-        session.pop('captcha', None)
 
         log_login(username, 'success', user_id=user.id, city=city)
         audit_log(OP_LOGIN, MODULE_USER, target_id=user.id, target_name=username,
