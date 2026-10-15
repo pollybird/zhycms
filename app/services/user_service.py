@@ -4,6 +4,7 @@
 """
 from flask_login import current_user
 from flask_babel import gettext as _gettext
+from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
 from ..models.user import User
@@ -61,7 +62,14 @@ def create_user(*, form_data):
                 email=email, is_active_flag=is_active, is_super=is_super)
     user.set_password(password)
     db.session.add(user)
-    db.session.flush()
+    # v3.1.3 M10（GitCode issue #3）：先查重后插入存在并发竞态，users.username
+    # 唯一索引兜底时 flush/commit 会抛 IntegrityError —— 捕获后回退业务错误而非 500
+    try:
+        db.session.flush()
+    except IntegrityError:
+        db.session.rollback()
+        _flash(_gettext('用户名已存在'), 'danger')
+        return None, messages
 
     # 分配角色
     for rid in role_ids:
@@ -80,7 +88,12 @@ def create_user(*, form_data):
             can_publish=str(cid) in can_publish_ids,
         ))
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        _flash(_gettext('用户名已存在'), 'danger')
+        return None, messages
     _flash(_gettext('账号创建成功'), 'success')
     audit_log(OP_CREATE, MODULE_USER, user.id, user.username,
               {'nickname': nickname, 'email': email, 'role_ids': role_ids})

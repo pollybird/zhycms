@@ -5,6 +5,24 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.3] - 2026-10-15
+
+**性能与并发健壮性**版本（GitCode issue #3 四项中危 M7-M10）。设置读取请求级缓存、浏览量计数写放大收口、首页 N+1 查询治理、用户名唯一性竞态兜底。无数据库结构变更、无新增 Python 依赖。
+
+### Fixed
+
+- **Setting 逐键查询写放大（M7，中危）**：单页渲染链路 `Setting.get()` 调用 20+ 次，每次一条 `first()` SQL。现新增请求级整表缓存（`flask.g`，`app/models/setting.py::_request_cache_map`）：同请求首查整表建映射，后续读零 SQL；`set()` 写后失效当前请求，同请求内写后立即可见；`get_dict()` 复用同一映射；无应用上下文（CLI）回退逐键查询。多 worker 场景无跨进程一致性问题。
+- **浏览量逐请求写事务（M8，中危）**：文章详情每次访问 `viewed + 1` 即 `db.session.commit()`，高并发下写库压力大；且整页缓存命中时视图体不执行，缓存 TTL 内（默认 900s）浏览量完全不增长。现改为**缓存累加 + 合并回库**：`_incr_view()` 把增量累加到缓存键 `article:viewed:pending`（缓存不可用回落旧行为），新增 `_flush_view_counts()` 以 `UPDATE ... SET viewed = viewed + n` 合并回库；APScheduler 新增 60s 周期任务 `zhycms_view_flush`，多 worker（不启内置调度器）时由请求内阈值（累计 200 次）兜底触发；整页缓存命中路径显式调用 `_incr_view()`，修复缓存窗口内计数不增长。合并失败增量放回缓存不丢数；兜底 TTL 24h 防调度器长期停止时内存累积。
+- **首页 N+1 查询（M9，中危）**：首页对 9 个行业区块 slug 逐个 `_home_column_articles()`（栏目 + 子栏目 + 文章各一条 SQL），叠加最新文章循环与导航树，单页 20+ 条 SQL。现收口为 `_home_section_data()` 批量拉取（栏目一次 `IN`、子栏目一次、跨栏目文章一次，共 3 条 SQL，内存分组取前 N，排序语义与原实现一致）；`Column.get_tree_cached()` 请求级缓存栏目树（导航 + 上下文处理器叠加只查一次），`clear_content_cache()` 统一失效，内容 CRUD 后同请求立即读到新树。
+- **用户名唯一性竞态（M10，中危）**：`create_user` 先查重后插入存在并发竞态，`users.username` 唯一索引兜底时 flush/commit 抛 `IntegrityError` 未捕获 → 500。现 `flush()` 与 `commit()` 均捕获 `IntegrityError` 回滚并 flash「用户名已存在」业务错误。
+
+### Changed
+
+- **升级注意**：无数据库结构变更、无新增依赖，覆盖代码重启即可。浏览量统计语义从「逐请求即时写库」变为「缓存累加 + 周期（约 60s）/阈值（200 次）合并」，计数为近似值（误差窗口 ≤ 60s 或 200 次）；依赖精确逐次计数的场景请自行评估。
+- **测试**：新增 14 项性能与并发用例（`tests/test_performance_m.py`，覆盖 M7-M10：SQL 计数、缓存失效、浏览量合并、缓存页计数、竞态回退、端点无 500）；全量 360 项通过。
+
+
+
 ## [3.1.2] - 2026-10-13
 
 **安全修复**版本（GitCode issue #2 五项中危 M1-M5）。表单整数输入保护、上传子目录路径白名单、CKEditor 反射型 XSS 防护、SVG 上传管控、登录验证码一次性消费。无数据库结构变更、无新增 Python 依赖。

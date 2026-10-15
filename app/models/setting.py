@@ -1,6 +1,8 @@
 import json
 from datetime import datetime
 
+from flask import g, has_app_context
+
 from ..extensions import db
 
 
@@ -28,7 +30,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.1.2'
+    CMS_VERSION = '3.1.3'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -158,7 +160,36 @@ class Setting(db.Model):
     }
 
     @classmethod
+    def _request_cache_map(cls):
+        """v3.1.3 M7（GitCode issue #3）：请求级整表缓存（g）。
+
+        单页渲染链路 Setting.get() 调用 20+ 次，逐次 first() 造成写放大；
+        同一请求内首查整表建映射，后续读零 SQL。set() 写后失效（见 set），
+        仅失效当前请求，多 worker 天然无一致性问题。
+        """
+        if not has_app_context():
+            return None
+        cache_map = g.get('_settings_map')
+        if cache_map is None:
+            cache_map = {r.key: (r.value or '') for r in cls.query.all()}
+            setattr(g, '_settings_map', cache_map)
+        return cache_map
+
+    @classmethod
     def get(cls, key, default=None):
+        cache_map = cls._request_cache_map()
+        if cache_map is not None:
+            if key in cache_map:
+                return cache_map[key]
+            # 键不在 DB 整表映射中：解析默认值并回填映射，避免同请求重复落库查询
+            item = cls.query.filter_by(key=key).first()
+            if item is None:
+                resolved = default if default is not None else cls.DEFAULTS.get(key, '')
+            else:
+                resolved = item.value or ''
+            cache_map[key] = resolved
+            return resolved
+        # 无应用上下文（CLI / 单测裸调用）：保持原有逐键查询行为
         item = cls.query.filter_by(key=key).first()
         if item is None:
             return default if default is not None else cls.DEFAULTS.get(key, '')
@@ -167,6 +198,10 @@ class Setting(db.Model):
     @classmethod
     def get_dict(cls):
         result = dict(cls.DEFAULTS)
+        cache_map = cls._request_cache_map()
+        if cache_map is not None:
+            result.update(cache_map)
+            return result
         for item in cls.query.all():
             result[item.key] = item.value or ''
         return result
@@ -179,6 +214,9 @@ class Setting(db.Model):
             db.session.add(item)
         else:
             item.value = str(value) if value is not None else ''
+        # v3.1.3 M7：写后失效当前请求的整表缓存，同请求内后续读立即可见
+        if has_app_context():
+            g.pop('_settings_map', None)
         return item
 
     @classmethod

@@ -92,8 +92,14 @@ def _member_only_redirect(column):
     return redirect(f'{login_url}{sep}next={nxt}')
 
 
-def _try_cache(key, ttl_setting_key, default_ttl=600):
-    """页面缓存装饰器（简易）：根据 Setting.cache_enable 开关决定是否走缓存。"""
+def _try_cache(key, ttl_setting_key, default_ttl=600, view_arg=None):
+    """页面缓存装饰器（简易）：根据 Setting.cache_enable 开关决定是否走缓存。
+
+    v3.1.3 M8（GitCode issue #3）：view_arg 指定视图参数中的文章 id 形参名。
+    整页缓存命中时视图函数体不会执行，原实现导致浏览量在缓存窗口内不增长；
+    命中路径改为显式调用 _incr_view 累加（缓存页本身不含实时计数，
+    增量由调度器/阈值合并回 DB）。
+    """
     from ..extensions import cache
 
     def decorator(view_func):
@@ -127,6 +133,9 @@ def _try_cache(key, ttl_setting_key, default_ttl=600):
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:
+                    # v3.1.3 M8：缓存命中同样累计浏览量（写放大由合并机制收口）
+                    if view_arg is not None and view_arg in kwargs:
+                        _incr_view(kwargs[view_arg])
                     return cached
             except Exception:
                 pass
@@ -138,6 +147,80 @@ def _try_cache(key, ttl_setting_key, default_ttl=600):
             return resp
         return wrapper
     return decorator
+
+
+# ---- v3.1.3 M8：浏览量缓存累加 + 合并回 DB（GitCode issue #3）----
+
+_VIEW_PENDING_KEY = 'article:viewed:pending'
+# 待合并增量达到该值时在请求内直接触发合并（多 worker 无调度器场景兜底）
+_VIEW_FLUSH_THRESHOLD = 200
+# 兜底过期：调度器长期停止时缓存增量最多滞留 24h，避免内存累积
+_VIEW_PENDING_TTL = 86400
+
+
+def _incr_view(aid):
+    """浏览量计数：优先缓存累加（消除每详情请求一次写事务）；
+    缓存不可用时回落旧行为直接递增 DB。"""
+    from ..extensions import cache
+
+    try:
+        pending = cache.get(_VIEW_PENDING_KEY)
+        pending = dict(pending) if isinstance(pending, dict) else {}
+        pending[aid] = pending.get(aid, 0) + 1
+        cache.set(_VIEW_PENDING_KEY, pending, timeout=_VIEW_PENDING_TTL)
+        if sum(pending.values()) >= _VIEW_FLUSH_THRESHOLD:
+            _flush_view_counts()
+    except Exception:
+        try:
+            article = Article.query.get(aid)
+            if article is not None:
+                article.viewed = (article.viewed or 0) + 1
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+def _flush_view_counts():
+    """把缓存累加的浏览量增量合并回 DB（APScheduler 周期任务 / 阈值触发）。
+
+    先取后删之间存在微小竞态窗口：窗口内到达的增量可能随删除丢失，
+    对浏览量这类近似统计可接受（与 issue 方案 A「临时键+过期合并」一致）；
+    合并失败时增量放回缓存，避免丢数。
+    """
+    from ..extensions import cache
+    from sqlalchemy import func
+
+    try:
+        pending = cache.get(_VIEW_PENDING_KEY)
+    except Exception:
+        return
+    if not isinstance(pending, dict) or not pending:
+        return
+    try:
+        cache.delete(_VIEW_PENDING_KEY)
+    except Exception:
+        return
+    try:
+        for aid, n in pending.items():
+            if not n:
+                continue
+            db.session.query(Article).filter(Article.id == aid).update(
+                {Article.viewed: func.coalesce(Article.viewed, 0) + n},
+                synchronize_session=False,
+            )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        # 合并失败：增量放回缓存（与期间新增量合并），等下一轮
+        try:
+            back = cache.get(_VIEW_PENDING_KEY)
+            merged = dict(pending)
+            if isinstance(back, dict):
+                for k, v in back.items():
+                    merged[k] = merged.get(k, 0) + v
+            cache.set(_VIEW_PENDING_KEY, merged, timeout=_VIEW_PENDING_TTL)
+        except Exception:
+            pass
 
 
 def _inject_default_alt(html):
@@ -179,7 +262,7 @@ def _build_nav():
     外链分支（col.name / col.link_url / col.link_target）可直接渲染，
     各主题无需为插件单独改造。
     """
-    columns = Column.get_tree(enabled_only=True)
+    columns = Column.get_tree_cached(enabled_only=True)
     # v2.6.4：未登录的前台访客看不到 member_only 栏目（有插件守卫时生效）
     if not _frontend_authenticated():
         columns = [c for c in columns if not getattr(c, 'member_only', False)]
@@ -236,27 +319,64 @@ def check_site_status():
         return render_template(theme_template('closed'), seo=_seo()), 503
 
 
-def _home_column_articles(slug, limit=8):
-    """按 slug 查找栏目，收集其（含子栏目）下的文章，用于首页展示。"""
-    col = Column.query.filter_by(
-        slug=slug, is_enabled=True, is_deleted=False
-    ).first()
-    if col is None:
-        return None, []
+# 首页行业区块：slug → 展示条数（与演示数据栏目对应，缺失栏目返回 (None, [])）
+_HOME_SECTION_LIMITS = {
+    'products': 8, 'services': 6, 'news': 6, 'cases': 4,
+    'courses': 8, 'teachers': 6, 'campus-news': 6,
+    'dishes': 8, 'food-news': 6,
+}
 
-    # 收集本栏目及其直接子栏目下的文章
-    col_ids = [col.id]
-    for child in col.children.filter_by(is_deleted=False, is_enabled=True).all():
-        col_ids.append(child.id)
 
-    articles = Article.query.filter(
-        Article.column_id.in_(col_ids),
-        Article.is_deleted == False,
-        Article.status == STATUS_PUBLISHED,  # 工作流：只显示已发布
-    ).order_by(
-        Article.sort_order.desc(), Article.published_at.desc()
-    ).limit(limit).all()
-    return col, articles
+def _home_section_data():
+    """v3.1.3 M9（GitCode issue #3）：首页各栏目区块批量拉取，替代逐栏目子查询。
+
+    原实现 9 个 slug 各发 1~3 条 SQL（栏目 + 子栏目 + 文章），单页首页约 20+ 条；
+    收口为 3 条 SQL：目标栏目一次、全部子栏目一次、跨栏目文章一次，内存分组取前 N。
+    返回 {slug: (col_or_None, articles)}，模板上下文契约与原 _home_column_articles 一致。
+    """
+    slugs = list(_HOME_SECTION_LIMITS)
+    cols = Column.query.filter(
+        Column.slug.in_(slugs),
+        Column.is_enabled == True,
+        Column.is_deleted == False,
+    ).all()
+    parent_ids = [c.id for c in cols]
+    child_ids_by_parent = {}
+    if parent_ids:
+        for ch in Column.query.filter(
+            Column.parent_id.in_(parent_ids),
+            Column.is_deleted == False,
+            Column.is_enabled == True,
+        ).all():
+            child_ids_by_parent.setdefault(ch.parent_id, []).append(ch.id)
+
+    all_ids = set(parent_ids)
+    for ids in child_ids_by_parent.values():
+        all_ids.update(ids)
+    articles_by_col = {}
+    if all_ids:
+        for a in Article.query.filter(
+            Article.column_id.in_(all_ids),
+            Article.is_deleted == False,
+            Article.status == STATUS_PUBLISHED,
+        ).order_by(Article.sort_order.desc(), Article.published_at.desc()).all():
+            articles_by_col.setdefault(a.column_id, []).append(a)
+
+    result = {}
+    col_by_slug = {c.slug: c for c in cols}
+    for slug, limit in _HOME_SECTION_LIMITS.items():
+        col = col_by_slug.get(slug)
+        if col is None:
+            result[slug] = (None, [])
+            continue
+        arts = list(articles_by_col.get(col.id, []))
+        for cid in child_ids_by_parent.get(col.id, []):
+            arts.extend(articles_by_col.get(cid, []))
+        # 父+子栏目合并后重排：sort_order 降序 → published_at 降序（与原单栏目查询序一致）
+        arts.sort(key=lambda a: (a.sort_order or 0, a.published_at or datetime.min),
+                  reverse=True)
+        result[slug] = (col, arts[:limit])
+    return result
 
 
 # ============================================================
@@ -297,31 +417,39 @@ def index():
 
     # 友情链接改由 friend_link 插件提供（模板全局函数 friend_links()，禁用时返回 []）
 
+    # v3.1.3 M9：前 3 个 list 栏目的最新文章批量拉取，替代逐栏目子查询
     list_columns = Column.query.filter_by(
         type='list', is_enabled=True, is_deleted=False
     ).all()
     latest_articles = []
-    for col in list_columns[:3]:
-        for a in col.articles.filter_by(
-            is_deleted=False, status=STATUS_PUBLISHED
-        ).order_by(Article.published_at.desc()).limit(5).all():
-            latest_articles.append((col, a))
+    latest_cols = list_columns[:3]
+    if latest_cols:
+        lc_ids = [c.id for c in latest_cols]
+        by_col = {}
+        for a in Article.query.filter(
+            Article.column_id.in_(lc_ids),
+            Article.is_deleted == False,
+            Article.status == STATUS_PUBLISHED,
+        ).order_by(Article.published_at.desc()).all():
+            by_col.setdefault(a.column_id, []).append(a)
+        for col in latest_cols:
+            for a in by_col.get(col.id, [])[:5]:
+                latest_articles.append((col, a))
 
-    # 行业主题首页数据
+    # v3.1.3 M9：行业主题首页数据批量拉取（原 9 次 _home_column_articles → 3 条 SQL）
+    sections = _home_section_data()
     about_col = Column.query.filter_by(
         slug='about', is_enabled=True, is_deleted=False
     ).first()
-    products_col, products = _home_column_articles('products', limit=8)
-    services_col, services = _home_column_articles('services', limit=6)
-    news_col, news = _home_column_articles('news', limit=6)
-    cases_col, cases = _home_column_articles('cases', limit=4)
-
-    # v2.6.3：教育 / 餐饮行业主题首页数据（栏目 slug 与 bootstrap 演示数据对应）
-    courses_col, courses = _home_column_articles('courses', limit=8)
-    teachers_col, teachers = _home_column_articles('teachers', limit=6)
-    campus_news_col, campus_news = _home_column_articles('campus-news', limit=6)
-    dishes_col, dishes = _home_column_articles('dishes', limit=8)
-    food_news_col, food_news = _home_column_articles('food-news', limit=6)
+    products_col, products = sections['products']
+    services_col, services = sections['services']
+    news_col, news = sections['news']
+    cases_col, cases = sections['cases']
+    courses_col, courses = sections['courses']
+    teachers_col, teachers = sections['teachers']
+    campus_news_col, campus_news = sections['campus-news']
+    dishes_col, dishes = sections['dishes']
+    food_news_col, food_news = sections['food-news']
 
     # 图片默认 ALT 注入（对内容型单页的 page_content，留空由单页渲染处处理）
     return render_template(
@@ -482,7 +610,7 @@ def column_detail(slug, page=None):
 # ============================================================
 
 @frontend_bp.route('/column/<slug>/article/<int:aid>')
-@_try_cache('article', 'cache_ttl_article', 900)
+@_try_cache('article', 'cache_ttl_article', 900, view_arg='aid')
 def article_detail(slug, aid):
     col = Column.query.filter_by(slug=slug, is_deleted=False).first_or_404()
     article = Article.query.get_or_404(aid)
@@ -494,12 +622,8 @@ def article_detail(slug, aid):
     if denied is not None:
         return denied
 
-    # 浏览量 +1（写库时暂时绕过缓存副作用）
-    try:
-        article.viewed = (article.viewed or 0) + 1
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+    # v3.1.3 M8：浏览量走缓存累加 + 调度器周期合并，消除每详情请求一次写事务
+    _incr_view(aid)
 
     nav = _build_nav()
     fields = col.fields.filter_by(is_deleted=False, is_frontend_visible=True).order_by(

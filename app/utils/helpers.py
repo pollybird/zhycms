@@ -268,6 +268,13 @@ def clear_content_cache(column_id=None, article_id=None):
     并触发搜索索引更新（v2.4.0）。"""
     from ..extensions import cache
     from ..models.setting import Setting
+    # v3.1.3 M9：内容变更（栏目/文章 CRUD）后失效当前请求的栏目树缓存，
+    # 保证同请求内后续导航/上下文渲染读到最新树（多 worker 无一致性问题）
+    try:
+        from ..models.column import Column
+        Column.invalidate_tree_cache()
+    except Exception:
+        pass
     # v2.4.0：搜索索引更新（独立于缓存开关）
     if article_id:
         try:

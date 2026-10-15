@@ -101,6 +101,34 @@ class Column(db.Model):
         columns = query.order_by(cls.parent_id.asc(), cls.sort_order.desc(), cls.created_at.desc()).all()
         return columns
 
+    # v3.1.3 M9（GitCode issue #3）：请求级栏目树缓存（g）
+    _TREE_CACHE_KEYS = ('_col_tree_True', '_col_tree_False')
+
+    @classmethod
+    def get_tree_cached(cls, enabled_only=True):
+        """请求级缓存栏目树：同一请求内（导航 + 上下文处理器叠加）只查一次 DB。
+
+        无应用上下文时回退 get_tree()；栏目 CRUD 后由 service 层调用
+        invalidate_tree_cache() 失效当前请求，多 worker 无一致性问题。
+        """
+        from flask import g, has_app_context
+        if not has_app_context():
+            return cls.get_tree(enabled_only=enabled_only)
+        key = f'_col_tree_{bool(enabled_only)}'
+        cached = g.get(key)
+        if cached is None:
+            cached = cls.get_tree(enabled_only=enabled_only)
+            setattr(g, key, cached)
+        return cached
+
+    @classmethod
+    def invalidate_tree_cache(cls):
+        """失效当前请求的栏目树缓存（栏目增删改后调用）。"""
+        from flask import g, has_app_context
+        if has_app_context():
+            for k in cls._TREE_CACHE_KEYS:
+                g.pop(k, None)
+
     @classmethod
     def build_nested(cls, columns, parent_id=None):
         """构建嵌套树。"""

@@ -239,6 +239,7 @@ def _setup_scheduler(app):
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
+        from apscheduler.triggers.interval import IntervalTrigger
     except ImportError:
         return None
 
@@ -270,6 +271,19 @@ def _setup_scheduler(app):
 
     # 每天 02:30 清理过期数据
     sched.add_job(cleanup_job, CronTrigger(hour=2, minute=30), id='zhycms_cleanup', replace_existing=True)
+
+    # 任务3（v3.1.3 M8，GitCode issue #3）：浏览量缓存增量周期合并回 DB（~60s）。
+    # 多 worker（gunicorn）不启动内置调度器时，由请求内阈值（200 次）兜底触发合并。
+    def view_flush_job():
+        with app.app_context():
+            try:
+                from .frontend.views import _flush_view_counts
+                _flush_view_counts()
+            except Exception:
+                app.logger.exception('view count flush failed')
+
+    sched.add_job(view_flush_job, IntervalTrigger(seconds=60), id='zhycms_view_flush', replace_existing=True)
+
     # 备份任务在应用启动 + 每次设置保存时按配置 reschedule
     try:
         from .models import Setting
@@ -465,7 +479,7 @@ def create_app(config_name=None):
 
         settings = Setting.get_dict()
         fragments = Fragment.get_dict()
-        nav_columns = Column.get_tree(enabled_only=True)
+        nav_columns = Column.get_tree_cached(enabled_only=True)
         theme = get_active_theme()
 
         return dict(
