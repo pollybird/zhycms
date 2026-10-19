@@ -4,6 +4,8 @@
 
 **当前版本：v3.1.3**（性能与并发健壮性：Setting 请求级缓存 + 浏览量缓存合并 + 首页 N+1 治理 + 用户名唯一性竞态兜底。详见 [CHANGELOG](CHANGELOG.md)）
 
+**项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
+
 ---
 
 ## 目录
