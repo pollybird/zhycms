@@ -16,7 +16,7 @@
       <div class="form-group">
         <label>{{ _('搜索引擎类型') }}</label>
         <select name="search_engine" class="form-control">
-          <option value="whoosh" {{ 'selected' if settings.search_engine == 'whoosh' }}>{{ _('Whoosh（纯 Python，内置，支持中文分词）') }}</option>
+          <option value="tantivy" {{ 'selected' if settings.search_engine == 'tantivy' }}>{{ _('Tantivy（内置，高性能，支持中文分词）') }}</option>
           <option value="meilisearch" {{ 'selected' if settings.search_engine == 'meilisearch' }}>{{ _('Meilisearch（需外部服务，高性能）') }}</option>
           <option value="sql" {{ 'selected' if settings.search_engine == 'sql' }}>{{ _('SQL LIKE（兼容性最高，无中文分词）') }}</option>
         </select>

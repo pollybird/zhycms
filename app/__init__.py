@@ -375,6 +375,56 @@ def _resolve_redis_url(app):
         return None
 
 
+def _maybe_rebuild_search_index(app):
+    """v3.1.4：Tantivy 索引缺失时启动后台自动重建（升级无感）。
+
+    v3.1.3→v3.1.4 升级后，Alembic 迁移已把 search_engine 改写为 tantivy 引擎，
+    但磁盘上仍是旧 Whoosh 索引残壳。检测：引擎为 tantivy 且默认语言索引
+    meta.json 缺失 → 后台线程 rebuild_all()；重建期间搜索走 SQL 兜底。
+    原子占位文件保证多 worker 下仅一个进程执行；TESTING 环境跳过。
+    """
+    import threading
+    if app.config.get('TESTING'):
+        return
+    try:
+        from .constants import Search as _S
+        from .models.setting import Setting
+        if Setting.get('search_engine', _S.DEFAULT_ENGINE) != _S.ENGINE_TANTIVY:
+            return
+        from .utils.search import _get_index_root, rebuild_all
+        from .utils.i18n_content import get_default_locale
+        root = _get_index_root()
+        meta = os.path.join(root, get_default_locale(), 'meta.json')
+        if os.path.exists(meta):
+            return  # 索引已存在，无需重建
+        building = os.path.join(root, '.tantivy_building')
+        try:
+            fd = os.open(building, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+        except FileExistsError:
+            return  # 其他 worker 正在重建
+        app.logger.info('[Search] Tantivy 索引缺失，后台自动重建开始')
+
+        def _bg():
+            with app.app_context():
+                try:
+                    indexed, errors = rebuild_all()
+                    app.logger.info(
+                        '[Search] 后台自动重建完成：%d 篇索引，%d 个错误',
+                        indexed, errors)
+                except Exception:
+                    app.logger.exception('[Search] 后台自动重建索引失败')
+                finally:
+                    try:
+                        os.remove(building)
+                    except OSError:
+                        pass
+
+        threading.Thread(target=_bg, daemon=True).start()
+    except Exception:
+        app.logger.exception('[Search] 索引自检异常（非致命）')
+
+
 def create_app(config_name=None):
     if config_name is None:
         # ZHOCMS_ 为 v2.1 前旧前缀（历史拼写差异），保留兼容回退
@@ -717,6 +767,10 @@ def create_app(config_name=None):
             _setup_scheduler(app)
         except Exception:
             app.logger.exception('scheduler init failed (non-fatal)')
+
+    # v3.1.4：Tantivy 索引缺失时后台自动重建（升级无感，期间 SQL 兜底）
+    with app.app_context():
+        _maybe_rebuild_search_index(app)
 
     return app
 

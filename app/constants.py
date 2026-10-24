@@ -44,13 +44,11 @@ class Locales:
 
 
 class Search:
-    """搜索引擎名称。"""
-
-    ENGINE_WHOOSH = 'whoosh'
+    ENGINE_TANTIVY = 'tantivy'      # v3.1.4 起（替代 Whoosh）
     ENGINE_MEILI = 'meilisearch'
     ENGINE_SQL = 'sql'
-    ENGINES = (ENGINE_WHOOSH, ENGINE_MEILI, ENGINE_SQL)
-    DEFAULT_ENGINE = ENGINE_WHOOSH
+    ENGINES = (ENGINE_TANTIVY, ENGINE_MEILI, ENGINE_SQL)
+    DEFAULT_ENGINE = ENGINE_TANTIVY
 
 
 class Roles:

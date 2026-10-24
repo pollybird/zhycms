@@ -583,9 +583,9 @@ def setting_search():
                        'indexed': indexed, 'errors': errors})
             return redirect(url_for('admin.setting_search'))
         changed = {}
-        val = (request.form.get('search_engine') or 'whoosh').strip()
-        if val not in ('whoosh', 'meilisearch', 'sql'):
-            val = 'whoosh'
+        val = (request.form.get('search_engine') or 'tantivy').strip()
+        if val not in ('tantivy', 'meilisearch', 'sql'):
+            val = 'tantivy'
         if Setting.get('search_engine') != val:
             Setting.set('search_engine', val)
             changed['search_engine'] = val

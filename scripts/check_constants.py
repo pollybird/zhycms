@@ -28,7 +28,7 @@ GATE_PATTERNS = {
     r"""['"]review['"]""": 'constants.Workflow.STATUS_REVIEW',
     r"""['"]archived['"]""": 'constants.Workflow.STATUS_ARCHIVED',
     # 搜索引擎名
-    r"""['"]whoosh['"]""": 'constants.Search.ENGINE_WHOOSH',
+    r"""['"]tantivy['"]""": 'constants.Search.ENGINE_TANTIVY',
     r"""['"]meilisearch['"]""": 'constants.Search.ENGINE_MEILI',
     # 上传白名单（多元素字面量列表/元组）
     r"""\('zip',\s*'tar\.gz',\s*'tgz'\)""": 'constants.Upload.THEME_EXTS',

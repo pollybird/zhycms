@@ -36,6 +36,25 @@ COPY requirements.txt requirements-prod.txt ./
 # 核心依赖 + 生产依赖（gunicorn / gevent，Docker 运行时需要）
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-prod.txt
 
+# pkuseg 中文分词模型预热（v3.1.4）：构建期下载并解压，运行期完全离线。
+# 默认 GitHub Releases；国内构建可覆盖为镜像前缀地址，例：
+#   --build-arg PKUSEG_MODEL_URL=https://ghfast.top/https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip
+# 注意：spacy-pkuseg 仅在 zip 缺失时才自行下载并解压，因此 zip 与解压目录需同时预置。
+ARG PKUSEG_MODEL_URL=https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip
+RUN python - "$PKUSEG_MODEL_URL" <<'PY'
+import sys, zipfile
+from urllib.request import urlretrieve
+url = sys.argv[1]
+zip_path = '/opt/pkuseg/spacy_ontonotes.zip'
+import os
+os.makedirs('/opt/pkuseg/spacy_ontonotes', exist_ok=True)
+print('Downloading pkuseg model:', url)
+urlretrieve(url, zip_path)
+with zipfile.ZipFile(zip_path) as z:
+    z.extractall('/opt/pkuseg/spacy_ontonotes')
+print('pkuseg model ready at /opt/pkuseg/spacy_ontonotes')
+PY
+
 # ---- Stage 2: Runtime ----
 FROM python:3.12-slim
 
@@ -57,6 +76,10 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV ZHYCMS_ENV=production
+
+# 复制 pkuseg 分词模型（v3.1.4 预热，运行期离线可用；root 所有、应用只读）
+COPY --from=builder /opt/pkuseg /opt/pkuseg
+ENV PKUSEG_HOME=/opt/pkuseg
 
 WORKDIR /app
 

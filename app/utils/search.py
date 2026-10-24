@@ -1,11 +1,19 @@
-"""v2.4.0 全文搜索抽象层（v2.5.1 起支持内容级多语言）。
+"""v2.4.0 全文搜索抽象层（v2.5.1 起支持内容级多语言；v3.1.4 引擎切换为 Tantivy）。
 
-三后端回退链：Whoosh → Meilisearch → SQL LIKE。
+三后端回退链：Tantivy → Meilisearch → SQL LIKE。
 通过 Setting 'search_engine' 选择引擎，运行时可切换。
 索引策略：文章保存时同步索引（通过 clear_content_cache 钩子触发）。
+中文分词：pkuseg 预分词为空格连接串后交 Tantivy 默认分词器（见 tokenizer.py）。
+
+v3.1.4 设计要点：
+- 索引仅存储 uid/type/id，展示字段按 id 回库水合（t_field 解析与前台一致，
+  且避免 Whoosh 时代"结果快照陈旧"、stored 分词串外泄两个问题）
+- uid 唯一性以"写前 delete_documents_by_term + add_document"模拟
+- Tantivy writer 锁与 Whoosh 相同（单写者），保存时索引冲突仅告警，
+  搜索走 SQL 兜底，行为与旧版一致
 
 v2.5.1 多语言：
-- Whoosh 按语言分索引目录 instance/search_index/<locale>/
+- Tantivy 按语言分索引目录 instance/search_index/<locale>/
 - Meilisearch 按语言分索引 zhycms_articles_<locale>
 - 每种语言的文档内容经 t_field 解析（翻译表 → 无翻译回退主表，与前台一致）
 - 搜索按当前 locale 选索引；locale 索引不存在时回退默认语言索引
@@ -23,6 +31,7 @@ from ..constants import Search as _S
 from ..models.setting import Setting
 from ..models.article import Article, ArticleTranslation, STATUS_PUBLISHED
 from ..models.column import Column
+from .tokenizer import tokenize
 
 
 # 内容类型标识（索引文档 uid 前缀）
@@ -107,7 +116,7 @@ def _strip_html(text):
 
 
 def _get_index_root():
-    """返回 Whoosh 索引根目录 instance/search_index/。"""
+    """返回 Tantivy 索引根目录 instance/search_index/。"""
     base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     root = os.path.join(base, 'instance', 'search_index')
     os.makedirs(root, exist_ok=True)
@@ -115,7 +124,7 @@ def _get_index_root():
 
 
 def _get_index_dir(locale):
-    """返回某语言的 Whoosh 索引目录 instance/search_index/<locale>/。"""
+    """返回某语言的 Tantivy 索引目录 instance/search_index/<locale>/。"""
     d = os.path.join(_get_index_root(), locale)
     os.makedirs(d, exist_ok=True)
     return d
@@ -369,194 +378,262 @@ class SqlLikeBackend(SearchBackend):
 
 
 # ============================================================
-# Whoosh 后端（主推荐）
+# Tantivy 后端（主推荐，v3.1.4 起）
 # ============================================================
 
-_whoosh_indexes = {}  # {locale: index} 单例缓存
-_whoosh_analyzer = None
+_tantivy_indexes = {}  # {locale: Index} 单例缓存
+_tantivy_schema = None
+
+_WRITER_HEAP = 50_000_000  # tantivy writer 堆内存（50MB 默认值，CMS 量级充裕）
 
 
-def _get_whoosh_schema():
-    """返回 Whoosh 索引 schema。"""
-    from whoosh.fields import Schema, TEXT, ID, NUMERIC, DATETIME
-    # jieba 中文分词分析器（惰性加载）；对中英文混排均有效
-    global _whoosh_analyzer
-    if _whoosh_analyzer is None:
-        from jieba.analyse import ChineseAnalyzer as _JiebaAnalyzer
-        _whoosh_analyzer = _JiebaAnalyzer()
-    return Schema(
-        uid=ID(stored=True, unique=True),
-        type=ID(stored=True),
-        id=NUMERIC(stored=True),
-        title=TEXT(analyzer=_whoosh_analyzer, stored=True),
-        content=TEXT(analyzer=_whoosh_analyzer),
-        summary=TEXT(analyzer=_whoosh_analyzer, stored=True),
-        column_id=NUMERIC(stored=True),
-        column_name=TEXT(stored=True),
-        column_slug=TEXT(stored=True),
-        published_at=DATETIME(stored=True),
-        status=ID(),
-    )
+def _get_tantivy_schema():
+    """返回 Tantivy 索引 schema（惰性构建，进程级缓存）。
+
+    仅 uid/type/id 存储（stored），展示字段不入索引——检索命中后按 id
+    回库水合，保证结果展示始终为实时数据且不含分词中间形态。
+    """
+    global _tantivy_schema
+    if _tantivy_schema is None:
+        import tantivy
+        sb = tantivy.SchemaBuilder()
+        sb.add_text_field('uid', stored=True, tokenizer_name='raw')
+        sb.add_text_field('type', stored=True, tokenizer_name='raw')
+        sb.add_unsigned_field('id', stored=True)
+        sb.add_text_field('title')       # 仅索引（tokenize 后写入）
+        sb.add_text_field('content')     # 仅索引
+        sb.add_text_field('summary')     # 仅索引
+        sb.add_text_field('status', tokenizer_name='raw')  # 仅过滤
+        _tantivy_schema = sb.build()
+    return _tantivy_schema
 
 
-def _get_whoosh_index(locale, create=False):
-    """获取指定语言的 Whoosh 索引（单例）。
+def _get_tantivy_index(locale, create=False):
+    """获取指定语言的 Tantivy 索引（单例）。
 
     create=False 且索引不存在时返回 None（供搜索回退判断）。
+    目录存在但无 tantivy meta.json（如旧 Whoosh 残壳）：create=True 时
+    清空重建，create=False 时视为无索引返回 None。
     """
-    if locale in _whoosh_indexes:
-        return _whoosh_indexes[locale]
-    from whoosh.index import create_in, open_dir, exists_in
+    if locale in _tantivy_indexes:
+        return _tantivy_indexes[locale]
+    import tantivy
     index_dir = _get_index_dir(locale)
-    if exists_in(index_dir):
-        idx = open_dir(index_dir)
-    elif create:
-        idx = create_in(index_dir, _get_whoosh_schema())
-    else:
-        return None
-    _whoosh_indexes[locale] = idx
+    has_index = os.path.exists(os.path.join(index_dir, 'meta.json'))
+    if not has_index:
+        if not create:
+            return None
+        import shutil
+        shutil.rmtree(index_dir, ignore_errors=True)
+        os.makedirs(index_dir, exist_ok=True)
+    idx = tantivy.Index(_get_tantivy_schema(), path=index_dir)
+    _tantivy_indexes[locale] = idx
     return idx
 
 
-class WhooshBackend(SearchBackend):
-    """Whoosh 全文搜索后端（纯 Python + jieba 中文分词，按语言分索引）。"""
+def _to_tantivy_doc(doc):
+    """把 _build_doc/_provider_doc 产出的 dict 转为 tantivy.Document。
 
-    def _ensure_current_schema(self):
-        """旧版索引（v2.5.2 前无 uid/type 字段）一次性重建自愈。
+    文本字段经 tokenize() 预分词（pkuseg）；日期保持 datetime。
+    """
+    import tantivy
+    return tantivy.Document(
+        uid=doc['uid'],
+        type=doc['type'],
+        id=int(doc.get('id') or 0),
+        title=tokenize(doc.get('title') or ''),
+        content=tokenize(doc.get('content') or ''),
+        summary=tokenize(doc.get('summary') or ''),
+        status=doc.get('status') or STATUS_PUBLISHED,
+    )
 
-        升级后未手动「重建索引」时，旧 schema 索引无法写入多类型文档；
-        检测到任一语言索引 schema 过旧即全量重建（仅触发一次）。
+
+class TantivyBackend(SearchBackend):
+    """Tantivy 全文搜索后端（Rust 内核 + pkuseg 中文预分词，按语言分索引）。"""
+
+    # ---------- 写入 ----------
+
+    def _write_doc(self, uid, doc_factory):
+        """单文档"写前删 + 新增"（模拟 Whoosh update_document）。
+
+        doc_factory: 返回 tantivy.Document 或 None（None 表示仅删除）。
+        writer 随方法返回释放（锁随引用计数回收），锁冲突按现状告警不中断。
         """
         for loc in _index_locales():
-            index = _get_whoosh_index(loc)
-            if index is not None and 'uid' not in index.schema:
-                current_app.logger.info(
-                    '检测到旧版搜索索引 schema，自动重建（%s）', loc)
-                self.rebuild_all()
-                return
-
-    def index_article(self, article):
-        self._ensure_current_schema()
-        col = Column.query.get(article.column_id)
-        for loc in _index_locales():
-            index = _get_whoosh_index(loc, create=True)
-            writer = index.writer()
+            index = _get_tantivy_index(loc, create=True)
+            writer = index.writer(heap_size=_WRITER_HEAP, num_threads=1)
             try:
-                writer.update_document(**_build_doc(article, col, loc))
+                writer.delete_documents_by_term('uid', uid)
+                doc = doc_factory(loc)
+                if doc is not None:
+                    writer.add_document(doc)
                 writer.commit()
             except Exception:
                 writer.cancel()
                 raise
+            index.reload()
+
+    def index_article(self, article):
+        col = Column.query.get(article.column_id)
+        uid = f'{TYPE_ARTICLE}:{article.id}'
+        self._write_doc(uid, lambda loc: _to_tantivy_doc(_build_doc(article, col, loc)))
 
     def unindex_article(self, article_id):
-        for loc in _index_locales():
-            index = _get_whoosh_index(loc)
-            if index is None:
-                continue
-            writer = index.writer()
-            try:
-                writer.delete_by_term('uid', f'{TYPE_ARTICLE}:{article_id}')
-                writer.commit()
-            except Exception:
-                writer.cancel()
+        self.unindex_object(TYPE_ARTICLE, article_id)
 
     def index_object(self, type_, obj_id):
         """索引/更新插件内容单条记录（写入全部语言索引）。"""
         prov = get_search_providers().get(type_)
         if prov is None:
             return
-        self._ensure_current_schema()
-        for loc in _index_locales():
+        uid = f'{type_}:{obj_id}'
+
+        def factory(loc):
             raw = prov.get_doc(obj_id, loc)
-            index = _get_whoosh_index(loc, create=True)
-            writer = index.writer()
-            try:
-                if raw is None:
-                    # 下架/删除：从索引移除
-                    writer.delete_by_term('uid', f'{type_}:{obj_id}')
-                else:
-                    writer.update_document(**_provider_doc(prov, raw))
-                writer.commit()
-            except Exception:
-                writer.cancel()
-                raise
+            return _to_tantivy_doc(_provider_doc(prov, raw)) if raw is not None else None
+
+        self._write_doc(uid, factory)
 
     def unindex_object(self, type_, obj_id):
+        uid = f'{type_}:{obj_id}'
         for loc in _index_locales():
-            index = _get_whoosh_index(loc)
+            index = _get_tantivy_index(loc)
             if index is None:
                 continue
-            writer = index.writer()
+            writer = index.writer(heap_size=_WRITER_HEAP, num_threads=1)
             try:
-                writer.delete_by_term('uid', f'{type_}:{obj_id}')
+                writer.delete_documents_by_term('uid', uid)
                 writer.commit()
             except Exception:
                 writer.cancel()
+            index.reload()
+
+    # ---------- 检索 ----------
+
+    @staticmethod
+    def _doc_first(doc, field, default=None):
+        """tantivy Document 字段取单值（绑定层一律返回列表）。"""
+        values = doc[field]
+        if not values:
+            return default
+        return values[0]
+
+    def _hydrate(self, hits, loc):
+        """按 uid/type/id 回库水合展示字段（保持 tantivy 相关度顺序）。
+
+        文章：一次 IN 查询取回、逐栏目缓存、t_field 按当前语言解析；
+        插件内容：走提供者 get_doc（协议本身即按 locale 产出本地化字段）。
+        """
+        article_ids = [oid for _uid, type_, oid in hits if type_ == TYPE_ARTICLE]
+        articles = {}
+        if article_ids:
+            for a in Article.query.filter(Article.id.in_(article_ids)).all():
+                articles[a.id] = a
+        providers = get_search_providers()
+        columns = {}
+        items = []
+        for uid, type_, oid in hits:
+            if type_ == TYPE_ARTICLE:
+                a = articles.get(oid)
+                if a is None:
+                    continue  # 索引残影（刚删除未提交），跳过
+                if a.column_id not in columns:
+                    columns[a.column_id] = Column.query.get(a.column_id)
+                col = columns[a.column_id]
+                fields = _localized_text(a, col, loc)
+                items.append({
+                    'id': a.id,
+                    'uid': uid,
+                    'type': TYPE_ARTICLE,
+                    'title': fields['title'],
+                    'summary': fields['summary'],
+                    'column_id': a.column_id,
+                    'column_name': fields['column_name'],
+                    'column_slug': fields['column_slug'],
+                    'published_at': a.published_at,
+                    'url': None,
+                })
+            else:
+                prov = providers.get(type_)
+                raw = prov.get_doc(oid, loc) if prov is not None else None
+                if raw is None:
+                    continue
+                items.append({
+                    'id': raw.get('id'),
+                    'uid': uid,
+                    'type': type_,
+                    'title': raw.get('title') or '',
+                    'summary': raw.get('summary') or '',
+                    'column_id': raw.get('column_id'),
+                    'column_name': raw.get('column_name') or '',
+                    'column_slug': raw.get('column_slug') or '',
+                    'published_at': raw.get('published_at'),
+                    'url': None,
+                })
+        return items
 
     def search(self, keyword, page=1, per_page=20, locale=None):
-        from whoosh.qparser import MultifieldParser
         loc = _search_locale(locale)
-        index = _get_whoosh_index(loc)
+        index = _get_tantivy_index(loc)
         if index is None:
             # 该语言索引尚未建立（如刚开启 i18n 未重建），回退默认语言索引
             default = _search_locale(None)
             if default != loc:
-                index = _get_whoosh_index(default)
+                index = _get_tantivy_index(default)
         if index is None:
             return [], 0
-        parser = MultifieldParser(
-            ['title', 'content', 'summary'],
-            schema=index.schema
-        )
-        query = parser.parse(keyword)
-        # 只召回已发布内容（索引可能包含草稿/归档）
-        if 'status' in index.schema:
-            from whoosh.query import Term
-            query = query & Term('status', STATUS_PUBLISHED)
-        searcher = index.searcher()
+        tokenized = tokenize(keyword)
+        if not tokenized:
+            return [], 0
+        # tokenize 已剥离标点并小写化（免疫查询语法/大写运算符），
+        # 仍兜底 ValueError 防绑定层边界行为
         try:
-            results = searcher.search_page(query, page, pagelen=per_page)
-            items = [_result_item({
-                'id': r.get('id'),
-                'uid': r.get('uid'),
-                'type': r.get('type'),
-                'title': r.get('title', ''),
-                'summary': r.get('summary', ''),
-                'column_id': r.get('column_id'),
-                'column_name': r.get('column_name', ''),
-                'column_slug': r.get('column_slug', ''),
-                'published_at': r.get('published_at'),
-            }) for r in results]
-            return items, results.total
-        finally:
-            searcher.close()
+            query = index.parse_query(
+                f'({tokenized}) AND status:{STATUS_PUBLISHED}',
+                ['title', 'content', 'summary'])
+        except ValueError:
+            return [], 0
+        try:
+            index.reload()  # 拾取其他进程/线程刚提交的写入
+        except Exception:
+            pass
+        searcher = index.searcher()
+        offset = (page - 1) * per_page
+        result = searcher.search(query, limit=per_page, offset=offset, count=True)
+        hits = []
+        for _score, addr in result.hits:
+            doc = searcher.doc(addr)
+            hits.append((
+                self._doc_first(doc, 'uid', ''),
+                self._doc_first(doc, 'type', TYPE_ARTICLE),
+                self._doc_first(doc, 'id', 0),
+            ))
+        return self._hydrate(hits, loc), result.count
+
+    # ---------- 运维 ----------
 
     def rebuild_all(self):
-        from whoosh.index import create_in
         import shutil
-        # 重建：清空整个索引根目录（含旧的单层结构与各语言子目录）
+        # 重建：清空整个索引根目录（含旧 Whoosh 残壳与各语言子目录）
         root = _get_index_root()
         if os.path.isdir(root):
             shutil.rmtree(root)
         os.makedirs(root, exist_ok=True)
-        global _whoosh_indexes
-        _whoosh_indexes = {}
+        global _tantivy_indexes
+        _tantivy_indexes = {}
 
         articles = Article.query.filter_by(is_deleted=False).all()
         providers = get_search_providers()
         errors = 0
         indexed = 0
-        locales = _index_locales()
-        for loc in locales:
-            index_dir = _get_index_dir(loc)
-            index = create_in(index_dir, _get_whoosh_schema())
-            _whoosh_indexes[loc] = index
-            writer = index.writer()
+        for loc in _index_locales():
+            index = _get_tantivy_index(loc, create=True)
+            writer = index.writer(heap_size=_WRITER_HEAP, num_threads=1)
             try:
                 for a in articles:
                     try:
                         col = Column.query.get(a.column_id)
-                        writer.add_document(**_build_doc(a, col, loc))
+                        writer.add_document(_to_tantivy_doc(_build_doc(a, col, loc)))
                         indexed += 1
                     except Exception:
                         errors += 1
@@ -564,7 +641,7 @@ class WhooshBackend(SearchBackend):
                     try:
                         for raw in prov.iter_docs(loc):
                             try:
-                                writer.add_document(**_provider_doc(prov, raw))
+                                writer.add_document(_to_tantivy_doc(_provider_doc(prov, raw)))
                                 indexed += 1
                             except Exception:
                                 errors += 1
@@ -576,18 +653,25 @@ class WhooshBackend(SearchBackend):
             except Exception:
                 writer.cancel()
                 raise
+            index.reload()
         return indexed, errors
 
     def health(self):
         try:
             parts = []
             for loc in _index_locales():
-                index = _get_whoosh_index(loc)
-                count = index.doc_count() if index is not None else 0
+                index = _get_tantivy_index(loc)
+                count = 0
+                if index is not None:
+                    try:
+                        index.reload()
+                        count = index.searcher().num_docs
+                    except Exception:
+                        count = 0
                 parts.append(f'{loc}:{count}')
-            return True, f'Whoosh 索引正常（{len(_index_locales())} 种语言，文档数 {", ".join(parts)}）'
+            return True, f'Tantivy 索引正常（{len(_index_locales())} 种语言，文档数 {", ".join(parts)}）'
         except Exception as e:
-            return False, f'Whoosh 索引异常: {e}'
+            return False, f'Tantivy 索引异常: {e}'
 
 
 # ============================================================
@@ -729,15 +813,22 @@ class MeilisearchBackend(SearchBackend):
 # ============================================================
 
 def get_backend():
-    """根据 Setting 返回当前搜索后端（每请求缓存）。"""
+    """根据 Setting 返回当前搜索后端（每请求缓存）。
+
+    v3.1.4：无法识别的历史引擎值（如迁移未覆盖的残留 'whoosh'）
+    回退 SQL LIKE 并告警，不抛异常——搜索始终可用。
+    """
     if hasattr(g, '_search_backend'):
         return g._search_backend
     engine = Setting.get('search_engine', _S.DEFAULT_ENGINE)
-    if engine == _S.ENGINE_WHOOSH:
-        backend = WhooshBackend()
+    if engine == _S.ENGINE_TANTIVY:
+        backend = TantivyBackend()
     elif engine == _S.ENGINE_MEILI:
         backend = MeilisearchBackend()
     else:
+        if engine != _S.ENGINE_SQL:
+            current_app.logger.warning(
+                '未知搜索引擎值 %r，回退 SQL LIKE（请检查迁移是否执行）', engine)
         backend = SqlLikeBackend()
     g._search_backend = backend
     return backend
@@ -747,7 +838,7 @@ def search_articles(keyword, page=1, per_page=20, locale=None):
     """公共搜索 API：返回 (items, total)。
     后端故障时自动回退到 SQL LIKE。locale 为当前语言代码。
 
-    兜底策略：索引后端（Whoosh/Meilisearch）零命中时，再用实时 SQL 查一次。
+    兜底策略：索引后端（Tantivy/Meilisearch）零命中时，再用实时 SQL 查一次。
     索引可能未建立或陈旧（如升级到多语言版本后未点「重建索引」），导致
     按外文关键词检索时漏召回；SQL 直接查翻译表，始终为最新数据。
     """

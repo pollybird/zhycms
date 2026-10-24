@@ -2,7 +2,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v3.1.3**（性能与并发健壮性：Setting 请求级缓存 + 浏览量缓存合并 + 首页 N+1 治理 + 用户名唯一性竞态兜底。详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v3.1.4**（依赖腐化专项治理：全文搜索切换 Tantivy + pkuseg 中文分词、redis/pytest 约束放宽、CI 矩阵扩展 3.13/3.14。详见 [CHANGELOG](CHANGELOG.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -58,7 +58,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **国际化（i18n）** | Flask-Babel 界面文案 + 内容级多语言翻译表（文章/栏目/碎片/产品/表单/岗位/友情链接，v2.5.2 起含产品规格参数与岗位部门/地点/薪资） | v2.3/v2.5 |
 | **Redis 缓存** | 环境变量自动检测，RedisCache + 服务端 Session，支撑多实例负载均衡 | v2.5 |
 | **数据库迁移** | Flask-Migrate（Alembic）管理 schema 版本，支持回滚 | v2.4 |
-| **全文搜索** | 默认 Whoosh + jieba 中文分词，可选 Meilisearch；多语言检索、插件内容接入、SQL 兜底 | v2.4 |
+| **全文搜索** | 默认 Tantivy（Rust 内核）+ pkuseg 中文分词，可选 Meilisearch；多语言检索、插件内容接入、SQL 兜底 | v2.4 |
 | **对象存储 OSS** | 阿里云 OSS / 腾讯云 COS / 七牛云 Kodo，一键迁移本地文件上云 | v2.4 |
 | **Docker 部署** | 官方镜像 `pollybird/zhycms` 已发布，MySQL/PostgreSQL 一键启动，支持本地构建 | v2.4 |
 | **REST API** | `/api/v1/` 只读端点，Token 鉴权 + CORS，适合小程序/Headless | v2.2 |
@@ -140,7 +140,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 
 ### 环境要求
 
-- Python 3.9+
+- Python 3.10+（CI 覆盖 3.10 / 3.11 / 3.12 / 3.13，3.14 实验性）
 - 数据库：**MySQL 5.7+** 或 **PostgreSQL 12+**（生产推荐）
 - SQLite 仅用于开发/测试（不支持并发写入）
 
@@ -168,7 +168,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.1.3**，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.1.4**，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -185,9 +185,9 @@ docker compose -f docker-compose.postgresql.yml up -d
 ```
 
 > 也可直接拉取镜像：
-> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.3`）
-> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.3`）
-> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.3`）
+> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.4`）
+> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.4`）
+> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.4`）
 >
 > 三个 tag（`mysql` / `postgresql` / `latest`）指向同一镜像，内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
 
@@ -313,7 +313,7 @@ zhycms/
 
 ### 全文搜索
 
-- **默认引擎**：Whoosh（纯 Python，零外部依赖）+ jieba 中文分词
+- **默认引擎**：Tantivy（Rust 内核，tantivy-py 绑定，v3.1.4 起）+ pkuseg 中文分词（spacy-pkuseg）
 - **可选后端**：Meilisearch（大型站点推荐）
 - **索引范围**：文章（标题 + 正文去 HTML + 摘要 + 栏目名）+ 插件内容（产品、招聘岗位）
 - **多语言检索（v2.5.1）**：按当前语言分索引检索，未翻译内容回退默认语言
@@ -410,7 +410,7 @@ zhycms/
 
 仅覆盖代码 + `pip install -r requirements.txt` 即可。首次启动自动 stamp Alembic baseline 并执行增量迁移，无需手动操作。
 
-- 全文搜索默认 Whoosh，首次使用需在后台「搜索设置」点击「重建索引」
+- 全文搜索默认 Tantivy，升级后首次启动自动后台重建索引（重建期间回退 SQL LIKE），无需手动操作
 - 对象存储插件升级后自动启用，不配置凭证不产生云端调用
 
 ### v2.2.x → v2.3.0

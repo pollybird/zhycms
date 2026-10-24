@@ -5,6 +5,31 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.4] - 2026-10-24
+
+**依赖腐化专项治理**版本。全文搜索引擎从停更的 Whoosh + jieba 切换为活跃维护的 Tantivy + pkuseg（spacy-pkuseg）；放宽 redis / pytest / pytest-cov 版本约束；CI 测试矩阵扩展至 Python 3.13 / 3.14。有数据迁移（搜索引擎标识切换），无数据库结构变更。
+
+### Changed
+
+- **全文搜索引擎切换：Whoosh → Tantivy（内置默认）**：Whoosh 上游已停止维护（whoosh-reloaded 分叉亦停更且转 GPL），切换为 Rust 内核、活跃维护的 tantivy-py（`tantivy>=0.26,<1.0`），索引性能与相关度显著优于纯 Python 实现。`Setting.search_engine` 取值由 `whoosh` 改为 `tantivy`（`constants.Search.ENGINE_TANTIVY`），Alembic 迁移 0010 自动改写存量配置；残留未知引擎值（含旧 `whoosh`）启动时告警并回退 SQL LIKE，不抛异常。
+- **中文分词切换：jieba → pkuseg**：jieba 0.42.1（2020）长期停更，切换为 `spacy-pkuseg>=1.0,<2.0`（活跃维护的 fork，原 pkuseg 0.0.25 停更早于 jieba）。新增 `app/utils/tokenizer.py` 统一分词入口：双检锁单例、ASCII 小写化、标点剥离，输出空格连接的分词串供 Tantivy 索引与查询。
+- **索引架构调整：只存 uid / 内容类型 / 记录 ID，展示字段实时回库「水合」**：标题、正文、摘要仅索引不存储（Tantivy stored 字段存输入原文，若存分词后文本会导致结果标题带空格）；搜索结果按 ID 回库取原文，顺带解决 Whoosh 时代「结果快照陈旧」问题，多语言 `t_field` 解析与前台完全一致。
+- **升级无感：启动自检 + 后台自动重建索引**：`create_app` 启动时检测默认语言索引标志文件（`meta.json`），缺失则通过 `O_EXCL` 原子占位文件防多 worker 并发，由 daemon 线程后台全量重建，重建期间搜索自动回退 SQL LIKE；TESTING 环境跳过。升级覆盖代码后无需手动点击「重建索引」。
+- **放宽 redis 约束**：`redis>=5.0,<6.0` → `>=5.0,<9.0`（redis-py 7.x/8.x 向后兼容 5.x API，调用面仅 `from_url`/`ping` 与 Flask-Caching/Session/Limiter 封装）。
+- **放宽开发依赖约束**：`pytest` 升级到 `>=8.0,<10.0`、`pytest-cov` 升级到 `>=5.0,<8.0`（已在 pytest 9.1.1 + pytest-cov 7.1.0 下全量回归通过）。
+- **CI 测试矩阵扩展**：新增 Python 3.13（必过）与 Python 3.14（实验性，`continue-on-error`，待 spacy-pkuseg 发布 cp314 wheel 后转正）；矩阵现为 3.10 / 3.11 / 3.12 / 3.13 / 3.14。Docker 镜像维持 Python 3.12-slim 不变。
+
+### Removed
+
+- **依赖移除**：`Whoosh>=2.7.4,<3.0`、`jieba>=0.42.1` 从 requirements.txt 移除。
+
+### 升级注意
+
+- **pkuseg 模型首次初始化需下载约 60MB 模型文件**（spacy_ontonotes.zip，托管于 GitHub Releases）到 `~/.pkuseg/`（可用环境变量 `PKUSEG_HOME` 改路径）。离线/内网部署：预先放置 `~/.pkuseg/spacy_ontonotes.zip` 并解压出 `~/.pkuseg/spacy_ontonotes/`（内含 `features.msgpack` 与 `weights.npz`）即可完全离线运行；Docker 官方镜像已内置预热，无需处理。
+- 未下载模型时搜索功能仍可用：分词器初始化失败的请求路径会告警并回退，SQL LIKE 兜底不受影响（建议升级后尽快保证模型就位以获得索引检索能力）。
+- 覆盖代码 + `pip install -r requirements.txt` + 重启即可，Alembic 自动执行 0010 数据迁移，首次启动自动后台重建索引。
+- **测试**：搜索测试模块改写（保留 3 项 + 新增 Tantivy 引擎级 5 项：水合原文、uid 替换去重、移除索引、特殊字符不炸、未知引擎回退）+ 新增分词器契约测试 6 项；全量 371 项通过。
+
 ## [3.1.3] - 2026-10-15
 
 **性能与并发健壮性**版本（GitCode issue #3 四项中危 M7-M10）。设置读取请求级缓存、浏览量计数写放大收口、首页 N+1 查询治理、用户名唯一性竞态兜底。无数据库结构变更、无新增 Python 依赖。

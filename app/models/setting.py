@@ -30,7 +30,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.1.3'
+    CMS_VERSION = '3.1.4'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -133,8 +133,8 @@ class Setting(db.Model):
         'i18n_default_locale': 'zh',         # 默认语种（zh 中文 / en 英文）
         'i18n_available_locales': 'zh',      # 可用语种清单，逗号分隔，如 zh,en
 
-        # ===== v2.4.0：全文搜索 =====
-        'search_engine': 'whoosh',             # whoosh / meilisearch / sql
+        # ===== v2.4.0：全文搜索（v3.1.4 引擎切换为 Tantivy）=====
+        'search_engine': 'tantivy',            # tantivy / meilisearch / sql
         'search_meili_url': '',                # Meilisearch 服务地址
         'search_meili_key': '',                # Meilisearch API Key
         'search_index_on_save': 'on',          # on=文章保存时自动索引
