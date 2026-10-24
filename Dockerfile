@@ -41,19 +41,12 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements-prod.txt
 #   --build-arg PKUSEG_MODEL_URL=https://ghfast.top/https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip
 # 注意：spacy-pkuseg 仅在 zip 缺失时才自行下载并解压，因此 zip 与解压目录需同时预置。
 ARG PKUSEG_MODEL_URL=https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip
-RUN python - "$PKUSEG_MODEL_URL" <<'PY'
-import sys, zipfile
-from urllib.request import urlretrieve
-url = sys.argv[1]
-zip_path = '/opt/pkuseg/spacy_ontonotes.zip'
-import os
-os.makedirs('/opt/pkuseg/spacy_ontonotes', exist_ok=True)
-print('Downloading pkuseg model:', url)
-urlretrieve(url, zip_path)
-with zipfile.ZipFile(zip_path) as z:
-    z.extractall('/opt/pkuseg/spacy_ontonotes')
-print('pkuseg model ready at /opt/pkuseg/spacy_ontonotes')
-PY
+RUN python -c "import os, sys, zipfile, urllib.request; \
+    os.makedirs('/opt/pkuseg/spacy_ontonotes', exist_ok=True); \
+    print('Downloading pkuseg model:', sys.argv[1]); \
+    urllib.request.urlretrieve(sys.argv[1], '/opt/pkuseg/spacy_ontonotes.zip'); \
+    zipfile.ZipFile('/opt/pkuseg/spacy_ontonotes.zip').extractall('/opt/pkuseg/spacy_ontonotes'); \
+    print('pkuseg model ready at /opt/pkuseg/spacy_ontonotes')" "$PKUSEG_MODEL_URL"
 
 # ---- Stage 2: Runtime ----
 FROM python:3.12-slim
