@@ -25,7 +25,7 @@
 
 ### 升级注意
 
-- **pkuseg 模型首次初始化需下载约 60MB 模型文件**（spacy_ontonotes.zip，托管于 GitHub Releases）到 `~/.pkuseg/`（可用环境变量 `PKUSEG_HOME` 改路径）。离线/内网部署：预先放置 `~/.pkuseg/spacy_ontonotes.zip` 并解压出 `~/.pkuseg/spacy_ontonotes/`（内含 `features.msgpack` 与 `weights.npz`）即可完全离线运行；Docker 官方镜像已内置预热，无需处理。
+- **pkuseg 模型首次初始化需下载约 60MB 模型文件**（`spacy_ontonotes.zip`，官方地址：https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip；国内可用 ghfast.top 镜像：`https://ghfast.top/https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip`）到 `~/.pkuseg/`（可用环境变量 `PKUSEG_HOME` 改路径）。离线/内网部署：预先放置 `~/.pkuseg/spacy_ontonotes.zip` 并解压出 `~/.pkuseg/spacy_ontonotes/`（内含 `features.msgpack` 与 `weights.npz`）即可完全离线运行；Docker 官方镜像已内置预热，无需处理。
 - 未下载模型时搜索功能仍可用：分词器初始化失败的请求路径会告警并回退，SQL LIKE 兜底不受影响（建议升级后尽快保证模型就位以获得索引检索能力）。
 - 覆盖代码 + `pip install -r requirements.txt` + 重启即可，Alembic 自动执行 0010 数据迁移，首次启动自动后台重建索引。
 - **测试**：搜索测试模块改写（保留 3 项 + 新增 Tantivy 引擎级 5 项：水合原文、uid 替换去重、移除索引、特殊字符不炸、未知引擎回退）+ 新增分词器契约测试 6 项；全量 371 项通过。

@@ -31,17 +31,40 @@ pkuseg 分词器**首次初始化时需联网下载约 60MB 模型文件**（`sp
 - 前台搜索**不受影响**：分词器初始化失败会告警并自动回退 SQL LIKE 实时查询；
 - 文章保存时的索引更新会告警跳过，待模型就位后到后台「搜索设置」点一次「重建索引」即可补齐。
 
+**模型文件地址**（二选一，国内网络建议用镜像）：
+
+| 类型 | 下载地址 |
+| --- | --- |
+| 官方（GitHub Releases，境外网络） | https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip |
+| 镜像（ghfast.top，国内推荐） | https://ghfast.top/https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip |
+
+> 镜像为 GitHub Releases 资源的反代加速，文件内容与官方完全一致；如该镜像失效，可将 URL 前缀替换为其他 GitHub 加速镜像（如 `ghproxy.net`、`gh-proxy.com`）。
+
 **离线 / 内网部署预置方法**（模型就位后完全离线运行）：
 
 ```bash
-# 在能联网的机器上下载模型包并预置（以 Linux 为例）
+# 1. 创建目录
 mkdir -p ~/.pkuseg/spacy_ontonotes
 cd ~/.pkuseg
-# 下载 spacy_ontonotes.zip（GitHub Releases；国内可用 ghfast.top 等镜像前缀）
-unzip spacy_ontonotes.zip -d spacy_ontonotes/   # 解压出 features.msgpack 与 weights.npz
+
+# 2. 下载模型包（二选一）
+#    方式 A：境外网络（直连 GitHub）
+curl -L -o spacy_ontonotes.zip \
+  https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip
+
+#    方式 B：国内网络（ghfast.top 镜像，与上面 URL 内容一致）
+curl -L -o spacy_ontonotes.zip \
+  https://ghfast.top/https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip
+
+# 3. 解压（必须手动解压！见下方注意事项）
+unzip spacy_ontonotes.zip -d spacy_ontonotes/
+
+# 4. 验证：应能看到 features.msgpack 与 weights.npz 两个文件
+ls -la spacy_ontonotes/
+# 预期输出包含：features.msgpack、weights.npz
 ```
 
-> 注意：仅放置 zip 不够，spacy-pkuseg 仅在「zip 不存在」时才会自行下载并解压；预置 zip 后需手动解压出 `spacy_ontonotes/` 目录。
+> **注意：仅放置 zip 不够**——spacy-pkuseg 仅在「zip 不存在」时才会自行下载并解压；预置 zip 后必须手动解压出 `spacy_ontonotes/` 目录（内含 `features.msgpack` 与 `weights.npz`），否则初始化会报 `FileNotFoundError: unigram_word.txt`。
 > Docker 官方镜像构建期已内置模型预热，无需任何处理。
 
 ### 三、行为变化与兼容性
