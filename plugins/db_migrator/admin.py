@@ -156,8 +156,8 @@ def db_migrator_migrate():
         clear_db_config()
         try:
             switch_engine(current_app, db, old_uri)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            current_app.logger.warning('数据库迁移切换失败后回退原库也失败：%s', e)
         current_app.logger.exception('切换到新数据库失败')
         flash(_gettext('数据迁移成功，但引擎切换失败：请重启应用以使用新数据库'), 'warning')
         return redirect(url_for('admin.db_migrator_index'))
@@ -165,8 +165,9 @@ def db_migrator_migrate():
     try:
         from app.extensions import cache
         cache.clear()
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001
+        # 清缓存失败不影响迁移结果，旧缓存将在 TTL 后失效
+        current_app.logger.warning('数据库迁移后清空整站缓存失败：%s', e)
     flash(_gettext(
         '迁移完成：{0} 张表 / {1} 行数据已写入新库，应用已即时切换到新数据库，'
         '无需重启（旧库文件保留作为备份）。'

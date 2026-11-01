@@ -91,8 +91,9 @@ def get_search_providers():
                 prov = None
             if prov is not None and getattr(prov, 'type', ''):
                 providers[prov.type] = prov
-    except Exception:
-        pass
+    except Exception as e:
+        # 插件隔离：插件注册表不可用时降级为「无插件内容」，不影响内置搜索
+        current_app.logger.warning('读取插件搜索提供者失败，跳过插件内容：%s', e)
     return providers
 
 
@@ -146,7 +147,8 @@ def _index_locales():
                 locs.insert(0, default)
             return locs
         return [default]
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('解析索引语言列表失败，回退 zh：%s', e)
         return ['zh']
 
 
@@ -160,7 +162,8 @@ def _search_locale(locale):
         if locale and locale in get_available_locales():
             return locale
         return default
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('解析搜索语言失败，回退 zh：%s', e)
         return 'zh'
 
 
@@ -504,8 +507,9 @@ class TantivyBackend(SearchBackend):
             try:
                 writer.delete_documents_by_term('uid', uid)
                 writer.commit()
-            except Exception:
+            except Exception as e:
                 writer.cancel()
+                current_app.logger.warning('移除索引 %s 失败：%s', uid, e)
             index.reload()
 
     # ---------- 检索 ----------
@@ -595,8 +599,8 @@ class TantivyBackend(SearchBackend):
             return [], 0
         try:
             index.reload()  # 拾取其他进程/线程刚提交的写入
-        except Exception:
-            pass
+        except Exception as e:
+            current_app.logger.warning('索引 reload 失败（继续用当前快照检索）：%s', e)
         searcher = index.searcher()
         offset = (page - 1) * per_page
         result = searcher.search(query, limit=per_page, offset=offset, count=True)
@@ -635,16 +639,19 @@ class TantivyBackend(SearchBackend):
                         col = Column.query.get(a.column_id)
                         writer.add_document(_to_tantivy_doc(_build_doc(a, col, loc)))
                         indexed += 1
-                    except Exception:
+                    except Exception as e:
                         errors += 1
+                        current_app.logger.warning('索引文章 %s 失败（%s）：%s', a.id, loc, e)
                 for prov in providers.values():
                     try:
                         for raw in prov.iter_docs(loc):
                             try:
                                 writer.add_document(_to_tantivy_doc(_provider_doc(prov, raw)))
                                 indexed += 1
-                            except Exception:
+                            except Exception as e:
                                 errors += 1
+                                current_app.logger.warning(
+                                    '索引插件文档失败（%s/%s）：%s', prov.type, loc, e)
                     except Exception:
                         errors += 1
                         current_app.logger.exception(
@@ -666,8 +673,9 @@ class TantivyBackend(SearchBackend):
                     try:
                         index.reload()
                         count = index.searcher().num_docs
-                    except Exception:
+                    except Exception as e:
                         count = 0
+                        current_app.logger.warning('读取索引 %s 文档数失败：%s', loc, e)
                 parts.append(f'{loc}:{count}')
             return True, f'Tantivy 索引正常（{len(_index_locales())} 种语言，文档数 {", ".join(parts)}）'
         except Exception as e:
@@ -738,8 +746,9 @@ class MeilisearchBackend(SearchBackend):
                     f'{self._get_url()}/indexes/{self.INDEX_NAME}_{loc}/documents/{uid}',
                     headers=self._headers(), timeout=10
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning(
+                    'Meili 移除索引 %s#%s（%s）失败：%s', type_, obj_id, loc, e)
 
     def search(self, keyword, page=1, per_page=20, locale=None):
         import requests
@@ -776,8 +785,8 @@ class MeilisearchBackend(SearchBackend):
                     f'{self._get_url()}/indexes/{index_name}',
                     json={'primaryKey': 'uid'}, headers=self._headers(), timeout=10
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('Meili 索引 %s 主键设置失败：%s', index_name, e)
             docs = []
             for a in articles:
                 col = Column.query.get(a.column_id)

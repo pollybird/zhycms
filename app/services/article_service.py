@@ -175,8 +175,8 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
         # 快照失败不影响主事务
         try:
             db.session.rollback()
-        except Exception:
-            pass
+        except Exception as rollback_err:
+            current_app.logger.warning('文章快照失败后回滚失败：%s', rollback_err)
 
     # 清缓存 + 审计日志
     clear_content_cache(column_id=column.id, article_id=article.id)

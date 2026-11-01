@@ -57,8 +57,8 @@ def _build_payload(form_obj, submission_obj, fields, submit_page=None):
             if getattr(f, 'field_type', None) == 'file' and val:
                 try:
                     val = f'[文件] {request.url_root.rstrip("/")}{val}'
-                except Exception:
-                    pass
+                except Exception as e:
+                    current_app.logger.warning('表单通知拼接附件地址失败：%s', e)
         rows.append((label, val or ''))
     if submit_page:
         page = submit_page
@@ -66,7 +66,9 @@ def _build_payload(form_obj, submission_obj, fields, submit_page=None):
         try:
             page = request.headers.get('Referer', '') or (request.url_root.rstrip('/') +
                                                                 f'/form/{form_obj.slug}')
-        except Exception:
+        except Exception as e:
+            # 无请求上下文时退化为表单相对地址
+            current_app.logger.warning('表单通知解析来源页面失败：%s', e)
             page = f'/form/{form_obj.slug}'
     return {
         'form_name': form_obj.name,

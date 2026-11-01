@@ -1,6 +1,6 @@
 """v3.0.0 可视化页面构建器后台：页面管理、编辑器 API、画布预览。"""
 from flask import (
-    render_template, redirect, url_for, request, jsonify, abort, flash,
+    render_template, redirect, url_for, request, jsonify, abort, flash, current_app,
 )
 from flask_babel import gettext as _gettext
 from flask_login import current_user
@@ -318,7 +318,8 @@ def _front_url(page):
             return url_for('frontend.column_detail', slug=col.slug)
         if page.scope == _B.SCOPE_ARTICLE and col is not None:
             return url_for('frontend.column_detail', slug=col.slug)
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('生成页面预览 URL 失败（页面 %s），回退 /：%s', page.id, e)
         return '/'
     return '/'
 

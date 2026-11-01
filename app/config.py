@@ -1,8 +1,11 @@
 import os
 import secrets
+import logging
 from datetime import timedelta
 
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_secret_key():
@@ -58,9 +61,9 @@ def _resolve_database_uri():
         saved = load_db_uri()
         if saved:
             return saved
-    except Exception:
-        # 配置文件缺失或损坏时静默回退到默认库，保证应用可启动进入初始化向导
-        pass
+    except Exception as e:
+        # 应用上下文外（配置加载期）：配置文件缺失或损坏时回退默认库，保证可进入初始化向导
+        logger.warning('读取数据库配置文件失败，回退默认 SQLite：%s', e)
     return 'sqlite:///' + os.path.join(BASE_DIR, 'instance', 'zhycms.db')
 
 

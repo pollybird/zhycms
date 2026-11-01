@@ -12,7 +12,7 @@ import os
 from functools import wraps
 
 from flask import Blueprint, render_template, abort
-from flask import current_app  # noqa: F401
+from flask import current_app
 
 from app.extensions import db
 from app.extensions import cache
@@ -62,19 +62,20 @@ def _try_cache(key, ttl_setting_key, default_ttl=900):
             try:
                 from app.i18n import select_locale
                 cache_key += '|loc=' + select_locale()
-            except Exception:
-                pass
+            except Exception as e:
+                # 语种解析失败时缓存键退化为无 locale
+                current_app.logger.warning('产品页缓存键追加语种失败：%s', e)
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:
                     return cached
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('产品页缓存读取失败（%s）：%s', cache_key, e)
             resp = view_func(*args, **kwargs)
             try:
                 cache.set(cache_key, resp, timeout=ttl)
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('产品页缓存写入失败（%s）：%s', cache_key, e)
             return resp
         return wrapper
     return decorator

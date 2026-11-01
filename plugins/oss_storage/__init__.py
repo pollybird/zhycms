@@ -18,9 +18,13 @@
   templates/oss_storage/settings.html  后台配置页
   translations/    插件独立翻译域（v2.3 国际化规范）
 """
+import logging
+
 from app.plugin_api import PluginBase
 
 from . import admin as _admin  # noqa: F401  导入即注册后台路由
+
+logger = logging.getLogger(__name__)
 
 
 class OSSStoragePlugin(PluginBase):
@@ -86,8 +90,10 @@ class OSSStoragePlugin(PluginBase):
                 continue
             try:
                 mod = importlib.import_module(f'.{modname}', _pkg.__name__)
-            except Exception:
-                continue  # 单个驱动文件导入失败不影响其它驱动
+            except Exception as e:
+                # 插件隔离：单个驱动文件导入失败不影响其它驱动
+                logger.warning('对象存储驱动模块 %s 导入失败：%s', modname, e)
+                continue
             for attr in vars(mod).values():
                 if (isinstance(attr, type)
                         and issubclass(attr, CloudStorageDriver)
@@ -102,8 +108,9 @@ class OSSStoragePlugin(PluginBase):
             from app.models.setting import Setting
             if Setting.get('storage_driver', 'local') != 'local':
                 Setting.set('storage_driver', 'local')
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：重置存储驱动失败不影响禁用流程
+            logger.warning('禁用对象存储插件时重置驱动失败：%s', e)
 
 
 plugin = OSSStoragePlugin()

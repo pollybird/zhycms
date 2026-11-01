@@ -77,8 +77,9 @@ def _detect_mime(file_stream, original_name=''):
         import magic
         mime = magic.from_buffer(head, mime=True) or ''
         return mime
-    except Exception:
-        pass
+    except Exception as e:
+        # 可选依赖缺失或 C 绑定解析异常：回退下方内置文件头嗅探
+        current_app.logger.warning('python-magic 不可用，回退内置 MIME 嗅探：%s', e)
     # 2. 文件头硬匹配（常见恶意文件：php/asp/aspx/exe/dll/sh 等脚本 / elf）
     if head.startswith(b'<?php') or b'<script' in head[:1024].lower() or head.startswith(b'#!'):
         return 'text/x-script'
@@ -95,7 +96,8 @@ def _detect_mime(file_stream, original_name=''):
             # verify 之后文件指针失效，再开一次
             img2 = Image.open(io.BytesIO(head))
             return f'image/{img2.format.lower()}'
-        except Exception:
+        except (OSError, ValueError) as e:
+            current_app.logger.warning('Pillow 校验图片失败（%s）：%s', original_name, e)
             return 'application/octet-stream'
     # 4. PDF
     if head.startswith(b'%PDF-'):
@@ -209,10 +211,12 @@ def _compress_and_thumb(src_path, ext, quality=80, thumb_width=300):
             rel_full = f'uploads/{rel}' if not rel.startswith('uploads/') else rel
             thumb_rel = rel_full
             thumb_url = url_for('static', filename=rel_full)
-        except Exception:
+        except Exception as e:
+            current_app.logger.warning('生成缩略图失败（%s），跳过：%s', src_path, e)
             thumb_rel, thumb_url = None, None
         return compressed_size, thumb_url, thumb_rel
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('图片压缩/缩略图处理失败（%s），使用原图：%s', src_path, e)
         return None, None, None
 
 
@@ -232,10 +236,13 @@ def _file_still_exists(dup):
         if _storage._driver_allowed(storage_name):
             try:
                 return get_driver(storage_name).exists(key)
-            except Exception:
+            except Exception as e:
+                current_app.logger.warning(
+                    '云端对象存在性校验失败（%s/%s），信任历史记录：%s', storage_name, key, e)
                 return True
         return True
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('校验历史上传文件失败（%s），信任历史记录：%s', key, e)
         return True
 
 
@@ -310,8 +317,9 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
     if Setting.get('upload_enable_mime_check') == 'on':
         try:
             mime = _detect_mime(file_storage.stream, original_name)
-        except Exception:
+        except Exception as e:
             mime = ''
+            current_app.logger.warning('MIME 嗅探失败（%s），跳过内容校验：%s', original_name, e)
         mime_l = (mime or '').lower()
         # 明显危险的 MIME 直接拒绝：脚本 / 可执行 / 服务端页面（含 text/x-php 等 libmagic 变体）
         danger_tokens = ('x-script', 'x-executable', 'x-sh', 'x-httpd-php', 'x-php',
@@ -339,8 +347,9 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
             try:
                 dup.ref_count = (dup.ref_count or 0) + 1
                 db.session.commit()
-            except Exception:
+            except Exception as e:
                 db.session.rollback()
+                current_app.logger.warning('引用计数更新失败（%s）：%s', dup.stored_name, e)
             # stored_name 存的是相对 static 的路径/对象 key，如 uploads/... 直接用
             return dup.stored_name, dup.url, None
 
@@ -376,8 +385,8 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
             from PIL import Image as _Image
             with _Image.open(save_path) as _img:
                 width, height = _img.size
-        except Exception:
-            pass
+        except Exception as e:
+            current_app.logger.warning('读取图片尺寸失败（%s）：%s', save_path, e)
 
     # 7. 发布到存储驱动（本地 no-op；云驱动上传，失败显式报错不静默回退）
     rel_path = f'uploads/{sub_dir}/{date_dir}/{new_name}'.replace('//', '/')
@@ -433,7 +442,8 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
         )
         db.session.add(u)
         db.session.commit()
-    except Exception:
+    except Exception as e:
         db.session.rollback()  # 索引写入失败不影响上传本身返回
+        current_app.logger.warning('上传索引写入失败（%s）：%s', rel_path, e)
 
     return rel_path, file_url, None

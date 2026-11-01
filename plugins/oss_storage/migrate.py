@@ -44,10 +44,13 @@ def _existing_content_columns():
                 cols = [c['name'] for c in insp.get_columns(table)]
                 if col in cols:
                     result.append((table, col))
-            except Exception:
+            except Exception as e:
+                # 表不存在/无权限时跳过该列，不影响其他表
+                current_app.logger.warning('检查迁移表 %s 结构失败，已跳过：%s', table, e)
                 continue
         return result
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('读取数据库结构失败，按全部内容列处理：%s', e)
         return list(_CONTENT_COLUMNS)
 
 
@@ -81,8 +84,9 @@ def dry_run():
                 .where(tbl.c[col].like('%{0}%'.format(LOCAL_URL_PREFIX)))
             ).scalar()
             url_hits += int(n or 0)
-        except Exception:
-            pass
+        except Exception as e:
+            # 统计单表引用数失败不影响预览结果
+            current_app.logger.warning('统计表 %s 的本地地址引用失败：%s', table, e)
     try:
         n = db.session.execute(
             select(func.count()).select_from(sa.table('settings', sa.column('value', sa.Text)))
@@ -90,8 +94,8 @@ def dry_run():
             {'p': '%{0}%'.format(LOCAL_URL_PREFIX)}
         ).scalar()
         url_hits += int(n or 0)
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('统计设置项中的本地地址引用失败：%s', e)
 
     return {
         'files_total': len(records),
@@ -167,13 +171,16 @@ def _rewrite_urls(old_prefix, new_prefix):
                     .values(**{col: func.replace(tbl.c[col], old_prefix, new_prefix)})
                 )
                 changed += int(result.rowcount or n)
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            current_app.logger.warning('改写表 %s.%s 的地址前缀失败，已回滚：%s',
+                                       table, col, e)
     try:
         for s in Setting.query.filter(Setting.value.like('%{0}%'.format(old_prefix))).all():
             s.value = s.value.replace(old_prefix, new_prefix)
             changed += 1
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        current_app.logger.warning('改写设置项中的地址前缀失败，已回滚：%s', e)
     db.session.commit()
     return changed

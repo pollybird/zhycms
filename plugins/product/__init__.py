@@ -11,6 +11,8 @@
   demo.py              演示数据钩子（manufacturing 行业）
   templates/product/   后台页面 + 前台详情兜底模板
 """
+import logging
+
 from app.plugin_api import PluginBase
 from app.constants import Roles as _R
 
@@ -18,6 +20,8 @@ from . import admin as _admin       # noqa: F401  导入即注册后台路由（
 from .frontend import (
     frontend_product_url, product_brief, product_list_data, product_latest,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ProductPlugin(PluginBase):
@@ -133,8 +137,9 @@ class ProductPlugin(PluginBase):
                    db.session.query(Product.id).filter_by(is_deleted=False).all()]
             for pid in ids:
                 backend.unindex_object('product', pid)
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：清理索引失败不影响禁用流程
+            logger.warning('禁用产品插件时清理搜索索引失败：%s', e)
 
     def generate_demo_data(self, industry):
         from .demo import generate

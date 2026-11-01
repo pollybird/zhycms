@@ -185,8 +185,9 @@ def backup_restore_upload():
         try:
             if os.path.isfile(temp_path):
                 os.remove(temp_path)
-        except Exception:
-            pass
+        except Exception as e:
+            # 临时文件清理失败不影响主流程，仅留痕便于排查残留
+            current_app.logger.warning('上传恢复临时文件清理失败：%s', e)
     return redirect(url_for('admin.backup_index'))
 
 
@@ -315,7 +316,9 @@ def monitor_index():
     from ...utils.backup_utils import _db_type_and_path
     try:
         db_type, db_name = _db_type_and_path()[:2]
-    except Exception:
+    except Exception as e:
+        # 数据库类型解析失败时监控页展示 unknown，不影响页面渲染
+        current_app.logger.warning('解析数据库类型失败，监控页显示 unknown：%s', e)
         db_type, db_name = 'unknown', '-'
     db_info = {
         'driver': db_type,

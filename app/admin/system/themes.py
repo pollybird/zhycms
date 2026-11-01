@@ -14,7 +14,7 @@ import tempfile
 import zipfile
 
 from flask import (render_template, redirect, url_for, request, flash,
-                   send_file)
+                   send_file, current_app)
 
 from flask_babel import gettext as _gettext
 from ...extensions import db, cache
@@ -340,8 +340,9 @@ def theme_activate(slug):
     # 覆盖「先开缓存产生页面、再关缓存切主题」的边缘场景。
     try:
         cache.clear()
-    except Exception:
-        pass
+    except Exception as e:
+        # 清缓存失败不阻断主题切换，旧缓存将在 TTL 到期后自然失效
+        current_app.logger.warning('主题切换后清空前台缓存失败：%s', e)
 
     name = (mf.get('name') or '').strip() or slug
     audit_log(OP_UPDATE, MODULE_SETTING, target_id='site_theme',

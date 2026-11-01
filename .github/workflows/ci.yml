@@ -62,3 +62,13 @@ jobs:
           python-version: '3.12'
       - name: Check no hardcoded constants
         run: python scripts/check_constants.py
+
+  excepts-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check no silent exception swallowing
+        run: python scripts/check_excepts.py

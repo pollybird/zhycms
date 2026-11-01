@@ -1,8 +1,11 @@
 """内容发布工作流：状态 + 审核 + 版本快照。"""
+import logging
 from datetime import datetime
 
 from ..extensions import db
 from ..constants import Workflow as _W
+
+logger = logging.getLogger(__name__)
 
 # ========== 内容状态（v2.6.0 起统一定义在 app/constants.py，此处向后兼容重导出） ==========
 STATUS_DRAFT = _W.STATUS_DRAFT          # 草稿
@@ -122,7 +125,9 @@ class ArticleVersion(db.Model):
         ArticleFieldValue.query.filter_by(article_id=article.id).delete()
         try:
             payload = _json.loads(self.custom_fields_json or '{}')
-        except Exception:
+        except Exception as e:
+            # 历史快照 JSON 损坏时按无自定义字段恢复，不阻断回滚
+            logger.warning('文章版本快照的自定义字段 JSON 解析失败，按空值恢复：%s', e)
             payload = {}
         for f_id_str, info in payload.items():
             try:

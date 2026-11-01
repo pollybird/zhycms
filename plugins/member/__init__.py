@@ -15,6 +15,8 @@
   frontend_routes.py   前台蓝本 member_frontend
   templates/           前台（frontend/）与后台（admin/）模板
 """
+import logging
+
 from flask import session, url_for
 from flask_babel import gettext as _gettext
 from markupsafe import Markup, escape
@@ -23,6 +25,8 @@ from app.plugin_api import PluginBase
 
 from . import admin as _admin  # noqa: F401  导入即注册后台路由
 from .frontend_routes import member_frontend  # noqa: F401
+
+logger = logging.getLogger(__name__)
 
 
 def _render_user_menu():
@@ -165,8 +169,9 @@ class MemberPlugin(PluginBase):
         try:
             from app.utils.helpers import clear_content_cache
             clear_content_cache()
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：清缓存失败不影响禁用流程，缓存将在 TTL 后失效
+            logger.warning('禁用会员插件时清除前台缓存失败：%s', e)
 
 
 plugin = MemberPlugin()

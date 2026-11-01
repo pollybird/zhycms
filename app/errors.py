@@ -10,7 +10,7 @@
 from http import HTTPStatus
 
 from flask import (
-    render_template, request,
+    render_template, request, current_app,
 )
 from werkzeug.exceptions import HTTPException
 
@@ -101,8 +101,9 @@ def _handle_admin(e, code):
     try:
         return render_template(template, error_code=code,
                                error_description=description), code
-    except Exception:
-        # 模板不存在时回退到简单文本
+    except Exception as exc:
+        # 错误页隔离：模板不存在时回退简单文本，错误页自身不能再抛
+        current_app.logger.warning('后台错误页模板 %s 渲染失败，回退纯文本：%s', template, exc)
         return (f'<h1>{code}</h1><p>{description}</p>',
                 code, {'Content-Type': 'text/html; charset=utf-8'})
 
@@ -116,7 +117,9 @@ def _handle_frontend(e, code):
         from .utils.themes import theme_template
         nav = _build_nav()
         seo = _seo()
-    except Exception:
+    except Exception as exc:
+        # 错误页隔离：导航/SEO 构建失败不应拖垮错误页本身
+        current_app.logger.warning('构建前台错误页上下文失败，使用空上下文：%s', exc)
         nav = []
         seo = {}
 
@@ -129,7 +132,8 @@ def _handle_frontend(e, code):
                                nav=nav, seo=seo,
                                error_code=code,
                                error_description=description), code
-    except Exception:
-        # 主题模板缺失时回退到纯文本
+    except Exception as exc:
+        # 错误页隔离：主题模板缺失/渲染失败时回退纯文本
+        current_app.logger.warning('前台错误页主题模板渲染失败，回退纯文本：%s', exc)
         return (f'<h1>{code}</h1><p>{description}</p>',
                 code, {'Content-Type': 'text/html; charset=utf-8'})

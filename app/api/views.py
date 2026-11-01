@@ -55,19 +55,19 @@ def api_cache(key_prefix):
             try:
                 from ..i18n import select_locale
                 cache_key += '|loc=' + select_locale()
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('API 缓存键附加语言失败：%s', e)
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:
                     return cached
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('API 缓存读取失败：%s', e)
             resp = view_func(*args, **kwargs)
             try:
                 cache.set(cache_key, resp, timeout=ttl)
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('API 缓存写入失败：%s', e)
             return resp
         return wrapper
     return decorator
@@ -236,7 +236,8 @@ def _article_summary(a, column=None):
         try:
             url = url_for('frontend.article_detail', slug=col.slug, aid=a.id,
                           _external=True)
-        except Exception:
+        except Exception as e:
+            current_app.logger.warning('生成文章绝对 URL 失败（%s#%s）：%s', col.slug, a.id, e)
             url = f'/column/{col.slug}/article/{a.id}'
     return {
         'id': a.id, 'title': a.title, 'summary': a.summary or '',

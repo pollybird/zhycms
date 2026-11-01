@@ -27,11 +27,14 @@ v2.6.4 新增：插件依赖（requires）、继承（extends）、最低核心�
 """
 import os
 import json
+import logging
 import importlib
 
 from flask import g, has_app_context
 
 from .plugin_api import PluginBase  # noqa: F401  供类型提示与外部 import
+
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # 版本比较辅助
@@ -81,7 +84,8 @@ def current_core_version():
     try:
         from .models.setting import Setting
         return Setting.CMS_VERSION
-    except Exception:
+    except Exception as e:
+        logger.warning('读取核心版本号失败，按 0.0.0 处理：%s', e)
         return '0.0.0'
 
 
@@ -192,8 +196,9 @@ def enabled_slugs():
     slugs = {s.strip() for s in raw.split(',') if s.strip()}
     try:
         cache.set(_ENABLED_CACHE_KEY, slugs, timeout=_ENABLED_CACHE_TTL)
-    except Exception:
-        pass  # 缓存失败不影响功能
+    except Exception as e:
+        # 缓存失败不影响功能，下次请求重新读库
+        logger.warning('插件启用清单写入缓存失败：%s', e)
     return slugs
 
 
@@ -210,8 +215,9 @@ def set_enabled_slugs(slugs):
     # 清理进程/共享缓存（Redis 后端时跨 worker 失效）
     try:
         cache.delete(_ENABLED_CACHE_KEY)
-    except Exception:
-        pass
+    except Exception as e:
+        # 缓存删除失败最坏情况下 60s 后自愈
+        logger.warning('插件启用清单缓存失效失败：%s', e)
 
 
 def plugin_enabled(slug):
@@ -224,7 +230,8 @@ def plugin_enabled(slug):
             slugs = enabled_slugs()
             g._plugin_enabled_slugs = slugs
         return slug in slugs
-    except Exception:
+    except Exception as e:
+        logger.warning('判断插件 %s 启用状态失败，按未启用处理：%s', slug, e)
         return False
 
 
@@ -245,7 +252,9 @@ def discover():
         try:
             with open(manifest_path, 'r', encoding='utf-8') as f:
                 rec.manifest = json.load(f)
-        except Exception:
+        except Exception as e:
+            logger.warning('插件 %s 的 manifest.json 读取失败，按空元数据加载：%s',
+                           entry, e)
             rec.manifest = {}
 
 
@@ -272,8 +281,9 @@ def _register_instance(app, rec):
         if i18n_dir and os.path.isdir(i18n_dir):
             from .i18n import register_plugin_i18n
             register_plugin_i18n(rec.slug, i18n_dir, domain='messages')
-    except Exception:
-        pass  # 单个插件 i18n 注册失败不拖垮整体
+    except Exception as e:
+        # 插件隔离：单个插件 i18n 注册失败不拖垮整体
+        app.logger.warning('插件 %s 国际化目录注册失败： %s', rec.slug, e)
 
     # 1) 后台路由（挂在核心 admin_bp 上，endpoint 自动获得前缀即时生效机制）
     inst.get_admin_routes(admin_bp)
@@ -336,8 +346,9 @@ def _import_plugin_models_recursive(base_module):
             continue
         try:
             importlib.import_module(modname)
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：单个模型模块导入失败不阻断其他插件建表
+            logger.warning('插件模型模块 %s 导入失败：%s', modname, e)
 
 
 def discover_and_load(app, import_models_only=False):
@@ -413,7 +424,9 @@ def get_plugin_records():
         if rec.instance is not None:
             try:
                 menu = rec.instance.get_admin_menu() or []
-            except Exception:
+            except Exception as e:
+                # 插件隔离：菜单构建失败仅隐藏该插件菜单
+                logger.warning('插件 %s 后台菜单构建失败：%s', rec.slug, e)
                 menu = []
         result.append({
             'slug': rec.slug,
@@ -500,6 +513,7 @@ def validate_enable(slug):
         from .builder import contrib
         berr = contrib.validation_error(slug)
     except Exception as e:
+        logger.warning('插件 %s 页面构建器布局片段校验失败：%s', slug, e)
         berr = str(e)
     if berr:
         return f'页面构建器布局片段不合法：{berr}'
@@ -558,8 +572,9 @@ def disable_plugin(slug):
     if rec is not None and rec.instance is not None:
         try:
             rec.instance.on_disabled()
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：禁用回调异常不影响禁用流程本身
+            logger.warning('插件 %s 的 on_disabled 回调执行失败：%s', slug, e)
     return None
 
 
@@ -571,13 +586,15 @@ def remove_record(slug):
     try:
         from .builder.registry import unregister_owner as _unreg_widgets
         _unreg_widgets(slug)
-    except Exception:
-        pass
+    except Exception as e:
+        # 插件隔离：组件注销失败不影响卸载流程
+        logger.warning('插件 %s 构建器组件注销失败：%s', slug, e)
     try:
         from .builder.contrib import unregister_owner as _unreg_layouts
         _unreg_layouts(slug)
-    except Exception:
-        pass
+    except Exception as e:
+        # 插件隔离：布局片段注销失败不影响卸载流程
+        logger.warning('插件 %s 构建器布局片段注销失败：%s', slug, e)
     rec = _by_slug.pop(slug, None)
     if rec is not None:
         try:
@@ -608,7 +625,9 @@ def plugin_admin_menus():
             continue
         try:
             items = rec.instance.get_admin_menu() or []
-        except Exception:
+        except Exception as e:
+            # 插件隔离：单个插件菜单异常时跳过
+            logger.warning('插件 %s 后台菜单构建失败，已跳过：%s', rec.slug, e)
             items = []
         visible = []
         for item in items:
@@ -623,8 +642,8 @@ def plugin_admin_menus():
                 try:
                     from .i18n import plugin_gettext
                     _label = plugin_gettext(rec.slug, _label)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning('插件 %s 菜单标签翻译失败，使用原文：%s', rec.slug, e)
                 try:
                     from flask_babel import gettext as _g
                     # 再查一次核心域（避免中文 label 实际来自 plugins/admin.py 视图变量）
@@ -634,8 +653,9 @@ def plugin_admin_menus():
                         _core = _g(_label)
                         if _core and _core != _label:
                             _label = _core
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning('插件 %s 菜单标签核心域翻译失败，使用原文：%s',
+                                   rec.slug, e)
             item = dict(item)
             item['label'] = _label
             visible.append(item)
@@ -650,16 +670,17 @@ def plugin_admin_menus():
                 try:
                     from .i18n import plugin_gettext as _pg2
                     _name = _pg2(rec.slug, _name)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning('插件 %s 分组名翻译失败，使用原文：%s', rec.slug, e)
                 try:
                     from flask_babel import gettext as _g2
                     if _re2.search(r'[\u3400-\u9fff]', _name):
                         _c2 = _g2(_name)
                         if _c2 and _c2 != _name:
                             _name = _c2
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning('插件 %s 分组名核心域翻译失败，使用原文：%s',
+                                   rec.slug, e)
             result.append({'slug': rec.slug, 'name': _name,
                            'icon': icon, 'items': visible})
     return result
@@ -674,8 +695,9 @@ def plugin_audit_modules():
             continue
         try:
             mods.extend(rec.instance.audit_modules or [])
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：审计模块声明异常时跳过该插件
+            logger.warning('插件 %s 审计模块声明读取失败：%s', rec.slug, e)
     return mods
 
 
@@ -699,8 +721,9 @@ def plugin_frontend_menus():
                         'label': label, 'url': url,
                         'target': (m.get('target') or '').strip(),
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：单个插件前台菜单异常时跳过
+            logger.warning('插件 %s 前台菜单构建失败，已跳过：%s', rec.slug, e)
     return items
 
 
@@ -716,7 +739,9 @@ def frontend_guard():
             continue
         try:
             guard = rec.instance.get_frontend_guard()
-        except Exception:
+        except Exception as e:
+            # 插件隔离：守卫钩子异常时跳过该插件
+            logger.warning('插件 %s 前台守卫钩子执行失败，已跳过：%s', rec.slug, e)
             continue
         if isinstance(guard, dict) and callable(guard.get('is_authenticated')):
             return guard
@@ -732,8 +757,9 @@ def collect_sitemap_urls():
             continue
         try:
             urls.extend(rec.instance.get_sitemap_urls() or [])
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：sitemap 钩子异常时跳过该插件
+            logger.warning('插件 %s sitemap URL 采集失败，已跳过：%s', rec.slug, e)
     return urls
 
 

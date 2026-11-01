@@ -11,6 +11,7 @@
 render.html 继承当前主题 base.html，navbar/footer/SEO 与手工模板完全一致。
 """
 from flask import current_app, render_template
+from jinja2 import TemplateNotFound, TemplateSyntaxError
 from markupsafe import Markup, escape
 
 from ..constants import Builder as _B
@@ -24,7 +25,8 @@ def _current_locale():
     try:
         from ..i18n import select_locale
         return select_locale()
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('构建器解析当前语种失败，回退 zh：%s', e)
         return 'zh'
 
 
@@ -33,7 +35,9 @@ def _is_member():
         from ..plugin_system import frontend_guard
         guard = frontend_guard()
         return bool(guard and guard['is_authenticated']())
-    except Exception:
+    except Exception as e:
+        # 插件隔离：会员视图判断失败时按非会员处理
+        current_app.logger.warning('构建器会员状态判断失败，按非会员处理：%s', e)
         return False
 
 
@@ -61,7 +65,8 @@ def _template_base_ctx():
         base = {}
         current_app.update_template_context(base)
         return base
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('构建器组件模板上下文补全失败，使用空上下文：%s', e)
         return {}
 
 
@@ -70,7 +75,12 @@ def _theme_template_exists(template_path):
         loader = current_app.jinja_env.loader
         loader.get_source(current_app.jinja_env, template_path)
         return True
-    except Exception:
+    except TemplateNotFound:
+        # 主题未提供该组件覆写模板 → 预期的回退分支
+        return False
+    except TemplateSyntaxError as e:
+        current_app.logger.warning('主题组件模板 %s 语法错误，回退核心模板：%s',
+                                   template_path, e)
         return False
 
 

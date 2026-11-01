@@ -139,16 +139,16 @@ def _register_dynamic_admin_rules(app, target_prefix=None):
                 app.url_map._matcher = StateMachineMatcher(merge_slashes=merge_slashes)
                 for r in app.url_map._rules:
                     app.url_map._matcher.add(r)
-    except Exception:
-        pass
+    except Exception as e:
+        app.logger.warning('重建 URL matcher 失败（后台前缀切换）：%s', e)
     # 标记 + 触发常规索引更新（_rules_by_endpoint 排序等）
     try:
         if hasattr(app.url_map, '_remap'):
             app.url_map._remap = True
         if hasattr(app.url_map, 'update'):
             app.url_map.update()
-    except Exception:
-        pass
+    except Exception as e:
+        app.logger.warning('刷新 URL 路由索引失败（后台前缀切换）：%s', e)
 
     # 如果 target_prefix 就是基准前缀，无需 add（remove 已保留它）
     if target_prefix == base_prefix:
@@ -159,7 +159,8 @@ def _register_dynamic_admin_rules(app, target_prefix=None):
     # 因此直接用 Werkzeug Rule 构造后塞进 url_map._rules / _rules_by_endpoint，再统一 rebuild matcher。
     try:
         from werkzeug.routing import Rule as _WZRule
-    except Exception:
+    except Exception as e:
+        app.logger.warning('导入 Werkzeug Rule 失败，跳过动态后台前缀规则注册：%s', e)
         _WZRule = None
 
     new_rules_added = []
@@ -219,15 +220,15 @@ def _register_dynamic_admin_rules(app, target_prefix=None):
                     app.url_map._matcher = StateMachineMatcher(merge_slashes=merge_slashes)
                     for _r in app.url_map._rules:
                         app.url_map._matcher.add(_r)
-        except Exception:
-            pass
+        except Exception as e:
+            app.logger.warning('新增规则后重建 URL matcher 失败：%s', e)
         try:
             if hasattr(app.url_map, '_remap'):
                 app.url_map._remap = True
             if hasattr(app.url_map, 'update'):
                 app.url_map.update()
-        except Exception:
-            pass
+        except Exception as e:
+            app.logger.warning('新增规则后刷新 URL 路由索引失败：%s', e)
 
 
 # ============================================================
@@ -306,7 +307,8 @@ def _setup_scheduler(app):
     if not os.environ.get('WERKZEUG_RUN_MAIN'):
         try:
             sched.start()
-        except Exception:
+        except Exception as e:
+            app.logger.warning('调度器启动失败（非致命，定时任务不可用）：%s', e)
             return None
     set_scheduler(sched)
     return sched
@@ -491,7 +493,8 @@ def create_app(config_name=None):
                     Setting.get('jwt_refresh_expires_days', '7')) * 24 * 3600
             except (TypeError, ValueError):
                 pass
-        except Exception:
+        except Exception as e:
+            app.logger.warning('读取 JWT 配置失败，回退 SECRET_KEY：%s', e)
             app.config['JWT_SECRET_KEY'] = app.config.get('SECRET_KEY')
     jwt.init_app(app)
 
@@ -551,7 +554,9 @@ def create_app(config_name=None):
         try:
             from .plugin_system import plugin_admin_menus
             return dict(plugin_admin_menus=plugin_admin_menus())
-        except Exception:
+        except Exception as e:
+            # 插件隔离：菜单构建失败时后台使用核心菜单
+            app.logger.warning('构建插件后台菜单失败，已跳过：%s', e)
             return dict(plugin_admin_menus=[])
 
     # v2.6.1：蓝图注册 + 插件加载 + 错误处理（抽离至 app/blueprints.py）
@@ -623,15 +628,16 @@ def create_app(config_name=None):
             Permission.ensure_presets()
             Role.ensure_presets()
             db.session.commit()
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            app.logger.warning('初始化 RBAC 预设角色/权限失败：%s', e)
 
         # ===== 兼容旧 Article 数据：补 status 字段值 =====
         try:
             from .models.article import Article
             Article.ensure_status_column()
-        except Exception:
-            pass
+        except Exception as e:
+            app.logger.warning('补全旧文章 status 字段失败：%s', e)
 
         # ===== v2.2 升级兼容：老站点一次性自动启用内置友情链接插件 =====
         # 新装站点在初始化向导中写入 friend_link_plugin_migrated 标记，
@@ -645,8 +651,9 @@ def create_app(config_name=None):
                 enable_plugin('friend_link')
                 Setting.set('friend_link_plugin_migrated', '1')
                 db.session.commit()
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            app.logger.warning('自动启用友情链接插件迁移失败：%s', e)
 
         # ===== v2.3 升级兼容：老站点一次性自动启用内置表单插件 =====
         # 新装站点在初始化向导中写入 form_plugin_migrated 标记，避免误触发；
@@ -661,8 +668,9 @@ def create_app(config_name=None):
                 enable_plugin('form')
                 Setting.set('form_plugin_migrated', '1')
                 db.session.commit()
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            app.logger.warning('自动启用自定义表单插件迁移失败：%s', e)
 
         # ===== v2.4：oss_storage 对象存储插件一次性自动启用 =====
         # 启用后存储驱动仍为本地（storage_driver=local），不配置凭证不产生
@@ -676,8 +684,9 @@ def create_app(config_name=None):
                 enable_plugin('oss_storage')
                 Setting.set('oss_storage_plugin_seeded', '1')
                 db.session.commit()
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            app.logger.warning('自动启用对象存储插件迁移失败：%s', e)
 
     # CSRF 纵深防御（v2.4.2）：对 Cookie 鉴权的状态变更请求做 Origin/Referer 同源校验。
     # SameSite=Lax 已挡住现代浏览器跨站 POST，此钩子额外覆盖旧浏览器（不识别 SameSite）

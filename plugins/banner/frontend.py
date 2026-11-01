@@ -6,7 +6,10 @@ banner_items(slug, limit=None) 注册为 Jinja 全局函数（核心自动包裹
 缓存策略：页面缓存开启时按分组缓存结果；缓存键含分组 updated_at 时间戳，
 后台任何保存动作（分组/图片）都会 touch 分组时间戳，自动失效，无需手动清理。
 """
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 def banner_items(slug, limit=None):
@@ -58,11 +61,13 @@ def banner_items(slug, limit=None):
         cached = cache.get(key)
         if cached is not None:
             return cached
-    except Exception:
-        pass
+    except Exception as e:
+        # 缓存读取失败回退直接查询，不影响页面渲染
+        logger.warning('轮播图缓存读取失败（%s）：%s', key, e)
     result = _query()
     try:
         cache.set(key, result, timeout=ttl)
-    except Exception:
-        pass
+    except Exception as e:
+        # 缓存写入失败仅影响后续命中率，不影响本次结果
+        logger.warning('轮播图缓存写入失败（%s）：%s', key, e)
     return result

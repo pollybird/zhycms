@@ -100,7 +100,9 @@ def audit_index():
     try:
         from ...plugin_system import plugin_audit_modules
         module_choices = list(MODULE_CHOICES) + list(plugin_audit_modules())
-    except Exception:
+    except Exception as e:
+        # 插件隔离：插件审计模块加载失败时仅使用核心模块筛选项
+        current_app.logger.warning('加载插件审计模块失败，使用核心模块筛选项：%s', e)
         module_choices = MODULE_CHOICES
     return render_template(
         'admin/audit/index.html',
@@ -212,8 +214,9 @@ def audit_clean():
     count = AuditLog.clean_expired(keep_days=keep_days)
     try:
         db.session.commit()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        current_app.logger.warning('审计日志清理提交失败，已回滚：%s', e)
         count = 0
     if keep_days == 0:
         flash(_gettext('已清空全部审计日志，共删除 {0} 条记录').format(count), 'success')

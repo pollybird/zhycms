@@ -4,6 +4,7 @@
 即时生效机制），路径与核心版一致（/friend-links），老站书签/审计记录不受影响；
 未启用插件时所有路由 404（不暴露存在性），菜单本就隐藏。
 """
+import logging
 from functools import wraps
 
 from flask import render_template, redirect, url_for, request, flash, abort
@@ -21,6 +22,7 @@ from app.utils.i18n_content import get_available_locales, get_default_locale
 
 from flask_babel import gettext as _gettext
 AUDIT_MODULE = 'friend_link'
+logger = logging.getLogger(__name__)
 
 
 def _gate(view):
@@ -77,7 +79,9 @@ def _trans_locales():
     try:
         default_locale = get_default_locale()
         return [l for l in get_available_locales() if l != default_locale]
-    except Exception:
+    except Exception as e:
+        # 多语言配置异常时表单仅展示默认语言
+        logger.warning('读取友情链接可用语种失败，按无多语言处理：%s', e)
         return []
 
 

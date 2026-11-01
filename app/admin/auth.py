@@ -156,8 +156,8 @@ def setup():
                 clear_db_config()
                 try:
                     switch_engine(current_app, db, old_uri)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    current_app.logger.warning('数据库切换失败后回退原库也失败：%s', exc)
                 flash(_gettext('切换到 %(dbtype)s 失败，已回退到原数据库：%(error)s') % {'dbtype': db_type, 'error': e}, 'danger')
                 return render_template('admin/setup.html', **ctx)
             if _is_initialized():
@@ -294,8 +294,9 @@ def login():
                                        lock_minutes=_login_lock_minutes())
                 try:
                     db.session.commit()
-                except Exception:
+                except Exception as exc:
                     db.session.rollback()
+                    current_app.logger.warning('登录失败计数写入失败，已回滚：%s', exc)
                 if user.is_locked:
                     _lf = _login_max_fail()
                     _ll = _login_lock_minutes()
@@ -317,7 +318,9 @@ def login():
         last_ip = user.last_login_ip or ''
         try:
             city = locate_city(ip)
-        except Exception:
+        except Exception as exc:
+            # 归属地查询失败不阻断登录，城市留空
+            current_app.logger.warning('登录 IP 归属地查询失败（%s）：%s', ip, exc)
             city = ''
         abnormal = (Setting.get('login_abnormal_city_alert') == 'on'
                     and is_abnormal_login(ip, last_ip))

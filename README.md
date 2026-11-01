@@ -2,15 +2,27 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v3.1.5**（后台富文本新增 Markdown 编辑模式：表单内一键切换 + 实时预览，系统设置可改默认模式；升级无感，默认仍为 CKEditor。详见 [CHANGELOG](CHANGELOG.md)）
+<p>
+  <img alt="Version" src="https://img.shields.io/badge/version-3.1.6-2e6df6?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-395%20passed-brightgreen?style=flat-square">
+  <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
+</p>
+
+**当前版本：v3.1.6**（异常吞噬专项治理：全库通用异常捕获统一中文 warning 留痕、可判定场景收窄为具体异常类型、插件隔离处保留并注释；行为与接口零变更，无数据库迁移、无新增依赖。详见 [CHANGELOG](CHANGELOG.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
+
+> 如果这个项目对你有帮助，欢迎点个 **Star** 支持一下；也欢迎在 Gitee / GitHub 提 Issue、发 PR 一起共建。
 
 ---
 
 ## 目录
 
 - [简介](#简介)
+- [界面预览](#界面预览)
 - [核心特性](#核心特性)
 - [版本速览](#版本速览)
 - [快速开始](#快速开始)
@@ -33,6 +45,7 @@
   - [审计日志](#审计日志)
 - [开发者文档](#开发者文档)
 - [升级指南](#升级指南)
+- [Star 支持](#star-支持)
 - [参与贡献](#参与贡献)
 - [许可证](#许可证)
 
@@ -48,11 +61,33 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 
 ---
 
+## 界面预览
+
+以下截图取自内置演示数据（制造业主题），完整功能可在 [在线演示](https://zhycms.tzzhy.cn/) 体验。
+
+### 前台
+
+| 首页（轮播 + 产品展示） |
+| :---: |
+| ![前台首页](docs/screenshots/home.png) |
+
+### 后台
+
+| 仪表盘 | 文章管理（工作流状态与批量操作） |
+| :---: | :---: |
+| ![后台仪表盘](docs/screenshots/admin-dashboard.png) | ![文章管理](docs/screenshots/admin-articles.png) |
+| **文章编辑（富文本 / Markdown 双模式）** | **可视化页面构建器** |
+| ![文章编辑](docs/screenshots/admin-editor.png) | ![页面构建器](docs/screenshots/admin-builder.png) |
+| **插件管理（启用 / 禁用 / 上传安装）** | **主题管理（内置 8 套主题）** |
+| ![插件管理](docs/screenshots/admin-plugins.png) | ![主题管理](docs/screenshots/admin-themes.png) |
+
+---
+
 ## 核心特性
 
 | 特性 | 说明 | 版本 |
 |------|------|------|
-| **多主题模板系统** | 前台模板按主题组织，后台一键切换；内置 6 套主题（含 2 套英文主题） | v1.0 |
+| **多主题模板系统** | 前台模板按主题组织，后台一键切换；内置 8 套主题（含 2 套英文主题） | v1.0 |
 | **主题管理** | 上传/启用/删除/打包下载主题压缩包，缺失模板自动兜底 | v2.2 |
 | **插件机制** | `plugins/<slug>/` 零侵入扩展，启停即时生效、无需重启 | v2.2 |
 | **国际化（i18n）** | Flask-Babel 界面文案 + 内容级多语言翻译表（文章/栏目/碎片/产品/表单/岗位/友情链接，v2.5.2 起含产品规格参数与岗位部门/地点/薪资） | v2.3/v2.5 |
@@ -76,6 +111,14 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.1.6（2026-11-01）
+
+异常吞噬专项治理。全库通用异常捕获统一中文 warning 留痕、可判定场景收窄为具体异常类型、插件隔离处保留宽捕获并注释；文章五状态流转收敛为 `app/services/workflow_service.py` 状态机并改为单事务提交（状态与版本快照原子生效）；新增 CI 门禁 `scripts/check_excepts.py`（配套白名单）。无数据库结构变更、无新增依赖。
+
+### v3.1.5（2026-11-01）
+
+后台富文本双模式编辑。文章正文、单页栏目内容与富文本碎片新增 Markdown 模式（表单内一键切换 + 实时预览，系统设置可改默认模式），Markdown 原文双写存储、`content` 始终为 HTML，前台主题 / 搜索 / API 零改动。数据库迁移 `0011`，新增依赖 `markdown`。
 
 ### v3.1.0（2026-10-10）
 
@@ -426,6 +469,12 @@ zhycms/
 5. 启动服务，按 [UPGRADE.md](./UPGRADE.md) 逐项核对
 
 > 升级涉及新建表、补列、数据回填，**仅启动程序无法完成迁移**。
+
+---
+
+## Star 支持
+
+如果 ZhyCMS 帮你快速搭起了站点，欢迎在 [GitHub](https://github.com/pollybird/zhycms) / [Gitee](https://gitee.com/pollybird/zhycms) / [GitCode](https://gitcode.com/pollybird/ZhyCMS) 点个 **Star**，这是对项目最直接的鼓励；也欢迎提 Issue、发 PR 一起共建。
 
 ---
 

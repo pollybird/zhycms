@@ -7,8 +7,6 @@
   - RBAC：栏目专属权限 / 全局权限双轨校验
   - 审计日志：每次关键动作写入 AuditLog
 """
-from datetime import datetime
-
 from flask import (
     render_template, redirect, url_for, request,
     flash, abort, jsonify, current_app
@@ -33,10 +31,13 @@ from ...utils.search import reindex_article
 from ...utils.word_import import convert_docx_to_html
 from ...models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_PUBLISH, OP_ARCHIVE,
-    OP_REVIEW_PASS, OP_REVIEW_REJECT, OP_BATCH, OP_ROLLBACK,
-    MODULE_ARTICLE,
+    OP_BATCH, OP_ROLLBACK, MODULE_ARTICLE,
 )
 from ...services.article_service import save_article
+from ...services.workflow_service import (
+    ACTION_SUBMIT_REVIEW, ACTION_REVIEW_PASS, ACTION_REVIEW_REJECT,
+    ACTION_PUBLISH, ACTION_ARCHIVE, can_transition, transition_article,
+)
 from .. import admin_bp
 
 
@@ -60,6 +61,29 @@ def _build_tree_with_depth(columns, parent_id=None, depth=0):
             result.append(col)
             result.extend(_build_tree_with_depth(columns, col.id, depth + 1))
     return result
+
+
+def _get_article(cid, aid):
+    """取文章并校验归属栏目与删除状态（工作流动作共用）。"""
+    col = Column.query.get_or_404(cid)
+    article = Article.query.get_or_404(aid)
+    if article.column_id != col.id or article.is_deleted:
+        abort(404)
+    return article
+
+
+def _run_transition(cid, aid, action):
+    """执行工作流动作并统一 flash 消息与重定向。"""
+    article = _get_article(cid, aid)
+    result = transition_article(
+        article, action, user=current_user,
+        reject_reason=request.form.get('reject_reason'),
+    )
+    for category, msg in result.messages:
+        flash(msg, category)
+    if result.redirect == 'edit':
+        return redirect(url_for('admin.article_edit', cid=cid, aid=aid))
+    return redirect(url_for('admin.article_index', cid=cid))
 
 
 # ============================================================
@@ -193,157 +217,31 @@ def article_edit(cid, aid):
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/submit-review', methods=['POST'])
 @permission_required('content:submit_review', column_id_arg='cid')
 def article_submit_review(cid, aid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
-    if article.column_id != col.id or article.is_deleted:
-        abort(404)
-    if article.status not in (STATUS_DRAFT, STATUS_ARCHIVED):
-        flash(_gettext('只有草稿或已归档的内容可以提交审核'), 'warning')
-        return redirect(url_for('admin.article_index', cid=cid))
-    article.status = STATUS_REVIEW
-    article.reject_reason = None
-    article.sync_enabled_from_status()
-    article.updated_by = getattr(current_user, 'id', None)
-    try:
-        db.session.commit()
-        clear_content_cache(column_id=cid, article_id=aid)
-        flash(_gettext('已提交待审核，请等待审核员处理'), 'success')
-        audit_log(OP_UPDATE, MODULE_ARTICLE, article.id, article.title,
-                  {'action': 'submit_review', 'from_status': 'draft/archived'})
-        ArticleVersion.snapshot(article, article.status, note='提交审核',
-                                created_by=getattr(current_user, 'id', None))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        flash(_gettext('提交失败'), 'danger')
-    return redirect(url_for('admin.article_index', cid=cid))
+    return _run_transition(cid, aid, ACTION_SUBMIT_REVIEW)
 
 
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/review-pass', methods=['POST'])
 @permission_required('content:review', column_id_arg='cid')
 def article_review_pass(cid, aid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
-    if article.column_id != col.id or article.is_deleted:
-        abort(404)
-    if not current_user.column_flag('can_review', cid):
-        flash(_gettext('您在该栏目没有「审核」权限'), 'warning')
-        return redirect(url_for('admin.article_index', cid=cid))
-    if article.status != STATUS_REVIEW:
-        flash(_gettext('只有「待审核」状态才能审核通过'), 'warning')
-        return redirect(url_for('admin.article_index', cid=cid))
-    article.status = STATUS_PUBLISHED
-    article.reject_reason = None
-    article.reviewed_by = getattr(current_user, 'id', None)
-    article.reviewed_at = datetime.now()
-    article.sync_enabled_from_status()
-    article.updated_by = getattr(current_user, 'id', None)
-    try:
-        db.session.commit()
-        clear_content_cache(column_id=cid, article_id=aid)
-        flash(_gettext('审核通过，内容已正式发布'), 'success')
-        audit_log(OP_REVIEW_PASS, MODULE_ARTICLE, article.id, article.title,
-                  {'column_id': cid})
-        ArticleVersion.snapshot(article, article.status, note='审核通过',
-                                created_by=getattr(current_user, 'id', None))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        flash(_gettext('审核失败'), 'danger')
-    return redirect(url_for('admin.article_index', cid=cid))
+    return _run_transition(cid, aid, ACTION_REVIEW_PASS)
 
 
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/review-reject', methods=['POST'])
 @permission_required('content:review', column_id_arg='cid')
 def article_review_reject(cid, aid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
-    if article.column_id != col.id or article.is_deleted:
-        abort(404)
-    if not current_user.column_flag('can_review', cid):
-        flash(_gettext('您在该栏目没有「审核」权限'), 'warning')
-        return redirect(url_for('admin.article_index', cid=cid))
-    if article.status != STATUS_REVIEW:
-        flash(_gettext('只有「待审核」状态才能驳回'), 'warning')
-        return redirect(url_for('admin.article_index', cid=cid))
-    reason = (request.form.get('reject_reason') or '').strip()[:500]
-    if not reason:
-        flash(_gettext('驳回原因必填'), 'danger')
-        return redirect(url_for('admin.article_edit', cid=cid, aid=aid))
-    article.status = STATUS_DRAFT
-    article.reject_reason = reason
-    article.reviewed_by = getattr(current_user, 'id', None)
-    article.reviewed_at = datetime.now()
-    article.sync_enabled_from_status()
-    article.updated_by = getattr(current_user, 'id', None)
-    try:
-        db.session.commit()
-        clear_content_cache(column_id=cid, article_id=aid)
-        flash(_gettext('已驳回，原因已写入供编辑修改（{0}…）').format(reason[:30]), 'success')
-        audit_log(OP_REVIEW_REJECT, MODULE_ARTICLE, article.id, article.title,
-                  {'column_id': cid, 'reason': reason})
-        ArticleVersion.snapshot(article, article.status,
-                                note=f'审核驳回：{reason[:50]}',
-                                created_by=getattr(current_user, 'id', None))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        flash(_gettext('驳回失败'), 'danger')
-    return redirect(url_for('admin.article_index', cid=cid))
+    return _run_transition(cid, aid, ACTION_REVIEW_REJECT)
 
 
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/publish', methods=['POST'])
 @permission_required('content:publish', column_id_arg='cid')
 def article_publish(cid, aid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
-    if article.column_id != col.id or article.is_deleted:
-        abort(404)
-    if not current_user.column_flag('can_publish', cid):
-        flash(_gettext('您在该栏目没有「发布」权限'), 'warning')
-        return redirect(url_for('admin.article_index', cid=cid))
-    article.status = STATUS_PUBLISHED
-    article.reject_reason = None
-    article.sync_enabled_from_status()
-    article.updated_by = getattr(current_user, 'id', None)
-    try:
-        db.session.commit()
-        clear_content_cache(column_id=cid, article_id=aid)
-        flash(_gettext('已直接发布'), 'success')
-        audit_log(OP_PUBLISH, MODULE_ARTICLE, article.id, article.title,
-                  {'column_id': cid, 'from': 'direct_publish'})
-        ArticleVersion.snapshot(article, article.status, note='直接发布',
-                                created_by=getattr(current_user, 'id', None))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        flash(_gettext('发布失败'), 'danger')
-    return redirect(url_for('admin.article_index', cid=cid))
+    return _run_transition(cid, aid, ACTION_PUBLISH)
 
 
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/archive', methods=['POST'])
 @permission_required('content:archive', column_id_arg='cid')
 def article_archive(cid, aid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
-    if article.column_id != col.id or article.is_deleted:
-        abort(404)
-    article.status = STATUS_ARCHIVED
-    article.sync_enabled_from_status()
-    article.updated_by = getattr(current_user, 'id', None)
-    try:
-        db.session.commit()
-        clear_content_cache(column_id=cid, article_id=aid)
-        flash(_gettext('已归档（前台不再展示）'), 'success')
-        audit_log(OP_ARCHIVE, MODULE_ARTICLE, article.id, article.title,
-                  {'column_id': cid})
-        ArticleVersion.snapshot(article, article.status, note='归档',
-                                created_by=getattr(current_user, 'id', None))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        flash(_gettext('归档失败'), 'danger')
-    return redirect(url_for('admin.article_index', cid=cid))
+    return _run_transition(cid, aid, ACTION_ARCHIVE)
 
 
 # ============================================================
@@ -494,7 +392,7 @@ def article_batch(cid):
         audit_op = OP_ARCHIVE
     elif action == 'submit_review':
         for a in articles:
-            if a.status in (STATUS_DRAFT, STATUS_ARCHIVED):
+            if can_transition(a.status, ACTION_SUBMIT_REVIEW):
                 a.status = STATUS_REVIEW
                 a.reject_reason = None
                 a.sync_enabled_from_status()

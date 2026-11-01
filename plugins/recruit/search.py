@@ -5,10 +5,13 @@
   - 岗位保存/删除/上下架时由 admin.py 调用核心 reindex_object/unindex_object
   - 索引后端零命中/故障时，SQL 兜底检索同样覆盖岗位
 """
+import logging
+
 from app.extensions import db
 from app.utils.search import SearchProvider, _search_locale
 from app.utils.i18n_content import t_field, get_default_locale
 
+logger = logging.getLogger(__name__)
 
 RECRUIT_TYPE = 'recruit_job'
 
@@ -135,5 +138,7 @@ class RecruitSearchProvider(SearchProvider):
             return f'/job-{jid}.html'
         try:
             return url_for('recruit_frontend.job_detail', jid=jid)
-        except Exception:
+        except Exception as e:
+            # 路由不可用时退回静态路径
+            logger.warning('搜索结果生成岗位详情 URL 失败，回退 /jobs：%s', e)
             return f'/jobs/{jid}'

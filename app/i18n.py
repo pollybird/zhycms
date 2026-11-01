@@ -20,10 +20,13 @@
   - 源代码字符串本身为中文，zh 无 .mo 时 gettext 返回 msgid（即中文），
     故 zh 无需翻译文件亦正常；en 需提供翻译。
 """
+import logging
 import os
 import threading
 
 from flask import request, session
+
+logger = logging.getLogger(__name__)
 
 # 语种显示名（扩展如 ja/ko 仅需在此追加映射）
 # 用 N_ 标记以便 pybabel 抽取，运行时 _translate_label 再用 gettext 翻译实际值
@@ -127,10 +130,12 @@ def _load_plugin_translations(slug, locale_str):
                     )
                 except Exception as _e:
                     last_err = _e
+                    logger.warning('插件 %s 的 %s 翻译编译失败（%s）：%s',
+                                   slug, locale_str, po, _e)
                     try:
                         os.unlink(tmp.name)
-                    except Exception:
-                        pass
+                    except OSError as unlink_err:
+                        logger.warning('清理临时翻译文件失败：%s', unlink_err)
                     continue
                 fp_path = tmp.name
             if fp_path:
@@ -139,12 +144,13 @@ def _load_plugin_translations(slug, locale_str):
                 return tr
         except Exception as _e:
             last_err = _e
+            logger.warning('插件 %s 的 %s 翻译加载失败：%s', slug, locale_str, _e)
         finally:
             if fp_path and fp_path != mo and fp_path != po and os.path.exists(fp_path):
                 try:
                     os.unlink(fp_path)
-                except Exception:
-                    pass
+                except OSError as unlink_err:
+                    logger.warning('清理临时翻译文件失败：%s', unlink_err)
     return None
 
 
@@ -255,7 +261,8 @@ def current_locale():
     try:
         loc = get_locale()
         return str(loc) if loc else 'zh'
-    except Exception:
+    except Exception as e:
+        logger.warning('获取当前语种失败，回退 zh：%s', e)
         return 'zh'
 
 
@@ -265,7 +272,7 @@ def ensure_translations_compiled():
     背景：`*.mo` 在 .gitignore 中不入库，正式部署用 `pybabel compile -d
     app/translations` 生成；但开发环境（run.py）若未手动编译，Flask-Babel
     运行时只加载 .mo，会导致全站 `_()` 文案回退成中文。故在 create_app 时
-    做一次幂等编译。任何失败都静默跳过（gettext 回退原文，不影响启动）。
+    做一次幂等编译。失败时仅记录警告并跳过（gettext 回退原文，不影响启动）。
     """
     try:
         from babel.messages import mofile as _mofile, pofile as _pofile
@@ -288,5 +295,5 @@ def ensure_translations_compiled():
                 catalog = _pofile.read_po(fp)
             with open(mo_path, 'wb') as fp:
                 _mofile.write_mo(fp, catalog)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning('启动时编译核心翻译失败，gettext 将回退原文：%s', e)

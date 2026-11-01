@@ -108,8 +108,9 @@ def log_login(username, result, message='', user_id=None, city=None):
     db.session.add(log)
     try:
         db.session.commit()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        current_app.logger.warning('登录日志写入失败：%s', e)
 
 
 # ============================================================
@@ -273,8 +274,8 @@ def clear_content_cache(column_id=None, article_id=None):
     try:
         from ..models.column import Column
         Column.invalidate_tree_cache()
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('栏目树缓存失效失败：%s', e)
     # v2.4.0：搜索索引更新（独立于缓存开关）
     if article_id:
         try:
@@ -294,13 +295,13 @@ def clear_content_cache(column_id=None, article_id=None):
     for k in keys:
         try:
             cache.delete(k)
-        except Exception:
-            pass
+        except Exception as e:
+            current_app.logger.warning('清除页面缓存 %s 失败：%s', k, e)
     # 简单起见，直接清整站缓存（覆盖 sitemap 等关联）
     try:
         cache.clear()
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('清空页面缓存失败：%s', e)
 
 
 # ============================================================

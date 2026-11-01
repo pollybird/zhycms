@@ -11,7 +11,11 @@
 插件通过 PluginBase.get_builder_widgets() 在启动期注册，owner=插件 slug；
 运行时插件被禁用，其组件在编辑器标灰、前台拒绝渲染（空占位）。
 """
+import logging
+
 from ..constants import Builder as _B
+
+logger = logging.getLogger(__name__)
 
 # type -> {'widget': Widget 实例, 'owner': 'core' 或插件 slug}
 _registry = {}
@@ -101,7 +105,9 @@ def _owner_enabled(owner):
     try:
         from ..plugin_system import plugin_enabled
         return plugin_enabled(owner)
-    except Exception:
+    except Exception as e:
+        # 插件隔离：插件系统不可用时按未启用处理
+        logger.warning('查询插件启用状态失败（%s），按未启用处理：%s', owner, e)
         return False
 
 

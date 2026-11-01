@@ -1,7 +1,11 @@
 from datetime import datetime
 
+import logging
+
 from ..extensions import db
 from .workflow import STATUS_DRAFT, STATUS_PUBLISHED, STATUSES_ENABLED
+
+logger = logging.getLogger(__name__)
 
 
 class Article(db.Model):
@@ -85,8 +89,9 @@ class Article(db.Model):
                 "UPDATE articles SET status = :draft WHERE (status IS NULL OR status = '') AND is_enabled = 0"
             ).bindparams(draft=STATUS_DRAFT))
             db.session.commit()
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            logger.warning('旧文章状态补全失败，已回滚：%s', e)
 
 
 class ArticleFieldValue(db.Model):

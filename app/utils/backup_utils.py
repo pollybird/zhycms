@@ -54,7 +54,8 @@ def _parse_db_url(rest):
         if '?' in dbname:
             dbname = dbname.split('?', 1)[0]
         return dbname, host, port, user or '', pwd or ''
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('数据库连接串解析失败，按空配置处理：%s', e)
         return '', None, None, '', ''
 
 
@@ -153,8 +154,9 @@ def _backup_sqlite(src_path, dest_path):
         except OSError:
             pass
         return True
-    except Exception:
-        # fallback: 直接复制 + gzip
+    except Exception as e:
+        # backup API 不可用（如事务状态异常）：回退直接复制 + gzip
+        current_app.logger.warning('SQLite backup API 失败，回退文件复制：%s', e, exc_info=True)
         if os.path.exists(src_path):
             with open(src_path, 'rb') as f_in, gzip.open(dest_path, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
@@ -195,8 +197,8 @@ def _run_dump_with_gzip(cmd, dest_path, env=None, fallback_json=False):
                 os.remove(dest_path)
         except OSError:
             pass
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('外部数据库导出命令失败，尝试 JSON 兜底：%s', e)
     if fallback_json:
         return _backup_json(dest_path)
     return False
@@ -282,8 +284,9 @@ def _restore_sqlite(gz_path):
             raw_conn.commit()
         finally:
             src.close()
-    except Exception:
+    except Exception as e:
         # 无法 backup 方法回写，直接尝试用文件覆盖（仅在文件路径模式可用）
+        current_app.logger.warning('SQLite backup API 回写失败，尝试文件覆盖：%s', e, exc_info=True)
         try:
             raw_conn.close()
             db.engine.dispose()
@@ -328,8 +331,9 @@ def _restore_mysql(gz_path):
         # 元数据锁（MDL），导致导入端 `DROP TABLE` 与自己死锁、永久挂起。
         try:
             db.session.commit()
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            current_app.logger.warning('恢复前提交/结束会话失败：%s', e)
         db.engine.dispose()
         # --init-command 设置锁等待超时：并发连接持锁时 15 秒快速失败，
         # 避免恢复请求永久挂起（错误信息可通过返回值提示用户稍后重试）
@@ -413,8 +417,9 @@ def _restore_json(gz_path):
         for t in reversed(ordered):
             try:
                 cur.execute(f'DELETE FROM {_q(t)}')
-            except Exception:
+            except Exception as e:
                 conn.rollback()
+                current_app.logger.warning('恢复 JSON 备份时清空表 %s 失败：%s', t, e)
         for t in ordered:
             rows = data.get(t, [])
             if not rows:
@@ -465,8 +470,8 @@ def system_monitor_stats():
         res['disk_used_gb'] = round(usage.used / (1024 ** 3), 2)
         res['disk_free_gb'] = round(usage.free / (1024 ** 3), 2)
         res['disk_used_pct'] = round(usage.used * 100 / usage.total, 1) if usage.total else 0
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('读取磁盘占用失败：%s', e)
     # DB 文件大小（SQLite 直接看文件；MySQL/PG 近似用 information_schema 查）
     try:
         db_type, db_name_or_path, *_ = _db_type_and_path()
@@ -490,18 +495,18 @@ def system_monitor_stats():
                         "SELECT ROUND(pg_database_size(current_database())/1024/1024::numeric, 2)"
                     )).scalar()
                 res['db_size_mb'] = float(r or 0)
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                current_app.logger.warning('查询数据库大小失败：%s', e)
+    except Exception as e:
+        current_app.logger.warning('读取数据库大小失败：%s', e)
     # 站点运行时长：从最早用户创建时间 / 或用当前进程启动时间近似
     try:
         from ..models.user import User
         first = User.query.order_by(User.created_at.asc()).first()
         if first:
             res['uptime_seconds'] = int((datetime.now() - first.created_at).total_seconds())
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('计算站点运行时长失败：%s', e)
     # 备份目录总大小
     try:
         bdir = _backup_dir()
@@ -512,12 +517,13 @@ def system_monitor_stats():
                 total += os.path.getsize(fp)
         res['backup_total_mb'] = round(total / (1024 * 1024), 2)
         res['backup_count'] = BackupRecord.query.count()
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('读取备份目录统计失败：%s', e)
     # DB 健康状态
     try:
         db.session.execute(db.text('SELECT 1'))
         res['db_alive'] = True
-    except Exception:
+    except Exception as e:
         res['db_alive'] = False
+        current_app.logger.warning('数据库健康检查失败：%s', e)
     return res

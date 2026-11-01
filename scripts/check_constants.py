@@ -93,7 +93,8 @@ def check():
         rel = str(fpath.relative_to(ROOT))
         try:
             content = fpath.read_text(encoding='utf-8')
-        except Exception:
+        except Exception as e:
+            print(f'警告：无法读取 {rel}，已跳过：{e}', file=sys.stderr)
             continue
         for pat, const_ref in GATE_PATTERNS.items():
             for m in re.finditer(pat, content):

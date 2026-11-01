@@ -5,6 +5,30 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.6] - 2026-11-01
+
+**异常吞噬专项治理**版本（非破坏性）。对全库 `except Exception` / 裸 `except` 做统一梳理：可明确判定的场景收窄为具体异常类型，无法预判的保留宽捕获但补中文 `warning` 留痕（含模块/操作前缀与关键上下文），彻底消除静默吞噬；插件加载/钩子/菜单等必须隔离的失败点保留宽捕获并加 `# 插件隔离：...` 注释说明。**无功能变更、无数据库结构变更、无新增依赖**，升级覆盖代码重启即可。
+
+### Changed
+
+- **异常留痕统一**：`app/` 与 `plugins/` 下全部通用异常捕获点补充日志——请求上下文内用 `current_app.logger.warning(...)`，上下文外（`config.py`、`storage.py`、`ip_locator.py`、`models/`、`builder/`、`scripts/` 等）用 `logging.getLogger(__name__)`；消息统一中文并带模块/操作前缀，参数走 `%s` 惰性插值。
+- **异常类型收窄**：可明确判定来源的捕获改为具体类型（`OSError`、`(TypeError, ValueError)`、`requests.RequestException`、`jinja2.TemplateNotFound` / `TemplateSyntaxError` 等），减少误吞无关异常；模板不存在的预期分支改为显式 `except TemplateNotFound: return False`。
+- **备份/恢复、搜索索引、i18n 编译等排障困难链路**：失败时使用 `exc_info=True` 或 `logger.exception`，保留完整堆栈。
+- **插件隔离显式化**：单个插件加载失败、钩子异常、菜单/审计模块注册失败等不影响宿主，保留宽捕获并加注释说明用途，同时写 warning 便于定位。
+- **控制流显式处理保留**：通过返回值告知调用方失败（如插件启用返回错误、连接测试返回错误信息）、`flash` 提示、主动 `raise`/re-raise 的位置维持原状，行为零变更。
+- **文章工作流状态机重构**：五个状态流转视图（提交审核 / 审核通过 / 审核驳回 / 发布 / 归档）中重复的「改字段 → commit → 快照 → commit」两段式提交收敛到新增 `app/services/workflow_service.py`，改为「改字段 → flush → 快照 → 单次 commit」，避免首次提交成功后快照失败导致状态已变更而版本记录缺失；「驳回原因必填」、待审核前置状态、栏目级 `can_review` / `can_publish` 校验等业务规则同步下沉到 service，视图仅保留取对象、flash 与重定向。
+
+### Added
+
+- **新增 CI 门禁 `scripts/check_excepts.py`**：扫描 `app/` 与 `plugins/` 下的通用异常捕获（含 `BaseException` 与裸 `except`），其后处理体内若无 `logger` / `logging` / `raise` / `flash` / `abort` / `jsonify` 等留痕或显式处理信号且不在白名单，则退出码 1；白名单 `scripts/excepts_whitelist.txt` 逐条记录 `文件:行号:理由`。
+- **GitHub Actions 新增 `excepts-gate` 作业**：与 `constants-gate` 并列执行，防止新增静默吞噬。
+
+### 升级注意
+
+- 覆盖代码 + 重启即可，**无数据库迁移、无新增依赖**、无配置变更；返回值、状态码与页面输出均未改变。
+- 治理后日志量略有增加，均为 `WARNING` 级别且仅在异常分支触发，正常路径无额外开销。
+- **测试**：全量 395 项通过；`check_excepts.py` / `check_constants.py` / `check_release.py` 三门禁全绿。
+
 ## [3.1.5] - 2026-11-01
 
 **编辑器能力扩展**版本（非破坏性）。后台富文本新增 Markdown 编辑模式：文章正文、单页栏目内容、富文本碎片（含各自多语言译文字段）均可在表单内一键切换「富文本 | Markdown」，Markdown 模式带实时预览；「系统设置 → 编辑设置」可将新建内容的默认模式改为 Markdown。升级后默认仍为 CKEditor，老内容仍按原格式打开，老用户操作习惯零变化。**有数据库结构变更**（5 张表各新增 `*_md` / `*_format` 两列，迁移 `0011` 自动执行），**新增 1 个 Python 依赖**（`markdown`）。

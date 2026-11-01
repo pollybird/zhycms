@@ -26,10 +26,13 @@
 """
 import copy
 import json
+import logging
 import os
 
 from ..constants import Builder as _B
 from .schema import validate_layout, LayoutError
+
+logger = logging.getLogger(__name__)
 
 # scope -> 片段文件名（与主题 fixture 同名约定，但语义是「贡献片段」）
 SCOPE_FILES = {
@@ -173,7 +176,9 @@ def _enabled_owners():
     try:
         from ..plugin_system import enabled_slugs
         return set(enabled_slugs())
-    except Exception:
+    except Exception as e:
+        # 插件隔离：插件系统不可用时按无启用插件处理，仅保留基础布局
+        logger.warning('读取已启用插件失败，按无插件处理：%s', e)
         return set()
 
 
@@ -288,18 +293,9 @@ def compose_layout(base_layout, scope, enabled=None):
         base['root'] = root
         return base
     except Exception as e:  # 合并层绝不阻断初始化：退回基础布局
-        try:
-            from flask import current_app
-            current_app.logger.warning('插件布局片段合并失败，已回退基础布局：%s', e)
-        except Exception:
-            pass
+        logger.warning('插件布局片段合并失败，已回退基础布局：%s', e)
         return copy.deepcopy(base_layout)
 
 
 def _log_warning(owner, frag, message):
-    try:
-        from flask import current_app
-        current_app.logger.warning(
-            '插件 %s 的 builder/%s %s', owner, frag.get('source'), message)
-    except Exception:
-        pass
+    logger.warning('插件 %s 的 builder/%s %s', owner, frag.get('source'), message)

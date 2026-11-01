@@ -66,7 +66,9 @@ def _frontend_authenticated():
         from ..plugin_system import frontend_guard
         guard = frontend_guard()
         return bool(guard and guard['is_authenticated']())
-    except Exception:
+    except Exception as e:
+        # 插件隔离：前台登录守卫不可用时按未登录处理
+        current_app.logger.warning('读取前台登录守卫失败：%s', e)
         return False
 
 
@@ -77,7 +79,8 @@ def _member_only_redirect(column):
     try:
         from ..plugin_system import frontend_guard
         guard = frontend_guard()
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('读取前台登录守卫失败（栏目 %s）：%s', column.id, e)
         guard = None
     # 没有插件提供前台登录能力时该字段不生效（保持核心可独立运行）
     if guard is None or guard['is_authenticated']():
@@ -85,8 +88,8 @@ def _member_only_redirect(column):
     login_url = '/'
     try:
         login_url = guard['login_url']()
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning('插件登录地址生成失败，回退首页：%s', e)
     nxt = request.full_path if request.query_string else request.path
     sep = '&' if '?' in login_url else '?'
     return redirect(f'{login_url}{sep}next={nxt}')
@@ -122,14 +125,14 @@ def _try_cache(key, ttl_setting_key, default_ttl=600, view_arg=None):
             try:
                 from ..i18n import select_locale
                 cache_key += '|loc=' + select_locale()
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('前台缓存键附加语言失败：%s', e)
             # v2.6.3：缓存键包含当前主题，主题切换后新旧主题绝不串页
             # （多 worker / 缓存清理失败时的纵深防御，正常切换仍由后台主动 cache.clear）
             try:
                 cache_key += '|theme=' + get_active_theme()
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('前台缓存键附加主题失败：%s', e)
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:
@@ -137,13 +140,13 @@ def _try_cache(key, ttl_setting_key, default_ttl=600, view_arg=None):
                     if view_arg is not None and view_arg in kwargs:
                         _incr_view(kwargs[view_arg])
                     return cached
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('前台缓存读取失败：%s', e)
             resp = view_func(*args, **kwargs)
             try:
                 cache.set(cache_key, resp, timeout=ttl)
-            except Exception:
-                pass
+            except Exception as e:
+                current_app.logger.warning('前台缓存写入失败：%s', e)
             return resp
         return wrapper
     return decorator
@@ -170,14 +173,17 @@ def _incr_view(aid):
         cache.set(_VIEW_PENDING_KEY, pending, timeout=_VIEW_PENDING_TTL)
         if sum(pending.values()) >= _VIEW_FLUSH_THRESHOLD:
             _flush_view_counts()
-    except Exception:
+    except Exception as e:
+        # 浏览计数隔离：缓存不可用时回退直接递增 DB，不影响页面响应
+        current_app.logger.warning('浏览量缓存累加失败，回退 DB 递增：%s', e)
         try:
             article = Article.query.get(aid)
             if article is not None:
                 article.viewed = (article.viewed or 0) + 1
                 db.session.commit()
-        except Exception:
+        except Exception as e2:
             db.session.rollback()
+            current_app.logger.warning('浏览量 DB 递增失败（文章 %s）：%s', aid, e2)
 
 
 def _flush_view_counts():
@@ -192,13 +198,15 @@ def _flush_view_counts():
 
     try:
         pending = cache.get(_VIEW_PENDING_KEY)
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('读取待合并浏览量失败：%s', e)
         return
     if not isinstance(pending, dict) or not pending:
         return
     try:
         cache.delete(_VIEW_PENDING_KEY)
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('清理待合并浏览量键失败：%s', e)
         return
     try:
         for aid, n in pending.items():
@@ -209,8 +217,9 @@ def _flush_view_counts():
                 synchronize_session=False,
             )
         db.session.commit()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        current_app.logger.warning('浏览量增量合并回 DB 失败：%s', e)
         # 合并失败：增量放回缓存（与期间新增量合并），等下一轮
         try:
             back = cache.get(_VIEW_PENDING_KEY)
@@ -219,8 +228,8 @@ def _flush_view_counts():
                 for k, v in back.items():
                     merged[k] = merged.get(k, 0) + v
             cache.set(_VIEW_PENDING_KEY, merged, timeout=_VIEW_PENDING_TTL)
-        except Exception:
-            pass
+        except Exception as e2:
+            current_app.logger.warning('浏览量增量回写缓存失败：%s', e2)
 
 
 def _inject_default_alt(html):
@@ -276,8 +285,9 @@ def _build_nav():
                 link_url=m['url'], link_target=m['target'],
             )
             tree.append({'node': fake_col, 'children': []})
-    except Exception:
-        pass
+    except Exception as e:
+        # 插件隔离：插件菜单项构建失败不影响核心导航
+        current_app.logger.warning('构建插件前台菜单失败，已跳过：%s', e)
     return tree
 
 
@@ -854,8 +864,9 @@ def sitemap():
     try:
         from ..plugin_system import collect_sitemap_urls
         urls.extend(collect_sitemap_urls())
-    except Exception:
-        pass
+    except Exception as e:
+        # 插件隔离：插件 URL 收集失败时仅生成本站内置页面
+        current_app.logger.warning('收集插件 Sitemap URL 失败，已跳过：%s', e)
 
     parts = ['<?xml version="1.0" encoding="UTF-8"?>',
              '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
@@ -886,5 +897,6 @@ def healthz():
     try:
         db.session.execute(text('SELECT 1'))
         return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('健康检查数据库探测失败：%s', e)
         return '{"status":"error"}', 503, {'Content-Type': 'application/json'}

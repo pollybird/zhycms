@@ -1,5 +1,6 @@
 """构建器业务服务：页面、草稿、发布、修订、默认布局初始化。"""
 import json
+import logging
 import os
 from datetime import datetime
 
@@ -10,6 +11,8 @@ from ..utils.themes import THEMES_DIR, THEME_SLUG_RE, get_active_theme
 from .schema import (
     validate_layout, loads_layout, dumps_layout, LayoutError,
 )
+
+logger = logging.getLogger(__name__)
 
 FIXTURES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fixtures')
 
@@ -300,5 +303,6 @@ def _clear_cache():
     try:
         from ..extensions import cache
         cache.clear()
-    except Exception:
-        pass
+    except Exception as e:
+        # 清缓存失败不影响发布结果，旧缓存将在 TTL 到期后失效
+        logger.warning('页面构建发布后清空缓存失败：%s', e)

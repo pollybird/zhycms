@@ -14,8 +14,11 @@
 云端公开 URL = ``CDN 域名/对象 key``，域名统一做去尾斜杠标准化。
 """
 import os
+import logging
 
 from flask import current_app, url_for
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -156,7 +159,8 @@ def _driver_allowed(name):
     try:
         from ..plugin_system import plugin_enabled
         return plugin_enabled(owner)
-    except Exception:
+    except Exception as e:
+        logger.warning('判断存储驱动 %s 归属插件状态失败，按不可用处理：%s', name, e)
         return False
 
 
@@ -171,7 +175,8 @@ def get_driver(name=None):
         try:
             from ..models.setting import Setting
             name = (Setting.get('storage_driver', 'local') or 'local').strip()
-        except Exception:
+        except Exception as e:
+            logger.warning('读取存储驱动配置失败，回退 local：%s', e)
             name = 'local'
 
     if name == 'local' or name not in _DRIVERS:
@@ -189,5 +194,6 @@ def active_driver_name():
     """当前实际生效的驱动名（考虑插件禁用 / 驱动缺失的回退）。"""
     try:
         return get_driver().name
-    except Exception:
+    except Exception as e:
+        logger.warning('查询当前存储驱动失败，回退 local：%s', e)
         return 'local'

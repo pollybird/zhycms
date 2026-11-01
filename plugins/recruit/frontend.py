@@ -7,7 +7,7 @@
 from datetime import datetime
 
 from flask import url_for
-from flask import current_app  # noqa: F401
+from flask import current_app
 
 from app.models.setting import Setting
 
@@ -18,7 +18,9 @@ def recruit_job_url(job):
         return f'/job-{job.id}.html'
     try:
         return url_for('recruit_frontend.job_detail', jid=job.id)
-    except Exception:
+    except Exception as e:
+        # 路由不可用时退回静态路径
+        current_app.logger.warning('生成岗位详情 URL 失败，回退 /jobs：%s', e)
         return f'/jobs/{job.id}'
 
 

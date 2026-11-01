@@ -16,7 +16,8 @@ def get_default_locale():
     try:
         from ..models.setting import Setting
         return Setting.get('i18n_default_locale') or 'zh'
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('读取默认语言失败，回退 zh：%s', e)
         return 'zh'
 
 
@@ -25,7 +26,8 @@ def i18n_enabled():
     try:
         from ..models.setting import Setting
         return Setting.get('i18n_enable') == '1'
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('读取多语言开关失败，按关闭处理：%s', e)
         return False
 
 
@@ -35,7 +37,8 @@ def get_available_locales():
         from ..models.setting import Setting
         raw = Setting.get('i18n_available_locales') or 'zh'
         return [c.strip() for c in raw.split(',') if c.strip()]
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('读取可用语言列表失败，回退 zh：%s', e)
         return ['zh']
 
 
@@ -87,7 +90,8 @@ def _safe_current_locale():
     if has_app_context():
         try:
             return select_locale()
-        except Exception:
+        except Exception as e:
+            current_app.logger.warning('解析当前语言失败，回退默认语言：%s', e)
             return get_default_locale()
     return get_default_locale()
 

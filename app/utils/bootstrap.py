@@ -8,6 +8,8 @@
 """
 from datetime import datetime, timedelta
 
+from flask import current_app
+
 from ..extensions import db
 from ..models.user import User
 from ..models.setting import Setting
@@ -54,8 +56,9 @@ def create_admin(username, password, nickname='超级管理员'):
         _rbac_mod.Permission.ensure_presets()
         _rbac_mod.Role.ensure_presets()
         db.session.flush()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        current_app.logger.warning('初始化 RBAC 预设失败：%s', e)
 
     # 给首个管理员绑定 super_admin 角色
     try:
@@ -65,8 +68,9 @@ def create_admin(username, password, nickname='超级管理员'):
             ur = UserRole.query.filter_by(user_id=admin.id, role_id=super_role.id).first()
             if not ur:
                 db.session.add(UserRole(user_id=admin.id, role_id=super_role.id))
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        current_app.logger.warning('为初始管理员绑定超级管理员角色失败：%s', e)
 
     db.session.commit()
     return admin
@@ -110,8 +114,9 @@ def _seed_builder_demo_layouts():
             if err:
                 return
             bsvc.publish_page(page, note='演示数据默认布局')
-        except Exception:
+        except Exception as e:
             db.session.rollback()
+            current_app.logger.warning('发布演示默认布局失败（%s/%s）：%s', scope, column_id, e)
 
     _publish('home', None)
     _publish('article', None)
@@ -140,8 +145,9 @@ def _clean_demo_data():
         from ..models.builder import BuilderRevision, BuilderPage
         BuilderRevision.query.delete()
         BuilderPage.query.delete()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
+        current_app.logger.warning('清理演示构建记录失败：%s', e)
     Column.query.delete()
     Fragment.query.delete()
     FragmentGroup.query.delete()

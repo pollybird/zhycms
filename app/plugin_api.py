@@ -23,8 +23,11 @@ __init__.py（定义 PluginBase 子类并实例化为模块级变量 `plugin`）
 启用/禁用即时生效（运行时 Setting 门控），无需重启。
 """
 
+import logging
 import os
 import importlib
+
+logger = logging.getLogger(__name__)
 
 
 class PluginBase:
@@ -68,7 +71,10 @@ class PluginBase:
         try:
             mod = importlib.import_module(type(self).__module__)
             base = os.path.dirname(os.path.abspath(mod.__file__))
-        except Exception:
+        except Exception as e:
+            # 插件隔离：定位插件包目录失败时视为无迁移文件
+            logger.warning('插件 %s 定位包目录失败，跳过迁移文件：%s',
+                           type(self).__module__, e)
             return []
         versions_dir = os.path.join(base, 'migrations', 'versions')
         if not os.path.isdir(versions_dir):
@@ -110,7 +116,10 @@ class PluginBase:
         try:
             mod = importlib.import_module(type(self).__module__)
             base = os.path.dirname(os.path.abspath(mod.__file__))
-        except Exception:
+        except Exception as e:
+            # 插件隔离：定位插件包目录失败时回退到本模块目录
+            logger.warning('插件 %s 定位包目录失败，使用默认翻译目录：%s',
+                           type(self).__module__, e)
             base = os.path.dirname(os.path.abspath(__file__))
         return os.path.join(base, 'translations')
 
@@ -174,7 +183,10 @@ class PluginBase:
         try:
             mod = importlib.import_module(type(self).__module__)
             base = os.path.dirname(os.path.abspath(mod.__file__))
-        except Exception:
+        except Exception as e:
+            # 插件隔离：定位插件包目录失败时视为无默认布局片段
+            logger.warning('插件 %s 定位包目录失败，跳过默认布局片段：%s',
+                           type(self).__module__, e)
             return {}
         return discover_package_layouts(base)
 

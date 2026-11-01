@@ -4,9 +4,13 @@
 - product_latest(slug, limit) 首页等处的产品卡片数据
 - frontend_product_url(p)     产品详情 URL（伪静态开 → /product-{id}.html，关 → 动态 URL）
 """
+import logging
+
 from flask import request, url_for
 
 from app.models.setting import Setting
+
+logger = logging.getLogger(__name__)
 
 
 def frontend_product_url(product, column=None):
@@ -17,7 +21,9 @@ def frontend_product_url(product, column=None):
     try:
         return url_for('product_frontend.product_detail_by_column',
                        slug=col.slug, pid=product.id)
-    except Exception:
+    except Exception as e:
+        # 路由不可用（插件前台蓝本未注册）时退回动态地址
+        logger.warning('生成产品详情 URL 失败，回退动态地址：%s', e)
         return f'/column/{col.slug}/product/{product.id}'
 
 

@@ -3,7 +3,11 @@
 优先使用 http://ip-api.com/json/ 免费接口（有请求频率限制）；
 失败时回退本地判断：仅对比 IP 网段与上次登录 IP 前两段是否一致，不一致则视为「异地」。
 """
+import logging
+
 import requests as _requests
+
+logger = logging.getLogger(__name__)
 
 _cache = {}  # ip -> city / None
 
@@ -24,8 +28,8 @@ def locate_city(ip, timeout=3):
             city = (j.get('regionName', '') or '') + (j.get('city', '') or '')
             _cache[ip] = city or '未知'
             return city or ''
-    except Exception:
-        pass
+    except (_requests.RequestException, ValueError, AttributeError) as e:
+        logger.warning('IP 归属地查询失败（%s），回退本地判断：%s', ip, e)
     _cache[ip] = ''
     return ''
 
@@ -38,5 +42,6 @@ def is_abnormal_login(current_ip, last_ip):
         c = current_ip.split('.')[:2]
         p = last_ip.split('.')[:2]
         return c != p
-    except Exception:
+    except (AttributeError, TypeError) as e:
+        logger.warning('异地登录判断失败：%s', e)
         return False

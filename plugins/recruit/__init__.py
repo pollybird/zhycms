@@ -9,11 +9,15 @@
   frontend_routes.py     前台蓝本（岗位列表/详情/申请提交，动态 + 伪静态）
   templates/recruit/     后台页面 + 前台兜底模板（主题可覆盖）
 """
+import logging
+
 from app.plugin_api import PluginBase
 from app.constants import Roles as _R
 
 from . import admin as _admin       # noqa: F401  导入即注册后台路由（并引入 models）
 from .frontend import recruit_job_url, recruit_jobs
+
+logger = logging.getLogger(__name__)
 
 
 class RecruitPlugin(PluginBase):
@@ -68,7 +72,9 @@ class RecruitPlugin(PluginBase):
         try:
             from flask import url_for
             url = url_for('recruit_frontend.job_list')
-        except Exception:
+        except Exception as e:
+            # 前台蓝本尚未注册时退回静态路径
+            logger.warning('招聘前台菜单解析网址失败，回退 /jobs：%s', e)
             url = '/jobs'
         return [{'label': self._('招贤纳士'), 'url': url, 'target': ''}]
 
@@ -113,8 +119,9 @@ class RecruitPlugin(PluginBase):
                    db.session.query(RecruitJob.id).filter_by(is_deleted=False).all()]
             for jid in ids:
                 backend.unindex_object('recruit_job', jid)
-        except Exception:
-            pass
+        except Exception as e:
+            # 插件隔离：清理索引失败不影响禁用流程
+            logger.warning('禁用招聘插件时清理搜索索引失败：%s', e)
 
     def get_sitemap_urls(self):
         """开放申请的岗位详情页收录（loc 为完整 URL）。"""

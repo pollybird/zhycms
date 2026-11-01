@@ -666,6 +666,8 @@ def setting_redis():
             conn.ping()
             redis_reachable = True
         except Exception as e:
+            # 探测失败仅影响页面提示，不阻断设置页
+            current_app.logger.warning('Redis 连通性探测失败：%s', e)
             redis_error = str(e)
     return render_template('admin/setting/redis.html',
                            env_redis_url=env_redis_url,

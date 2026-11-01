@@ -1,7 +1,10 @@
 """全量操作审计日志。"""
+import logging
 from datetime import datetime
 
 from ..extensions import db
+
+logger = logging.getLogger(__name__)
 
 
 # 操作类型枚举
@@ -122,6 +125,7 @@ class AuditLog(db.Model):
         except Exception:
             # 审计日志写入失败不得影响业务
             db.session.rollback()
+            logger.exception('审计日志写入失败，已回滚')
 
     @classmethod
     def clean_expired(cls, keep_days=90):

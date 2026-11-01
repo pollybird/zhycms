@@ -5,12 +5,14 @@
   - 产品保存/删除/下架时由 admin.py 调用核心 reindex_object/unindex_object
   - 索引后端零命中/故障时，SQL 兜底检索同样覆盖产品
 """
+import logging
 from datetime import datetime
 
 from app.extensions import db
 from app.utils.search import SearchProvider, _search_locale
 from app.utils.i18n_content import t_field, get_default_locale
 
+logger = logging.getLogger(__name__)
 
 PRODUCT_TYPE = 'product'
 
@@ -149,5 +151,7 @@ class ProductSearchProvider(SearchProvider):
         try:
             return url_for('product_frontend.product_detail_by_column',
                            slug=slug, pid=pid)
-        except Exception:
+        except Exception as e:
+            # 路由不可用时退回伪静态地址
+            logger.warning('搜索结果生成产品详情 URL 失败，回退伪静态地址：%s', e)
             return f'/product-{pid}.html'

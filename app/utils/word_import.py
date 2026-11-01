@@ -95,7 +95,8 @@ def _compress_image(raw):
     try:
         img = Image.open(io.BytesIO(raw))
         img.load()
-    except Exception:
+    except (OSError, ValueError) as e:
+        current_app.logger.warning('Word 内嵌图片解析失败，保留原图：%s', e)
         return None, None
 
     # 等比缩放到最大宽度
@@ -111,7 +112,8 @@ def _compress_image(raw):
             return out.getvalue(), 'png'
         img.convert('RGB').save(out, format='JPEG', quality=JPEG_QUALITY, optimize=True)
         return out.getvalue(), 'jpg'
-    except Exception:
+    except (OSError, ValueError) as e:
+        current_app.logger.warning('Word 内嵌图片压缩失败，保留原图：%s', e)
         return None, None
 
 

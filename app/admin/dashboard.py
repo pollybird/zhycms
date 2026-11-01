@@ -4,7 +4,7 @@
   - 工作流待审核文章计数卡片
   - 系统监控基础数据（磁盘/数据库/运行时长）
 """
-from flask import render_template, request, session, flash
+from flask import render_template, request, session, flash, current_app
 from flask_login import current_user
 
 from ..extensions import db
@@ -31,7 +31,9 @@ def _pending_form_submissions():
     try:
         from plugins.form.models import FormSubmission
         return FormSubmission.query.filter_by(is_deleted=False, is_read=False).count()
-    except Exception:
+    except Exception as e:
+        # 插件隔离：表单插件数据结构异常时仪表盘显示 0
+        current_app.logger.warning('读取未读表单提交数失败：%s', e)
         return 0
 
 
@@ -65,7 +67,8 @@ def dashboard():
     }
     try:
         monitor = system_monitor_stats()
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning('读取系统监控指标失败，仪表盘隐藏监控区块：%s', e)
         monitor = None
     return render_template('admin/dashboard.html', stats=stats, monitor=monitor,
                            dashboard_audit_maps=dashboard_audit_maps,

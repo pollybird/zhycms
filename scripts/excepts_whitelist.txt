@@ -1,0 +1,23 @@
+# v3.1.6 通用异常捕获白名单
+#
+# 格式：文件:行号:理由（逐条审定，行号变化需同步更新）
+# 仅列出「显式处理」的例外：返回值/错误信息已交给调用方、rollback 守卫、
+# 预期分支等；静默吞噬必须有 logger.warning 留痕，不得进入本白名单。
+
+app/plugin_system.py:534:enable_plugin 失败信息返回调用方并回滚事务（显式处理）
+app/plugin_system.py:775:演示数据钩子错误逐条收集后返回调用方（显式处理）
+app/utils/backup_utils.py:106:create_backup 记录 err_msg 写入备份记录并返回调用方（显式处理）
+app/utils/backup_utils.py:256:restore_backup 统一返回 (False, 错误信息)（显式处理）
+app/utils/backup_utils.py:273:SQLite 备份文件损坏时返回用户可读错误（显式处理）
+app/utils/backup_utils.py:296:回写数据库文件失败时返回用户可读错误（显式处理）
+app/utils/backup_utils.py:315:gzip 解压失败清理中间文件并返回错误（显式处理）
+app/utils/backup_utils.py:367:PostgreSQL 解压失败清理中间文件并返回错误（显式处理）
+app/utils/dbconfig.py:125:连接测试兜底返回用户可读错误（显式处理）
+app/utils/search.py:681:索引健康检查返回错误信息（显式处理）
+app/utils/search.py:816:Meilisearch 健康检查返回错误信息（显式处理）
+app/api/views.py:150:JWT 校验失败返回 401 错误响应（显式处理）
+plugins/auto_translate/service.py:308:连接测试返回 (False, 错误信息)（显式处理）
+plugins/oss_storage/migrate.py:133:迁移中断返回统计与错误信息（显式处理）
+plugins/oss_storage/admin.py:114:驱动健康检查失败回退 local 并 flash 提示（显式处理）
+plugins/oss_storage/drivers/base.py:189:删除不存在的对象不报错（预期分支）
+plugins/oss_storage/drivers/base.py:203:健康检查返回 (False, 错误信息)（显式处理）
