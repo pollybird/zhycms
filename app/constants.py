@@ -51,6 +51,21 @@ class Search:
     DEFAULT_ENGINE = ENGINE_TANTIVY
 
 
+class Editor:
+    """后台编辑器模式（v3.1.5）。"""
+
+    MODE_CKEDITOR = 'ckeditor'
+    MODE_MARKDOWN = 'markdown'
+    MODES = (MODE_CKEDITOR, MODE_MARKDOWN)
+    DEFAULT_MODE = MODE_CKEDITOR
+
+    # 内容格式标记（articles.content_format 等列的取值）：
+    # html=富文本 HTML（CKEditor 产出），markdown=Markdown 原文转出的 HTML
+    FORMAT_HTML = 'html'
+    FORMAT_MARKDOWN = MODE_MARKDOWN
+    FORMATS = (FORMAT_HTML, FORMAT_MARKDOWN)
+
+
 class Roles:
     """预设角色 slug。"""
 

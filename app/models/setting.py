@@ -30,7 +30,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.1.4'
+    CMS_VERSION = '3.1.5'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -141,6 +141,9 @@ class Setting(db.Model):
         'search_results_per_page': '20',       # 每页搜索结果数
         'search_highlight': 'on',              # on=高亮匹配关键词
 
+        # ===== 模块9：后台编辑器（v3.1.5）=====
+        'editor_default_mode': 'ckeditor',     # ckeditor / markdown（仅影响新建内容）
+
         # ===== v2.4.0：对象存储（oss_storage 插件，键值存储零迁移）=====
         'storage_driver': 'local',             # local / aliyun / tencent / qiniu
         'oss_aliyun_access_key_id': '',        # 阿里云 AccessKey ID
@@ -230,3 +233,10 @@ class Setting(db.Model):
     def get_allowed_exts(cls):
         raw = cls.get('upload_allowed_exts', cls.DEFAULTS['upload_allowed_exts'])
         return [e.strip().lower() for e in raw.split(',') if e.strip()]
+
+    @classmethod
+    def get_editor_default_mode(cls):
+        """后台编辑器默认模式（v3.1.5）：ckeditor / markdown，非法值回退 ckeditor。"""
+        from ..constants import Editor
+        mode = (cls.get('editor_default_mode') or '').strip()
+        return mode if mode in Editor.MODES else Editor.MODE_CKEDITOR

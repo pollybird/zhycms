@@ -14,6 +14,9 @@ class Article(db.Model):
     summary = db.Column(db.Text)
     cover = db.Column(db.String(255))
     content = db.Column(db.Text)
+    # v3.1.5：Markdown 双写（content 始终是 HTML，content_md 存原文供编辑回填）
+    content_md = db.Column(db.Text)
+    content_format = db.Column(db.String(16), default='html', nullable=False)
     author = db.Column(db.String(64))
     source = db.Column(db.String(128))
     sort_order = db.Column(db.Integer, default=0, nullable=False)
@@ -119,6 +122,9 @@ class ArticleTranslation(db.Model):
     title = db.Column(db.String(255), nullable=False)
     summary = db.Column(db.Text)
     content = db.Column(db.Text)
+    # v3.1.5：Markdown 双写
+    content_md = db.Column(db.Text)
+    content_format = db.Column(db.String(16), default='html', nullable=False)
     seo_title = db.Column(db.String(255))
     seo_keywords = db.Column(db.String(255))
     seo_description = db.Column(db.String(500))

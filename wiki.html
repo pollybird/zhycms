@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.1.4 使用手册</title>
+<title>ZhyCMS v3.1.5 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -82,6 +82,7 @@
   <a href="#identity">CMS 与网站标识</a>
   <a href="#rbac">用户、角色与权限</a>
   <a href="#workflow">内容工作流与版本</a>
+  <a href="#editor">Markdown 编辑模式 <span class="tag tag-new">v3.1.5</span></a>
   <a href="#backup">备份与恢复</a>
   <a href="#notify">表单消息通知</a>
   <a href="#seo">SEO 与站点性能</a>
@@ -160,7 +161,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.1.4</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.1.5</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -186,6 +187,7 @@
   <tr><td>Docker 部署</td><td>官方镜像 pollybird/zhycms 已发布，MySQL/PostgreSQL 一键启动，支持本地构建</td><td>v2.4</td></tr>
   <tr><td>RBAC 权限</td><td>角色/权限点两级模型，菜单与按钮级授权，栏目级内容粒度</td><td>v2.0</td></tr>
   <tr><td>内容工作流</td><td>草稿 → 待审核 → 已发布/已驳回，版本快照与对比还原</td><td>v2.0</td></tr>
+  <tr><td>后台编辑器双模式</td><td>富文本（CKEditor）/ Markdown 一键切换，实时预览，系统设置可改默认模式</td><td>v3.1.5</td></tr>
   <tr><td>审计日志</td><td>登录、配置变更、内容 CRUD 全量留痕，多维度检索</td><td>v2.0</td></tr>
   <tr><td>SEO 优化</td><td>伪静态、sitemap、robots.txt、页面缓存、图片默认 ALT</td><td>v2.0</td></tr>
   <tr><td>表单收集</td><td>可视化表单设计，提交后邮件/企微实时通知</td><td>v2.0</td></tr>
@@ -367,6 +369,20 @@ docker compose -f docker-compose.postgresql.yml up -d
 </ul>
 <h3>版本快照</h3>
 <p>文章每次保存自动生成版本快照，支持<b>查看差异</b>与<b>一键还原</b>（还原动作本身也生成新版本，可安全撤销）。</p>
+</section>
+
+<section id="editor">
+<h2>Markdown 编辑模式 <span class="tag tag-new">v3.1.5</span></h2>
+<p>后台所有富文本输入框（文章正文、单页栏目内容、富文本碎片，含各自多语言译文字段）均支持 <b>富文本（CKEditor）/ Markdown</b> 双模式编辑，编辑器顶部「富文本 | Markdown」分段控件一键切换。</p>
+<h3>使用要点</h3>
+<ul>
+  <li><b>默认仍为富文本</b>：升级后老内容以 CKEditor 打开，操作习惯零变化；新建内容默认模式可在 <b>系统设置 → 编辑设置</b> 中改为 Markdown（仅影响新建内容）。</li>
+  <li><b>Markdown 模式</b>：等宽编辑区 + 实时预览（输入停顿约 300ms 后渲染），支持插入图片（复用后台上传接口）与全屏编辑。</li>
+  <li><b>切换即转换</b>：富文本 → Markdown 由 turndown.js 转换，反向由 marked.js 转换；<b>切向 Markdown 时会弹二次确认</b>——表格样式、字体字号、颜色、对齐等 Markdown 无法表达的排版会丢失，未保存前刷新即可放弃。</li>
+  <li><b>存储约定</b>：无论哪种模式，<code>content</code> 列始终保存 HTML（Markdown 保存时服务端用 python-markdown 渲染），前台主题、搜索、内容 API 全部零改动；Markdown 原文另存 <code>*_md</code> 列，供再次编辑时原样回填。</li>
+  <li><b>版本回滚</b>：快照只存 HTML，回滚后该内容强制以富文本格式打开。</li>
+  <li><b>依赖兜底</b>：若服务器未安装 <code>markdown</code> 包（<code>pip install "markdown&gt;=3.7,&lt;4.0"</code>），后台不报错，Markdown 内容降级为纯文本转义；「编辑设置」页会展示依赖状态。</li>
+</ul>
 </section>
 
 <section id="backup">

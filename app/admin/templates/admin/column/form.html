@@ -128,7 +128,12 @@
       <div class="card" id="page-content-card" style="display:none;">
         <div class="card-header"><h3 class="card-title"><i class="fas fa-edit"></i> {{ _('单页内容') }}</h3></div>
         <div class="card-body p-0">
-          <textarea name="page_content" id="page_content" rows="10" class="form-control" style="border:0;">{{ column.page_content if column else '' }}</textarea>
+          {# v3.1.5：richtext-md = 支持 Markdown 切换的富文本；data-* 供 rich-editor.js 读取 #}
+          <textarea name="page_content" id="page_content" rows="10" class="form-control richtext-md" style="border:0;"
+            data-md-field="page_content_md" data-format-field="page_content_format"
+            data-mode="{{ 'markdown' if column and column.page_content_format == 'markdown' else default_editor_mode }}">{{ column.page_content if column else '' }}</textarea>
+          <textarea name="page_content_md" style="display:none">{{ column.page_content_md if column else '' }}</textarea>
+          <input type="hidden" name="page_content_format" value="">
         </div>
       </div>
 
@@ -237,7 +242,11 @@
             </div>
             <div class="form-group">
               <label>{{ _('单页内容') }} ({{ loc|upper }})</label>
-              <textarea name="page_content_{{ loc }}" rows="8" class="form-control page-richtext">{{ tr.page_content if tr else '' }}</textarea>
+              <textarea name="page_content_{{ loc }}" rows="8" class="form-control richtext-md"
+                data-md-field="page_content_{{ loc }}_md" data-format-field="page_content_{{ loc }}_format"
+                data-mode="{{ 'markdown' if tr and tr.page_content_format == 'markdown' else default_editor_mode }}">{{ tr.page_content if tr else '' }}</textarea>
+              <textarea name="page_content_{{ loc }}_md" style="display:none">{{ tr.page_content_md if tr else '' }}</textarea>
+              <input type="hidden" name="page_content_{{ loc }}_format" value="">
             </div>
             <div class="form-group">
               <label>SEO {{ _('标题') }} ({{ loc|upper }})</label>
@@ -364,13 +373,30 @@
 {% endblock %}
 
 {% block js %}
-<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
-<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/marked/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/turndown/turndown.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/rich-editor.js') }}"></script>
 <style>
   .ck.ck-editor__editable_inline { min-height: 500px; }
   .ck.ck-content { font-size: 15px; line-height: 1.8; }
 </style>
 <script>
+  // v3.1.5：编辑器脚本改由 rich-editor.js 按需加载（Markdown 模式下不加载约 1MB 的 CKEditor）。
+  // CKEditor 仍为自托管 super-build + GPL 许可证（CDN 分发不接受 'GPL' key）。
+  RichEditor.configure({
+    ckUrl: '{{ url_for("static", filename="ckeditor5/ckeditor.js") }}',
+    ckLangUrl: '{{ url_for("static", filename="ckeditor5/translations/zh-cn.js") }}',
+    i18n: {
+      richText: '{{ _('富文本') }}',
+      preview: '{{ _('预览') }}',
+      insertImage: '{{ _('插入图片') }}',
+      fullscreen: '{{ _('全屏') }}',
+      exitFullscreen: '{{ _('退出全屏') }}',
+      confirmToMarkdown: '{{ _('复杂排版（表格样式、字体字号、对齐等）在 Markdown 模式下可能丢失，建议切换后检查再保存。是否继续？') }}',
+      uploading: '{{ _('上传中…') }}',
+      uploadFailed: '{{ _('图片上传失败') }}'
+    }
+  });
   let fieldIndex = $('#fields-container .field-row').length;
 
   function toggle_type_blocks(){
@@ -387,9 +413,7 @@
   $('#col-type').on('change', toggle_type_blocks);
   toggle_type_blocks();
 
-  // CKEditor 初始化单页内容
-  // 自托管 super-build + GPL 许可证（CDN 分发不接受 'GPL' key）。
-  let editor;
+  // CKEditor 配置（原样透传给 RichEditor；视觉与功能与旧版一致）
   const pageCkConfig = {
     licenseKey: 'GPL',
     language: 'zh-cn',
@@ -429,24 +453,29 @@
     },
     simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=column' }
   };
-  const ta = document.querySelector('#page_content');
-  if (ta) {
-    CKEDITOR.ClassicEditor.create(ta, pageCkConfig).then(e => { editor = e; })
-      .catch(err => console.error(err));
-    $('#column-form').on('submit', function(){
-      if (editor) ta.value = editor.getData();
-    });
-  }
 
-  // 单页富文本字段（field_type=richtext）也用 CKEditor，提交前回写各自 textarea
-  let pageFieldEditors = [];
-  document.querySelectorAll('.page-richtext').forEach(el => {
-    CKEDITOR.ClassicEditor.create(el, pageCkConfig).then(e => {
-      pageFieldEditors.push({el: el, editor: e});
-    }).catch(err => console.error(err));
+  // 单页内容 + 多语言单页内容：RichEditor 双模式（data-* 属性驱动，批量初始化）
+  document.querySelectorAll('.richtext-md').forEach(function(el){
+    RichEditor.init({
+      textarea: el, ckConfig: pageCkConfig,
+      uploadUrl: '{{ url_for("admin.upload_file") }}?type=column',
+      uploadType: 'column', minHeight: 500
+    });
   });
+
+  // 单页自定义字段的富文本（无 Markdown 存储列）保持纯 CKEditor，脚本按需加载
+  let pageFieldEditors = [];
+  if (document.querySelectorAll('.page-richtext').length) {
+    RichEditor.loadCk().then(function(){
+      document.querySelectorAll('.page-richtext').forEach(function(el){
+        CKEDITOR.ClassicEditor.create(el, pageCkConfig).then(function(e){
+          pageFieldEditors.push({el: el, editor: e});
+        }).catch(function(err){ console.error(err); });
+      });
+    }).catch(function(err){ console.error(err); });
+  }
   $('#column-form').on('submit', function(){
-    pageFieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
+    pageFieldEditors.forEach(function(item){ item.el.value = item.editor.getData(); });
   });
 
   function add_field(){

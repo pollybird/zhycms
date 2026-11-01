@@ -2,7 +2,7 @@
 
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
-**当前版本：v3.1.4**（依赖腐化专项治理：全文搜索切换 Tantivy + pkuseg 中文分词、redis/pytest 约束放宽、CI 矩阵扩展 3.13/3.14。详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v3.1.5**（后台富文本新增 Markdown 编辑模式：表单内一键切换 + 实时预览，系统设置可改默认模式；升级无感，默认仍为 CKEditor。详见 [CHANGELOG](CHANGELOG.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 

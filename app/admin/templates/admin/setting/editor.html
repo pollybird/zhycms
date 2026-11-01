@@ -1,0 +1,53 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('编辑设置') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('编辑设置') }}{% endblock %}
+{% set active_menu = 'setting_editor' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item">{{ _('系统设置') }}</li>
+<li class="breadcrumb-item active">{{ _('编辑设置') }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <div class="card card-outline card-primary">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-edit"></i> {{ _('默认编辑模式') }}</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <div class="icheck-primary">
+          <input type="radio" name="editor_default_mode" value="ckeditor" id="mode-ckeditor"
+                 {{ 'checked' if current_mode == 'ckeditor' }}>
+          <label for="mode-ckeditor">{{ _('富文本（CKEditor，与旧版一致）') }}</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="icheck-primary">
+          <input type="radio" name="editor_default_mode" value="markdown" id="mode-markdown"
+                 {{ 'checked' if current_mode == 'markdown' }}>
+          <label for="mode-markdown">Markdown（{{ _('带实时预览') }}）</label>
+        </div>
+      </div>
+      <small class="form-text text-muted">
+        {{ _('仅影响新建内容；已有内容打开时仍按各自保存时的格式进入对应编辑器。编辑表单内也可随时一键切换。') }}
+      </small>
+    </div>
+  </div>
+
+  <div class="card card-outline card-info">
+    <div class="card-header"><h3 class="card-title"><i class="fas fa-heartbeat"></i> {{ _('Markdown 渲染依赖') }}</h3></div>
+    <div class="card-body">
+      <p class="mb-0">
+        {% if md_available %}
+        <span class="badge badge-success">{{ _('正常') }}</span>
+        {{ _('python-markdown 已安装，Markdown 保存时将渲染为 HTML。') }}
+        {% else %}
+        <span class="badge badge-danger">{{ _('缺失') }}</span>
+        {{ _('未安装 markdown 包（pip install "markdown>=3.7,<4.0"），Markdown 内容将降级为纯文本转义。') }}
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存设置') }}</button>
+</form>
+{% endblock %}

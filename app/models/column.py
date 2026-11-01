@@ -27,6 +27,9 @@ class Column(db.Model):
 
     # 单页内容（仅 type=page 且为叶子栏目时使用）
     page_content = db.Column(db.Text)
+    # v3.1.5：Markdown 双写（page_content 始终是 HTML，page_content_md 存原文）
+    page_content_md = db.Column(db.Text)
+    page_content_format = db.Column(db.String(16), default='html', nullable=False)
 
     # 列表栏目：每页条数
     page_size = db.Column(db.Integer, default=10)
@@ -218,6 +221,9 @@ class ColumnTranslation(db.Model):
     name = db.Column(db.String(100), nullable=False)
     summary = db.Column(db.Text)
     page_content = db.Column(db.Text)
+    # v3.1.5：Markdown 双写
+    page_content_md = db.Column(db.Text)
+    page_content_format = db.Column(db.String(16), default='html', nullable=False)
     seo_title = db.Column(db.String(255))
     seo_keywords = db.Column(db.String(255))
     seo_description = db.Column(db.String(500))

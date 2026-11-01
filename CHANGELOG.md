@@ -5,6 +5,31 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.5] - 2026-11-01
+
+**编辑器能力扩展**版本（非破坏性）。后台富文本新增 Markdown 编辑模式：文章正文、单页栏目内容、富文本碎片（含各自多语言译文字段）均可在表单内一键切换「富文本 | Markdown」，Markdown 模式带实时预览；「系统设置 → 编辑设置」可将新建内容的默认模式改为 Markdown。升级后默认仍为 CKEditor，老内容仍按原格式打开，老用户操作习惯零变化。**有数据库结构变更**（5 张表各新增 `*_md` / `*_format` 两列，迁移 `0011` 自动执行），**新增 1 个 Python 依赖**（`markdown`）。
+
+### Added
+
+- **后台富文本双模式编辑（文章/单页栏目/碎片）**：编辑器标题行新增「富文本 | Markdown」分段切换。Markdown 模式为等宽字体编辑区 + 实时预览（marked.js，300ms 防抖），支持插入图片（复用既有上传接口）与全屏；切换由 turndown.js / marked.js 在客户端双向转换，切向 Markdown 且有内容时弹二次确认（表格样式、字体字号、对齐等 Markdown 无法表达的排版会丢失）。
+- **双写存储 + 格式标记**：新增 `content_md` / `content_format` 等同名两列（`articles`、`article_translations`、`columns`、`column_translations`、`fragments`）。Markdown 模式保存时 `content` 列写渲染后的 HTML（python-markdown，`extra`/`sane_lists`/`nl2br` 扩展，与前端 `breaks:true` 对齐），原文存 `*_md` 供编辑回填；`content` 列始终是 HTML，前台 8 套主题、搜索、内容 API、RSS/Sitemap 零改动。
+- **「系统设置 → 编辑设置」页**：`Setting.editor_default_mode`（`ckeditor` / `markdown`，默认 `ckeditor`）控制新建内容的默认编辑模式；页面只读展示 `markdown` 依赖可用性便于排障；变更写审计日志。
+- **编辑页模式判定**：记录自身 `*_format='markdown'` → Markdown 打开，否则跟随全局默认；老数据 `*_format` 默认 `'html'` 永远以 CKEditor 打开（升级无感）。
+- **共享前端组件 `app/static/js/rich-editor.js`**：三处表单统一接线（data-* 属性驱动批量初始化）；CKEditor 脚本按需加载（Markdown 模式首屏不加载约 1MB 的 ckeditor.js）；marked 12.0.2 / turndown 7.2.0 自托管于 `app/static/vendor/`，不引 CDN。
+
+### Changed
+
+- **CKEditor 初始化改造**：三个表单的内联初始化迁移至 `rich-editor.js`，CKEditor 工具栏配置原样透传（视觉与功能与旧版一致）；文章「从 Word 导入」改为经 RichEditor 跨模式写入（Markdown 模式下导入内容自动转为 Markdown）。
+- **版本回滚**：回滚后强制 `content_format='html'` 并清空 `content_md`（快照只存 HTML，避免与 Markdown 原文不一致），回滚成功提示已注明。
+- **新增依赖**：`markdown>=3.7,<4.0`（纯 Python，活跃维护）；依赖缺失时后台不 500，Markdown 内容降级为纯文本转义并告警（兜底分支，正常部署不触发）。
+- **常量与门禁**：`constants.Editor`（模式/格式取值），`check_constants.py` 新增 `'ckeditor'` 裸字面量门禁（`'markdown'` 因通知模块 `msgtype` 等语义不同不入门禁）。
+
+### 升级注意
+
+- 覆盖代码 + `pip install -r requirements.txt` + 重启即可，Alembic 自动执行 `0011`（5 张表加列 + 幂等种子 `editor_default_mode='ckeditor'`）；新列均无索引，兼容 MySQL 5.6。
+- 升级后无需任何配置：默认编辑模式仍为富文本，老内容打开方式不变；需要 Markdown 默认模式的站点到「系统设置 → 编辑设置」切换。
+- **测试**：新增 `test_markdown_render.py`（渲染/双写契约 13 项）与 `test_markdown_editor.py`（三处保存链路、编辑页模式判定、设置页读写、版本回滚 11 项）；全量 395 项通过。
+
 ## [3.1.4] - 2026-10-24
 
 **依赖腐化专项治理**版本。全文搜索引擎从停更的 Whoosh + jieba 切换为活跃维护的 Tantivy + pkuseg（spacy-pkuseg）；放宽 redis / pytest / pytest-cov 版本约束；CI 测试矩阵扩展至 Python 3.13 / 3.14。有数据迁移（搜索引擎标识切换），无数据库结构变更。

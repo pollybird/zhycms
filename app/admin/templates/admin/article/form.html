@@ -85,7 +85,12 @@
           </div>
         </div>
         <div class="card-body p-0">
-          <textarea name="content" id="content" rows="15" class="form-control" style="border:0;">{{ article.content if article else '' }}</textarea>
+          {# v3.1.5：richtext-md = 支持 Markdown 切换的富文本；data-* 供 rich-editor.js 读取 #}
+          <textarea name="content" id="content" rows="15" class="form-control richtext-md" style="border:0;"
+            data-md-field="content_md" data-format-field="content_format"
+            data-mode="{{ 'markdown' if article and article.content_format == 'markdown' else default_editor_mode }}">{{ article.content if article else '' }}</textarea>
+          <textarea name="content_md" style="display:none">{{ article.content_md if article else '' }}</textarea>
+          <input type="hidden" name="content_format" value="">
         </div>
       </div>
 
@@ -128,7 +133,11 @@
               </div>
               <div class="form-group">
                 <label>{{ _('正文内容') }} ({{ loc|upper }})</label>
-                <textarea name="content_{{ loc }}" rows="10" class="form-control richtext">{{ tr.content if tr else '' }}</textarea>
+                <textarea name="content_{{ loc }}" rows="10" class="form-control richtext-md"
+                  data-md-field="content_{{ loc }}_md" data-format-field="content_{{ loc }}_format"
+                  data-mode="{{ 'markdown' if tr and tr.content_format == 'markdown' else default_editor_mode }}">{{ tr.content if tr else '' }}</textarea>
+                <textarea name="content_{{ loc }}_md" style="display:none">{{ tr.content_md if tr else '' }}</textarea>
+                <input type="hidden" name="content_{{ loc }}_format" value="">
               </div>
               <div class="form-group">
                 <label>SEO {{ _('标题') }} ({{ loc|upper }})</label>
@@ -263,16 +272,31 @@
 {% endblock %}
 
 {% block js %}
-<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
-<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/marked/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/turndown/turndown.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/rich-editor.js') }}"></script>
 <style>
   .ck.ck-editor__editable_inline { min-height: 600px; }
   .ck.ck-content { font-size: 15px; line-height: 1.8; }
 </style>
 <script>
-  // 使用 CKEditor5 super-build（内置全部官方插件）以支持字体颜色、背景色、字号、字体、
-  // 段落对齐、缩进、高亮、上下标、清除格式等富文本功能。
-  // 自托管（本地 static 引用）+ GPL 许可证；CDN 分发不接受 'GPL' key，故改为本地托管。
+  // v3.1.5：编辑器脚本改由 rich-editor.js 按需加载（Markdown 模式下不加载约 1MB 的 CKEditor）。
+  // CKEditor 仍为自托管 super-build + GPL 许可证（CDN 分发不接受 'GPL' key）。
+  RichEditor.configure({
+    ckUrl: '{{ url_for("static", filename="ckeditor5/ckeditor.js") }}',
+    ckLangUrl: '{{ url_for("static", filename="ckeditor5/translations/zh-cn.js") }}',
+    i18n: {
+      richText: '{{ _('富文本') }}',
+      preview: '{{ _('预览') }}',
+      insertImage: '{{ _('插入图片') }}',
+      fullscreen: '{{ _('全屏') }}',
+      exitFullscreen: '{{ _('退出全屏') }}',
+      confirmToMarkdown: '{{ _('复杂排版（表格样式、字体字号、对齐等）在 Markdown 模式下可能丢失，建议切换后检查再保存。是否继续？') }}',
+      uploading: '{{ _('上传中…') }}',
+      uploadFailed: '{{ _('图片上传失败') }}'
+    }
+  });
+
   const ckConfig = {
     licenseKey: 'GPL',
     language: 'zh-cn',
@@ -322,23 +346,34 @@
     }
   };
 
-  let mainEditor, fieldEditors = [];
-  CKEDITOR.ClassicEditor.create(document.querySelector('#content'), ckConfig)
-    .then(e => { mainEditor = e; })
-    .catch(err => console.error(err));
-
-  document.querySelectorAll('.richtext').forEach(el => {
-    CKEDITOR.ClassicEditor.create(el, ckConfig).then(e => {
-      fieldEditors.push({el: el, editor: e});
-    }).catch(err => console.error(err));
+  // 正文 + 多语言正文：RichEditor 双模式（data-* 属性驱动，批量初始化）
+  let mainRichEditor = null;
+  document.querySelectorAll('.richtext-md').forEach(function(el){
+    const inst = RichEditor.init({
+      textarea: el, ckConfig: ckConfig,
+      uploadUrl: '{{ url_for("admin.upload_file") }}?type=article',
+      uploadType: 'article', minHeight: 600
+    });
+    if (el.id === 'content') mainRichEditor = inst;
   });
+
+  // 自定义字段的富文本（无 Markdown 存储列）保持纯 CKEditor，脚本按需加载
+  let fieldEditors = [];
+  if (document.querySelectorAll('.richtext').length) {
+    RichEditor.loadCk().then(function(){
+      document.querySelectorAll('.richtext').forEach(function(el){
+        CKEDITOR.ClassicEditor.create(el, ckConfig).then(function(e){
+          fieldEditors.push({el: el, editor: e});
+        }).catch(function(err){ console.error(err); });
+      });
+    }).catch(function(err){ console.error(err); });
+  }
 
   $('#article-form').on('submit', function(){
-    if (mainEditor) document.querySelector('#content').value = mainEditor.getData();
-    fieldEditors.forEach(item => { item.el.value = item.editor.getData(); });
+    fieldEditors.forEach(function(item){ item.el.value = item.editor.getData(); });
   });
 
-  // 从 Word(.docx) 导入正文：上传→后端转干净 HTML→灌入编辑器
+  // 从 Word(.docx) 导入正文：上传→后端转干净 HTML→灌入编辑器（v3.1.5 起经 RichEditor 跨模式写入）
   (function(){
     const btn = document.getElementById('import-word-btn');
     const fileInput = document.getElementById('import-word-file');
@@ -366,14 +401,13 @@
         .then(r => r.json().then(data => ({ok: r.ok, data})))
         .then(({ok, data}) => {
           if (!ok || data.error) throw new Error(data.error || '{{ _('导入失败') }}');
-          if (!mainEditor) { alert('{{ _('编辑器尚未就绪，请稍候重试') }}'); return; }
-          const current = (mainEditor.getData() || '').trim();
+          const current = (mainRichEditor.getHTML() || '').trim();
           if (current && !confirm('{{ _('正文已有内容。点击“确定”在末尾追加导入内容，点击“取消”则替换全部内容。') }}')) {
-            mainEditor.setData(data.html);           // {{ _('取消 → 替换') }}
+            mainRichEditor.setHTML(data.html);           // {{ _('取消 → 替换') }}
           } else if (current) {
-            mainEditor.setData(current + data.html); // {{ _('确定 → 追加') }}
+            mainRichEditor.setHTML(current + data.html); // {{ _('确定 → 追加') }}
           } else {
-            mainEditor.setData(data.html);           // {{ _('原本为空 → 直接填入') }}
+            mainRichEditor.setHTML(data.html);           // {{ _('原本为空 → 直接填入') }}
           }
           if (data.messages && data.messages.length) {
             console.warn('{{ _('Word 导入提示：') }}', data.messages);

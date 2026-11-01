@@ -9,6 +9,7 @@ from flask import (
 from flask_babel import gettext as _gettext
 from ...extensions import db
 from ...models.column import Column, ColumnField
+from ...models.setting import Setting
 from ...utils.i18n_content import get_available_locales, get_default_locale
 from ...utils.helpers import permission_required, audit_log, clear_content_cache
 from ...utils.themes import list_theme_templates, TEMPLATE_CATEGORIES
@@ -99,6 +100,7 @@ def column_create():
         column=None, parents=parents, field_types=FIELD_TYPES,
         parent_options=_build_tree_with_depth(parents),
         template_options=_template_options(),
+        default_editor_mode=Setting.get_editor_default_mode(),
     )
 
 
@@ -127,6 +129,7 @@ def column_edit(cid):
         template_options=_template_options(),
         trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
         default_locale=get_default_locale(),
+        default_editor_mode=Setting.get_editor_default_mode(),
     )
 
 

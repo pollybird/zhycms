@@ -7,8 +7,10 @@ from flask_babel import gettext as _gettext
 from ...extensions import db
 from ...constants import Upload as _U
 from ...models.fragment import Fragment, FragmentGroup, FragmentTranslation
+from ...models.setting import Setting
 from ...utils.i18n_content import get_available_locales, get_default_locale
 from ...utils.helpers import permission_required, audit_log, clear_content_cache, safe_int
+from ...utils.markdown_render import apply_editor_form
 from ...utils.uploads import save_upload_file
 from ...models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRAGMENT
 from .. import admin_bp
@@ -108,7 +110,8 @@ def fragment_create():
         return redirect(url_for('admin.fragment_index'))
     return render_template('admin/fragment/form.html', fragment=None, groups=groups, field_types=FIELD_TYPES,
                            trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
-                           default_locale=get_default_locale())
+                           default_locale=get_default_locale(),
+                           default_editor_mode=Setting.get_editor_default_mode())
 
 
 @admin_bp.route('/fragments/<int:fid>/edit', methods=['GET', 'POST'])
@@ -127,7 +130,8 @@ def fragment_edit(fid):
         return redirect(url_for('admin.fragment_index'))
     return render_template('admin/fragment/form.html', fragment=frag, groups=groups, field_types=FIELD_TYPES,
                            trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
-                           default_locale=get_default_locale())
+                           default_locale=get_default_locale(),
+                           default_editor_mode=Setting.get_editor_default_mode())
 
 
 def _save_fragment(fragment):
@@ -176,7 +180,11 @@ def _save_fragment(fragment):
             fragment.value = ''
         # 否则保留原值
     else:
-        fragment.value = request.form.get('value') or ''
+        if field_type == 'richtext':
+            # v3.1.5：富文本碎片支持 Markdown 双写（value 始终是 HTML）
+            apply_editor_form(fragment, request.form, 'value', 'value')
+        else:
+            fragment.value = request.form.get('value') or ''
 
     # v2.5.0：保存各语种翻译（非默认语言）
     _save_fragment_translations(fragment)

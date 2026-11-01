@@ -47,7 +47,12 @@
             {% if fragment and fragment.field_type == 'textarea' %}
             <textarea name="value" rows="4" class="form-control">{{ fragment.value or '' }}</textarea>
             {% elif fragment and fragment.field_type == 'richtext' %}
-            <textarea name="value" id="value_richtext" rows="8" class="form-control">{{ fragment.value or '' }}</textarea>
+            {# v3.1.5：richtext-md = 支持 Markdown 切换的富文本；data-* 供 rich-editor.js 读取 #}
+            <textarea name="value" id="value_richtext" rows="8" class="form-control richtext-md"
+              data-md-field="value_md" data-format-field="value_format"
+              data-mode="{{ 'markdown' if fragment.value_format == 'markdown' else default_editor_mode }}">{{ fragment.value or '' }}</textarea>
+            <textarea name="value_md" style="display:none">{{ fragment.value_md or '' }}</textarea>
+            <input type="hidden" name="value_format" value="">
             {% else %}
             <input type="text" name="value" class="form-control" value="{{ fragment.value if fragment else '' }}">
             {% endif %}
@@ -127,13 +132,29 @@
 
 {% block js %}
 {% if fragment and fragment.field_type == 'richtext' %}
-<script src="{{ url_for('static', filename='ckeditor5/ckeditor.js') }}"></script>
-<script src="{{ url_for('static', filename='ckeditor5/translations/zh-cn.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/marked/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/turndown/turndown.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/rich-editor.js') }}"></script>
 <script>
+  // v3.1.5：编辑器脚本改由 rich-editor.js 按需加载（Markdown 模式下不加载约 1MB 的 CKEditor）。
+  // CKEditor 仍为自托管 super-build + GPL 许可证（CDN 分发不接受 'GPL' key）。
+  RichEditor.configure({
+    ckUrl: '{{ url_for("static", filename="ckeditor5/ckeditor.js") }}',
+    ckLangUrl: '{{ url_for("static", filename="ckeditor5/translations/zh-cn.js") }}',
+    i18n: {
+      richText: '{{ _('富文本') }}',
+      preview: '{{ _('预览') }}',
+      insertImage: '{{ _('插入图片') }}',
+      fullscreen: '{{ _('全屏') }}',
+      exitFullscreen: '{{ _('退出全屏') }}',
+      confirmToMarkdown: '{{ _('复杂排版（表格样式、字体字号、对齐等）在 Markdown 模式下可能丢失，建议切换后检查再保存。是否继续？') }}',
+      uploading: '{{ _('上传中…') }}',
+      uploadFailed: '{{ _('图片上传失败') }}'
+    }
+  });
+
   // super-build 全功能富文本（字体颜色/背景色/字号/字体/对齐/缩进/高亮等）
-  // 自托管 super-build + GPL 许可证（CDN 分发不接受 'GPL' key）。
-  let editor;
-  CKEDITOR.ClassicEditor.create(document.querySelector('#value_richtext'), {
+  const fragmentCkConfig = {
     licenseKey: 'GPL',
     language: 'zh-cn',
     placeholder: '{{ _('在此输入内容……') }}',
@@ -171,55 +192,29 @@
       options: [9, 10, 11, 12, 13, 'default', 15, 17, 19, 21, 24, 28, 32, 40]
     },
     simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=fragment' }
-  }).then(e => { editor = e; }).catch(err => console.error(err));
+  };
 
-  // 多语言翻译内容值：与默认语言一致使用富文本编辑器（提交前回写 textarea）
-  const i18nEditors = [];
-  document.querySelectorAll('.i18n-value-richtext').forEach(el => {
-    CKEDITOR.ClassicEditor.create(el, {
-      licenseKey: 'GPL',
-      language: 'zh-cn',
-      placeholder: '{{ _('在此输入内容……') }}',
-      toolbar: {
-        items: [
-          'undo', 'redo', '|',
-          'heading', '|',
-          'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', '|',
-          'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'code', '|',
-          'alignment', '|',
-          'bulletedList', 'numberedList', 'outdent', 'indent', '|',
-          'link', 'imageUpload', 'insertTable', 'blockQuote', 'highlight',
-          'codeBlock', 'horizontalLine', 'specialCharacters', '|',
-          'removeFormat', 'sourceEditing'
-        ],
-        shouldNotGroupWhenFull: true
-      },
-      removePlugins: [
-        'AIAssistant', 'AITextAdapter', 'OpenAITextAdapter', 'AWSTextAdapter',
-        'CKBox', 'CKFinder', 'EasyImage', 'RealTimeCollaborativeComments',
-        'RealTimeCollaborativeTrackChanges', 'RealTimeCollaborativeRevisionHistory',
-        'PresenceList', 'Comments', 'TrackChanges', 'TrackChangesData', 'RevisionHistory',
-        'Pagination', 'WProofreader', 'MathType', 'SlashCommand', 'Template',
-        'DocumentOutline', 'FormatPainter', 'TableOfContents', 'PasteFromOfficeEnhanced',
-        'CaseChange'
-      ],
-      image: {
-        toolbar: ['imageTextAlternative', 'toggleImageCaption', '|',
-                  'imageStyle:inline', 'imageStyle:block', 'imageStyle:side']
-      },
-      table: {
-        contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties']
-      },
-      fontSize: {
-        options: [9, 10, 11, 12, 13, 'default', 15, 17, 19, 21, 24, 28, 32, 40]
-      },
-      simpleUpload: { uploadUrl: '{{ url_for("admin.upload_file") }}?type=fragment' }
-    }).then(e => { i18nEditors.push({el: el, editor: e}); }).catch(err => console.error(err));
+  // 主字段值：RichEditor 双模式
+  RichEditor.init({
+    textarea: document.querySelector('#value_richtext'), ckConfig: fragmentCkConfig,
+    uploadUrl: '{{ url_for("admin.upload_file") }}?type=fragment',
+    uploadType: 'fragment', minHeight: 300
   });
 
+  // 多语言翻译内容值：无 Markdown 存储列，保持纯 CKEditor（提交前回写 textarea）
+  const i18nEditors = [];
+  if (document.querySelectorAll('.i18n-value-richtext').length) {
+    RichEditor.loadCk().then(function(){
+      document.querySelectorAll('.i18n-value-richtext').forEach(function(el){
+        CKEDITOR.ClassicEditor.create(el, fragmentCkConfig).then(function(e){
+          i18nEditors.push({el: el, editor: e});
+        }).catch(function(err){ console.error(err); });
+      });
+    }).catch(function(err){ console.error(err); });
+  }
+
   $('#fragment-form').on('submit', function(){
-    if (editor) document.querySelector('#value_richtext').value = editor.getData();
-    i18nEditors.forEach(item => { item.el.value = item.editor.getData(); });
+    i18nEditors.forEach(function(item){ item.el.value = item.editor.getData(); });
   });
 </script>
 {% endif %}

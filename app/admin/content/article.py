@@ -17,8 +17,10 @@ from flask_babel import gettext as _gettext
 from flask_login import current_user
 
 from ...extensions import db
+from ...constants import Editor
 from ...models.column import Column, ColumnField
 from ...models.article import Article
+from ...models.setting import Setting
 from ...utils.i18n_content import get_available_locales, get_default_locale
 from ...models.workflow import (
     STATUS_DRAFT, STATUS_REVIEW, STATUS_PUBLISHED, STATUS_ARCHIVED,
@@ -142,6 +144,7 @@ def article_create(cid):
         status_choices=STATUS_CHOICES, default_status=STATUS_DRAFT,
         trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
         default_locale=get_default_locale(),
+        default_editor_mode=Setting.get_editor_default_mode(),
     )
 
 
@@ -179,6 +182,7 @@ def article_edit(cid, aid):
         default_status=article.status,
         trans_locales=[l for l in get_available_locales() if l != get_default_locale()],
         default_locale=get_default_locale(),
+        default_editor_mode=Setting.get_editor_default_mode(),
     )
 
 
@@ -374,6 +378,10 @@ def article_rollback(cid, aid, vid):
         v.restore_to(article)
         article.updated_by = getattr(current_user, 'id', None)
         article.sync_enabled_from_status()
+        # v3.1.5：版本快照只存 HTML，回滚后强制 html 格式并清空 Markdown 原文，
+        # 避免 content_md 与回滚后的 content 不一致
+        article.content_format = Editor.FORMAT_HTML
+        article.content_md = None
         # 回滚后自动切换为草稿，避免误直接覆盖线上
         if article.status == STATUS_PUBLISHED:
             article.status = STATUS_DRAFT
@@ -385,7 +393,7 @@ def article_rollback(cid, aid, vid):
                                 note=f'回滚到版本 v{v.version_no}',
                                 created_by=getattr(current_user, 'id', None))
         db.session.commit()
-        flash(_gettext('已回滚到版本 v{0}，当前状态为草稿，请检查后重新提交').format(v.version_no), 'success')
+        flash(_gettext('已回滚到版本 v{0}，当前状态为草稿，请检查后重新提交（回滚后以富文本格式打开）').format(v.version_no), 'success')
         audit_log(OP_ROLLBACK, MODULE_ARTICLE, article.id, article.title,
                   {'to_version_no': v.version_no, 'title_snapshot': v.title})
     except Exception:

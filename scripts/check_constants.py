@@ -30,6 +30,8 @@ GATE_PATTERNS = {
     # 搜索引擎名
     r"""['"]tantivy['"]""": 'constants.Search.ENGINE_TANTIVY',
     r"""['"]meilisearch['"]""": 'constants.Search.ENGINE_MEILI',
+    # 编辑器模式（v3.1.5；'markdown' 不收编——通知模块 msgtype 等处语义不同易误伤）
+    r"""['"]ckeditor['"]""": 'constants.Editor.MODE_CKEDITOR',
     # 上传白名单（多元素字面量列表/元组）
     r"""\('zip',\s*'tar\.gz',\s*'tgz'\)""": 'constants.Upload.THEME_EXTS',
     r"""\['jpg',\s*'jpeg',\s*'png',\s*'gif',\s*'webp'\]""": 'constants.Upload.IMAGE_EXTS',

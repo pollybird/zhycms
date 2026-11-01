@@ -11,6 +11,7 @@ from ..models.column import Column, ColumnField, ColumnFieldValue, ColumnTransla
 from ..utils.helpers import audit_log, clear_content_cache, safe_int
 from ..utils.uploads import save_upload_file
 from ..utils.i18n_content import get_available_locales, get_default_locale
+from ..utils.markdown_render import apply_editor_form
 from ..models.audit import OP_CREATE, OP_UPDATE, MODULE_COLUMN
 
 
@@ -80,7 +81,8 @@ def save_column(column, *, form_data, files_data):
 
     # 类型专属字段
     if col_type == 'page':
-        column.page_content = form_data.get('page_content') or ''
+        # v3.1.5：双写（markdown 模式 page_content=渲染后的 HTML）
+        apply_editor_form(column, form_data, 'page_content', 'page_content')
     elif col_type == 'list':
         ps = safe_int(form_data.get('page_size'), 10)
         column.page_size = ps if ps > 0 else 10
@@ -213,7 +215,11 @@ def _save_column_translations(column, form_data):
             db.session.add(tr)
         tr.name = tr_name
         for fld in trans_fields[1:]:
-            setattr(tr, fld, (form_data.get(f'{fld}_{loc}') or '').strip())
+            if fld == 'page_content':
+                # v3.1.5：译文单页内容同样支持 Markdown 双写
+                apply_editor_form(tr, form_data, f'page_content_{loc}', 'page_content')
+            else:
+                setattr(tr, fld, (form_data.get(f'{fld}_{loc}') or '').strip())
 
 
 def _save_page_field_values(column, form_data, files_data):

@@ -276,6 +276,11 @@
                 </a>
               </li>
               <li class="nav-item">
+                <a href="{{ url_for('admin.setting_editor') }}" class="nav-link {{ 'active' if active_menu == 'setting_editor' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('编辑设置') }}</p>
+                </a>
+              </li>
+              <li class="nav-item">
                 <a href="{{ url_for('admin.setting_redis') }}" class="nav-link {{ 'active' if active_menu == 'setting_redis' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('Redis 缓存') }}</p>
                 </a>

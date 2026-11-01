@@ -27,6 +27,9 @@ class Fragment(db.Model):
     field_type = db.Column(db.String(32), nullable=False)
     # text/textarea/richtext/image/url/number/file
     value = db.Column(db.Text)
+    # v3.1.5：Markdown 双写（value 始终是 HTML，value_md 存原文供编辑回填）
+    value_md = db.Column(db.Text)
+    value_format = db.Column(db.String(16), default='html', nullable=False)
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
     sort_order = db.Column(db.Integer, default=0, nullable=False)

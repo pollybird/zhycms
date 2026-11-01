@@ -618,6 +618,30 @@ def setting_search():
                            settings=settings, health_ok=ok, health_msg=message)
 
 
+# ============ 编辑设置（v3.1.5）============
+
+@admin_bp.route('/settings/editor', methods=['GET', 'POST'])
+@permission_required('system:settings')
+def setting_editor():
+    """后台编辑器默认模式：ckeditor / markdown（仅影响新建内容）。"""
+    from ...constants import Editor
+    if request.method == 'POST':
+        val = (request.form.get('editor_default_mode') or '').strip()
+        if val not in Editor.MODES:
+            val = Editor.MODE_CKEDITOR
+        if Setting.get('editor_default_mode') != val:
+            Setting.set('editor_default_mode', val)
+            db.session.commit()
+            audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
+                      {'category': 'editor', 'changed': {'editor_default_mode': val}})
+        flash(_gettext('编辑设置已保存'), 'success')
+        return redirect(url_for('admin.setting_editor'))
+    from ...utils.markdown_render import is_available as _md_available
+    return render_template('admin/setting/editor.html',
+                           current_mode=Setting.get_editor_default_mode(),
+                           md_available=_md_available())
+
+
 # ============ Redis 缓存配置（v2.5.0）============
 
 @admin_bp.route('/settings/redis')

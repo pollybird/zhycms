@@ -18,6 +18,7 @@ from ..models.workflow import (
 from ..utils.helpers import audit_log, clear_content_cache, safe_int
 from ..utils.uploads import save_upload_file
 from ..utils.i18n_content import get_available_locales, get_default_locale
+from ..utils.markdown_render import apply_editor_form
 from ..models.audit import OP_CREATE, OP_UPDATE, MODULE_ARTICLE
 
 
@@ -52,7 +53,8 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
 
     article.title = title
     article.summary = (form_data.get('summary') or '').strip()
-    article.content = form_data.get('content') or ''
+    # v3.1.5：双写（markdown 模式 content=渲染后的 HTML，content_md=原文）
+    apply_editor_form(article, form_data, 'content', 'content')
     article.author = (form_data.get('author') or '').strip()
     article.source = (form_data.get('source') or '').strip()
     article.sort_order = safe_int(form_data.get('sort_order'), 0)
@@ -217,5 +219,8 @@ def _save_article_translations(article, form_data):
             db.session.add(tr)
         tr.title = tr_title
         for fld in trans_fields[1:]:
-            setattr(tr, fld, (form_data.get(f'{fld}_{loc}') or '').strip()
-                    if fld != 'content' else (form_data.get(f'{fld}_{loc}') or ''))
+            if fld == 'content':
+                # v3.1.5：译文正文同样支持 Markdown 双写
+                apply_editor_form(tr, form_data, f'content_{loc}', 'content')
+            else:
+                setattr(tr, fld, (form_data.get(f'{fld}_{loc}') or '').strip())
