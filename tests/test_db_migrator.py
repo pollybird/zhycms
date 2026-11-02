@@ -87,6 +87,102 @@ class TestMigrationCore:
             second = run_migration(uri, overwrite=True)
             assert second['total_rows'] == first['total_rows']
 
+    def test_migrate_1200_rows_succeeds(self, app, tmp_path):
+        """3.1.7 回归：上线前灌入 1000+ 行数据时迁移不能失败。"""
+        from app.extensions import db
+        from app.models.article import Article
+        from app.models.column import Column
+        from plugins.db_migrator.migrate import run_migration
+
+        uri = _target_uri(tmp_path)
+        col = None
+        with app.app_context():
+            try:
+                col = Column(name='迁移测试栏目', slug='mig-test-news', type='list')
+                db.session.add(col)
+                db.session.commit()
+                for i in range(1200):
+                    db.session.add(Article(
+                        column_id=col.id, title='批量文章 %d' % i,
+                        content='正文' * 50, status='published',
+                        is_enabled=True, is_deleted=False,
+                    ))
+                db.session.commit()
+                result = run_migration(uri)
+                assert result['total_rows'] > 1200
+                assert not result['orphans']
+            finally:
+                # 共享测试库：清理本用例灌入的数据，避免影响后续用例
+                if col is not None:
+                    Article.query.filter_by(column_id=col.id).delete(
+                        synchronize_session=False)
+                    Column.query.filter_by(id=col.id).delete(
+                        synchronize_session=False)
+                    db.session.commit()
+
+        tgt = create_engine(uri)
+        try:
+            with tgt.connect() as tc:
+                n = tc.execute(text('SELECT COUNT(*) FROM articles')).scalar()
+            assert n >= 1200
+        finally:
+            tgt.dispose()
+
+    def test_orphan_fk_blocks_with_readable_report(self, app, tmp_path):
+        """源库孤儿外键（SQLite 不强制外键）→ 迁移前拦截并给出表名。"""
+        from app.extensions import db
+        from app.models.article import Article
+        from plugins.db_migrator.migrate import run_migration, MigrationError
+
+        uri = _target_uri(tmp_path)
+        with app.app_context():
+            article = Article(
+                column_id=99999, title='孤儿引用文章', content='x',
+                status='published', is_enabled=True, is_deleted=False,
+            )
+            db.session.add(article)
+            db.session.commit()
+            try:
+                with pytest.raises(MigrationError) as ei:
+                    run_migration(uri)
+                msg = str(ei.value)
+                assert 'articles' in msg
+                assert '外键孤儿' in msg
+            finally:
+                Article.query.filter_by(id=article.id).delete(
+                    synchronize_session=False)
+                db.session.commit()
+
+    def test_nullify_nullable_orphan_allowed(self, app, tmp_path):
+        """可空外键孤儿：勾选自动置空后迁移成功，目标库对应值为 NULL。"""
+        from app.extensions import db
+        from app.models.audit import AuditLog
+        from plugins.db_migrator.migrate import run_migration
+
+        uri = _target_uri(tmp_path)
+        with app.app_context():
+            log = AuditLog(user_id=99999, op_type='create', module='article')
+            db.session.add(log)
+            db.session.commit()
+            try:
+                result = run_migration(uri, nullify_orphans=True)
+                assert any(o['table'] == 'audit_logs' for o in result['orphans'])
+            finally:
+                AuditLog.query.filter_by(id=log.id).delete(
+                    synchronize_session=False)
+                db.session.commit()
+
+        tgt = create_engine(uri)
+        try:
+            with tgt.connect() as tc:
+                nulls = tc.execute(text(
+                    'SELECT COUNT(*) FROM audit_logs WHERE user_id IS NULL'
+                )).scalar()
+            assert nulls >= 1
+        finally:
+            tgt.dispose()
+
+
 
 class TestDbMigratorRoutes:
     """后台路由：门控 404、页面 200、测试连接、迁移 HTTP 流程。"""

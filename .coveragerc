@@ -1,0 +1,14 @@
+[run]
+source =
+    app
+    plugins
+omit =
+    tests/*
+    */migrations/versions/*
+    .venv/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == '__main__':

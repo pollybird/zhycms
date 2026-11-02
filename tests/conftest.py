@@ -12,11 +12,48 @@
   app          → Flask 应用实例
 """
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
 
 import pytest
+
+
+def pytest_addoption(parser):
+    """v3.1.7：覆盖率门禁专用开关。
+
+    spacy_pkuseg 为 Cython 编译扩展，在部分 Python 版本/平台上与 coverage
+    的追踪核心冲突，导致覆盖率无法采集。--no-cython 用纯 Python 分词兜底，
+    仅影响覆盖率运行，正常测试仍使用 pkuseg。
+    """
+    parser.addoption(
+        '--no-cython', action='store_true', default=False,
+        help='覆盖率运行时跳过 Cython 分词器（spacy_pkuseg），改用纯 Python 兜底分词',
+    )
+
+
+class _PurePythonSegmenter:
+    """--no-cython 下的分词兜底：ASCII 单词整体保留，CJK 按单字切分。
+
+    tokenize() 的对外契约（空格连接、小写、无纯标点 token）保持不变；
+    索引与查询走同一分词器，因此检索结果仍然一致。
+    """
+
+    def cut(self, text):
+        return re.findall(r'[A-Za-z0-9_]+|[\u4e00-\u9fff]', text or '')
+
+
+@pytest.fixture(scope='session', autouse=True)
+def _disable_cython_tokenizer(pytestconfig):
+    """--no-cython 时把分词器替换为纯 Python 实现（session 级生效）。"""
+    if not pytestconfig.getoption('--no-cython'):
+        return
+    import app.utils.tokenizer as tokenizer
+    seg = _PurePythonSegmenter()
+    tokenizer.get_segmenter = lambda: seg
+    tokenizer._seg = seg
+
 
 # 确保项目根目录在 PYTHONPATH
 ROOT = Path(__file__).resolve().parent.parent

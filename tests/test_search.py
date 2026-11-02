@@ -50,6 +50,33 @@ class TestSearch:
         assert resp.status_code == 200
         assert '焊接'.encode() in resp.data
 
+    def test_async_rebuild_returns_immediately(self, app, admin_client, monkeypatch):
+        """v3.1.7：重建索引改为后台任务，请求立即返回并可轮询状态。"""
+        import time
+        import app.utils.search as search_mod
+
+        def slow_rebuild():
+            time.sleep(0.3)
+            return 1, 0
+
+        monkeypatch.setattr(search_mod, 'rebuild_all', slow_rebuild)
+        t0 = time.time()
+        resp = admin_client.post('/admin/settings/search',
+                                 data={'action': 'rebuild'})
+        elapsed = time.time() - t0
+        assert resp.status_code in (200, 302)
+        assert elapsed < 0.25, '重建请求不应等待索引生成'
+
+        # 轮询状态直到后台任务结束
+        state = None
+        for _ in range(40):
+            r = admin_client.get('/admin/settings/search/rebuild-status')
+            state = r.get_json()['state']
+            if state in ('success', 'failed'):
+                break
+            time.sleep(0.1)
+        assert state == 'success'
+
     def test_batch_ops_update_index(self, app, admin_client):
         """批量发布/删除操作逐篇更新搜索索引。
 

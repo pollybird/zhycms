@@ -13,8 +13,8 @@ app/utils/backup_utils.py:296:回写数据库文件失败时返回用户可读�
 app/utils/backup_utils.py:315:gzip 解压失败清理中间文件并返回错误（显式处理）
 app/utils/backup_utils.py:367:PostgreSQL 解压失败清理中间文件并返回错误（显式处理）
 app/utils/dbconfig.py:125:连接测试兜底返回用户可读错误（显式处理）
-app/utils/search.py:681:索引健康检查返回错误信息（显式处理）
-app/utils/search.py:816:Meilisearch 健康检查返回错误信息（显式处理）
+app/utils/search.py:683:索引健康检查返回错误信息（显式处理）
+app/utils/search.py:818:Meilisearch 健康检查返回错误信息（显式处理）
 app/api/views.py:150:JWT 校验失败返回 401 错误响应（显式处理）
 plugins/auto_translate/service.py:308:连接测试返回 (False, 错误信息)（显式处理）
 plugins/oss_storage/migrate.py:133:迁移中断返回统计与错误信息（显式处理）

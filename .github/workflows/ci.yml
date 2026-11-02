@@ -72,3 +72,23 @@ jobs:
           python-version: '3.12'
       - name: Check no silent exception swallowing
         run: python scripts/check_excepts.py
+
+  coverage:
+    # v3.1.7：覆盖率门禁固定 Python 3.12。spacy-pkuseg 为 Cython 扩展，
+    # 在部分版本与 coverage 追踪核心冲突；--no-cython 用纯 Python 分词
+    # 兜底，保证覆盖率可采集。阈值 50% 为当前基线，后续逐步提高。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      - name: Run tests with coverage gate
+        run: |
+          pytest --no-cython --cov=app --cov=plugins \
+            --cov-report=term-missing --cov-fail-under=50

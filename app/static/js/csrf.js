@@ -14,8 +14,7 @@
     return m ? m.content : '';
   }
 
-  document.addEventListener('submit', function (e) {
-    var f = e.target;
+  function injectToken(f) {
     if (!f || f.nodeName !== 'FORM') return;
     if (f.querySelector('input[name="_csrf_token"], input[name="csrf_token"]')) return;
     var token = readToken();
@@ -25,7 +24,19 @@
     input.name = '_csrf_token';
     input.value = token;
     f.appendChild(input);
+  }
+
+  document.addEventListener('submit', function (e) {
+    injectToken(e.target);
   }, true);
+
+  // jQuery 的 .submit() / form.submit() 不会派发原生 submit 事件，捕获监听
+  // 无法生效。页面加载完成后为所有已存在的表单预注入 Token，覆盖
+  // 「脚本提交表单」的场景（如批量操作、下拉框 onchange 自动提交）。
+  document.addEventListener('DOMContentLoaded', function () {
+    var forms = document.forms;
+    for (var i = 0; i < forms.length; i++) injectToken(forms[i]);
+  });
 
   // 便捷读取：window.csrfToken 供手写 fetch 使用
   try {

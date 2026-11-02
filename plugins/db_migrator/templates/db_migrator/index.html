@@ -80,6 +80,10 @@
           <label for="dm-overwrite">{{ _p('db_migrator', '覆盖目标库已有数据（先删除本系统同名表再重建，目标库中其它无关表不受影响）') }}</label>
         </div>
         <div class="icheck-primary">
+          <input type="checkbox" name="nullify_orphans" value="on" id="dm-nullify">
+          <label for="dm-nullify">{{ _p('db_migrator', '自动置空孤儿外键（可空列）：源库存在指向不存在父记录的数据时，复制时置为 NULL，避免外键约束导致迁移失败') }}</label>
+        </div>
+        <div class="icheck-primary">
           <input type="checkbox" name="switch_now" value="on" id="dm-switch">
           <label for="dm-switch">{{ _p('db_migrator', '迁移后立即切换到新数据库（免重启即时生效；不勾选则重启后生效）') }}</label>
         </div>

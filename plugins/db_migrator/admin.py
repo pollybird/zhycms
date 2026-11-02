@@ -108,6 +108,7 @@ def db_migrator_migrate():
     db_type = (request.form.get('db_type') or '').strip().lower()
     overwrite = request.form.get('overwrite') == 'on'
     switch_now = request.form.get('switch_now') == 'on'
+    nullify_orphans = request.form.get('nullify_orphans') == 'on'
 
     # 先确认目标库可达，避免建表/迁移中途才报连接错误
     ok, message = test_connection(uri)
@@ -116,7 +117,8 @@ def db_migrator_migrate():
         return redirect(url_for('admin.db_migrator_index'))
 
     try:
-        result = run_migration(uri, overwrite=overwrite)
+        result = run_migration(uri, overwrite=overwrite,
+                               nullify_orphans=nullify_orphans)
     except MigrationError as e:
         flash(_gettext('迁移失败：{0}').format(e), 'danger')
         return redirect(url_for('admin.db_migrator_index'))

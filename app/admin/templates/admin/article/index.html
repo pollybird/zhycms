@@ -46,8 +46,6 @@
       <a href="{{ url_for('admin.article_index', cid=column.id) }}" class="btn btn-link btn-sm">{{ _('重置') }}</a>
     </form>
 
-    <form method="post" id="batch-form" action="{{ url_for('admin.article_batch', cid=column.id) }}">
-      <input type="hidden" name="action" id="batch-action">
       <table class="table table-hover table-sm">
         <thead>
           <tr>
@@ -125,6 +123,11 @@
           {% endfor %}
         </tbody>
       </table>
+
+    {# 批量表单独立于表格：避免与行内单条操作表单嵌套（HTML 非法嵌套会导致勾选丢失） #}
+    <form method="post" id="batch-form" action="{{ url_for('admin.article_batch', cid=column.id) }}">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" id="batch-action">
     </form>
 
     {% include 'admin/_pagination.html' with context %}
@@ -172,6 +175,14 @@
   function checked_ids(){
     return $('.row-check:checked').length;
   }
+  // 勾选框在表格内、批量表单在表格外，提交前动态收集选中 id
+  function fill_batch_ids(){
+    var $f = $('#batch-form');
+    $f.find('input[name="ids[]"]').remove();
+    $('.row-check:checked').each(function(){
+      $f.append('<input type="hidden" name="ids[]" value="' + this.value + '">');
+    });
+  }
   function batch_action(action){
     if (checked_ids() === 0){ alert('{{ _('请先选择文章') }}'); return; }
     var tips = {
@@ -181,6 +192,7 @@
       'delete': '{{ _('确认批量删除所选文章？删除后不可恢复。') }}'
     };
     if (tips[action] && !confirm(tips[action])) return;
+    fill_batch_ids();
     $('#batch-action').val(action);
     $('#batch-form').submit();
   }
@@ -190,6 +202,8 @@
     if (!target){ alert('{{ _('请先选择目标栏目') }}'); return; }
     if (!confirm('{{ _('确认将所选文章移动到目标栏目？') }}')) return;
     var $f = $('#batch-form');
+    fill_batch_ids();
+    $f.find('input[name="target_column_id"]').remove();
     $f.append('<input type="hidden" name="target_column_id" value="' + target + '">');
     $('#batch-action').val('move');
     $f.submit();

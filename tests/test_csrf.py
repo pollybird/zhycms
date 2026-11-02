@@ -116,3 +116,24 @@ class TestCSRF:
         html = open('app/admin/templates/admin/setup.html',
                     encoding='utf-8').read()
         assert 'csrf-token' in html and 'js/csrf.js' in html
+
+    # ---- v3.1.7 回归：批量操作表单 ----
+
+    def test_batch_forms_have_token_and_are_not_nested(self):
+        """批量表单必须内置 _csrf_token，且位于表格之外。
+
+        jQuery 的 .submit() 不派发原生 submit 事件，csrf.js 的捕获注入
+        会失效，因此批量表单需直接渲染 Token 字段；同时表单不能包住表格
+        行内表单（HTML 非法嵌套会导致勾选数据丢失）。
+        """
+        paths = (
+            'app/admin/templates/admin/article/index.html',
+            'app/admin/templates/admin/column/index.html',
+        )
+        for path in paths:
+            html = open(path, encoding='utf-8').read()
+            assert 'id="batch-form"' in html, path
+            assert 'name="_csrf_token"' in html, path
+            assert html.index('</table>') < html.index('id="batch-form"'), \
+                path + ' 批量表单不应包裹表格'
+

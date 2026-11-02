@@ -68,11 +68,12 @@
         {% endif %}
         {{ health_msg }}
       </p>
+      <p class="mb-0" id="rebuild-status-text">暂无重建任务</p>
     </div>
     <div class="card-footer">
       <button type="submit" name="action" value="rebuild" class="btn btn-warning"
-              onclick="return confirm('{{ _('确定重建全部索引？文章数量多时可能耗时较长。') }}');">
-        <i class="fas fa-sync"></i> {{ _('重建索引') }}
+              onclick="return confirm('{{ _('确定在后台重建全部索引？提交后页面立即返回，重建进度会自动刷新。') }}');">
+        <i class="fas fa-sync"></i> {{ _('重建索引（后台执行）') }}
       </button>
     </div>
   </div>
@@ -87,5 +88,28 @@
 document.querySelector('select[name="search_engine"]').addEventListener('change', function() {
   document.getElementById('meili-card').style.display = this.value === 'meilisearch' ? '' : 'none';
 });
+
+// 后台重建进度：进行中每 3 秒轮询一次状态接口
+(function () {
+  var box = document.getElementById('rebuild-status-text');
+  if (!box) return;
+  var labels = {idle: '暂无重建任务', running: '正在后台重建索引…', success: '重建完成', failed: '重建失败'};
+  var statusUrl = {{ url_for('admin.setting_search_rebuild_status')|tojson }};
+  function render(s) {
+    var text = labels[s.state] || s.state;
+    if (s.message && s.state !== 'running') text += '：' + s.message;
+    box.textContent = text;
+    box.className = 'mb-0 ' + (s.state === 'failed' ? 'text-danger'
+      : s.state === 'success' ? 'text-success' : 'text-info');
+    if (s.state === 'running') setTimeout(poll, 3000);
+  }
+  function poll() {
+    fetch(statusUrl, {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () { setTimeout(poll, 5000); });
+  }
+  render({state: {{ rebuild_status.state|tojson }}, message: {{ rebuild_status.message|tojson }}});
+})();
 </script>
 {% endblock %}

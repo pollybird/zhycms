@@ -11,7 +11,7 @@ import os
 
 from flask import (
     render_template, redirect, url_for, request, flash, abort, current_app,
-    session,
+    session, jsonify,
 )
 from flask_babel import gettext as _gettext
 from flask_login import current_user
@@ -573,14 +573,13 @@ def setting_search():
     if request.method == 'POST':
         action = request.form.get('action', '')
         if action == 'rebuild':
-            # 重建索引
-            from ...utils.search import rebuild_all as _rebuild
-            indexed, errors = _rebuild()
-            flash(_gettext('索引重建完成：成功 %(n)d 篇，失败 %(e)d 篇',
-                           n=indexed, e=errors), 'success')
+            # 后台异步重建：请求立即返回，页面轮询进度，避免文章量大时超时
+            from ...utils.search import start_rebuild
+            started, message = start_rebuild(current_app._get_current_object())
+            flash(message, 'success' if started else 'warning')
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'search', 'action': 'rebuild_index',
-                       'indexed': indexed, 'errors': errors})
+                       'started': started})
             return redirect(url_for('admin.setting_search'))
         changed = {}
         val = (request.form.get('search_engine') or 'tantivy').strip()
@@ -612,10 +611,19 @@ def setting_search():
         return redirect(url_for('admin.setting_search'))
     settings = Setting.get_dict()
     # 健康检查
-    from ...utils.search import health as _health
+    from ...utils.search import health as _health, get_rebuild_status
     ok, message = _health()
     return render_template('admin/setting/search.html',
-                           settings=settings, health_ok=ok, health_msg=message)
+                           settings=settings, health_ok=ok, health_msg=message,
+                           rebuild_status=get_rebuild_status())
+
+
+@admin_bp.route('/settings/search/rebuild-status')
+@permission_required('system:settings')
+def setting_search_rebuild_status():
+    """后台索引重建进度（供搜索设置页轮询）。"""
+    from ...utils.search import get_rebuild_status
+    return jsonify(get_rebuild_status())
 
 
 # ============ 编辑设置（v3.1.5）============

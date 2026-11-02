@@ -21,7 +21,9 @@ v2.5.1 多语言：
 """
 import os
 import re
+import json
 import html as html_lib
+import threading
 from datetime import datetime
 
 from flask import current_app, g
@@ -959,6 +961,125 @@ def rebuild_all():
     """重建全部索引（全部语言）。返回 (indexed_count, error_count)。"""
     backend = get_backend()
     return backend.rebuild_all()
+
+
+# ============================================================
+# 后台异步重建（v3.1.7）
+# ============================================================
+
+_REBUILD_STATUS_FILE = '.rebuild_status.json'
+_REBUILD_LOCK_FILE = '.rebuild.lock'
+
+
+def _rebuild_status_path():
+    return os.path.join(_get_index_root(), _REBUILD_STATUS_FILE)
+
+
+def _write_rebuild_status(payload):
+    """原子写入重建状态文件（多 worker 共享读取）。"""
+    path = _rebuild_status_path()
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(payload, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def get_rebuild_status():
+    """读取后台重建状态；从未执行过返回 {'state': 'idle'}。"""
+    try:
+        with open(_rebuild_status_path(), encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError) as e:
+        current_app.logger.warning('读取索引重建状态失败：%s', e)
+    return {'state': 'idle'}
+
+
+def _reindex_changed_since(started):
+    """重建完成后补索引：重建期间被修改/删除的文章按 id 再同步一次。
+
+    重建开始时取的是数据库快照，快照之后的增量写入可能因目录被清空而
+    丢失，这里按 updated_at 兜底补齐。返回补索引条数。
+    """
+    backend = get_backend()
+    if isinstance(backend, SqlLikeBackend):
+        return 0
+    rows = Article.query.filter(Article.updated_at >= started).all()
+    count = 0
+    for a in rows:
+        try:
+            if a.is_deleted:
+                backend.unindex_article(a.id)
+            else:
+                backend.index_article(a)
+            count += 1
+        except Exception as e:
+            current_app.logger.warning('重建后补索引文章 %s 失败：%s', a.id, e)
+    return count
+
+
+def start_rebuild(app=None):
+    """后台线程重建全站索引，立即返回，不阻塞请求。
+
+    返回 (started, message)。通过状态文件 + 锁文件实现多 worker 互斥，
+    状态由 get_rebuild_status() 供页面轮询。
+    """
+    if app is None:
+        app = current_app._get_current_object()
+    lock_path = os.path.join(_get_index_root(), _REBUILD_LOCK_FILE)
+    try:
+        fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.close(fd)
+    except FileExistsError:
+        return False, '已有重建任务正在后台执行，请稍后查看状态'
+
+    started = datetime.now()
+    _write_rebuild_status({
+        'state': 'running',
+        'started_at': started.isoformat(timespec='seconds'),
+        'finished_at': None,
+        'indexed': 0,
+        'errors': 0,
+        'message': '正在后台重建索引',
+    })
+
+    def _bg():
+        with app.app_context():
+            try:
+                indexed, errors = rebuild_all()
+                caught = _reindex_changed_since(started)
+                payload = {
+                    'state': 'success',
+                    'started_at': started.isoformat(timespec='seconds'),
+                    'finished_at': datetime.now().isoformat(timespec='seconds'),
+                    'indexed': indexed + caught,
+                    'errors': errors,
+                    'message': f'重建完成：索引 {indexed + caught} 条，失败 {errors} 条',
+                }
+                _write_rebuild_status(payload)
+                app.logger.info('[Search] 后台重建索引完成：%s', payload['message'])
+            except Exception as e:
+                app.logger.exception('[Search] 后台重建索引失败')
+                _write_rebuild_status({
+                    'state': 'failed',
+                    'started_at': started.isoformat(timespec='seconds'),
+                    'finished_at': datetime.now().isoformat(timespec='seconds'),
+                    'indexed': 0,
+                    'errors': 0,
+                    'message': f'重建失败：{e}',
+                })
+            finally:
+                try:
+                    os.remove(lock_path)
+                except OSError:
+                    pass
+
+    threading.Thread(target=_bg, daemon=True, name='search-rebuild').start()
+    return True, '索引重建已在后台开始，可继续操作，页面会自动刷新进度'
+
 
 
 def health():
