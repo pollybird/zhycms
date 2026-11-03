@@ -969,6 +969,15 @@ def rebuild_all():
 
 _REBUILD_STATUS_FILE = '.rebuild_status.json'
 _REBUILD_LOCK_FILE = '.rebuild.lock'
+# 状态字段默认值：保证模板 tojson / JSON 接口不会遇到缺失键
+_REBUILD_STATUS_DEFAULTS = {
+    'state': 'idle',
+    'message': '',
+    'started_at': None,
+    'finished_at': None,
+    'indexed': 0,
+    'errors': 0,
+}
 
 
 def _rebuild_status_path():
@@ -985,17 +994,23 @@ def _write_rebuild_status(payload):
 
 
 def get_rebuild_status():
-    """读取后台重建状态；从未执行过返回 {'state': 'idle'}。"""
+    """读取后台重建状态；从未执行过返回空闲状态。
+
+    始终返回完整字段（缺失键用默认值补齐），避免模板 tojson 收到
+    Jinja Undefined 而抛 TypeError，也保证轮询接口的 JSON 结构稳定。
+    """
     try:
         with open(_rebuild_status_path(), encoding='utf-8') as f:
             data = json.load(f)
         if isinstance(data, dict):
-            return data
+            status = dict(_REBUILD_STATUS_DEFAULTS)
+            status.update(data)
+            return status
     except FileNotFoundError:
         pass
     except (OSError, ValueError) as e:
         current_app.logger.warning('读取索引重建状态失败：%s', e)
-    return {'state': 'idle'}
+    return dict(_REBUILD_STATUS_DEFAULTS)
 
 
 def _reindex_changed_since(started):

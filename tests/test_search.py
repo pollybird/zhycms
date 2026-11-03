@@ -50,6 +50,25 @@ class TestSearch:
         assert resp.status_code == 200
         assert '焊接'.encode() in resp.data
 
+    def test_search_settings_page_without_status_file(self, app, admin_client,
+                                                       monkeypatch, tmp_path):
+        """v3.1.7 回归：无重建状态文件时搜索设置页可正常渲染。
+
+        状态接口曾返回仅含 state 的字典，模板对缺失的 message 取
+        tojson 会拿到 Jinja Undefined，导致 TypeError。
+        """
+        import app.utils.search as search_mod
+        monkeypatch.setattr(
+            search_mod, '_rebuild_status_path',
+            lambda: str(tmp_path / '.rebuild_status.json'))
+
+        resp = admin_client.get('/admin/settings/search')
+        assert resp.status_code == 200
+        status = admin_client.get(
+            '/admin/settings/search/rebuild-status').get_json()
+        assert status['state'] == 'idle'
+        assert 'message' in status
+
     def test_async_rebuild_returns_immediately(self, app, admin_client, monkeypatch):
         """v3.1.7：重建索引改为后台任务，请求立即返回并可轮询状态。"""
         import time
