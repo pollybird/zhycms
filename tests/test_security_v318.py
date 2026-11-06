@@ -71,13 +71,30 @@ class TestVuln001ThemeSSTI:
             ok, reason = audit_template(bad)
             assert not ok, f'危险模板未被拦截: {bad}'
 
-    def test_audit_template_allows_normal_html(self):
-        """模板审计：正常主题模板（含 photos./CSS import 类文本）不误伤。"""
+    def test_audit_template_bypass_variants(self):
+        """模板审计二次加固：attr 拼接 / config / request 逃逸 / 环境内部对象。"""
         from app.utils.template_safety import audit_template
-        ok, _ = audit_template('<html><body>{{ site_name }} photos/1.jpg</body></html>')
-        assert ok
-        ok, _ = audit_template('<div>{{ article.title }}</div>')
-        assert ok
+        for bad in ("{{ (''|attr('__cl'~'ass__')) }}",  # attr 过滤器 + 字符串拼接
+                    '{{ config }}', '{{ config.SECRET_KEY }}',
+                    '{{ config["SECRET_KEY"] }}',
+                    '{{ request.application.config }}',  # request 白名单外属性
+                    '{{ request.environ }}',
+                    '{{ request["application"] }}',  # 下标回退 getattr
+                    '{{ cycler.__init__ }}', '{{ namespace(x=1) }}',
+                    '{{ joiner }}', '{{ lipsum }}'):
+            ok, reason = audit_template(bad)
+            assert not ok, f'绕过变体未被拦截: {bad}'
+
+    def test_audit_template_allows_request_whitelist(self):
+        """模板审计：request 白名单属性与纯文本不误伤。"""
+        from app.utils.template_safety import audit_template
+        for good in ('{{ request.path }}?lang={{ loc.code }}',
+                     '{{ request.args.get("page", 1) }}',
+                     '{{ request.endpoint }}', '{{ request.host_url }}',
+                     '{{ request.view_args }}',
+                     '<p>site config 文档</p>'):  # 纯文本 config 不误伤
+            ok, reason = audit_template(good)
+            assert ok, f'合法模板被误伤: {good} -> {reason}'
 
     def test_audit_theme_templates_rejects_package(self, tmp_path):
         """主题包含危险模板时整包审计失败并给出路径。"""
@@ -87,6 +104,39 @@ class TestVuln001ThemeSSTI:
         ok, violations = audit_theme_templates(str(tmp_path))
         assert not ok
         assert any('evil.html' in v[0] for v in violations)
+
+    def test_runtime_sandbox_no_config_leak(self, app):
+        """运行时：全站沙箱 globals 不含 config/request/session/g，
+        config.SECRET_KEY 渲染为 undefined 而非密钥。"""
+        with app.app_context():
+            env = app.jinja_env
+            assert env.sandboxed, '全站模板环境未沙箱化'
+            for key in ('config', 'request', 'session', 'g'):
+                assert key not in env.globals, f'globals 残留 {key}'
+            assert 'url_for' in env.globals  # 合法 global 保留
+            from jinja2 import UndefinedError
+            with pytest.raises(UndefinedError):
+                env.from_string('{{ config.SECRET_KEY }}').render()
+            with pytest.raises(UndefinedError):
+                env.from_string('{{ config["SECRET_KEY"] }}').render()
+            # attr 拼接：求值后的 __class__ 被沙箱 is_safe_attribute 拦截，渲染为空
+            assert env.from_string(
+                "{{ (''|attr('__cl'~'ass__')) }}").render() == ''
+
+    def test_runtime_request_proxy(self):
+        """运行时：request 安全代理放行白名单、拦截逃逸属性与下标。"""
+        from app import _TemplateRequestProxy
+
+        class _FakeReq:
+            path = '/x'
+            application = 'APP_OBJ'
+
+        proxy = _TemplateRequestProxy(_FakeReq())
+        assert proxy.path == '/x'
+        with pytest.raises(AttributeError):
+            proxy.application  # noqa: B018（断言语义即属性访问）
+        with pytest.raises(TypeError):
+            proxy['path']
 
 
 # ============================================================
@@ -109,6 +159,34 @@ class TestVuln002PluginRCE:
         from app.utils.plugin_safety import audit_python_source
         ok, _ = audit_python_source('def setup(app):\n    return True\n')
         assert ok
+
+    def test_audit_python_source_bypass_variants(self):
+        """插件审计二次加固（AST）：from-import / importlib / sys.modules /
+        动态 getattr / operator / builtins 变体全部拦截。"""
+        from app.utils.plugin_safety import audit_python_source
+        for bad in ('from os import system\nsystem("id")',
+                    'from os import popen',
+                    'import importlib\nimportlib.import_module("os").system("id")',
+                    'import sys\nsys.modules["os"].system("id")',
+                    'import builtins\nbuiltins.eval("1")',
+                    'import operator\noperator.attrgetter("__class__")(1)',
+                    'x = ().__class__.__mro__',
+                    'getattr(x, "__globals__")',
+                    'getattr(x, "__gl" + "obals__")',  # 动态属性名
+                    'compile("1", "<s>", "eval")',
+                    'x = globals()'):
+            ok, reason = audit_python_source(bad)
+            assert not ok, f'绕过变体未被拦截: {bad}'
+
+    def test_audit_python_source_allows_legit_patterns(self):
+        """插件审计：os.path / 私有属性 / 常量 getattr / dunder 常量不误伤。"""
+        from app.utils.plugin_safety import audit_python_source
+        for good in ('import os\np = os.path.join("a", "b")\nos.makedirs(p, exist_ok=True)',
+                     'def __init__(self):\n    self.__cache = {}',
+                     'x = getattr(obj, "name", None)',
+                     '__all__ = ["a"]\n__version__ = "1.0"'):
+            ok, reason = audit_python_source(good)
+            assert ok, f'合法代码被误伤: {good} -> {reason}'
 
     def test_plugin_upload_rejected_when_disabled(self, admin_client):
         """默认（plugin_upload_enabled 关闭）直传插件包被拒。"""
@@ -243,14 +321,66 @@ class TestVuln004005SSRF:
             with pytest.raises(ValueError):
                 assert_safe_external_url(bad)
 
-    def test_url_safety_allows_public_https(self):
+    def test_url_safety_rejects_exotic_ip_literals(self):
+        """非常规 IP 字面量绕过：十进制/十六进制/八进制/短格式/IPv4-mapped。"""
         from app.utils.url_safety import assert_safe_external_url
+        for bad in ('http://2130706433/',       # 十进制 127.0.0.1
+                    'http://0x7f000001/',       # 十六进制 127.0.0.1
+                    'http://0177.0.0.1/',       # 八进制 127.0.0.1
+                    'http://127.1/',            # 段数省略 127.0.0.1
+                    'http://[::ffff:127.0.0.1]/',  # IPv4-mapped IPv6
+                    'http://0.0.0.0/',          # 未指定地址
+                    'http://2852039166/',       # 十进制 169.254.169.254
+                    ):
+            with pytest.raises(ValueError):
+                assert_safe_external_url(bad)
+
+    def test_url_safety_dns_rebinding_rejected(self, monkeypatch):
+        """DNS 重绑定：域名解析到内网地址即拒绝（fail closed）。"""
+        import socket
+        from app.utils.url_safety import assert_safe_external_url
+
+        def _fake_getaddrinfo(host, *a, **kw):
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('127.0.0.1', 0))]
+
+        monkeypatch.setattr(socket, 'getaddrinfo', _fake_getaddrinfo)
+        with pytest.raises(ValueError, match='内网'):
+            assert_safe_external_url('https://rebinding.example.com/hook')
+        # 域名解析失败同样拒绝
+        def _fail_getaddrinfo(host, *a, **kw):
+            raise socket.gaierror('mock DNS failure')
+
+        monkeypatch.setattr(socket, 'getaddrinfo', _fail_getaddrinfo)
+        with pytest.raises(ValueError, match='解析失败'):
+            assert_safe_external_url('https://unresolvable.invalid/hook')
+
+    def test_url_safety_allows_public_https(self, monkeypatch):
+        import socket
+        from app.utils.url_safety import assert_safe_external_url
+
+        def _fake_getaddrinfo(host, *a, **kw):
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 0))]
+
+        monkeypatch.setattr(socket, 'getaddrinfo', _fake_getaddrinfo)
         assert assert_safe_external_url('https://example.com/hook')
         assert assert_safe_external_url('https://8.8.8.8/hook')
+        # 域名白名单精确命中：跳过 DNS 解析（可信域名）
+        assert assert_safe_external_url('https://qyapi.weixin.qq.com/x',
+                                        allowed_hosts={'qyapi.weixin.qq.com'})
 
-    def test_sms_webhook_save_validation(self, app):
+    def test_sms_webhook_save_validation(self, app, monkeypatch):
         """会员短信设置保存：内网 URL 校验失败不落库。"""
         from plugins.member import settings as member_settings
+        # mock DNS 解析：sms.example.com → 公网地址（测试环境无外网 DNS）
+        import socket
+        _orig_getaddrinfo = socket.getaddrinfo
+
+        def _fake_getaddrinfo(host, *a, **kw):
+            if host == 'sms.example.com':
+                return _orig_getaddrinfo('223.5.5.5', *a, **kw)
+            return _orig_getaddrinfo(host, *a, **kw)
+
+        monkeypatch.setattr(socket, 'getaddrinfo', _fake_getaddrinfo)
         with app.app_context():
             with pytest.raises(ValueError):
                 member_settings.save_group(

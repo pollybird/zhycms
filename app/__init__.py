@@ -6,6 +6,11 @@ from urllib.parse import urlparse
 
 from flask import Flask, redirect, url_for, request, g, abort
 from flask_login import current_user
+from flask.templating import (
+    Environment as _FlaskTemplateEnvironment,
+    _default_template_ctx_processor,
+)
+from jinja2.sandbox import SandboxedEnvironment
 
 from .config import config
 from .extensions import db, login_manager, cache, set_scheduler, babel, migrate, server_session, jwt, limiter
@@ -18,9 +23,71 @@ logger = logging.getLogger(__name__)
 # 后台路由「即时生效」机制：动态替换 Jinja url_for 生成前缀
 # ============================================================
 
+class _SandboxedFlaskEnvironment(SandboxedEnvironment, _FlaskTemplateEnvironment):
+    """全站 Jinja 沙箱环境（v3.1.8 VULN-001 加固）。
+
+    多继承：SandboxedEnvironment 提供属性内省拦截（__class__/__mro__ 等
+    dunder 访问抛 SecurityError，|attr 过滤器同样受检），Flask 模板环境
+    保留 blueprint 模板路径解析。全站模板（前台主题/后台/插件）统一走沙箱，
+    前台 render_template 链与构建器直渲链不再分裂。
+    """
+
+    def is_safe_attribute(self, obj, attr, value):
+        # 放行模型的单下划线业务属性（栏目深度 _depth / 角色缓存 _roles，
+        # 单下划线非 dunder，不构成属性内省链）；其余维持沙箱默认规则。
+        if attr in ('_depth', '_roles'):
+            return True
+        return super().is_safe_attribute(obj, attr, value)
+
+
+class _TemplateRequestProxy:
+    """模板上下文中的 request 安全代理（v3.1.8 纵深防御）。
+
+    只放行模板实际使用的只读属性白名单，阻断
+    ``request.application.config['SECRET_KEY']`` / ``request['application']``
+    等经由 request 对象逃逸到应用实例的攻击链（该链不经过 dunder，
+    沙箱无法拦截，必须由代理收口）。
+    """
+    __slots__ = ('_request',)
+    _ALLOWED = frozenset({
+        'path', 'full_path', 'args', 'view_args', 'endpoint', 'method',
+        'url', 'base_url', 'url_root', 'root_url', 'script_root', 'host',
+        'host_url', 'referrer', 'blueprint', 'query_string', 'path_info',
+    })
+
+    def __init__(self, req):
+        object.__setattr__(self, '_request', req)
+
+    def __getattr__(self, name):
+        if name in self._ALLOWED:
+            return getattr(object.__getattribute__(self, '_request'), name)
+        raise AttributeError(
+            f'模板上下文中不允许访问 request.{name}（安全代理白名单外属性）')
+
+    def __setattr__(self, name, value):
+        raise AttributeError('模板 request 代理为只读')
+
+    def __getitem__(self, key):
+        # Jinja foo['bar'] 语义会回退 getattr，这里显式禁止下标形式绕过
+        raise TypeError('模板 request 代理不支持下标访问')
+
+
 class _AdminPrefixAwareFlask(Flask):
     """覆写 Flask 的 create_url_adapter 与 jinja_env 初始化，使 url_for('admin.*')
     自动使用 admin_config.json 中最新前缀，不必重启服务。"""
+
+    # v3.1.8：全站模板沙箱化（前台主题 SSTI 修复的运行时层）
+    jinja_environment = _SandboxedFlaskEnvironment
+
+    def create_jinja_environment(self):
+        env = super().create_jinja_environment()
+        # Flask 默认把 config/request/session/g 放入 globals（供 import 的宏
+        # 使用）。config 是 dict 子类，config.SECRET_KEY 经 getitem 回退可读，
+        # request.application.config 链同理——globals 中剔除，渲染上下文中的
+        # request 由 _TemplateRequestProxy 收口（见下方 context processor）。
+        for key in ('config', 'request', 'session', 'g'):
+            env.globals.pop(key, None)
+        return env
 
     def create_url_adapter(self, request=None):
         adapter = super().create_url_adapter(request)
@@ -491,6 +558,20 @@ def create_app(config_name=None):
                        or os.environ.get('ZHOCMS_ENV', 'default'))
 
     app = _AdminPrefixAwareFlask(__name__, instance_relative_config=False)
+
+    # v3.1.8 VULN-001 纵深防御：渲染上下文中的 request 换为只读白名单代理，
+    # 阻断 request.application.config / request['application'] 逃逸链
+    def _secure_template_ctx():
+        rv = _default_template_ctx_processor()
+        if 'request' in rv:
+            rv['request'] = _TemplateRequestProxy(rv['request'])
+        return rv
+
+    app.template_context_processors[None] = [
+        _secure_template_ctx
+        if getattr(p, '__name__', '') == '_default_template_ctx_processor' else p
+        for p in app.template_context_processors.get(None, [])
+    ]
     app.config.from_object(config[config_name])
 
     config[config_name].init_app(app)

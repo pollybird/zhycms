@@ -21,8 +21,49 @@ _OS_ACCESS_RE = re.compile(r'\bos\.')
 # Python 风格 import（排除 CSS @import 与词内嵌入）
 _PY_IMPORT_RE = re.compile(r'(?<![\w@])import\s')
 
+# --- v3.1.8 二次加固：表达式片段级规则（防拼接/变体绕过） ---
+# 以下规则只对 {{ ... }} / {% ... %} 表达式片段生效，纯文本不误伤。
+
+# 提取模板表达式片段
+_EXPR_RE = re.compile(r'({{.*?}}|{%.*?%}|{#.*?#})', re.S)
+
+# |attr 过滤器：名称参数运行时可拼接（'__cl'~'ass__'），经典沙箱绕过武器
+_ATTR_FILTER_RE = re.compile(r'\|\s*attr\s*\(')
+# config 任意引用（globals 已剔除，模板中出现的 config 只能是攻击载荷）
+_CONFIG_RE = re.compile(r'\bconfig\b')
+# Jinja 环境内部对象（cycler/joiner/namespace/lipsum 可触达环境内部状态）
+_ENV_INTERNALS_RE = re.compile(r'\b(cycler|joiner|namespace|lipsum)\b')
+# request 对象属性访问：仅放行模板实际使用的白名单属性，
+# request.application / request.environ 等可直达应用实例与 config
+_REQUEST_ATTR_RE = re.compile(r'\brequest\s*\.\s*([A-Za-z_]\w*)')
+# request 下标访问：Jinja foo['bar'] 会回退 getattr，等价于属性访问
+_REQUEST_GETITEM_RE = re.compile(r'\brequest\s*\[')
+_REQUEST_ALLOWED_ATTRS = frozenset({
+    'path', 'full_path', 'args', 'view_args', 'endpoint', 'method',
+    'url', 'base_url', 'url_root', 'root_url', 'script_root', 'host',
+    'host_url', 'referrer', 'blueprint', 'query_string', 'path_info',
+})
+
 # 需审计的模板扩展名
 _TEMPLATE_EXTS = ('.html', '.htm', '.j2', '.jinja', '.jinja2')
+
+
+def _audit_expressions(content):
+    """表达式片段级审计（v3.1.8 二次加固）。返回 (ok, reason)。"""
+    for m in _EXPR_RE.finditer(content):
+        expr = m.group(0)
+        if _ATTR_FILTER_RE.search(expr):
+            return False, "包含 '|attr' 过滤器（可拼接属性名绕过沙箱）"
+        if _CONFIG_RE.search(expr):
+            return False, "包含 'config' 引用（模板上下文不暴露应用配置）"
+        if _ENV_INTERNALS_RE.search(expr):
+            return False, "包含模板环境内部对象（cycler/joiner/namespace/lipsum）"
+        if _REQUEST_GETITEM_RE.search(expr):
+            return False, "包含 request 下标访问（可回退为属性访问绕过白名单）"
+        for attr in _REQUEST_ATTR_RE.findall(expr):
+            if attr not in _REQUEST_ALLOWED_ATTRS:
+                return False, "包含白名单外的 request 属性访问 'request.{0}'".format(attr)
+    return True, ''
 
 
 def audit_template(content):
@@ -36,7 +77,7 @@ def audit_template(content):
         return False, "包含危险标识符 'os.'"
     if _PY_IMPORT_RE.search(content):
         return False, "包含危险标识符 'import'"
-    return True, ''
+    return _audit_expressions(content)
 
 
 def audit_theme_templates(root):

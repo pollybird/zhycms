@@ -11,11 +11,11 @@
 
 ### Security
 
-- **主题模板 SSTI → RCE（VULN-001，High）**：可视化构建器渲染链改用 `jinja2.sandbox.SandboxedEnvironment`，阻断 `__class__`/`__mro__`/`__subclasses__`/`__globals__` 等属性内省；主题包上传时新增模板静态审计（`app/utils/template_safety.py`），含 `config[`/`getattr`/`os.`/`import`/`eval(`/`exec(`/`subprocess` 等危险标识符的模板直接拒传并记审计日志。官方 8 套主题经全量扫描零命中，不受审计影响。
-- **插件包上传 RCE（VULN-002/VULN-009，High）**：新增 `plugin_upload_enabled` 设置项，**默认关闭**后台插件包直传（`系统设置 → 插件管理`页可显式开启）；开启后上传包仍需通过静态源码审计（`app/utils/plugin_safety.py`），含 `os.system`/`os.popen`/`subprocess.*`/`__import__`/`eval(`/`exec(` 的 `.py` 文件直接拒传。官方 11 个插件经全量扫描零命中；已在磁盘上的存量插件不重新审计。
+- **主题模板 SSTI → RCE（VULN-001，High）**：**全站模板环境统一沙箱化**（`_SandboxedFlaskEnvironment`，覆盖前台 `render_template` 链与构建器直渲链），阻断 `__class__`/`__mro__`/`__subclasses__`/`__globals__` 等属性内省及 `|attr` 拼接绕过；模板 globals 与渲染上下文不再暴露 `config` 对象（`config.SECRET_KEY` 不可经模板读取），`request` 以只读白名单代理注入（阻断 `request.application.config` 逃逸链）；主题包上传模板静态审计升级（`app/utils/template_safety.py`）：`|attr` 过滤器、`config` 引用、`request` 白名单外属性/下标访问、`cycler`/`joiner`/`namespace`/`lipsum` 环境内部对象一律拒传。官方 8 套主题经全量扫描零命中，前台渲染行为不变（`request.path` 等白名单属性正常可用）。
+- **插件包上传 RCE（VULN-002/VULN-009，High）**：新增 `plugin_upload_enabled` 设置项，**默认关闭**后台插件包直传（`系统设置 → 插件管理`页可显式开启）；开启后上传包需通过**基于 AST 语法树的源码审计**（`app/utils/plugin_safety.py`）：禁止导入 `subprocess`/`importlib`/`sys`/`builtins`/`operator`/`ctypes` 等高危模块，禁止 `from os import system` 等具名导入、`os.system` 等限定名调用、`eval`/`exec`/`__import__`/`compile` 裸调用、危险 dunder 属性访问及动态属性名 `getattr`——`from os import system`、`importlib.import_module("os").system`、`sys.modules['os']`、`getattr(x,'__gl'+'obals__')` 等字符串黑名单变体全部无效。官方插件为预装不经过本审计。
 - **敏感凭证明文存储（VULN-003，High，A02）**：`oss_*_secret`、`*_password`、`api_token`、`jwt_secret_key`、`search_meili_key` 等敏感配置改为 Fernet 加密入库（密文 `gAAAAA` 前缀）。加密密钥优先级：环境变量 `ZHYCMS_ENC_KEY` > `instance/enc_key` 持久化文件（权限 0600）> 首次启动自动生成落盘。历史明文敏感值首次读取时自动加密回写（惰性迁移）。密钥不可用时优雅降级并告警，不阻断启动。
 - **企业微信 Webhook SSRF（VULN-004，High，A10）**：通知 Webhook 校验由子串匹配改为域名精确白名单 + 强制 HTTPS（`qyapi.weixin.qq.com`），杜绝 `evil.com?qyapi.weixin.qq.com` 等子串绕过。
-- **短信 Webhook SSRF（VULN-005，High，A10）**：会员插件通用短信接口发送前对占位符替换后的最终 URL 做校验（协议白名单 + 内网/回环/链路本地/保留 IP 拒绝），后台保存配置时同样校验。新增公共工具 `app/utils/url_safety.py::assert_safe_external_url`。
+- **短信 Webhook SSRF（VULN-005，High，A10）**：会员插件通用短信接口发送前对占位符替换后的最终 URL 做校验，后台保存配置时同样校验。公共工具 `app/utils/url_safety.py::assert_safe_external_url` 二次加固：覆盖十进制/十六进制/八进制/段数省略等非常规 IPv4 字面量（`2130706433`、`0x7f000001`、`0177.0.0.1`、`127.1`）、IPv4-mapped IPv6（`::ffff:127.0.0.1`）与 `0.0.0.0/8`；域名经 DNS 解析后逐条记录判定（防 DNS 重绑定，解析失败 fail closed）。
 - **JWT 密钥复用 SECRET_KEY（VULN-006，Medium，A07）**：移除 `jwt_secret_key` 为空时回退复用 SECRET_KEY 的逻辑；未配置时启动自动生成随机密钥并加密持久化到 Setting，杜绝 SECRET_KEY 泄露即可伪造 API Token 的连锁风险。
 
 ### Added
@@ -28,7 +28,7 @@
 - **破坏性变更**：插件包直传默认关闭。如确需后台上传插件 zip，请在「插件管理」页显式开启「允许直接上传插件包」。
 - **加密密钥持久化**：使用 `instance/enc_key` 自动生成的部署，`instance` 目录需纳入备份；多实例/容器部署建议显式配置相同的环境变量 `ZHYCMS_ENC_KEY`，否则各实例加密数据互不通用。
 - 已加密敏感配置在密钥变更后无法解密（返回空串并告警），轮换密钥前请在后台重新保存各敏感配置。
-- **测试**：全量 443 项通过（新增 28 项安全回归）；`check_excepts.py` / `check_constants.py` / `check_release.py` 三门禁全绿；覆盖率 53%（门禁阈值 50%）。
+- **测试**：全量 450 项通过（新增 35 项安全回归，含全部已知绕过变体）；`check_excepts.py` / `check_constants.py` / `check_release.py` 三门禁全绿；覆盖率 53%（门禁阈值 50%）。
 
 ## [3.1.7] - 2026-11-03
 
