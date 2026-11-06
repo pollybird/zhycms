@@ -4,7 +4,7 @@
 
 | 版本 | 支持状态 | 说明 |
 | --- | --- | --- |
-| 3.1.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.1.3**（v3.1.2 安全五项 M1-M5 + v3.1.3 性能与并发健壮性四项 M7-M10），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
+| 3.1.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.1.8**（v3.1.8 安全加固专项：SAST 深度审计 P0+P1 共 7 个漏洞修复 + CSP 第三方资源白名单），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
 | 3.0.x | ✅ 完整支持 | 可视化页面构建器 + 插件默认布局贡献，建议升级至 3.1.x |
 | 2.6.x | ✅ 完整支持 | 前台会员体系 + 插件依赖强校验，建议升级至 3.1.x |
 | 2.5.x | ✅ 完整支持 | 内容级多语言 + Redis 缓存与 Session，建议升级至 3.1.x |
@@ -65,6 +65,15 @@
 - **首页 N+1 治理（v3.1.3 M9）**：首页区块 3 条 SQL 批量拉取、栏目树请求级缓存（内容 CRUD 后经 `clear_content_cache` 统一失效），降低高频页面的 DB 压力面。
 - **用户名唯一性竞态兜底（v3.1.3 M10）**：并发重名提交捕获 `IntegrityError` 回滚为业务错误提示，不再泄漏 500 异常页。
 
+### v3.1.8 安全加固专项（GitCode issue #12，SAST 深度审计 P0+P1）
+
+- **主题模板 SSTI 修复（VULN-001）**：可视化构建器渲染链强制 `jinja2.sandbox.SandboxedEnvironment`，阻断 `__class__`/`__mro__`/`__subclasses__`/`__globals__` 等属性内省；主题包上传新增模板静态审计（`app/utils/template_safety.py`），含 `config[`/`getattr`/`os.`/`import`/`eval(`/`exec(`/`subprocess` 等危险标识符的模板直接拒传并记审计日志。官方 8 套主题经全量扫描零命中。
+- **插件包上传 RCE 修复（VULN-002/009）**：插件包直传开关 `plugin_upload_enabled` **默认关闭**（插件管理页可显式开启）；上传包需通过静态源码审计（`app/utils/plugin_safety.py`），含 `os.system`/`os.popen`/`subprocess.*`/`__import__`/`eval(`/`exec(` 的源码直接拒传。存量磁盘插件不受影响。
+- **敏感凭证加密入库（VULN-003）**：`oss_*_secret`、`*_password`、`api_token`、`jwt_secret_key`、`search_meili_key` 等敏感配置改为 Fernet（`cryptography`）加密入库，密文 `gAAAAA` 前缀可识别；历史明文首次读取时自动加密回写（惰性迁移，无需 Alembic 脚本）。加密密钥与 SECRET_KEY 独立：环境变量 `ZHYCMS_ENC_KEY` > `instance/enc_key` 持久化文件（0600）> 首次启动自动生成。密钥不可用时优雅降级并告警。
+- **SSRF 防护统一（VULN-004/005）**：新增公共工具 `app/utils/url_safety.py::assert_safe_external_url`（协议白名单 + hostname 精确白名单 + 内网/回环/链路本地/保留/多播 IP 拒绝）。企业微信 Webhook 强制 HTTPS + 域名精确等于 `qyapi.weixin.qq.com`（修复子串匹配绕过）；会员插件短信 Webhook 在保存时与发送前（占位符替换后的最终 URL）各校验一次。
+- **JWT 密钥隔离（VULN-006）**：移除 `jwt_secret_key` 为空时回退复用 SECRET_KEY 的逻辑；未配置时启动自动生成随机密钥并加密持久化，DB 不可用阶段使用本次运行临时随机密钥，绝不回退 SECRET_KEY。升级后存量 JWT 全部失效，API 客户端需重新登录。
+- **CSP 第三方资源白名单（F-001）**：CSP 构建抽为 `_build_csp()`，基础策略与 v3.1.7 逐字节一致；后台「系统设置 → 后台安全」可为 `script-src`/`style-src`/`img-src`/`font-src`/`connect-src`/`media-src`/`frame-src` 配置换行分隔的来源白名单（`https://host[:port]` 精确源或 `*.example.com` 子域通配），保存时逐行校验（拒绝裸 `*`、非 http/https、userinfo、query/fragment、空格引号）。`frame-ancestors` 防点击劫持基线与 SVG 沙箱 CSP 永不读取白名单。
+
 ## 安全配置基线（部署方自查）
 
 1. **会话密钥**：生产环境显式设置 `ZHYCMS_SECRET_KEY` 为随机长字符串（`python -c "import secrets; print(secrets.token_hex(32))"`）；未设置时首次启动会自动生成并写入 `instance/secret_key`（权限 600），需妥善备份该文件（丢失会导致所有会话失效）。
@@ -75,3 +84,5 @@
 6. **密钥轮换**：升级 v2.4.1 后若此前使用过默认硬编码密钥，请立即轮换 `ZHYCMS_SECRET_KEY`（或删除 `instance/secret_key` 让系统重新生成），旧会话会失效需重新登录。
 7. **反向代理 / CSRF 同源校验（v2.4.2）**：CSRF 防护基于 `Origin/Referer` 与请求 `Host` 头比对，Nginx 反代需确保 `proxy_set_header Host $host;`（标准配置即满足）；若站点同时绑定多个域名访问，跨域名提交表单会被 403 拦截，属预期行为（同一域名访问正常）。REST API 调用（X-API-Token 鉴权）不受影响。
 8. **Redis 安全（v2.5.0）**：启用 Redis 后，建议配置密码（`requirepass` 或 ACL），Redis 仅监听内网地址（`bind 127.0.0.1` 或内网 IP），生产环境通过防火墙限制 6379 端口访问。`REDIS_URL` 中的密码与数据库 URI 中的密码一样属于敏感信息，不应入版本库（`.env` 已在 `.gitignore` 中）。
+9. **加密密钥（v3.1.8）**：敏感配置加密密钥优先取环境变量 `ZHYCMS_ENC_KEY`（可用 `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成）；未设置时首次启动自动生成并写入 `instance/enc_key`（权限 600），**务必随 `instance/` 目录一并备份**（丢失后已加密的敏感配置无法解密，需在后台重新录入）。多实例/容器部署必须各实例配置相同的 `ZHYCMS_ENC_KEY`；轮换密钥前请先在后台记录并重新保存各敏感配置。
+10. **插件包直传（v3.1.8）**：`plugin_upload_enabled` 默认关闭，仅在确需后台上传第三方插件 zip 时临时开启，用完建议关闭；上传包需通过静态源码审计，请仍只安装来源可信的插件。

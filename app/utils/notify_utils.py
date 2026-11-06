@@ -82,7 +82,14 @@ def send_wechat_webhook(markdown_content, mentioned_mobiles=None):
     返回 True/False。无 Webhook 配置或发送异常均返回 False 并记日志。
     """
     webhook = Setting.get('notify_wework_webhook')
-    if not webhook or 'qyapi.weixin.qq.com' not in webhook:
+    if not webhook:
+        return False
+    # v3.1.8 VULN-004：域名精确白名单 + 强制 https，杜绝子串绕过（SSRF）
+    from .url_safety import assert_safe_external_url
+    try:
+        assert_safe_external_url(webhook, allowed_hosts={'qyapi.weixin.qq.com'},
+                                 allow_schemes=('https',))
+    except ValueError:
         return False
     try:
         import requests

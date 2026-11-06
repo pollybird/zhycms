@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.1.7 使用手册</title>
+<title>ZhyCMS v3.1.8 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -161,7 +161,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.1.7</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.1.8</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -195,6 +195,7 @@
   <tr><td>可视化页面构建器</td><td>拖拽搭建首页/单页/列表/文章详情：24 组件、草稿/发布/修订回滚、双语与会员可见性、默认布局按主题 fixture + 插件片段三层合并；插件可注册组件并贡献默认布局；无布局永久回退手写模板</td><td>v3.0.0</td></tr>
   <tr><td>异常留痕治理</td><td>全库通用异常捕获统一中文 warning 留痕，可判定场景收窄为具体异常类型；插件隔离处保留宽捕获并注释；新增 CI 门禁防止新增静默吞噬</td><td>v3.1.6</td></tr>
   <tr><td>稳定性修复</td><td>批量操作 403 与批量勾选丢失修复；全站索引重建改为后台异步 + 进度轮询，增量变更自动补索引；数据库迁移新增外键孤儿预检与可空列自动置空</td><td>v3.1.7</td></tr>
+  <tr><td>安全加固</td><td>SAST 深度审计 P0+P1 修复：主题模板 SSTI 沙箱 + 上传审计、插件直传默认关闭 + 源码审计、敏感凭证 Fernet 加密入库、Webhook 与短信接口 SSRF 防护、JWT 密钥独立；新增 CSP 第三方资源白名单（后台可配）</td><td>v3.1.8</td></tr>
 </table>
 </section>
 

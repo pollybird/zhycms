@@ -8,6 +8,8 @@
 """
 from datetime import datetime
 import os
+import re
+from urllib.parse import urlparse
 
 from flask import (
     render_template, redirect, url_for, request, flash, abort, current_app,
@@ -268,6 +270,62 @@ def setting_upload_security():
 
 # ============ 后台安全（模块5：登录锁定 + 自定义后台前缀即时生效）============
 
+# v3.1.8 F-001：CSP 白名单指令键（与 app.__init__._CSP_EXTRA_SOURCES 对应）
+_CSP_SETTING_KEYS = (
+    'security_csp_script_src',
+    'security_csp_style_src',
+    'security_csp_img_src',
+    'security_csp_font_src',
+    'security_csp_connect_src',
+    'security_csp_media_src',
+    'security_csp_frame_src',
+)
+
+_CSP_HOST_RE = re.compile(
+    r'^[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?'
+    r'(\.[A-Za-z0-9]([A-Za-z0-9\-]*[A-Za-z0-9])?)*$')
+
+
+def _validate_csp_sources(raw):
+    """校验 CSP 白名单文本（每行一个源）。返回 (ok, 错误消息)。
+
+    允许的源形式：
+      - ``https://cdn.example.com`` / ``http://host:8080``（可带路径）
+      - ``*.example.com`` 或 ``https://*.example.com``（子域通配）
+    拒绝：裸 ``*``、非 http(s) scheme（data:/javascript: 等）、userinfo、
+    query/fragment、含空格或引号的非法值。
+    """
+    for lineno, line in enumerate(raw.splitlines(), 1):
+        src = line.strip()
+        if not src:
+            continue
+        if any(c in src for c in (' ', '\t', '"', "'")):
+            return False, '第 {0} 行包含非法字符（空格/引号）: {1}'.format(lineno, src)
+        if src == '*':
+            return False, '第 {0} 行不允许裸 * 通配，请使用 *.example.com 形式'.format(lineno)
+        # 裸 *.example.com 形式
+        if src.startswith('*.'):
+            if not _CSP_HOST_RE.match(src[2:]):
+                return False, '第 {0} 行通配主机名非法: {1}'.format(lineno, src)
+            continue
+        try:
+            parsed = urlparse(src)
+        except ValueError:
+            return False, '第 {0} 行 URL 解析失败: {1}'.format(lineno, src)
+        if parsed.scheme not in ('http', 'https'):
+            return False, '第 {0} 行仅允许 http/https 协议: {1}'.format(lineno, src)
+        if parsed.username or parsed.password:
+            return False, '第 {0} 行不允许包含用户信息: {1}'.format(lineno, src)
+        if parsed.query or parsed.fragment:
+            return False, '第 {0} 行不允许包含 query/fragment: {1}'.format(lineno, src)
+        host = parsed.hostname or ''
+        if host.startswith('*.'):
+            host = host[2:]
+        if not host or not _CSP_HOST_RE.match(host):
+            return False, '第 {0} 行主机名非法: {1}'.format(lineno, src)
+    return True, ''
+
+
 @admin_bp.route('/settings/security', methods=['GET', 'POST'])
 @permission_required('system:settings')
 def setting_security():
@@ -301,6 +359,24 @@ def setting_security():
         if Setting.get('login_abnormal_city_alert') != val:
             Setting.set('login_abnormal_city_alert', val)
             changed['login_abnormal_city_alert'] = val
+        # 3. CSP 第三方源白名单（v3.1.8 F-001）：整体校验，失败不落库并提示行号
+        from app.utils.admin_prefix import load_admin_prefix as _lap
+        csp_values = {}
+        for key in _CSP_SETTING_KEYS:
+            raw = request.form.get(key)
+            if raw is None:
+                continue
+            ok, err = _validate_csp_sources(raw)
+            if not ok:
+                flash(_gettext('CSP 白名单校验失败（{0}）：{1}').format(key, err), 'danger')
+                return redirect('/' + _lap() + '/settings/security')
+            # 规范化：去空行、逐行 strip
+            csp_values[key] = '\n'.join(
+                line.strip() for line in raw.splitlines() if line.strip())
+        for key, value in csp_values.items():
+            if Setting.get(key) != value:
+                Setting.set(key, value)
+                changed[key] = value or '(清空)'
         db.session.commit()
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
@@ -309,7 +385,6 @@ def setting_security():
             flash(_gettext('登录安全配置已保存'), 'success')
         # 若改变了前缀，url_for 在本次请求中使用的旧 URL adapter 已与新 url_map 不匹配，
         # 直接字面量拼新前缀下的 security 设置页 URL，避免 BuildError。
-        from app.utils.admin_prefix import load_admin_prefix as _lap
         return redirect('/' + _lap() + '/settings/security')
 
     settings = Setting.get_dict()

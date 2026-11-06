@@ -36,6 +36,34 @@
           </div>
         </div>
       </div>
+
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">{{ _('CSP 第三方资源白名单') }}</h3></div>
+        <div class="card-body">
+          <p class="text-muted">
+            {{ _('默认 CSP 仅允许同源资源（default-src \'self\'）。确需引用第三方资源（统计脚本、CDN、第三方 SDK）时，在下方对应指令中添加来源，一行一个，保存后即时生效。') }}
+          </p>
+          <p class="text-muted">
+            {{ _('格式：') }}<code>https://cdn.example.com</code> {{ _('或') }} <code>*.example.com</code>（{{ _('子域通配') }}）。
+            {{ _('不允许裸 *、非 http/https 协议；frame-ancestors 防点击劫持基线不开放白名单；SVG 沙箱策略不受此配置影响。') }}
+          </p>
+          {% for key, label in [
+            ('security_csp_script_src', 'script-src（' ~ _('脚本') ~ '）'),
+            ('security_csp_style_src', 'style-src（' ~ _('样式') ~ '）'),
+            ('security_csp_img_src', 'img-src（' ~ _('图片') ~ '）'),
+            ('security_csp_font_src', 'font-src（' ~ _('字体') ~ '）'),
+            ('security_csp_connect_src', 'connect-src（XHR/fetch/WebSocket）'),
+            ('security_csp_media_src', 'media-src（' ~ _('音视频') ~ '）'),
+            ('security_csp_frame_src', 'frame-src（' ~ _('嵌入框架') ~ '）'),
+          ] %}
+          <div class="form-group">
+            <label>{{ label }}</label>
+            <textarea name="{{ key }}" class="form-control text-monospace" rows="2"
+              placeholder="https://cdn.example.com">{{ settings.get(key, '') }}</textarea>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
     </div>
     <div class="col-md-4">
       <div class="card">

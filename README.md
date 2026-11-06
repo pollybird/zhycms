@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.1.7-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.1.8-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-415%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-443%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.1.7**（稳定性修复：批量操作 403、Tantivy 全站重建索引超时、数据库迁移 1000+ 行失败；无数据库迁移、无新增依赖。详见 [CHANGELOG](CHANGELOG.md)）
+**当前版本：v3.1.8**（安全加固专项：SAST 深度审计 P0+P1 共 7 个漏洞修复 + CSP 第三方资源白名单可配置；含配置项变更，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -111,6 +111,10 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.1.8（2026-11-06）
+
+安全加固专项（GitCode issue #12，SAST 深度审计）。修复 P0+P1 共 7 个漏洞：主题模板 SSTI（构建器渲染强制 Jinja 沙箱 + 上传静态审计）、插件包 RCE（上传静态审计 + 直传开关默认关闭）、敏感凭证明文入库（Fernet 加密 + 惰性迁移）、企业微信/短信 Webhook SSRF（域名白名单 + 内网 IP 拒绝）、JWT 密钥与 SECRET_KEY 隔离（未配置自动生成持久化）；新增 CSP 第三方资源白名单（后台「后台安全」页可配 script/style/img/font/connect/media/frame-src 7 个指令来源）。无数据库结构变更、无新增依赖。
 
 ### v3.1.7（2026-11-03）
 
@@ -215,7 +219,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.1.7**，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.1.8**，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -232,9 +236,9 @@ docker compose -f docker-compose.postgresql.yml up -d
 ```
 
 > 也可直接拉取镜像：
-> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.7`）
-> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.7`）
-> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.7`）
+> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.8`）
+> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.8`）
+> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.1.8`）
 >
 > 三个 tag（`mysql` / `postgresql` / `latest`）指向同一镜像，内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
 

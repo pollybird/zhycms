@@ -139,7 +139,12 @@ def member_settings():
         group = 'basic'
 
     if request.method == 'POST':
-        cfg.save_group(group, request.form)
+        try:
+            cfg.save_group(group, request.form)
+        except ValueError as e:
+            # v3.1.8 VULN-005：短信接口 URL SSRF 校验失败，不落库
+            flash(_gettext('保存失败：%(reason)s', reason=str(e)), 'error')
+            return redirect(url_for('admin.member_settings', group=group))
         clear_content_cache()
         audit_log(OP_UPDATE, MODULE_MEMBER, None, f'settings:{group}', None)
         flash(_gettext('设置已保存'), 'success')

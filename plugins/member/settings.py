@@ -87,8 +87,18 @@ def is_on(key):
 
 
 def save_group(group, form_data):
-    """按分组保存表单中允许的键。返回实际写入的键列表。"""
+    """按分组保存表单中允许的键。返回实际写入的键列表。
+
+    v3.1.8 VULN-005：sms 组保存时校验通用短信接口 URL（占位符以 0 填充后
+    做 SSRF 校验），不安全抛 ValueError 由路由层捕获提示，不落库。
+    """
     keys = GROUP_KEYS.get(group, [])
+    if group == 'sms':
+        url_tpl = (form_data.get('member_sms_webhook_url') or '').strip()
+        if url_tpl:
+            from app.utils.url_safety import assert_safe_external_url
+            sample = url_tpl.replace('{phone}', '0').replace('{code}', '0')
+            assert_safe_external_url(sample)
     for key in keys:
         if key in CHECKBOX_KEYS:
             value = 'on' if form_data.get(key) == 'on' else ''

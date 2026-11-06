@@ -12,6 +12,7 @@ render.html 继承当前主题 base.html，navbar/footer/SEO 与手工模板完�
 """
 from flask import current_app, render_template
 from jinja2 import TemplateNotFound, TemplateSyntaxError
+from jinja2.sandbox import SandboxedEnvironment
 from markupsafe import Markup, escape
 
 from ..constants import Builder as _B
@@ -194,8 +195,32 @@ def render_node(node, page_ctx, depth=0):
         return Markup('')
 
 
+def _get_sandbox_env():
+    """获取与 app.jinja_env 共享 loader 的 Jinja 沙箱环境（按 app 实例惰性缓存）。
+
+    v3.1.8（VULN-001）：主题覆写模板可经后台上传，构建器直渲链必须使用
+    SandboxedEnvironment，阻断 ``__class__``/``__mro__``/``__subclasses__``
+    等属性内省路径，防御主题模板 SSTI → RCE。
+    沙箱环境复制主环境的 filters 与 globals（url_for/csrf_token/_p/t 等），
+    官方主题模板在沙箱下渲染行为一致（步骤 0 已扫描零危险标识符）。
+    """
+    env = current_app.extensions.get('zhycms_jinja_sandbox')
+    if env is None:
+        src = current_app.jinja_env
+        env = SandboxedEnvironment(
+            loader=src.loader,
+            autoescape=src.autoescape,
+            undefined=src.undefined,
+            auto_reload=src.auto_reload,
+        )
+        env.filters.update(src.filters)
+        env.globals.update(src.globals)
+        current_app.extensions['zhycms_jinja_sandbox'] = env
+    return env
+
+
 def render_template_string_safe(template_name, ctx):
-    return current_app.jinja_env.get_template(template_name).render(**ctx)
+    return _get_sandbox_env().get_template(template_name).render(**ctx)
 
 
 def render_layout_html(layout, page_ctx=None):

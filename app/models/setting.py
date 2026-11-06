@@ -1,9 +1,12 @@
 import json
+import logging
 from datetime import datetime
 
 from flask import g, has_app_context
 
 from ..extensions import db
+
+logger = logging.getLogger(__name__)
 
 
 class Setting(db.Model):
@@ -30,7 +33,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.1.7'
+    CMS_VERSION = '3.1.8'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -160,7 +163,67 @@ class Setting(db.Model):
         'oss_qiniu_secret_key': '',            # 七牛 SecretKey
         'oss_qiniu_bucket': '',                # 空间名
         'oss_qiniu_cdn_domain': '',            # 七牛绑定域名（必填）
+
+        # ===== v3.1.8：安全加固（GitCode issue #12）=====
+        'plugin_upload_enabled': '',           # on=允许后台直传插件包（默认关闭）
+
+        # ===== v3.1.8：CSP 第三方资源白名单（F-001，换行分隔 origin，默认空）=====
+        'security_csp_script_src': '',
+        'security_csp_style_src': '',
+        'security_csp_img_src': '',
+        'security_csp_font_src': '',
+        'security_csp_connect_src': '',
+        'security_csp_media_src': '',
+        'security_csp_frame_src': '',
     }
+
+    # ===== v3.1.8：敏感键入库加密（VULN-003，GitCode issue #12）=====
+    # 判定规则：显式集合 + 后缀匹配（覆盖 oss_*_secret、*_password、
+    # member_sms_aliyun_key_secret、member_wechat_secret 等插件敏感键）。
+    # 敏感键 value 以 Fernet 密文（gAAAAA 前缀）入库，get/get_dict 返回明文。
+    SENSITIVE_KEYS_EXPLICIT = frozenset({
+        'api_token',
+        'jwt_secret_key',
+        'search_meili_key',
+    })
+    SENSITIVE_KEY_SUFFIXES = ('_secret', '_secret_key', '_password')
+
+    @classmethod
+    def _is_sensitive_key(cls, key):
+        if not key:
+            return False
+        if key in cls.SENSITIVE_KEYS_EXPLICIT:
+            return True
+        return key.endswith(cls.SENSITIVE_KEY_SUFFIXES)
+
+    @classmethod
+    def _resolve_sensitive(cls, key, raw, cache_map=None):
+        """敏感键读取处理：密文解密返回明文；历史明文惰性加密回写。
+
+        惰性迁移（v3.1.8 决策）：无需 Alembic 脚本，首次读取明文敏感值时
+        自动加密回写，读路径隐式写需自行提交，失败回滚降级返回明文。
+        """
+        if not raw:
+            return raw
+        from ..utils.crypto import FERNET_PREFIX, decrypt_value, encrypt_value
+        if raw.startswith(FERNET_PREFIX):
+            return decrypt_value(raw)
+        # 惰性迁移：明文 → 加密回写
+        encrypted = encrypt_value(raw)
+        if encrypted != raw:
+            item = cls.query.filter_by(key=key).first()
+            if item is not None and item.value == raw:
+                item.value = encrypted
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    # 惰性迁移回写失败：降级返回明文，下次读取重试
+                    db.session.rollback()
+                    logger.warning('敏感键 %s 惰性迁移回写失败：%s', key, e)
+                else:
+                    if cache_map is not None:
+                        cache_map[key] = encrypted
+        return raw
 
     @classmethod
     def _request_cache_map(cls):
@@ -180,23 +243,34 @@ class Setting(db.Model):
 
     @classmethod
     def get(cls, key, default=None):
+        resolved = None
+        found = False
         cache_map = cls._request_cache_map()
         if cache_map is not None:
             if key in cache_map:
-                return cache_map[key]
-            # 键不在 DB 整表映射中：解析默认值并回填映射，避免同请求重复落库查询
-            item = cls.query.filter_by(key=key).first()
-            if item is None:
-                resolved = default if default is not None else cls.DEFAULTS.get(key, '')
+                resolved = cache_map[key]
+                found = True
             else:
+                # 键不在 DB 整表映射中：解析默认值并回填映射，避免同请求重复落库查询
+                item = cls.query.filter_by(key=key).first()
+                if item is not None:
+                    resolved = item.value or ''
+                    found = True
+                else:
+                    resolved = default if default is not None else cls.DEFAULTS.get(key, '')
+                cache_map[key] = resolved
+        else:
+            # 无应用上下文（CLI / 单测裸调用）：保持原有逐键查询行为
+            item = cls.query.filter_by(key=key).first()
+            if item is not None:
                 resolved = item.value or ''
-            cache_map[key] = resolved
-            return resolved
-        # 无应用上下文（CLI / 单测裸调用）：保持原有逐键查询行为
-        item = cls.query.filter_by(key=key).first()
-        if item is None:
-            return default if default is not None else cls.DEFAULTS.get(key, '')
-        return item.value or ''
+                found = True
+            else:
+                resolved = default if default is not None else cls.DEFAULTS.get(key, '')
+        # v3.1.8 VULN-003：敏感键解密/惰性迁移（仅处理来自 DB 的值，默认值不回写）
+        if found and resolved and cls._is_sensitive_key(key):
+            return cls._resolve_sensitive(key, resolved, cache_map)
+        return resolved
 
     @classmethod
     def get_dict(cls):
@@ -204,19 +278,29 @@ class Setting(db.Model):
         cache_map = cls._request_cache_map()
         if cache_map is not None:
             result.update(cache_map)
-            return result
-        for item in cls.query.all():
-            result[item.key] = item.value or ''
+        else:
+            for item in cls.query.all():
+                result[item.key] = item.value or ''
+        # v3.1.8 VULN-003：模板注入的 site_settings 需拿到明文
+        for k in list(result):
+            if result[k] and cls._is_sensitive_key(k):
+                result[k] = cls._resolve_sensitive(k, result[k], cache_map)
         return result
 
     @classmethod
     def set(cls, key, value):
+        stored = str(value) if value is not None else ''
+        # v3.1.8 VULN-003：敏感键加密入库（已是密文则不重复加密）
+        if stored and cls._is_sensitive_key(key):
+            from ..utils.crypto import FERNET_PREFIX, encrypt_value
+            if not stored.startswith(FERNET_PREFIX):
+                stored = encrypt_value(stored)
         item = cls.query.filter_by(key=key).first()
         if item is None:
-            item = cls(key=key, value=str(value) if value is not None else '')
+            item = cls(key=key, value=stored)
             db.session.add(item)
         else:
-            item.value = str(value) if value is not None else ''
+            item.value = stored
         # v3.1.3 M7：写后失效当前请求的整表缓存，同请求内后续读立即可见
         if has_app_context():
             g.pop('_settings_map', None)

@@ -488,6 +488,19 @@ def theme_upload():
         except ValueError as e:
             flash(_gettext('主题包不合法：{0}').format(e), 'danger')
             return redirect(url_for('admin.theme_index'))
+        # v3.1.8（VULN-001）：模板静态安全审计，拦截含 SSTI 危险标识符的模板
+        from ...utils.template_safety import audit_theme_templates
+        audit_ok, violations = audit_theme_templates(root)
+        if not audit_ok:
+            detail = '；'.join('{0}: {1}'.format(rel, reason)
+                               for rel, reason in violations[:5])
+            flash(_gettext('主题包安全审计未通过：{0}').format(detail), 'danger')
+            audit_log(OP_UPLOAD, MODULE_SETTING, target_id='-',
+                      target_name=slug,
+                      detail={'action': '上传主题被拒',
+                              'reason': 'template_audit',
+                              'violations': [list(v) for v in violations[:20]]})
+            return redirect(url_for('admin.theme_index'))
         target = os.path.join(THEMES_DIR, slug)
         try:
             shutil.move(root, target)

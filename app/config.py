@@ -44,6 +44,45 @@ def _resolve_secret_key():
     return key
 
 
+def _resolve_enc_key():
+    """解析敏感配置加密密钥（v3.1.8 VULN-003，GitCode issue #12）。
+
+    优先级：环境变量 ``ZHYCMS_ENC_KEY`` > ``instance/enc_key`` 持久化文件
+    > 首次启动自动生成 Fernet 密钥并落盘（权限 0600）。
+
+    用于 Setting 敏感键（oss_*_secret、*_password 等）的入库加密，
+    与 SECRET_KEY 独立，轮换互不影响。密钥不可用时降级为明文存储并告警，
+    不阻断启动。
+    """
+    env_key = os.environ.get('ZHYCMS_ENC_KEY')
+    if env_key:
+        return env_key
+    key_path = os.path.join(BASE_DIR, 'instance', 'enc_key')
+    try:
+        if os.path.exists(key_path):
+            with open(key_path, 'r', encoding='utf-8') as f:
+                key = f.read().strip()
+            if key:
+                return key
+    except OSError:
+        pass
+    try:
+        from cryptography.fernet import Fernet
+        key = Fernet.generate_key().decode('ascii')
+    except Exception as e:
+        logger.warning('cryptography 不可用，敏感配置加密未启用：%s', e)
+        return ''
+    try:
+        os.makedirs(os.path.dirname(key_path), exist_ok=True)
+        with open(key_path, 'w', encoding='utf-8') as f:
+            f.write(key)
+        os.chmod(key_path, 0o600)
+    except OSError:
+        # 无法落盘时仍使用本次随机密钥，重启后已加密数据将无法解密（告警提示配置环境变量）
+        logger.warning('加密密钥无法持久化到 %s，建议配置环境变量 ZHYCMS_ENC_KEY', key_path)
+    return key
+
+
 def _resolve_database_uri():
     """按优先级解析启动时的数据库 URI。
 
@@ -70,6 +109,9 @@ def _resolve_database_uri():
 class Config:
     # 基础配置（SECRET_KEY：环境变量 > instance/secret_key 持久化 > 首次启动生成）
     SECRET_KEY = _resolve_secret_key()
+
+    # v3.1.8 VULN-003：敏感配置加密密钥（环境变量 > instance/enc_key > 首次启动生成）
+    ZHYCMS_ENC_KEY = _resolve_enc_key()
 
     # v2.5.0：Redis URL（可选）。有环境变量 REDIS_URL 且 Redis 可达时自动启用
     # Redis 缓存 + 服务端 Session；无则回退 SimpleCache + Cookie Session。
@@ -156,6 +198,9 @@ class TestingConfig(Config):
         'ZHYCMS_DB_URI', 'sqlite:///:memory:')
     WTF_CSRF_ENABLED = False
     SECRET_KEY = os.environ.get('ZHYCMS_SECRET_KEY', 'test-secret-key-for-pytest-only')
+    # v3.1.8：测试固定加密密钥（仅 pytest 使用，保证加解密用例可重复）
+    ZHYCMS_ENC_KEY = os.environ.get(
+        'ZHYCMS_ENC_KEY', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')
 
 
 config = {

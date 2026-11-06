@@ -176,6 +176,12 @@ def _send_webhook(phone, code):
     if not url_tpl:
         raise RuntimeError('通用短信接口地址未配置')
     url = url_tpl.replace('{phone}', phone).replace('{code}', code)
+    # v3.1.8 VULN-005：发送前对最终 URL 做 SSRF 校验（协议白名单 + 内网 IP 拒绝）
+    from app.utils.url_safety import assert_safe_external_url
+    try:
+        assert_safe_external_url(url)
+    except ValueError as e:
+        raise RuntimeError('短信接口地址不安全: {0}'.format(e))
     method = (cfg.cfg('member_sms_webhook_method') or 'GET').upper()
     if method == 'POST':
         resp = requests.post(url, json={'phone': phone, 'code': code}, timeout=10)

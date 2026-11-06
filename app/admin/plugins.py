@@ -50,10 +50,33 @@ _PLUGIN_REQUIRED_FILES = ('manifest.json', '__init__.py')
 @admin_bp.route('/plugins')
 @permission_required('system:settings')
 def plugin_index():
+    from ..models.setting import Setting
     return render_template('admin/plugin/index.html',
                            plugins=plugin_system.get_plugin_records(),
                            allowed_exts=' / '.join(_PLUGIN_ALLOWED_EXTS),
-                           required_files='、'.join(_PLUGIN_REQUIRED_FILES))
+                           required_files='、'.join(_PLUGIN_REQUIRED_FILES),
+                           plugin_upload_enabled=Setting.get('plugin_upload_enabled') == 'on')
+
+
+@admin_bp.route('/plugins/upload-toggle', methods=['POST'])
+@permission_required('system:settings')
+def plugin_upload_toggle():
+    """v3.1.8（VULN-002）：直传插件包开关（默认关闭）。
+
+    关闭时 /plugins/upload 一律拒绝；开启后才允许上传 zip/tar.gz，
+    且上传包仍需通过静态内容审计（plugin_safety.audit_plugin_package）。
+    """
+    from ..models.setting import Setting
+    from ..extensions import db
+    val = 'on' if request.form.get('plugin_upload_enabled') == 'on' else ''
+    Setting.set('plugin_upload_enabled', val)
+    db.session.commit()
+    audit_log(OP_UPDATE, MODULE_PLUGIN, target_id='plugin_upload_enabled',
+              target_name='plugin_upload_enabled',
+              detail={'action': '插件直传开关', 'value': val or 'off'})
+    flash(_gettext('已开启插件包直传，请仅上传来源可信的插件包') if val
+          else _gettext('已关闭插件包直传'), 'success')
+    return redirect(url_for('admin.plugin_index'))
 
 
 @admin_bp.route('/plugins/<slug>/toggle', methods=['POST'])
@@ -186,6 +209,12 @@ def plugin_download(slug):
 @permission_required('system:settings')
 def plugin_upload():
     """插件压缩包上传入口。全程校验不通过时不写入 plugins/ 目录。"""
+    # 0. v3.1.8（VULN-002）：直传开关（默认关闭），杜绝后台被攻破后直接 RCE
+    from ..models.setting import Setting
+    if Setting.get('plugin_upload_enabled') != 'on':
+        flash(_gettext('插件包直传已关闭（安全默认）。如确需上传，请先在下方开启「允许直接上传插件包」。'), 'danger')
+        return redirect(url_for('admin.plugin_index'))
+
     f = request.files.get('archive')
     if f is None or not f.filename:
         flash(_gettext('请选择要上传的插件压缩包'), 'danger')
@@ -222,6 +251,20 @@ def plugin_upload():
                 unpacked, raw_name, plugins_dir)
         except ValueError as e:
             flash(_gettext('插件包不合法：{0}').format(e), 'danger')
+            return redirect(url_for('admin.plugin_index'))
+
+        # 3.5 v3.1.8（VULN-002/009）：插件源码静态安全审计，拒绝高危调用
+        from ..utils.plugin_safety import audit_plugin_package
+        audit_ok, violations = audit_plugin_package(root)
+        if not audit_ok:
+            detail = '；'.join('{0}: {1}'.format(rel, reason)
+                               for rel, reason in violations[:5])
+            flash(_gettext('插件包安全审计未通过：{0}').format(detail), 'danger')
+            audit_log(OP_UPLOAD, MODULE_PLUGIN, target_id='-',
+                      target_name=slug,
+                      detail={'action': '上传插件被拒',
+                              'reason': 'plugin_audit',
+                              'violations': [list(v) for v in violations[:20]]})
             return redirect(url_for('admin.plugin_index'))
 
         # 4. 移动到 plugins/<slug>/

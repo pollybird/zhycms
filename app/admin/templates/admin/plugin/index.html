@@ -13,6 +13,18 @@
     <h3 class="card-title">{{ _('上传插件') }}</h3>
   </div>
   <div class="card-body">
+    <form method="post" action="{{ url_for('admin.plugin_upload_toggle') }}" class="mb-3 pb-3 border-bottom">
+      <div class="custom-control custom-switch">
+        <input type="checkbox" class="custom-control-input" id="plugin_upload_enabled"
+               name="plugin_upload_enabled" {% if plugin_upload_enabled %}checked{% endif %}
+               onchange="this.form.submit()">
+        <label class="custom-control-label" for="plugin_upload_enabled">{{ _('允许直接上传插件包') }}</label>
+      </div>
+      <small class="form-text text-muted">
+        {{ _('安全默认：关闭。关闭期间无法上传插件包；开启后上传包仍会通过安全审计（拒绝含命令执行/动态求值等高危调用的插件）。请仅上传来源可信的插件包。') }}
+      </small>
+    </form>
+    {% if plugin_upload_enabled %}
     <form method="post" action="{{ url_for('admin.plugin_upload') }}" enctype="multipart/form-data" id="upload-form">
       <div class="custom-file mb-3">
         <input type="file" name="archive" id="plugin-file" class="custom-file-input" accept=".zip" required>
@@ -21,6 +33,11 @@
       <button type="submit" class="btn btn-primary"><i class="fas fa-cloud-upload-alt"></i> {{ _('上传并安装') }}</button>
       <small class="form-text text-muted mt-2">{{ _('zip 根目录须包含 manifest.json 和 __init__.py；若插件已存在将跳过并给出提示') }}</small>
     </form>
+    {% else %}
+    <div class="alert alert-secondary mb-0">
+      <i class="fas fa-lock mr-1"></i> {{ _('插件包直传当前已关闭。如需上传第三方插件，请先开启上方开关。') }}
+    </div>
+    {% endif %}
   </div>
 </div>
 

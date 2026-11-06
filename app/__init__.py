@@ -1,5 +1,6 @@
 import os
 import re
+import logging
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -9,6 +10,8 @@ from flask_login import current_user
 from .config import config
 from .extensions import db, login_manager, cache, set_scheduler, babel, migrate, server_session, jwt, limiter
 from .i18n import select_locale, available_locales, current_locale, _p
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -427,6 +430,60 @@ def _maybe_rebuild_search_index(app):
         app.logger.exception('[Search] 索引自检异常（非致命）')
 
 
+# v3.1.8 F-001：CSP 指令 → Setting 白名单键映射（值为换行分隔的 origin 列表）。
+# 注意：frame-ancestors 不开放白名单（防点击劫持基线不可松动）；
+# SVG 响应的 sandbox CSP 为安全兜底，永远不读取白名单。
+_CSP_EXTRA_SOURCES = (
+    ('script-src', 'security_csp_script_src'),
+    ('style-src', 'security_csp_style_src'),
+    ('img-src', 'security_csp_img_src'),
+    ('font-src', 'security_csp_font_src'),
+    ('connect-src', 'security_csp_connect_src'),
+    ('media-src', 'security_csp_media_src'),
+    ('frame-src', 'security_csp_frame_src'),
+)
+
+# 指令输出顺序：与 v3.1.7 基线逐字节一致，追加指令插在 frame-ancestors 之前
+_CSP_DIRECTIVE_ORDER = (
+    'default-src', 'script-src', 'style-src', 'img-src', 'font-src',
+    'connect-src', 'media-src', 'frame-src', 'frame-ancestors',
+)
+
+
+def _build_csp():
+    """构建 Content-Security-Policy 头（v3.1.8 F-001）。
+
+    基础策略与 v3.1.7 完全一致；再从 Setting 读取 7 个指令的第三方源白名单
+    （换行分隔 origin，保存时已校验格式）追加到对应指令。空白名单时输出与
+    v3.1.7 基线逐字节一致（回归基线）。Setting 有请求级整表缓存，逐请求
+    构建无额外 SQL；DB 不可用时降级为纯基础策略。
+    """
+    directives = {
+        'default-src': ["'self'"],
+        'script-src': ["'self'", "'unsafe-inline'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        'img-src': ["'self'", 'data:', 'https:'],
+        'font-src': ["'self'", 'data:'],
+        'frame-ancestors': ["'self'"],
+    }
+    try:
+        from .models.setting import Setting
+        for directive, key in _CSP_EXTRA_SOURCES:
+            raw = Setting.get(key) or ''
+            extra = [line.strip() for line in raw.splitlines() if line.strip()]
+            if extra:
+                directives.setdefault(directive, []).extend(extra)
+    except Exception as e:
+        # DB 不可用（初始化向导等阶段）：降级为纯基础策略
+        logger.warning('CSP 白名单读取失败，使用基础策略：%s', e)
+    parts = []
+    for name in _CSP_DIRECTIVE_ORDER:
+        sources = directives.get(name)
+        if sources:
+            parts.append(name + ' ' + ' '.join(sources))
+    return '; '.join(parts)
+
+
 def create_app(config_name=None):
     if config_name is None:
         # ZHOCMS_ 为 v2.1 前旧前缀（历史拼写差异），保留兼容回退
@@ -476,11 +533,25 @@ def create_app(config_name=None):
     babel.init_app(app, locale_selector=select_locale)
 
     # v2.6.3：API JWT 鉴权初始化
-    # JWT_SECRET_KEY 优先用 Setting 'jwt_secret_key'，空则复用 SECRET_KEY
+    # v3.1.8 VULN-006：JWT 密钥与 SECRET_KEY 严格隔离，不再回退复用。
+    # 未配置时启动自动生成随机密钥并持久化到 Setting（敏感键，加密入库），
+    # 避免 SECRET_KEY 泄露即可伪造 API token 的连锁风险。
     with app.app_context():
         try:
+            import secrets as _secrets
             from .models.setting import Setting
-            jwt_secret = Setting.get('jwt_secret_key') or app.config.get('SECRET_KEY')
+            jwt_secret = Setting.get('jwt_secret_key')
+            if not jwt_secret:
+                jwt_secret = _secrets.token_urlsafe(32)
+                try:
+                    Setting.set('jwt_secret_key', jwt_secret)
+                    db.session.commit()
+                    app.logger.warning(
+                        'jwt_secret_key 未配置，已自动生成并持久化（加密存储）；'
+                        '建议在后台「安全设置」中显式设置独立密钥')
+                except Exception as e:
+                    db.session.rollback()
+                    app.logger.warning('jwt_secret_key 自动持久化失败，本次运行使用临时密钥：%s', e)
             app.config['JWT_SECRET_KEY'] = jwt_secret
             # 过期时间从 Setting 读取（分钟/天）
             try:
@@ -494,8 +565,10 @@ def create_app(config_name=None):
             except (TypeError, ValueError):
                 pass
         except Exception as e:
-            app.logger.warning('读取 JWT 配置失败，回退 SECRET_KEY：%s', e)
-            app.config['JWT_SECRET_KEY'] = app.config.get('SECRET_KEY')
+            # DB 不可用（如初始化向导阶段）：使用本次运行临时随机密钥，绝不回退 SECRET_KEY
+            import secrets as _secrets
+            app.logger.warning('读取 JWT 配置失败，本次运行使用临时随机密钥：%s', e)
+            app.config['JWT_SECRET_KEY'] = _secrets.token_urlsafe(32)
     jwt.init_app(app)
 
     # v2.6.3：API 速率限制初始化（未配置 Redis 时用内存存储，多实例下不精确但可用）
@@ -754,12 +827,8 @@ def create_app(config_name=None):
         response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
         # 简洁 CSP：默认同源；内联脚本/样式允许（AdminLTE/Jinja 渲染需要，
         # XSS 防护主要靠服务端转义）；图片允许 data: 与 https:（云存储/CDN）
-        response.headers.setdefault(
-            'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline';"
-            " style-src 'self' 'unsafe-inline';"
-            " img-src 'self' data: https:; font-src 'self' data:; frame-ancestors 'self'"
-        )
+        # v3.1.8 F-001：第三方源白名单由 _build_csp() 从 Setting 动态拼接
+        response.headers.setdefault('Content-Security-Policy', _build_csp())
         # v3.1.2 M4（GitCode issue #2 兜底）：SVG 响应附加 sandbox CSP + 强制
         # image/svg+xml Content-Type，防止历史遗留 SVG 中嵌入脚本在浏览器执行
         # （即便上传校验已拒绝危险片段，对存量 SVG 也做兜底防护）。
