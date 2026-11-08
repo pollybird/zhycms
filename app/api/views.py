@@ -22,6 +22,7 @@ from ..models.column import Column, ColumnField
 from ..models.article import Article
 from ..models.setting import Setting
 from ..models.workflow import STATUS_PUBLISHED
+from ..utils.db_utils import escape_like, LIKE_ESCAPE
 from . import api_bp
 
 
@@ -381,7 +382,9 @@ def column_articles(slug):
         ).order_by(Article.sort_order.desc(), Article.published_at.desc())
     keyword = (request.args.get('keyword') or '').strip()
     if keyword:
-        q = q.filter(Article.title.like(f'%{keyword}%'))
+        # v3.1.9 VULN-010：转义 LIKE 通配符
+        q = q.filter(Article.title.like(
+            f'%{escape_like(keyword)}%', escape=LIKE_ESCAPE))
     pagination = q.paginate(page=page, per_page=per_page, error_out=False)
     return api_ok(
         [_article_summary(a) for a in pagination.items],

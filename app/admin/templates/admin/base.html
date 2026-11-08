@@ -246,11 +246,6 @@
               {% endif %}
               {% if current_user.is_super or current_user.has_permission('system:settings') %}
               <li class="nav-item">
-                <a href="{{ url_for('admin.tool_image_alt') }}" class="nav-link {{ 'active' if active_menu == 'tool_image_alt' }}">
-                  <i class="far fa-circle nav-icon"></i><p>{{ _('图片ALT批量管理') }}</p>
-                </a>
-              </li>
-              <li class="nav-item">
                 <a href="{{ url_for('admin.plugin_index') }}" class="nav-link {{ 'active' if active_menu == 'plugin' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('插件管理') }}</p>
                 </a>

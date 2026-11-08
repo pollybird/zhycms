@@ -34,6 +34,7 @@ from ..models.setting import Setting
 from ..models.article import Article, ArticleTranslation, STATUS_PUBLISHED
 from ..models.column import Column
 from .tokenizer import tokenize
+from .db_utils import escape_like, LIKE_ESCAPE
 
 
 # 内容类型标识（索引文档 uid 前缀）
@@ -309,18 +310,18 @@ class SqlLikeBackend(SearchBackend):
             Article.status == STATUS_PUBLISHED,
         )
         main_match = db.or_(
-            Article.title.like(like),
-            Article.summary.like(like),
-            Article.content.like(like),
+            Article.title.like(like, escape=LIKE_ESCAPE),
+            Article.summary.like(like, escape=LIKE_ESCAPE),
+            Article.content.like(like, escape=LIKE_ESCAPE),
         )
         if loc != get_default_locale():
             # 非默认语言：命中翻译表，或命中主表（未翻译文章回退）
             trans_ids = db.session.query(ArticleTranslation.article_id).filter(
                 ArticleTranslation.locale == loc,
                 db.or_(
-                    ArticleTranslation.title.like(like),
-                    ArticleTranslation.summary.like(like),
-                    ArticleTranslation.content.like(like),
+                    ArticleTranslation.title.like(like, escape=LIKE_ESCAPE),
+                    ArticleTranslation.summary.like(like, escape=LIKE_ESCAPE),
+                    ArticleTranslation.content.like(like, escape=LIKE_ESCAPE),
                 )
             )
             q = q.filter(db.or_(Article.id.in_(trans_ids), main_match))
@@ -348,7 +349,8 @@ class SqlLikeBackend(SearchBackend):
 
     def search(self, keyword, page=1, per_page=20, locale=None):
         """合并检索文章与启用插件内容（各来源取当前页窗口后按时间归并排序）。"""
-        like = f'%{keyword}%'
+        # v3.1.9 VULN-010：转义 LIKE 通配符，避免 %/_ 放大结果集
+        like = f'%{escape_like(keyword)}%'
         loc = _search_locale(locale)
         # 各来源取前 page*per_page 条，保证归并后当前页数据完整
         window = page * per_page
@@ -695,7 +697,17 @@ class MeilisearchBackend(SearchBackend):
 
     def _get_url(self):
         base = Setting.get('search_meili_url', '').rstrip('/')
-        return base if base else 'http://127.0.0.1:7700'
+        if not base:
+            return 'http://127.0.0.1:7700'
+        # v3.1.9 VULN-011：使用前再校验一次（防存量脏数据），非法则回退默认地址
+        from .url_safety import assert_http_url
+        try:
+            assert_http_url(base)
+        except ValueError as e:
+            current_app.logger.warning(
+                'Meilisearch 地址非法，已回退默认 http://127.0.0.1:7700：%s', e)
+            return 'http://127.0.0.1:7700'
+        return base
 
     def _get_key(self):
         return Setting.get('search_meili_key', '')

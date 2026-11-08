@@ -227,6 +227,8 @@ def fragment_delete(fid):
     frag = Fragment.query.get_or_404(fid)
     frag.is_deleted = True
     db.session.commit()
+    # v3.1.9 VULN-021：删除属破坏性操作，补审计日志
+    audit_log(OP_DELETE, MODULE_FRAGMENT, fid, frag.name)
     flash(_gettext('碎片已删除'), 'success')
     return redirect(url_for('admin.fragment_index'))
 
@@ -237,4 +239,7 @@ def fragment_toggle(fid):
     frag = Fragment.query.get_or_404(fid)
     frag.is_enabled = not frag.is_enabled
     db.session.commit()
+    # v3.1.9 VULN-021：启停影响前台展示，补审计日志
+    audit_log(OP_UPDATE, MODULE_FRAGMENT, fid, frag.name,
+              {'is_enabled': frag.is_enabled})
     return redirect(url_for('admin.fragment_index'))

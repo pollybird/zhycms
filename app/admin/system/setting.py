@@ -458,18 +458,6 @@ def setting_notify():
     return render_template('admin/setting/notify.html', settings=Setting.get_dict())
 
 
-# ============ 图片 ALT 批量管理（模块8）============
-
-@admin_bp.route('/tools/image-alt')
-@permission_required('system:settings')
-def tool_image_alt():
-    """页面入口：后台展示站点范围内所有缺失或可批量修改的图片ALT条目。
-    前台具体渲染时会用 Setting.seo_image_alt_default 作为兜底。"""
-    # 简单返回模板，静态逻辑在前端页面实现（通过API加载文章/栏目/碎片的img标签）
-    return render_template('admin/setting/image_alt.html',
-                           settings=Setting.get_dict())
-
-
 # ============ 内容 API（v2.2.0）============
 
 @admin_bp.route('/settings/api', methods=['GET', 'POST'])
@@ -665,6 +653,15 @@ def setting_search():
             changed['search_engine'] = val
         for key in ('search_meili_url', 'search_meili_key'):
             val = (request.form.get(key) or '').strip()
+            if key == 'search_meili_url' and val:
+                # v3.1.9 VULN-011：校验服务地址格式（允许内网 Meilisearch）
+                from ...utils.url_safety import assert_http_url
+                try:
+                    assert_http_url(val)
+                except ValueError as e:
+                    flash(_gettext('Meilisearch 地址无效：%(err)s') % {'err': str(e)},
+                          'danger')
+                    return redirect(url_for('admin.setting_search'))
             if Setting.get(key) != val:
                 Setting.set(key, val)
                 changed[key] = val

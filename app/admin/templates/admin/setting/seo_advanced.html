@@ -104,15 +104,16 @@
       <div class="card-header"><h3 class="card-title">{{ _('图片 ALT 默认值（SEO 兜底）') }}</h3></div>
       <div class="card-body">
         <div class="form-group">
-          <label>{{ _('默认 ALT 文案') }}</label>
+          <label>
+            {{ _('默认 ALT 文案') }}
+            <i class="fas fa-question-circle text-info ml-1" style="cursor:help"
+               title="{{ _('ALT 是搜索引擎识别图片内容的主要依据，缺失或为空会影响图片搜索收录与页面关键词权重。设置后：前台渲染文章正文、单页内容与摘要时，缺少 alt 或 alt 为空的图片会自动填入此文案；已有非空 alt 保留原文不覆盖（编辑器手工设置优先）。历史内容无需修改数据库，渲染时自动兜底。') }}"></i>
+          </label>
           <input type="text" name="seo_image_alt_default" class="form-control" value="{{ settings.seo_image_alt_default or '' }}"
             placeholder="{{ _('如：企业官网图片') }}">
           <small class="form-text text-muted">{{ _('前台渲染时，若 img 缺少 alt 或 alt 为空，将自动注入此默认值提升 SEO。') }}</small>
         </div>
         <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存 SEO 高级配置') }}</button>
-        <a href="{{ url_for('admin.tool_image_alt') }}" class="btn btn-outline-secondary btn-block mt-2">
-          <i class="fas fa-images"></i> {{ _('前往「图片ALT批量管理」') }}
-        </a>
       </div>
     </div>
   </div>

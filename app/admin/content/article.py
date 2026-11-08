@@ -27,6 +27,7 @@ from ...models.workflow import (
 from ...utils.helpers import (
     permission_required, audit_log, clear_content_cache, safe_int,
 )
+from ...utils.db_utils import escape_like, LIKE_ESCAPE
 from ...utils.search import reindex_article
 from ...utils.word_import import convert_docx_to_html
 from ...models.audit import (
@@ -104,7 +105,9 @@ def article_index(cid):
 
     query = Article.query.filter_by(column_id=cid, is_deleted=False)
     if keyword:
-        query = query.filter(Article.title.like(f'%{keyword}%'))
+        # v3.1.9 VULN-010：转义 LIKE 通配符
+        query = query.filter(Article.title.like(
+            f'%{escape_like(keyword)}%', escape=LIKE_ESCAPE))
     # 工作流状态过滤优先，兼容旧的 enabled/disabled 参数
     if status in (STATUS_DRAFT, STATUS_REVIEW, STATUS_PUBLISHED, STATUS_ARCHIVED):
         query = query.filter_by(status=status)

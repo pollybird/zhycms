@@ -19,6 +19,7 @@ from app.admin import admin_bp
 from app.models.audit import OP_UPDATE, OP_DELETE, OP_CREATE
 from app.models.column import Column
 from app.utils.helpers import permission_required, audit_log, clear_content_cache
+from app.utils.db_utils import escape_like, LIKE_ESCAPE
 from app.plugin_system import plugin_enabled
 
 from .models import Member
@@ -48,10 +49,13 @@ def member_index():
 
     query = Member.query.filter_by(is_deleted=False)
     if keyword:
-        like = f'%{keyword}%'
+        # v3.1.9 VULN-010：转义 LIKE 通配符
+        like = f'%{escape_like(keyword)}%'
         query = query.filter(
-            db.or_(Member.username.like(like), Member.nickname.like(like),
-                   Member.phone.like(like), Member.email.like(like)))
+            db.or_(Member.username.like(like, escape=LIKE_ESCAPE),
+                   Member.nickname.like(like, escape=LIKE_ESCAPE),
+                   Member.phone.like(like, escape=LIKE_ESCAPE),
+                   Member.email.like(like, escape=LIKE_ESCAPE)))
     if status == 'enabled':
         query = query.filter_by(is_enabled=True)
     elif status == 'disabled':

@@ -329,9 +329,10 @@ def oauth_callback(provider):
         if member is None or member.is_deleted or not member.is_enabled:
             flash(_gettext('账号不可用，请联系管理员'), 'danger')
             return redirect(url_for('member_frontend.login'))
+        oauth_next = session.pop('oauth_next', '')
         login_member(member)
         flash(_gettext('登录成功'), 'success')
-        return redirect(_safe_next(session.pop('oauth_next', ''), '/member'))
+        return redirect(_safe_next(oauth_next, '/member'))
 
     # 已登录会员 → 绑定该第三方账号
     member = current_member()
@@ -353,9 +354,10 @@ def oauth_callback(provider):
     db.session.add(member)
     db.session.commit()
     _bind_oauth(member, provider, profile)
+    oauth_next = session.pop('oauth_next', '')
     login_member(member)
     flash(_gettext('登录成功，已为您自动创建账号'), 'success')
-    return redirect(_safe_next(session.pop('oauth_next', ''), '/member'))
+    return redirect(_safe_next(oauth_next, '/member'))
 
 
 def _bind_oauth(member, provider, profile):

@@ -15,7 +15,13 @@ SESSION_KEY = 'member_id'
 
 
 def login_member(member, remember=False):
-    """建立前台会员登录态。"""
+    """建立前台会员登录态。
+
+    v3.1.9 VULN-008：登录前清空会话，丢弃攻击者预置的 session（会话固定）。
+    调用方若在登录后才读取登录前的 session 数据（如 OAuth 的 next），
+    需先取出到局部变量。
+    """
+    session.clear()
     session[SESSION_KEY] = member.id
     session.permanent = bool(remember)
 

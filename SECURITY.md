@@ -4,7 +4,7 @@
 
 | 版本 | 支持状态 | 说明 |
 | --- | --- | --- |
-| 3.1.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.1.8**（v3.1.8 安全加固专项：SAST 深度审计 P0+P1 共 7 个漏洞修复 + CSP 第三方资源白名单），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
+| 3.1.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.1.9**（v3.1.9 可被利用缺陷修复：插件 AST 间接引用绕过、JWT 服务端吊销、会话固定、LIKE 通配符注入、Meilisearch 地址校验、生产 DEBUG 阻断、数据库错误脱敏），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
 | 3.0.x | ✅ 完整支持 | 可视化页面构建器 + 插件默认布局贡献，建议升级至 3.1.x |
 | 2.6.x | ✅ 完整支持 | 前台会员体系 + 插件依赖强校验，建议升级至 3.1.x |
 | 2.5.x | ✅ 完整支持 | 内容级多语言 + Redis 缓存与 Session，建议升级至 3.1.x |
@@ -74,10 +74,22 @@
 - **JWT 密钥隔离（VULN-006）**：移除 `jwt_secret_key` 为空时回退复用 SECRET_KEY 的逻辑；未配置时启动自动生成随机密钥并加密持久化，DB 不可用阶段使用本次运行临时随机密钥，绝不回退 SECRET_KEY。升级后存量 JWT 全部失效，API 客户端需重新登录。
 - **CSP 第三方资源白名单（F-001）**：CSP 构建抽为 `_build_csp()`，基础策略与 v3.1.7 逐字节一致；后台「系统设置 → 后台安全」可为 `script-src`/`style-src`/`img-src`/`font-src`/`connect-src`/`media-src`/`frame-src` 配置换行分隔的来源白名单（`https://host[:port]` 精确源或 `*.example.com` 子域通配），保存时逐行校验（拒绝裸 `*`、非 http/https、userinfo、query/fragment、空格引号）。`frame-ancestors` 防点击劫持基线与 SVG 沙箱 CSP 永不读取白名单。
 
+### v3.1.9 可被利用缺陷修复（GitCode issue #14 + SAST 续项）
+
+- **插件 AST 间接引用绕过（VULN-022）**：插件源码审计升级为**两遍 AST 分析**——先收集 import 别名（`import os as x`、`from os import system as s`）与赋值传播（`x = os.system`、`y = x`），再按还原后的限定名做调用判定；`getattr(os, "system")` 类危险属性获取直接拒传。Issue #14 实测 Payload 全部拦截，合法 `os.path` 别名不误伤。
+- **JWT 服务端吊销（VULN-007）**：配置 `REDIS_URL` 时，登出把 `jti` 写入 `zhycms:jwt:blacklist:<jti>`（TTL 为剩余有效期），`token_in_blocklist_loader` 使已登出 token 立即 401；Redis 运行期故障降级放行并告警，不返回 500。未配置 Redis 时维持“客户端删除 + access token 自然过期（默认 15 分钟）”语义。
+- **会话固定防护（VULN-008）**：后台登录与会员登录（密码/短信/OAuth/注册自动登录）在建立登录态前 `session.clear()`，攻击者预置的 Session 键不会带入登录后会话。
+- **SQL LIKE 通配符注入（VULN-010）**：`app/utils/db_utils.py::escape_like` 统一转义 `%`/`_`/`\`，5 处后台/API/搜索 LIKE 查询显式传入 `escape`，搜索 `%` 不再放大结果集。
+- **Meilisearch 地址校验（VULN-011）**：`assert_http_url()` 限定 http/https、要求 hostname 非空、拒绝 userinfo；**默认允许内网地址**（内网 Meilisearch 属常见合法部署），保存与使用前各校验一次，非法地址回退默认并告警。
+- **生产 DEBUG 阻断（VULN-012）**：`ZHYCMS_ENV=production` 且 `DEBUG=True` 时启动直接失败，杜绝 Werkzeug 调试器暴露（可 RCE）；本地 `default` 配置仅告警。
+- **错误信息脱敏（VULN-013）**：初始化向导数据库连接失败不再回显 `e.orig`（主机/端口/驱动/栈），对外固定文案，详情仅写日志。
+- **验证码随机源（VULN-020）**：验证码文本改用 `secrets.choice`（密码学安全随机源）。
+- **碎片操作审计（VULN-021）**：碎片删除/启停写入审计日志（`OP_DELETE` / `OP_UPDATE`）。
+
 ## 安全配置基线（部署方自查）
 
 1. **会话密钥**：生产环境显式设置 `ZHYCMS_SECRET_KEY` 为随机长字符串（`python -c "import secrets; print(secrets.token_hex(32))"`）；未设置时首次启动会自动生成并写入 `instance/secret_key`（权限 600），需妥善备份该文件（丢失会导致所有会话失效）。
-2. **运行模式**：以 `ZHYCMS_ENV=production` 或 gunicorn（`wsgi:app`）运行，确保 `DEBUG=False`，避免暴露 Werkzeug 调试器。
+2. **运行模式**：以 `ZHYCMS_ENV=production` 或 gunicorn（`wsgi:app`）运行，确保 `DEBUG=False`（v3.1.9 起 production 下开启 DEBUG 会直接拒绝启动）。
 3. **HTTPS**：前置 Nginx 反代并启用 HTTPS，会话 Cookie `Secure` 属性才能生效；反向代理负责剥离 `Server` 响应头。
 4. **文件权限**：数据库账号遵循最小权限原则；`instance/` 整目录权限收敛为 600/700（含 `secret_key`、`db_config.json`、`backups/`）。
 5. **备份**：定期在后台「备份运维」导出备份，验证 `instance/backups/` 的磁盘余量；恢复上传的备份文件不会残留 Web 目录。

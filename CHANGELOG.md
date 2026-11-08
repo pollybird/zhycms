@@ -5,6 +5,30 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.9] - 2026-11-08
+
+**安全修复版本**：完成 v3.1.8 顺延的 P2-B 全部 6 个 Medium，并闭环 GitCode Issue #14 中唯一 Medium（插件 AST 间接引用绕过），同时顺带修复 2 项零成本 Info 项。**无数据库结构变更、无新增依赖**，覆盖代码重启即可。
+
+### Security
+
+- **插件 AST 审计间接引用绕过（VULN-022，Medium，GitCode Issue #14）**：`app/utils/plugin_safety.py` 由单遍 AST 匹配升级为**两遍分析**——先收集 import 别名（`import os as x`、`from os import system as s`）与赋值传播（`x = os.system`、`y = x`，迭代至稳定），再按还原后的限定名做调用判定；`getattr(os, "system")` 类危险属性获取直接拦截。Issue #14 实测的 3 个 Payload 全部拒传，`import os.path as p` / `from os import path as os_path` 等合法别名不误伤。
+- **JWT 无服务端吊销（VULN-007，Medium）**：登出接口改为 `jwt_required(optional=True)`，配置 `REDIS_URL` 时将 `jti` 写入黑名单（`zhycms:jwt:blacklist:<jti>`，TTL 为剩余有效期），并注册 `token_in_blocklist_loader` 使已登出 token 立即 401；Redis 不可达/运行期故障时降级放行并告警，不返回 500。无 Redis 部署维持“客户端删除 + access token 15 分钟自然过期”语义。
+- **会话固定攻击（VULN-008，Medium）**：后台登录与会员登录（密码 / 短信 / OAuth / 注册自动登录）在建立登录态前 `session.clear()`，丢弃攻击者预置的 Session 键；OAuth 回调的 `next` 目标改为局部变量传递，跳转行为不变。
+- **SQL LIKE 通配符注入（VULN-010，Medium）**：新增 `app/utils/db_utils.py::escape_like`，文章标题、用户、会员、栏目文章 API、SQL 回退搜索共 5 处 `LIKE` 查询统一转义 `%`/`_`/`\` 并显式传入 `escape`，搜索 `%` 不再放大结果集。
+- **Meilisearch 地址未校验（VULN-011，Medium）**：`url_safety.py` 新增 `assert_http_url()`（scheme 限 http/https、hostname 非空、拒绝 userinfo；**默认允许内网地址**，避免破坏常见的内网 Meilisearch 部署）；保存 `search_meili_url` 时校验并拒绝非法值，使用前再校验一次防存量脏数据，非法则回退默认地址并告警。
+- **生产环境 DEBUG 未阻断（VULN-012，Medium）**：`create_app('production')` 且 `DEBUG=True` 时直接 `SystemExit` 拒绝启动，杜绝 Werkzeug 调试器暴露导致的 RCE；`default`（本地开发）仅告警，不误伤 `python run.py`。
+- **数据库错误信息泄露（VULN-013，Medium）**：初始化向导连接测试的 `OperationalError`/`SQLAlchemyError`/兜底分支不再回显 `e.orig` 或异常文本（主机、端口、驱动、栈信息），对外只返回固定中文文案，详情写日志（含堆栈）。
+- **验证码随机源（VULN-020，Info）**：验证码文本由 `random.choices` 改为 `secrets.choice`，消除 Mersenne Twister 可预测风险（图片噪点仍用 `random`，无安全语义）。
+- **fragment 删除/启停缺审计日志（VULN-021，Info）**：碎片删除与启停补 `audit_log`，记录 `OP_DELETE` / `OP_UPDATE` 及启停状态。
+
+### 升级注意
+
+- 覆盖代码 + 重启即可，**无数据库迁移、无新增依赖**。
+- **行为变化**：`ZHYCMS_ENV=production` 下若配置了 `DEBUG=True`，应用将拒绝启动，请改为 `DEBUG=False`。
+- **行为变化**：后台/会员登录会清空登录前的 Session（含攻击者预置键）；正常登录与 OAuth 跳转不受影响。
+- **JWT 登出**：配置 `REDIS_URL` 的部署在登出后 token 立即失效；未配置 Redis 的部署最长仍有 15 分钟残留（可在后台调整 access token 有效期）。
+- **测试**：全量 467 项通过（新增 17 项安全回归，含 Issue #14 全部 Payload）；`check_excepts.py` / `check_constants.py` / `check_release.py` 三门禁全绿；覆盖率 54%（门禁阈值 50%）。
+
 ## [3.1.8] - 2026-11-06
 
 **安全加固专项**版本。修复 SAST 深度审计报告（GitCode Issue #12，OWASP Top 10）中 P0+P1 共 7 个漏洞，并新增 CSP 第三方资源白名单功能。**无数据库结构变更、无新增依赖**（`cryptography>=42.0` 已在依赖中），覆盖代码重启即可；敏感凭证首次读取时自动加密回写（惰性迁移，无需迁移脚本）。

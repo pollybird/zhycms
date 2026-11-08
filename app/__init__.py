@@ -574,6 +574,16 @@ def create_app(config_name=None):
     ]
     app.config.from_object(config[config_name])
 
+    # v3.1.9 VULN-012：生产环境禁止 DEBUG，避免 Werkzeug 调试器被暴露（可 RCE）。
+    # 仅 production 硬阻断；default 映射 DevelopmentConfig，用于本地开发，
+    # 一并阻断会导致 `python run.py` 无法启动，故只告警。
+    if config_name == 'production' and app.config.get('DEBUG'):
+        raise SystemExit(
+            '生产环境禁止开启 DEBUG（ZHYCMS_ENV=production 时 DEBUG 必须为 False）')
+    if config_name == 'default' and app.config.get('DEBUG'):
+        app.logger.warning(
+            '当前以开发配置运行（DEBUG=True），生产部署请设置 ZHYCMS_ENV=production')
+
     config[config_name].init_app(app)
 
     # 初始化扩展
@@ -651,6 +661,22 @@ def create_app(config_name=None):
             app.logger.warning('读取 JWT 配置失败，本次运行使用临时随机密钥：%s', e)
             app.config['JWT_SECRET_KEY'] = _secrets.token_urlsafe(32)
     jwt.init_app(app)
+
+    # v3.1.9 VULN-007：JWT 服务端吊销。
+    # 有 Redis 时启用 jti 黑名单（登出即时失效）；无 Redis 时降级为
+    # “短期 access token 自然过期”模式，文档说明最长 15 分钟残留。
+    if redis_url:
+        import redis as _redis
+        app.config['JWT_BLOCKLIST_REDIS'] = _redis.from_url(
+            redis_url, decode_responses=True)
+    else:
+        app.config['JWT_BLOCKLIST_REDIS'] = None
+
+    from .utils.jwt_blocklist import is_revoked as _jwt_is_revoked
+
+    @jwt.token_in_blocklist_loader
+    def _jwt_blocklist_check(_jwt_header, jwt_payload):
+        return _jwt_is_revoked(jwt_payload.get('jti'))
 
     # v2.6.3：API 速率限制初始化（未配置 Redis 时用内存存储，多实例下不精确但可用）
     limiter.init_app(app)

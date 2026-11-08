@@ -1,6 +1,7 @@
 """简单的图片验证码生成。"""
 import io
 import random
+import secrets
 import string
 
 from PIL import Image, ImageDraw, ImageFont
@@ -8,7 +9,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 def generate_captcha(length=4, width=120, height=40):
     """生成验证码图片，返回 (验证码文本, PNG 二进制数据)。"""
-    chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+    # v3.1.9 VULN-020：验证码文本使用密码学安全随机源（random 为 MT 可预测）
+    alphabet = string.ascii_uppercase + string.digits
+    chars = ''.join(secrets.choice(alphabet) for _ in range(length))
     # 排除容易混淆的字符
     chars = chars.replace('0', 'D').replace('O', 'Q').replace('I', 'J').replace('1', 'L')
 

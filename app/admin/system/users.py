@@ -15,6 +15,7 @@ from ...models.rbac import (
     ROLE_SUPER_ADMIN, ROLE_CONTENT_EDITOR,
 )
 from ...utils.helpers import permission_required, audit_log
+from ...utils.db_utils import escape_like, LIKE_ESCAPE
 from ...models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_USER_MANAGE,
     MODULE_USER, MODULE_ROLE,
@@ -61,9 +62,12 @@ def user_index():
 
     query = User.query.filter_by(is_deleted=False)
     if keyword:
-        like = f'%{keyword}%'
+        # v3.1.9 VULN-010：转义 LIKE 通配符
+        like = f'%{escape_like(keyword)}%'
         query = query.filter(
-            db.or_(User.username.like(like), User.nickname.like(like), User.email.like(like))
+            db.or_(User.username.like(like, escape=LIKE_ESCAPE),
+                   User.nickname.like(like, escape=LIKE_ESCAPE),
+                   User.email.like(like, escape=LIKE_ESCAPE))
         )
     if status_filter == 'active':
         query = query.filter_by(is_active_flag=True)

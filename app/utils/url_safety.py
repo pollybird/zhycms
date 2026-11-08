@@ -88,3 +88,28 @@ def assert_safe_external_url(url, allowed_hosts=None, allow_schemes=('https', 'h
         if _ip_is_forbidden(ip):
             raise ValueError(f'内网/保留地址: {ip}')
     return url
+
+
+def assert_http_url(url, allow_private=True):
+    """校验服务地址格式（scheme / host），可选放行内网地址。
+
+    用于管理员可配置的服务端地址（如 Meilisearch，生产常部署在内网
+    ``http://127.0.0.1:7700`` / ``http://meili:7700``），威胁模型不同于
+    低权限用户输入，故 ``allow_private`` 默认 True，仅拦截非 http(s)、
+    空主机名、含 userinfo 等畸形地址。
+    """
+    if not isinstance(url, str) or not url.strip():
+        raise ValueError('地址不能为空')
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in ('http', 'https'):
+        raise ValueError(f'不允许的协议: {parsed.scheme}')
+    host = parsed.hostname
+    if not host:
+        raise ValueError('缺少主机名')
+    if parsed.username or parsed.password:
+        raise ValueError('地址中不允许包含用户名或密码')
+    if not allow_private:
+        for ip in _resolve_host_ips(host, resolve_dns=True):
+            if _ip_is_forbidden(ip):
+                raise ValueError(f'内网/保留地址: {ip}')
+    return url

@@ -310,6 +310,8 @@ def login():
             return render_template('admin/login.html', username=username)
 
         # 登录成功
+        # v3.1.9 VULN-008：登录前清空会话，丢弃攻击者预置的 session（会话固定）
+        session.clear()
         login_user(user, remember=False)
         user.reset_login_fail()
 

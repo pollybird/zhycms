@@ -9,6 +9,7 @@
 - 初始化过程中可用 ``switch_engine`` 热切换 SQLAlchemy 引擎，免重启即时生效。
 """
 import json
+import logging
 import os
 
 from sqlalchemy import engine_from_config
@@ -17,6 +18,8 @@ from sqlalchemy.engine import URL
 from flask_babel import gettext as _gettext
 BASE_DIR = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 CONFIG_PATH = os.path.join(BASE_DIR, 'instance', 'db_config.json')
+
+logger = logging.getLogger(__name__)
 
 # 各数据库默认端口，供表单未填端口时回退使用
 DEFAULT_PORTS = {'mysql': 3306, 'postgresql': 5432}
@@ -119,11 +122,16 @@ def test_connection(uri):
     except ModuleNotFoundError as e:
         return False, f'缺少数据库驱动：{e}。请先安装对应驱动（PyMySQL / psycopg2-binary）。'
     except OperationalError as e:
-        return False, f'无法连接数据库，请检查主机、端口、账号密码或数据库是否存在。详情：{e.orig if e.orig else e}'
+        # v3.1.9 VULN-013：对外文案固定，不回显 e.orig（含主机/端口/驱动细节），
+        # 详细信息仅写日志供运维排障。
+        logger.warning('数据库连接失败（OperationalError）：%s', e, exc_info=True)
+        return False, '无法连接数据库，请检查主机、端口、账号密码或数据库是否存在。'
     except SQLAlchemyError as e:
-        return False, f'数据库连接失败：{e}'
+        logger.warning('数据库连接失败（SQLAlchemyError）：%s', e, exc_info=True)
+        return False, '数据库连接失败，请检查连接配置后重试。'
     except Exception as e:  # noqa: BLE001 兜底，避免向导因未知异常白屏
-        return False, f'数据库连接失败：{e}'
+        logger.warning('数据库连接失败（未知异常）：%s', e, exc_info=True)
+        return False, '数据库连接失败，请检查连接配置后重试。'
     finally:
         if engine is not None:
             engine.dispose()
