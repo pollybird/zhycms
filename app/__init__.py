@@ -584,6 +584,16 @@ def create_app(config_name=None):
         app.logger.warning(
             '当前以开发配置运行（DEBUG=True），生产部署请设置 ZHYCMS_ENV=production')
 
+    # v3.1.10 VULN-018：非 testing 环境误用 TestingConfig 固定密钥时拒绝启动，
+    # 防止仓库内公开的测试密钥被带入生产（ZHYCMS_SECRET_KEY 环境变量优先）。
+    from .config import TestingConfig
+    if config_name != 'testing' and app.config.get('SECRET_KEY') == TestingConfig.SECRET_KEY:
+        app.logger.error(
+            '检测到非测试环境使用 TestingConfig 的固定 SECRET_KEY，'
+            '请配置环境变量 ZHYCMS_SECRET_KEY，应用拒绝启动')
+        raise SystemExit(
+            'TestingConfig SECRET_KEY must not be used outside testing')
+
     config[config_name].init_app(app)
 
     # 初始化扩展
@@ -726,6 +736,8 @@ def create_app(config_name=None):
             cms_name=Setting.CMS_NAME,
             cms_copyright=Setting.CMS_COPYRIGHT,
             cms_version=Setting.CMS_VERSION,
+            # v3.1.10 VULN-025：加密不可用标记（后台 base.html 渲染红色横幅）
+            zhycms_enc_unavailable=bool(app.config.get('ZHYCMS_ENC_UNAVAILABLE')),
         )
 
     # v2.2.0 插件菜单（启用 + 有权限才显示；后台模板使用）
@@ -801,6 +813,19 @@ def create_app(config_name=None):
             _alembic_bootstrap(app)
         except Exception as e:
             app.logger.warning('Alembic bootstrap 跳过（非致命）: %s', e)
+
+        # ===== v3.1.10 VULN-025：敏感配置加密可用性启动检查 =====
+        # 密钥缺失时不拒绝启动（避免存量容器/多实例未配 ZHYCMS_ENC_KEY 升级后
+        # 直接不可用），但标记 config 并记 error 日志，后台所有页面渲染红色横幅。
+        try:
+            from .utils.crypto import is_encryption_available
+            if not is_encryption_available():
+                app.config['ZHYCMS_ENC_UNAVAILABLE'] = True
+                app.logger.error(
+                    '敏感配置加密未启用（ZHYCMS_ENC_KEY 未配置且 instance/enc_key 不可用），'
+                    '敏感配置将以明文存储，请尽快配置加密密钥')
+        except Exception as e:
+            app.logger.warning('加密可用性检查失败（非致命）：%s', e)
 
         # ===== 幂等：初始化 RBAC 预设角色与权限 =====
         try:

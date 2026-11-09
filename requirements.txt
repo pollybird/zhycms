@@ -18,6 +18,8 @@ PyMySQL>=1.1.1
 cryptography>=42.0
 psycopg2-binary>=2.9.9
 requests>=2.31.0
+# v3.1.10 VULN-016 评估结论：puremagic 对 exe/elf/php/纯文本识别失败或误报
+# （实测 12 类样本 7 类不一致），不满足上传恶意文件拦截需求，保留 python-magic。
 python-magic>=0.4.27
 # v3.1.4：全文搜索（Tantivy + pkuseg 中文分词；spacy-pkuseg 为 pkuseg 活跃维护分支，导入名 pkuseg）
 tantivy>=0.26,<1.0
@@ -27,6 +29,7 @@ markdown>=3.7,<4.0
 # v2.5.0：Redis 缓存后端 + 服务端 Session（多实例部署必需；未配置 REDIS_URL 时自动回退）
 # v3.1.4：上限放宽至 <9.0（redis-py 6/7/8 对项目所用的 from_url/ping 等基础 API 向后兼容）
 redis>=5.0,<9.0
+# v3.1.10 VULN-016：0.8.0 为当前最新版（2025 年发布），约束已覆盖，无需变更
 Flask-Session>=0.8,<1.0
 # v2.6.3：API 鉴权升级（JWT）+ 速率限制
 Flask-JWT-Extended>=4.6.0,<5.0

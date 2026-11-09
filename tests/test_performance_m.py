@@ -248,8 +248,8 @@ class TestM10UserUniqueRace:
         with app.test_request_context('/'):
             form = MultiDict({
                 'username': 'm10dupuser',
-                'password': 'pass123456',
-                'confirm_password': 'pass123456',
+                'password': 'Pass123!wxyz',
+                'confirm_password': 'Pass123!wxyz',
             })
             user, _ = create_user(form_data=form)
             assert user is not None
@@ -265,8 +265,8 @@ class TestM10UserUniqueRace:
         with app.test_request_context('/'):
             form = MultiDict({
                 'username': 'm10raceuser',
-                'password': 'pass123456',
-                'confirm_password': 'pass123456',
+                'password': 'Pass123!wxyz',
+                'confirm_password': 'Pass123!wxyz',
             })
             err = IntegrityError('INSERT INTO users...', {}, Exception('UNIQUE'))
             with patch.object(db.session, 'commit', side_effect=err):
@@ -278,8 +278,8 @@ class TestM10UserUniqueRace:
         """后台创建重复用户名：返回表单页 + flash 错误，无 500。"""
         form = {
             'username': 'm10endpoint',
-            'password': 'pass123456',
-            'confirm_password': 'pass123456',
+            'password': 'Pass123!wxyz',
+            'confirm_password': 'Pass123!wxyz',
             'nickname': '端点用户',
         }
         resp1 = admin_client.post('/admin/users/create', data=form)

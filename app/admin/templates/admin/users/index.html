@@ -76,13 +76,13 @@
       <div class="modal-body">
         <div class="form-group">
           <label class="required-mark">{{ _('新密码') }}</label>
-          <input type="password" name="new_password" id="pwd-input" class="form-control" minlength="6" required autocomplete="new-password">
+          <input type="password" name="new_password" id="pwd-input" class="form-control" minlength="12" required autocomplete="new-password">
         </div>
         <div class="form-group">
           <label class="required-mark">{{ _('确认密码') }}</label>
-          <input type="password" name="new_password2" id="pwd2-input" class="form-control" minlength="6" required autocomplete="new-password">
+          <input type="password" name="new_password2" id="pwd2-input" class="form-control" minlength="12" required autocomplete="new-password">
         </div>
-        <p class="text-muted small mb-0">{{ _('密码至少 6 位，建议包含字母、数字和符号') }}</p>
+        <p class="text-muted small mb-0">{{ _('密码至少 12 位，需包含大写字母、小写字母、数字和特殊字符') }}</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">{{ _('取消') }}</button>

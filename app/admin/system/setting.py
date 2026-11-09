@@ -48,6 +48,30 @@ def _onoff(name):
     return 'on' if request.form.get(name) == 'on' else 'off'
 
 
+# v3.1.10 VULN-014：CORS 来源逐项格式（http(s)://host[:port]）
+_CORS_ORIGIN_RE = re.compile(r'^https?://[A-Za-z0-9][A-Za-z0-9.\-]*(?::\d{1,5})?$')
+
+
+def _validate_cors_origins(raw):
+    """校验 CORS 允许来源串。返回空串表示合法，否则为错误提示。
+
+    拒绝 `*` 通配符与 `null`，逐项必须是 http(s)://host[:port]。
+    """
+    if not raw:
+        return ''
+    for item in raw.split(','):
+        origin = item.strip()
+        if not origin:
+            continue
+        if origin == '*':
+            return _gettext('CORS 不允许使用 * 通配符，请填写明确域名（如 https://a.example.com）')
+        if origin.lower() == 'null':
+            return _gettext('CORS 不允许配置 null 来源')
+        if not _CORS_ORIGIN_RE.match(origin):
+            return _gettext('CORS 来源格式非法：{0}（应为 http(s)://域名[:端口]）').format(origin)
+    return ''
+
+
 def _int_safe(name, default=0):
     try:
         return int(request.form.get(name) or default)
@@ -480,7 +504,12 @@ def setting_api():
         if Setting.get('api_cache_ttl') != val:
             Setting.set('api_cache_ttl', val)
             changed['api_cache_ttl'] = val
+        # v3.1.10 VULN-014：新保存的 CORS 来源拒绝 * 通配符与非法格式
         val = (request.form.get('api_cors_origins') or '').strip()
+        cors_err = _validate_cors_origins(val)
+        if cors_err:
+            flash(cors_err, 'danger')
+            return redirect(url_for('admin.setting_api'))
         if Setting.get('api_cors_origins') != val:
             Setting.set('api_cors_origins', val)
             changed['api_cors_origins'] = val
@@ -545,7 +574,13 @@ def setting_api():
             settings[k] = int(settings.get(k, Setting.DEFAULTS.get(k, '0')))
         except (TypeError, ValueError):
             settings[k] = 0
-    return render_template('admin/setting/api.html', settings=settings)
+    # v3.1.10 VULN-014：存量配置含 * 时仅 UI 告警，不清空（避免运行时断跨域）
+    cors_has_wildcard = any(
+        item.strip() == '*'
+        for item in (settings.get('api_cors_origins') or '').split(',')
+    )
+    return render_template('admin/setting/api.html', settings=settings,
+                           cors_has_wildcard=cors_has_wildcard)
 
 
 # ============ 国际化（v2.3.0 Flask-Babel）============
@@ -790,8 +825,11 @@ def password():
         if not user.check_password(old_pwd):
             flash(_gettext('原密码错误'), 'danger')
             return redirect(url_for('admin.password'))
-        if len(new_pwd) < 6:
-            flash(_gettext('新密码长度不能少于 6 位'), 'danger')
+        # v3.1.10 VULN-015：后台新密码策略（12 位 + 四类字符）
+        from ...utils.password_policy import validate_password
+        ok, msg = validate_password(new_pwd)
+        if not ok:
+            flash(msg, 'danger')
             return redirect(url_for('admin.password'))
         if new_pwd != confirm_pwd:
             flash(_gettext('两次输入的新密码不一致'), 'danger')

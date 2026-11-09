@@ -195,8 +195,11 @@ def user_reset_password(uid):
     """超级管理员重置指定账号密码。"""
     user = User.query.filter_by(id=uid, is_deleted=False).first() or abort(404)
     new_pwd = request.form.get('new_password') or ''
-    if len(new_pwd) < 6:
-        flash(_gettext('新密码至少 6 位'), 'danger')
+    # v3.1.10 VULN-015：后台新密码策略（12 位 + 四类字符）
+    from ...utils.password_policy import validate_password
+    ok, msg = validate_password(new_pwd)
+    if not ok:
+        flash(msg, 'danger')
         return redirect(url_for('admin.user_edit', uid=uid))
     user.set_password(new_pwd)
     # 重置锁定计数

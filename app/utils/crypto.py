@@ -16,6 +16,8 @@ FERNET_PREFIX = 'gAAAAA'
 
 _fernet = None
 _fernet_key = None
+# v3.1.10 VULN-025：error 级告警仅记录一次，避免日志刷屏
+_warned_unavailable = False
 
 
 def _resolve_key():
@@ -54,13 +56,31 @@ def _get_fernet(key):
     return instance
 
 
+def is_encryption_available():
+    """敏感配置加密是否可用（v3.1.10 VULN-025）。
+
+    密钥缺失或 cryptography 组件初始化失败时返回 False，
+    供启动检查与后台安全状态页展示。
+    """
+    return _get_fernet(_resolve_key()) is not None
+
+
+def _warn_unavailable_once(message):
+    """密钥不可用告警：error 级，每进程仅记录一次（v3.1.10 VULN-025）。"""
+    global _warned_unavailable
+    if _warned_unavailable:
+        return
+    _warned_unavailable = True
+    logger.error('%s（请配置环境变量 ZHYCMS_ENC_KEY 或检查 instance/enc_key）', message)
+
+
 def encrypt_value(plain):
     """加密敏感配置明文，返回密文；密钥不可用时降级返回原文。"""
     if not plain:
         return plain
     f = _get_fernet(_resolve_key())
     if f is None:
-        logger.warning('加密密钥不可用，敏感配置将以明文存储')
+        _warn_unavailable_once('加密密钥不可用，敏感配置将以明文存储')
         return plain
     return f.encrypt(plain.encode('utf-8')).decode('ascii')
 
@@ -75,7 +95,7 @@ def decrypt_value(value):
         return value
     f = _get_fernet(_resolve_key())
     if f is None:
-        logger.warning('加密密钥不可用，无法解密敏感配置')
+        _warn_unavailable_once('加密密钥不可用，无法解密敏感配置')
         return ''
     try:
         return f.decrypt(value.encode('ascii')).decode('utf-8')

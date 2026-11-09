@@ -46,8 +46,11 @@ def create_user(*, form_data):
     if User.query.filter_by(username=username, is_deleted=False).first():
         _flash(_gettext('用户名已存在'), 'danger')
         return None, messages
-    if len(password) < 6:
-        _flash(_gettext('密码至少 6 位'), 'danger')
+    # v3.1.10 VULN-015：后台新密码策略（12 位 + 四类字符）
+    from ..utils.password_policy import validate_password
+    ok, msg = validate_password(password)
+    if not ok:
+        _flash(msg, 'danger')
         return None, messages
     if password != confirm:
         _flash(_gettext('两次输入的密码不一致'), 'danger')
@@ -120,9 +123,13 @@ def update_user(user, *, form_data):
     is_active = form_data.get('is_active_flag') == 'on'
     is_super = _requested_super(form_data)
 
-    if password and len(password) < 6:
-        _flash(_gettext('密码至少 6 位'), 'danger')
-        return None, messages
+    # v3.1.10 VULN-015：后台新密码策略（12 位 + 四类字符），留空表示不改密
+    if password:
+        from ..utils.password_policy import validate_password
+        ok, msg = validate_password(password)
+        if not ok:
+            _flash(msg, 'danger')
+            return None, messages
     if password and password != confirm:
         _flash(_gettext('两次输入的密码不一致'), 'danger')
         return None, messages

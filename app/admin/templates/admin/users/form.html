@@ -22,19 +22,19 @@
           {% if not user %}
           <div class="form-group">
             <label class="required-mark">{{ _('初始密码') }}</label>
-            <input type="password" name="password" class="form-control" minlength="6" required autocomplete="new-password">
+            <input type="password" name="password" class="form-control" minlength="12" required autocomplete="new-password">
           </div>
           <div class="form-group">
             <label class="required-mark">{{ _('确认密码') }}</label>
-            <input type="password" name="confirm_password" class="form-control" minlength="6" required autocomplete="new-password">
+            <input type="password" name="confirm_password" class="form-control" minlength="12" required autocomplete="new-password">
             <small class="form-text text-muted">{{ _('需与初始密码完全一致') }}</small>
           </div>
           {% else %}
           <div class="form-group">
             <label>{{ _('重置密码（留空则不修改）') }}</label>
             <div class="row">
-              <div class="col-sm-6"><input type="password" name="password" class="form-control" minlength="6" placeholder="{{ _('新密码，至少 6 位') }}" autocomplete="new-password"></div>
-              <div class="col-sm-6"><input type="password" name="confirm_password" class="form-control" minlength="6" placeholder="{{ _('确认新密码') }}" autocomplete="new-password"></div>
+              <div class="col-sm-6"><input type="password" name="password" class="form-control" minlength="12" placeholder="{{ _('新密码，至少 12 位（大小写字母+数字+特殊字符）') }}" autocomplete="new-password"></div>
+              <div class="col-sm-6"><input type="password" name="confirm_password" class="form-control" minlength="12" placeholder="{{ _('确认新密码') }}" autocomplete="new-password"></div>
             </div>
           </div>
           {% endif %}

@@ -39,8 +39,15 @@
         <div class="form-group">
           <label>{{ _('跨域白名单（CORS）') }}</label>
           <input type="text" name="api_cors_origins" class="form-control" value="{{ settings.api_cors_origins or '' }}"
-                 placeholder="{{ _('如 https://mini.example.com,https://m.example.com（* 表示允许全部）') }}">
-          <small class="form-text text-muted">{{ _('供小程序/H5 前端跨域调用，多个域名用英文逗号分隔，留空不允许跨域。') }}</small>
+                 placeholder="{{ _('如 https://mini.example.com,https://m.example.com') }}">
+          <small class="form-text text-muted">{{ _('供小程序/H5 前端跨域调用，多个域名用英文逗号分隔，留空不允许跨域。不允许使用 * 通配符。') }}</small>
+          {# v3.1.10 VULN-014：存量配置含 * 时仅告警不清空，运行时行为不变 #}
+          {% if cors_has_wildcard %}
+          <div class="alert alert-danger mt-2 mb-0">
+            <i class="fas fa-exclamation-triangle"></i>
+            {{ _('当前配置含 * 通配符，存在跨域滥用风险，建议改为显式域名列表（如 https://a.example.com）。') }}
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>

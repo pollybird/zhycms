@@ -4,7 +4,7 @@
 
 | 版本 | 支持状态 | 说明 |
 | --- | --- | --- |
-| 3.1.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.1.9**（v3.1.9 可被利用缺陷修复：插件 AST 间接引用绕过、JWT 服务端吊销、会话固定、LIKE 通配符注入、Meilisearch 地址校验、生产 DEBUG 阻断、数据库错误脱敏），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
+| 3.1.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.1.10**（v3.1.10 纵深防御与合规加固：模板审计下标拼接检测、加密 fail-open 高可见度告警、CORS 通配符收紧、后台管理员 12 位密码策略、CI Actions pin SHA、TestingConfig 密钥防护），建议运行 v3.0.x 及更早的站点覆盖代码升级 |
 | 3.0.x | ✅ 完整支持 | 可视化页面构建器 + 插件默认布局贡献，建议升级至 3.1.x |
 | 2.6.x | ✅ 完整支持 | 前台会员体系 + 插件依赖强校验，建议升级至 3.1.x |
 | 2.5.x | ✅ 完整支持 | 内容级多语言 + Redis 缓存与 Session，建议升级至 3.1.x |
@@ -86,6 +86,17 @@
 - **验证码随机源（VULN-020）**：验证码文本改用 `secrets.choice`（密码学安全随机源）。
 - **碎片操作审计（VULN-021）**：碎片删除/启停写入审计日志（`OP_DELETE` / `OP_UPDATE`）。
 
+### v3.1.10 纵深防御与合规加固（GitCode issue #14 残留 Low/Info + SAST P3）
+
+- **模板审计下标拼接检测（VULN-023）**：主题模板静态审计新增"下标内字符串拼接"规则（如 `{{ ''['_'+'_class'+'__'] }}`、`{{ x['__gl'~'obals__'] }}`），上传期即拒传；运行期 Jinja 沙箱本已拦截，此为审计层冗余防线。
+- **加密 fail-open 高可见度告警（VULN-025）**：`ZHYCMS_ENC_KEY` 与 `instance/enc_key` 均不可用时，记 error 日志（每进程一次，不刷屏），后台所有页面顶部渲染红色常驻横幅，「系统设置 → 后台安全」页显示「敏感配置加密：未启用」状态行；不拒绝启动、不改变加解密读写语义。
+- **CORS 通配符收紧（VULN-014）**：新保存的 `api_cors_origins` 拒绝 `*`、`null` 与非 http(s) 格式（逐项校验 `http(s)://host[:port]`）；存量已配 `*` 不清空、运行时行为不变，API 设置页显示红色告警建议整改。
+- **后台管理员密码策略（VULN-015）**：后台所有设置新密码入口（初始化向导、个人改密、用户管理新建/编辑/重置）统一要求 ≥12 位且同时包含大写字母、小写字母、数字、特殊字符（`app/utils/password_policy.py`）；**存量密码哈希不受影响，会员端维持 6 位策略不变**。
+- **依赖治理（VULN-016）**：评估 puremagic 替换 python-magic——实测 12 类文件样本 7 类 MIME 识别不一致（exe/elf/php/纯文本识别失败或误报），**不满足上传恶意文件拦截需求，保留 python-magic**；Flask-Session 0.8.0 已为最新版无需变更；新增 `.github/dependabot.yml`（pip + github-actions 周更）。
+- **CI Actions pin SHA（VULN-017）**：CI 工作流 10 处 `actions/checkout`、`actions/setup-python` 浮动标签替换为完整 commit SHA（保留版本注释），配合 dependabot 自动提升级 PR。
+- **TestingConfig 密钥防护（VULN-018）**：非 testing 配置下使用 TestingConfig 固定 SECRET_KEY 时启动直接 `SystemExit`，杜绝测试密钥误带生产。
+- **SSRF DNS TOCTOU 与 Markdown 内联 HTML（VULN-024/019，文档）**：维持既有披露与防护建议（见下方基线第 11/12 条），应用层不新增代码。
+
 ## 安全配置基线（部署方自查）
 
 1. **会话密钥**：生产环境显式设置 `ZHYCMS_SECRET_KEY` 为随机长字符串（`python -c "import secrets; print(secrets.token_hex(32))"`）；未设置时首次启动会自动生成并写入 `instance/secret_key`（权限 600），需妥善备份该文件（丢失会导致所有会话失效）。
@@ -99,3 +110,4 @@
 9. **加密密钥（v3.1.8）**：敏感配置加密密钥优先取环境变量 `ZHYCMS_ENC_KEY`（可用 `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成）；未设置时首次启动自动生成并写入 `instance/enc_key`（权限 600），**务必随 `instance/` 目录一并备份**（丢失后已加密的敏感配置无法解密，需在后台重新录入）。多实例/容器部署必须各实例配置相同的 `ZHYCMS_ENC_KEY`；轮换密钥前请先在后台记录并重新保存各敏感配置。
 10. **插件包直传（v3.1.8）**：`plugin_upload_enabled` 默认关闭，仅在确需后台上传第三方插件 zip 时临时开启，用完建议关闭；上传包需通过静态源码审计，请仍只安装来源可信的插件。
 11. **SSRF 与 DNS 重绑定残余风险（v3.1.8）**：`url_safety.py` 已在校验时对外部域名做 DNS 解析并逐条记录判定（解析失败 fail closed），可拦截绝大多数重绑定攻击。但 DNS 校验与实际 HTTP 请求之间存在 TOCTOU 时间窗——攻击者理论上可在校验通过后翻转 DNS 记录指向内网（典型 TTL=0 双重应答）。**彻底防御需在网络层兜底**：生产环境应配置出口防火墙（egress firewall）或出口代理，禁止应用服务器主动访问内网网段（`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`169.254.0.0/16`、`127.0.0.0/8`、云元数据地址 `169.254.169.254` 等），仅放行确需访问的外部服务端口。iptables 示例：`iptables -A OUTPUT -d 169.254.169.254 -j DROP`。使用云主机时建议同时开启云厂商的元数据服务加固（如 IMDSv2 强制 token 模式）。
+12. **Markdown 内联 HTML（v3.1.10）**：后台 Markdown 渲染（`app/utils/markdown_render.py`）允许内联 HTML（标准 Markdown 语义），当前**仅后台管理员可编辑内容**，风险可控。若未来开放前台投稿/评论等不可信来源的 Markdown 渲染，**必须先接入 `bleach` 白名单过滤后再渲染**，否则存在存储型 XSS 风险。

@@ -115,8 +115,11 @@ def setup():
         if not username or len(username) < 3:
             flash(_gettext('管理员账号至少 3 个字符'), 'danger')
             return render_template('admin/setup.html', **ctx)
-        if len(password) < 6:
-            flash(_gettext('管理员密码至少 6 个字符'), 'danger')
+        # v3.1.10 VULN-015：初始化向导管理员密码策略（12 位 + 四类字符）
+        from ..utils.password_policy import validate_password
+        ok, msg = validate_password(password)
+        if not ok:
+            flash(msg, 'danger')
             return render_template('admin/setup.html', **ctx)
         if password != password_confirm:
             flash(_gettext('两次输入的密码不一致'), 'danger')

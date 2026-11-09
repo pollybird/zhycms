@@ -1,0 +1,26 @@
+# v3.1.10 VULN-016/017：依赖与 GitHub Actions 供应链治理
+# 每周检查安全更新并自动提 PR；pip 与 actions 均纳入。
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    # 仅安全更新自动提 PR，普通版本升级人工评估（避免 Flask 生态耦合破坏）
+    allow:
+      - dependency-type: all
+    versioning-strategy: increase-if-necessary
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci

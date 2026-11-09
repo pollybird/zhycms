@@ -38,6 +38,10 @@ _ENV_INTERNALS_RE = re.compile(r'\b(cycler|joiner|namespace|lipsum)\b')
 _REQUEST_ATTR_RE = re.compile(r'\brequest\s*\.\s*([A-Za-z_]\w*)')
 # request 下标访问：Jinja foo['bar'] 会回退 getattr，等价于属性访问
 _REQUEST_GETITEM_RE = re.compile(r'\brequest\s*\[')
+# 下标内字符串拼接（v3.1.10 VULN-023，Issue #14）：
+# {{ ''['_'+'_class'+'__'] }} / {{ x['__gl'~'obals__'] }} 用拼接混淆属性名
+# 绕过字面量审计（运行期沙箱已拦截，此为审计层纵深防御，不追求完备）。
+_GETITEM_CONCAT_RE = re.compile(r"\[\s*(?:[^\]\[]*?['\"][^\]\[]*?)(?:~|\+)\s*['\"]")
 _REQUEST_ALLOWED_ATTRS = frozenset({
     'path', 'full_path', 'args', 'view_args', 'endpoint', 'method',
     'url', 'base_url', 'url_root', 'root_url', 'script_root', 'host',
@@ -60,6 +64,8 @@ def _audit_expressions(content):
             return False, "包含模板环境内部对象（cycler/joiner/namespace/lipsum）"
         if _REQUEST_GETITEM_RE.search(expr):
             return False, "包含 request 下标访问（可回退为属性访问绕过白名单）"
+        if _GETITEM_CONCAT_RE.search(expr):
+            return False, "包含下标内字符串拼接（疑似属性名混淆绕过审计）"
         for attr in _REQUEST_ATTR_RE.findall(expr):
             if attr not in _REQUEST_ALLOWED_ATTRS:
                 return False, "包含白名单外的 request 属性访问 'request.{0}'".format(attr)

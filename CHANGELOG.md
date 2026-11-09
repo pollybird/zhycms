@@ -5,6 +5,30 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.1.10] - 2026-11-09
+
+**纵深防御与合规加固版本**：闭环 GitCode Issue #14 残留 Low/Info 项与 SAST P3 共 9 项（7 项代码加固 + 2 项纯文档披露）。**无数据库结构变更、无新增依赖**，覆盖代码重启即可。
+
+### Security
+
+- **模板审计下标拼接检测（VULN-023，Low）**：`app/utils/template_safety.py` 新增「下标内字符串拼接」规则（正则识别 `['_'+'_class'+'__']`、`['__gl'~'obals__']` 等下标内 `+`/`~` 拼接），主题包上传期即拒传；运行期 Jinja 沙箱本已拦截此类绕过，本规则为审计层冗余防线。官方 8 套主题全量扫描零命中。
+- **加密 fail-open 高可见度告警（VULN-025，Low）**：`ZHYCMS_ENC_KEY` 与 `instance/enc_key` 均不可用时，`encrypt_value`/`decrypt_value` 记 error 级日志（每进程一次，不刷屏）；后台所有页面顶部渲染红色常驻横幅，「系统设置 → 后台安全」页显示「敏感配置加密：未启用」状态行。**不拒绝启动、不改变加解密读写语义**（fail-open 行为与 v3.1.8/v3.1.9 一致，仅提升可见度）。
+- **CORS 通配符收紧（VULN-014，Low）**：`api_cors_origins` 保存时逐项校验 `http(s)://host[:port]` 格式，新值拒绝 `*`、`null` 与非 http(s) 项；**存量已配 `*` 不清空、运行时行为不变**，API 设置页显示红色告警提示整改。
+- **后台管理员密码策略（VULN-015，Low）**：新增 `app/utils/password_policy.py`，后台所有设置新密码入口（初始化向导、个人改密、用户管理新建/编辑/重置）统一要求 ≥12 位且同时包含大写字母、小写字母、数字、特殊字符。**存量密码哈希不受影响可正常登录；前台会员端维持 6 位策略不变**。
+- **依赖治理（VULN-016，Info）**：评估 puremagic 替换 python-magic——实测 12 类文件样本 7 类 MIME 识别不一致（exe/elf/php/纯文本识别失败或误报），不满足上传恶意文件拦截需求，**保留 python-magic**（requirements.txt 附评估结论注释）；Flask-Session 0.8.0 已为最新版无需变更；新增 `.github/dependabot.yml`（pip + github-actions 双生态周更）。
+- **CI Actions pin SHA（VULN-017，Info）**：CI 工作流 10 处 `actions/checkout`、`actions/setup-python` 浮动标签替换为完整 commit SHA（保留版本注释便于 dependabot 提升级 PR），消除第三方 Action 供应链劫持风险。
+- **TestingConfig 密钥防护（VULN-018，Info）**：非 testing 配置下使用 TestingConfig 的固定 SECRET_KEY 时启动直接 `SystemExit`，杜绝测试密钥误带入生产部署。
+- **SSRF DNS TOCTOU 与 Markdown 内联 HTML（VULN-024/019，Info，纯文档）**：维持 SECURITY.md 基线第 11/12 条既有披露与防护建议（出口防火墙清单、bleach 白名单过滤前置条件），应用层不新增代码。
+
+### 升级注意
+
+- 覆盖代码 + 重启即可，**无数据库迁移、无新增依赖**。
+- **行为变化**：后台设置新密码统一要求 12 位四类字符（初始化向导、个人改密、用户管理新建/编辑/重置）；存量账号登录不受影响。
+- **行为变化**：`api_cors_origins` 保存新值时拒绝 `*` 与非法来源格式；存量 `*` 配置运行行为不变，仅 UI 红色告警。
+- **可见度变化**：加密密钥不可用时后台全页红色常驻横幅 + error 日志，请按提示配置 `ZHYCMS_ENC_KEY` 或检查 `instance/enc_key`。
+- **建议**：部署方按 SECURITY.md 基线第 11 条配置出口防火墙（禁内网网段与云元数据地址），彻底兜底 SSRF DNS TOCTOU 残余风险。
+- **测试**：全量 483 项通过（新增 16 项安全回归）；`check_excepts.py` / `check_constants.py` / `check_release.py` 三门禁全绿；覆盖率 54%（门禁阈值 50%）。
+
 ## [3.1.9] - 2026-11-08
 
 **安全修复版本**：完成 v3.1.8 顺延的 P2-B 全部 6 个 Medium，并闭环 GitCode Issue #14 中唯一 Medium（插件 AST 间接引用绕过），同时顺带修复 2 项零成本 Info 项。**无数据库结构变更、无新增依赖**，覆盖代码重启即可。

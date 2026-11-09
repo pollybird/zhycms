@@ -66,6 +66,30 @@
       </div>
     </div>
     <div class="col-md-4">
+      {# v3.1.10 VULN-025：敏感配置加密状态（只读） #}
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">{{ _('安全状态') }}</h3></div>
+        <div class="card-body">
+          <div class="form-group mb-0">
+            <label>{{ _('敏感配置加密') }}</label>
+            {% if zhycms_enc_unavailable %}
+            <div class="alert alert-danger mb-1">
+              <i class="fas fa-times-circle"></i> {{ _('未启用') }}
+            </div>
+            <small class="form-text text-muted">
+              {{ _('ZHYCMS_ENC_KEY 未配置且 instance/enc_key 不可用，敏感配置将以明文存储。') }}
+            </small>
+            {% else %}
+            <div class="alert alert-success mb-1">
+              <i class="fas fa-check-circle"></i> {{ _('已启用') }}
+            </div>
+            <small class="form-text text-muted">
+              {{ _('敏感配置（密钥/密码等）入库时使用 Fernet 加密。') }}
+            </small>
+            {% endif %}
+          </div>
+        </div>
+      </div>
       <div class="card">
         <div class="card-body">
           <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-save"></i> {{ _('保存设置') }}</button>

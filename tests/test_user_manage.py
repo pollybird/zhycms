@@ -21,8 +21,8 @@ class TestUserManage:
         """两次密码一致时应创建成功（回归：曾误报不一致）。"""
         resp = admin_client.post('/admin/users/create', data={
             'username': 'creator_test',
-            'password': 'abc12345',
-            'confirm_password': 'abc12345',
+            'password': 'Abc123!wxyz0',
+            'confirm_password': 'Abc123!wxyz0',
             'nickname': '测试账号',
             'email': 't@example.com',
             'is_active_flag': 'on',
@@ -34,14 +34,14 @@ class TestUserManage:
             assert user is not None
             assert user.is_active_flag is True
             assert user.nickname == '测试账号'
-            assert user.check_password('abc12345')
+            assert user.check_password('Abc123!wxyz0')
 
     def test_create_user_password_mismatch(self, admin_client, app):
         """两次密码不一致时应拒绝创建。"""
         resp = admin_client.post('/admin/users/create', data={
             'username': 'mismatch_test',
-            'password': 'abc12345',
-            'confirm_password': 'abc99999',
+            'password': 'Abc123!wxyz0',
+            'confirm_password': 'Abc123!wxyz9',
             'is_active_flag': 'on',
         }, follow_redirects=True)
         assert '两次输入的密码不一致'.encode() in resp.data
@@ -62,8 +62,8 @@ class TestUserManage:
 
         resp = admin_client.post('/admin/users/create', data={
             'username': 'role_bind_test',
-            'password': 'abc12345',
-            'confirm_password': 'abc12345',
+            'password': 'Abc123!wxyz0',
+            'confirm_password': 'Abc123!wxyz0',
             'role_ids[]': str(rid),
             'is_active_flag': 'on',
         }, follow_redirects=True)
@@ -104,12 +104,12 @@ class TestUserManage:
             uid = user.id
 
         resp = admin_client.post(f'/admin/users/{uid}/reset-password',
-                                 data={'new_password': 'new12345'},
+                                 data={'new_password': 'New123!wxyz0'},
                                  follow_redirects=False)
         assert resp.status_code == 302
 
         with app.app_context():
-            assert User.query.get(uid).check_password('new12345')
+            assert User.query.get(uid).check_password('New123!wxyz0')
 
     def test_non_super_cannot_grant_super(self, app):
         """非超管操作者（含 user_manage 权限）不能授予超管标志（防提权）。"""
@@ -136,8 +136,8 @@ class TestUserManage:
                 sess['_fresh'] = True
             resp = c.post('/admin/users/create', data={
                 'username': 'escalation_test',
-                'password': 'abc12345',
-                'confirm_password': 'abc12345',
+                'password': 'Abc123!wxyz0',
+                'confirm_password': 'Abc123!wxyz0',
                 'is_super': 'on',
                 'is_active_flag': 'on',
             }, follow_redirects=True)
