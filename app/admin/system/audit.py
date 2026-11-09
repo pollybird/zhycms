@@ -21,6 +21,7 @@ from ...models.audit import (
 )
 from ...models.setting import Setting
 from ...utils.helpers import permission_required, audit_log
+from ...utils.db_utils import escape_like, LIKE_ESCAPE
 from .. import admin_bp
 
 
@@ -58,15 +59,16 @@ def audit_index():
 
     query = AuditLog.query
     if keyword:
-        like = f'%{keyword}%'
+        like = f'%{escape_like(keyword)}%'
         query = query.filter(db.or_(
-            AuditLog.detail.like(like),
-            AuditLog.target_name.like(like),
-            AuditLog.username.like(like),
-            AuditLog.ip.like(like),
+            AuditLog.detail.like(like, escape=LIKE_ESCAPE),
+            AuditLog.target_name.like(like, escape=LIKE_ESCAPE),
+            AuditLog.username.like(like, escape=LIKE_ESCAPE),
+            AuditLog.ip.like(like, escape=LIKE_ESCAPE),
         ))
     if username:
-        query = query.filter(AuditLog.username.like(f'%{username}%'))
+        query = query.filter(AuditLog.username.like(
+            f'%{escape_like(username)}%', escape=LIKE_ESCAPE))
     if module:
         query = query.filter_by(module=module)
     if op_type:
@@ -128,13 +130,16 @@ def audit_export():
 
     query = AuditLog.query
     if keyword:
-        like = f'%{keyword}%'
+        like = f'%{escape_like(keyword)}%'
         query = query.filter(db.or_(
-            AuditLog.detail.like(like), AuditLog.target_name.like(like),
-            AuditLog.username.like(like), AuditLog.ip.like(like),
+            AuditLog.detail.like(like, escape=LIKE_ESCAPE),
+            AuditLog.target_name.like(like, escape=LIKE_ESCAPE),
+            AuditLog.username.like(like, escape=LIKE_ESCAPE),
+            AuditLog.ip.like(like, escape=LIKE_ESCAPE),
         ))
     if username:
-        query = query.filter(AuditLog.username.like(f'%{username}%'))
+        query = query.filter(AuditLog.username.like(
+            f'%{escape_like(username)}%', escape=LIKE_ESCAPE))
     if module:
         query = query.filter_by(module=module)
     if op_type:

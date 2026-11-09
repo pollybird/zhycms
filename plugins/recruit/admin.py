@@ -14,6 +14,7 @@ from app.extensions import db
 from app.admin import admin_bp
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log
+from app.utils.db_utils import escape_like, LIKE_ESCAPE
 from app.utils.i18n_content import get_available_locales, get_default_locale
 
 from .models import RecruitJob, RecruitApplication, RecruitJobTranslation
@@ -74,7 +75,8 @@ def recruit_job_index():
 
     query = RecruitJob.query.filter_by(is_deleted=False)
     if keyword:
-        query = query.filter(RecruitJob.title.like(f'%{keyword}%'))
+        query = query.filter(RecruitJob.title.like(
+            f'%{escape_like(keyword)}%', escape=LIKE_ESCAPE))
     if status == 'open':
         query = query.filter((RecruitJob.deadline.is_(None))
                              | (RecruitJob.deadline > datetime.now()))

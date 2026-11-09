@@ -18,6 +18,7 @@ from app.admin import admin_bp
 from app.models.column import Column
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log, clear_content_cache
+from app.utils.db_utils import escape_like, LIKE_ESCAPE
 from app.utils.uploads import save_upload_file
 from app.utils.i18n_content import get_available_locales, get_default_locale
 from app.plugin_system import plugin_enabled
@@ -144,7 +145,8 @@ def product_index():
             if allowed is not None:
                 query = query.filter(Product.column_id.in_(allowed or [0]))
     if keyword:
-        query = query.filter(Product.title.like(f'%{keyword}%'))
+        query = query.filter(Product.title.like(
+            f'%{escape_like(keyword)}%', escape=LIKE_ESCAPE))
     if status == 'enabled':
         query = query.filter_by(is_enabled=True)
     elif status == 'disabled':

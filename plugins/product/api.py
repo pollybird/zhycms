@@ -13,6 +13,7 @@ from app.api.views import (
     _pagination_meta, _to_int,
 )
 from app.plugin_system import plugin_enabled
+from app.utils.db_utils import escape_like, LIKE_ESCAPE
 from app.models.setting import Setting
 
 
@@ -72,7 +73,8 @@ def register(api_bp):
         ).order_by(Product.sort_order.desc(), Product.id.desc())
         keyword = (request.args.get('keyword') or '').strip()
         if keyword:
-            q = q.filter(Product.title.like(f'%{keyword}%'))
+            q = q.filter(Product.title.like(
+                f'%{escape_like(keyword)}%', escape=LIKE_ESCAPE))
         pagination = q.paginate(page=page, per_page=per_page, error_out=False)
         return api_ok(
             [_product_summary(p, col) for p in pagination.items],

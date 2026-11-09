@@ -9,6 +9,7 @@ import logging
 
 from app.extensions import db
 from app.utils.search import SearchProvider, _search_locale
+from app.utils.db_utils import escape_like, LIKE_ESCAPE
 from app.utils.i18n_content import t_field, get_default_locale
 
 logger = logging.getLogger(__name__)
@@ -94,28 +95,28 @@ class RecruitSearchProvider(SearchProvider):
     def sql_search(self, keyword, locale, page=1, per_page=20):
         """岗位 LIKE 检索（非默认语言同时匹配 recruit_job_translations）。"""
         from .models import RecruitJob, RecruitJobTranslation
-        like = f'%{keyword}%'
+        like = f'%{escape_like(keyword)}%'
         loc = _search_locale(locale)
         q = RecruitJob.query.filter(
             RecruitJob.is_deleted == False,  # noqa: E712
             RecruitJob.is_enabled == True,   # noqa: E712
         )
         main_match = db.or_(
-            RecruitJob.title.like(like),
-            RecruitJob.description.like(like),
-            RecruitJob.department.like(like),
-            RecruitJob.location.like(like),
-            RecruitJob.salary.like(like),
+            RecruitJob.title.like(like, escape=LIKE_ESCAPE),
+            RecruitJob.description.like(like, escape=LIKE_ESCAPE),
+            RecruitJob.department.like(like, escape=LIKE_ESCAPE),
+            RecruitJob.location.like(like, escape=LIKE_ESCAPE),
+            RecruitJob.salary.like(like, escape=LIKE_ESCAPE),
         )
         if loc != get_default_locale():
             trans_ids = db.session.query(RecruitJobTranslation.job_id).filter(
                 RecruitJobTranslation.locale == loc,
                 db.or_(
-                    RecruitJobTranslation.title.like(like),
-                    RecruitJobTranslation.description.like(like),
-                    RecruitJobTranslation.department.like(like),
-                    RecruitJobTranslation.location.like(like),
-                    RecruitJobTranslation.salary.like(like),
+                    RecruitJobTranslation.title.like(like, escape=LIKE_ESCAPE),
+                    RecruitJobTranslation.description.like(like, escape=LIKE_ESCAPE),
+                    RecruitJobTranslation.department.like(like, escape=LIKE_ESCAPE),
+                    RecruitJobTranslation.location.like(like, escape=LIKE_ESCAPE),
+                    RecruitJobTranslation.salary.like(like, escape=LIKE_ESCAPE),
                 )
             )
             q = q.filter(db.or_(RecruitJob.id.in_(trans_ids), main_match))

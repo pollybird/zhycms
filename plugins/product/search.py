@@ -10,6 +10,7 @@ from datetime import datetime
 
 from app.extensions import db
 from app.utils.search import SearchProvider, _search_locale
+from app.utils.db_utils import escape_like, LIKE_ESCAPE
 from app.utils.i18n_content import t_field, get_default_locale
 
 logger = logging.getLogger(__name__)
@@ -108,25 +109,25 @@ class ProductSearchProvider(SearchProvider):
     def sql_search(self, keyword, locale, page=1, per_page=20):
         """产品 LIKE 检索（非默认语言同时匹配 product_translations）。"""
         from .models import Product, ProductTranslation
-        like = f'%{keyword}%'
+        like = f'%{escape_like(keyword)}%'
         loc = _search_locale(locale)
         q = Product.query.filter(
             Product.is_deleted == False,  # noqa: E712
             Product.is_enabled == True,   # noqa: E712
         )
         main_match = db.or_(
-            Product.title.like(like),
-            Product.summary.like(like),
-            Product.content.like(like),
+            Product.title.like(like, escape=LIKE_ESCAPE),
+            Product.summary.like(like, escape=LIKE_ESCAPE),
+            Product.content.like(like, escape=LIKE_ESCAPE),
         )
         if loc != get_default_locale():
             trans_ids = db.session.query(ProductTranslation.product_id).filter(
                 ProductTranslation.locale == loc,
                 db.or_(
-                    ProductTranslation.title.like(like),
-                    ProductTranslation.summary.like(like),
-                    ProductTranslation.content.like(like),
-                    ProductTranslation.specs.like(like),
+                    ProductTranslation.title.like(like, escape=LIKE_ESCAPE),
+                    ProductTranslation.summary.like(like, escape=LIKE_ESCAPE),
+                    ProductTranslation.content.like(like, escape=LIKE_ESCAPE),
+                    ProductTranslation.specs.like(like, escape=LIKE_ESCAPE),
                 )
             )
             q = q.filter(db.or_(Product.id.in_(trans_ids), main_match))
