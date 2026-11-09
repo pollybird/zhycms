@@ -18,6 +18,7 @@
 - **依赖治理（VULN-016，Info）**：评估 puremagic 替换 python-magic——实测 12 类文件样本 7 类 MIME 识别不一致（exe/elf/php/纯文本识别失败或误报），不满足上传恶意文件拦截需求，**保留 python-magic**（requirements.txt 附评估结论注释）；Flask-Session 0.8.0 已为最新版无需变更；新增 `.github/dependabot.yml`（pip + github-actions 双生态周更）。
 - **CI Actions pin SHA（VULN-017，Info）**：CI 工作流 10 处 `actions/checkout`、`actions/setup-python` 浮动标签替换为完整 commit SHA（保留版本注释便于 dependabot 提升级 PR），消除第三方 Action 供应链劫持风险。
 - **TestingConfig 密钥防护（VULN-018，Info）**：非 testing 配置下使用 TestingConfig 的固定 SECRET_KEY 时启动直接 `SystemExit`，杜绝测试密钥误带入生产部署。
+- **LIKE 通配符转义补齐（VULN-010 续项，Medium）**：补齐 v3.1.9 遗漏的 6 文件模糊查询——审计日志列表与导出（keyword/username）、招聘插件岗位后台列表与 SQL 回退搜索（含翻译表）、产品插件后台列表/API 列表与 SQL 回退搜索（含翻译表），全部统一 `escape_like` + 显式 `escape`；全库扫描确认所有 `.like()` 均已带 `escape`。
 - **SSRF DNS TOCTOU 与 Markdown 内联 HTML（VULN-024/019，Info，纯文档）**：维持 SECURITY.md 基线第 11/12 条既有披露与防护建议（出口防火墙清单、bleach 白名单过滤前置条件），应用层不新增代码。
 
 ### 升级注意

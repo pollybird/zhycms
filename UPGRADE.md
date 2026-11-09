@@ -27,6 +27,7 @@ python run.py
 - **主题模板上传审计加严**：含下标内字符串拼接（如 `{{ ''['_'+'_class'+'__'] }}`）的模板将被拒传；官方 8 套主题不受影响（运行期 Jinja 沙箱本已拦截此类绕过，此为审计层冗余防线）。
 - **TestingConfig 密钥防护**：非 testing 配置下使用测试固定 SECRET_KEY（`test-secret-key-for-pytest-only`）时启动直接 `SystemExit`，杜绝测试密钥误带生产。
 - **CI/依赖治理（仅仓库层面）**：CI 工作流 Actions 已 pin 完整 commit SHA，新增 dependabot 周更（pip + github-actions）；puremagic 替换 python-magic 评估未通过（MIME 识别不一致率过高），**保留 python-magic**。
+- **LIKE 通配符转义补齐（行为不变）**：补齐 v3.1.9 遗漏的 6 文件模糊查询转义（审计日志列表/导出、招聘与产品插件的后台列表/API/SQL 回退搜索）；仅修正 `%`/`_` 通配符语义，正常关键词搜索结果不变。
 - **SSRF DNS TOCTOU 残余风险（文档建议，VULN-024）**：应用层已在校验时解析 DNS 并逐条判定，但校验与实际请求之间存在理论 TOCTOU 时间窗。**彻底防御需网络层兜底**——请按 SECURITY.md 安全配置基线第 11 条配置出口防火墙自查清单：
   - 禁止应用服务器主动访问内网网段：`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`169.254.0.0/16`、`127.0.0.0/8`；
   - 阻断云元数据地址：`iptables -A OUTPUT -d 169.254.169.254 -j DROP`；

@@ -79,7 +79,7 @@
 - **插件 AST 间接引用绕过（VULN-022）**：插件源码审计升级为**两遍 AST 分析**——先收集 import 别名（`import os as x`、`from os import system as s`）与赋值传播（`x = os.system`、`y = x`），再按还原后的限定名做调用判定；`getattr(os, "system")` 类危险属性获取直接拒传。Issue #14 实测 Payload 全部拦截，合法 `os.path` 别名不误伤。
 - **JWT 服务端吊销（VULN-007）**：配置 `REDIS_URL` 时，登出把 `jti` 写入 `zhycms:jwt:blacklist:<jti>`（TTL 为剩余有效期），`token_in_blocklist_loader` 使已登出 token 立即 401；Redis 运行期故障降级放行并告警，不返回 500。未配置 Redis 时维持“客户端删除 + access token 自然过期（默认 15 分钟）”语义。
 - **会话固定防护（VULN-008）**：后台登录与会员登录（密码/短信/OAuth/注册自动登录）在建立登录态前 `session.clear()`，攻击者预置的 Session 键不会带入登录后会话。
-- **SQL LIKE 通配符注入（VULN-010）**：`app/utils/db_utils.py::escape_like` 统一转义 `%`/`_`/`\`，5 处后台/API/搜索 LIKE 查询显式传入 `escape`，搜索 `%` 不再放大结果集。
+- **SQL LIKE 通配符注入（VULN-010）**：`app/utils/db_utils.py::escape_like` 统一转义 `%`/`_`/`\`，5 处后台/API/搜索 LIKE 查询显式传入 `escape`，搜索 `%` 不再放大结果集（v3.1.10 补齐审计日志列表/导出、招聘与产品插件的后台列表/API/SQL 回退搜索共 6 文件遗漏，全库 `.like()` 已零遗漏）。
 - **Meilisearch 地址校验（VULN-011）**：`assert_http_url()` 限定 http/https、要求 hostname 非空、拒绝 userinfo；**默认允许内网地址**（内网 Meilisearch 属常见合法部署），保存与使用前各校验一次，非法地址回退默认并告警。
 - **生产 DEBUG 阻断（VULN-012）**：`ZHYCMS_ENV=production` 且 `DEBUG=True` 时启动直接失败，杜绝 Werkzeug 调试器暴露（可 RCE）；本地 `default` 配置仅告警。
 - **错误信息脱敏（VULN-013）**：初始化向导数据库连接失败不再回显 `e.orig`（主机/端口/驱动/栈），对外固定文案，详情仅写日志。
@@ -95,6 +95,7 @@
 - **依赖治理（VULN-016）**：评估 puremagic 替换 python-magic——实测 12 类文件样本 7 类 MIME 识别不一致（exe/elf/php/纯文本识别失败或误报），**不满足上传恶意文件拦截需求，保留 python-magic**；Flask-Session 0.8.0 已为最新版无需变更；新增 `.github/dependabot.yml`（pip + github-actions 周更）。
 - **CI Actions pin SHA（VULN-017）**：CI 工作流 10 处 `actions/checkout`、`actions/setup-python` 浮动标签替换为完整 commit SHA（保留版本注释），配合 dependabot 自动提升级 PR。
 - **TestingConfig 密钥防护（VULN-018）**：非 testing 配置下使用 TestingConfig 固定 SECRET_KEY 时启动直接 `SystemExit`，杜绝测试密钥误带生产。
+- **LIKE 通配符转义补齐（VULN-010 续项）**：补齐 v3.1.9 遗漏的 6 文件——审计日志列表与导出（keyword/username）、招聘插件岗位后台列表与 SQL 回退搜索（含翻译表）、产品插件后台列表/API 列表与 SQL 回退搜索（含翻译表），全部统一 `escape_like` + 显式 `escape`，全库扫描零遗漏。
 - **SSRF DNS TOCTOU 与 Markdown 内联 HTML（VULN-024/019，文档）**：维持既有披露与防护建议（见下方基线第 11/12 条），应用层不新增代码。
 
 ## 安全配置基线（部署方自查）
