@@ -388,6 +388,60 @@ def _setup_scheduler(app):
 # v2.4.0：Alembic 迁移 bootstrap
 # ============================================================
 
+def _dedupe_alembic_version(app):
+    """清理 alembic_version 中的重复版本行。
+
+    多 worker（gunicorn/uwsgi ≥2 进程）同时启动并执行迁移时，SQLite 的
+    非事务 DDL 可能写入多条版本记录（如同时存在 0011 与 0001）。Alembic
+    会因「当前版本互相重叠」拒绝 upgrade，Flask-Migrate 再 sys.exit(1)，
+    表现为进程无提示退出。这里仅在记录能收敛到唯一链尾时清理旧记录。
+    """
+    from sqlalchemy import text
+
+    rows = [r[0] for r in db.session.execute(
+        text('SELECT version_num FROM alembic_version')).fetchall()]
+    if len(rows) <= 1:
+        return
+
+    try:
+        from alembic.script import ScriptDirectory
+        from .config import BASE_DIR
+        directory = os.path.join(BASE_DIR, 'migrations')
+        cfg = app.extensions['migrate'].migrate.get_config(directory)
+        script = ScriptDirectory.from_config(cfg)
+
+        def _ancestors(rev_id):
+            out, stack = set(), [rev_id]
+            while stack:
+                rev = script.get_revision(stack.pop())
+                if rev is None:
+                    continue
+                downs = rev.down_revision
+                downs = [downs] if isinstance(downs, str) else list(downs or [])
+                for d in downs:
+                    if d not in out:
+                        out.add(d)
+                        stack.append(d)
+            return out
+
+        tails = [r for r in rows
+                 if all(r not in _ancestors(o) for o in rows if o != r)]
+    except Exception as e:
+        app.logger.warning('[Alembic] 版本表含多条记录 %s，无法解析迁移链，跳过自动修复：%s', rows, e)
+        return
+
+    if len(tails) != 1:
+        # 真正的多分支（多 head）不擅自删除，交由人工处理
+        app.logger.warning('[Alembic] 版本表含多条记录 %s（多分支），跳过自动修复', rows)
+        return
+
+    keep = tails[0]
+    db.session.execute(
+        text('DELETE FROM alembic_version WHERE version_num != :keep'), {'keep': keep})
+    db.session.commit()
+    app.logger.warning('[Alembic] 检测到 alembic_version 重复记录 %s，已清理并保留 %s', rows, keep)
+
+
 def _alembic_bootstrap(app):
     """在 create_app 的 app_context 内调用。
     检测数据库状态，执行 stamp 或 upgrade：
@@ -405,20 +459,28 @@ def _alembic_bootstrap(app):
     has_users = insp.has_table('users')
     has_articles = insp.has_table('articles')
 
-    if not has_users or not has_articles:
-        # 全新安装：db.create_all() 已建全部表，仅 stamp baseline
-        flask_stamp(directory='migrations', revision='0001')
-        app.logger.info('[Alembic] 新装 stamp baseline 0001')
-    elif not has_alembic:
-        # v2.3.0 及更早旧库：stamp baseline 后执行增量
-        flask_stamp(directory='migrations', revision='0001')
-        app.logger.info('[Alembic] 旧库 stamp baseline 0001（v2.3.0 兼容）')
-        flask_upgrade(directory='migrations')
-        app.logger.info('[Alembic] 增量迁移完成')
-    else:
-        # 已纳入 Alembic 管理：执行增量
-        flask_upgrade(directory='migrations')
-        app.logger.info('[Alembic] 增量迁移完成')
+    if has_alembic:
+        _dedupe_alembic_version(app)
+
+    try:
+        if not has_users or not has_articles:
+            # 全新安装：db.create_all() 已建全部表，仅 stamp baseline
+            flask_stamp(directory='migrations', revision='0001')
+            app.logger.info('[Alembic] 新装 stamp baseline 0001')
+        elif not has_alembic:
+            # v2.3.0 及更早旧库：stamp baseline 后执行增量
+            flask_stamp(directory='migrations', revision='0001')
+            app.logger.info('[Alembic] 旧库 stamp baseline 0001（v2.3.0 兼容）')
+            flask_upgrade(directory='migrations')
+            app.logger.info('[Alembic] 增量迁移完成')
+        else:
+            # 已纳入 Alembic 管理：执行增量
+            flask_upgrade(directory='migrations')
+            app.logger.info('[Alembic] 增量迁移完成')
+    except SystemExit as e:
+        # Flask-Migrate 的 catch_errors 会把迁移异常转成 sys.exit(1)，
+        # SystemExit 不属于 Exception，会直接击穿 create_app 导致进程静默退出
+        raise RuntimeError(f'Alembic 迁移失败（exit={e.code}），详见上方日志') from None
 
 
 # ============================================================

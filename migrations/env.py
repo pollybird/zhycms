@@ -14,7 +14,9 @@ from alembic import context
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers 默认为 True，会把 Flask / Flask-Migrate 已创建的
+    # logger 全部禁用，导致迁移失败时的错误日志（含真实原因）被静默吞掉
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # 从 Flask-Migrate 扩展获取 metadata
 try:
