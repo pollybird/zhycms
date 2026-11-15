@@ -30,6 +30,48 @@ import importlib
 logger = logging.getLogger(__name__)
 
 
+def __getattr__(name):
+    """v3.2.0 站群：按需导出站点维度基类（避免插件导入期的循环依赖）。
+
+    支持 ``from app.plugin_api import SiteScopedMixin, DEFAULT_SITE_ID``。
+    """
+    if name in ('SiteScopedMixin', 'DEFAULT_SITE_ID'):
+        from .models.site import SiteScopedMixin, DEFAULT_SITE_ID
+        return {'SiteScopedMixin': SiteScopedMixin,
+                'DEFAULT_SITE_ID': DEFAULT_SITE_ID}[name]
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
+def current_site_id():
+    """v3.2.0 站群：当前请求解析到的站点 id（默认站点为 0）。
+
+    与核心 ``app.sites.current_site_id()`` 等价；插件可直接
+    ``from app.plugin_api import current_site_id`` 使用。
+    """
+    from .sites import current_site_id as _current_site_id
+    return _current_site_id()
+
+
+def site_filter(query, model=None):
+    """v3.2.0 站群：给查询追加「当前站点」过滤。
+
+    ``model`` 缺省时从 ``query.column_descriptions`` 推断；模型没有
+    ``site_id`` 列时原样返回（便于插件兼容无站点维度的表）。
+
+    用法::
+
+        from app.plugin_api import site_filter
+        items = site_filter(MyModel.query.filter_by(is_deleted=False)).all()
+    """
+    if model is None:
+        descs = getattr(query, 'column_descriptions', None) or []
+        if descs:
+            model = descs[0].get('entity')
+    if model is not None and hasattr(model, 'site_id'):
+        return query.filter(model.site_id == current_site_id())
+    return query
+
+
 class PluginBase:
     """插件基类：子类按需覆写钩子方法。"""
 

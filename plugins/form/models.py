@@ -16,8 +16,10 @@ class Form(db.Model):
     __tablename__ = 'forms'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.0 站群：表单按站点切分（slug 站点内唯一）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     name = db.Column(db.String(100), nullable=False)
-    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(100), nullable=False, index=True)
     description = db.Column(db.Text)
     success_message = db.Column(db.String(255), default='提交成功，感谢您的反馈！')
     is_open = db.Column(db.Boolean, default=True, nullable=False)
@@ -40,6 +42,10 @@ class Form(db.Model):
     translations = db.relationship(
         'FormTranslation', backref='form',
         cascade='all, delete-orphan', lazy='selectin'
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'slug', name='uq_form_site_slug'),
     )
 
 

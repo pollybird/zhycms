@@ -18,6 +18,7 @@ from app.extensions import db
 from app.extensions import cache
 from app.models.column import Column
 from app.models.setting import Setting
+from app.sites import current_site_id
 from app.plugin_system import plugin_enabled
 from app.utils.themes import theme_template, get_active_theme, THEMES_DIR
 
@@ -55,7 +56,7 @@ def _try_cache(key, ttl_setting_key, default_ttl=900):
                 ttl = default_ttl
             if ttl <= 0:
                 return view_func(*args, **kwargs)
-            cache_key = f'frontend/{key}/' + '/'.join(
+            cache_key = f'frontend/site{current_site_id()}/{key}/' + '/'.join(
                 [str(v) for v in args] + [f'{k}={v}' for k, v in sorted(kwargs.items())]
             )
             # v2.5.0：缓存键包含当前 locale，避免不同语言命中同一缓存
@@ -140,8 +141,10 @@ def _render_product_detail(column, product):
 @_gate
 @_try_cache('product', 'cache_ttl_article', 900)
 def product_detail_by_column(slug, pid):
-    col = Column.query.filter_by(slug=slug, is_deleted=False).first_or_404()
-    product = Product.query.get_or_404(pid)
+    col = Column.query.filter_by(
+        slug=slug, is_deleted=False, site_id=current_site_id()).first_or_404()
+    product = Product.query.filter_by(
+        id=pid, site_id=current_site_id()).first_or_404()
     if product.column_id != col.id or product.is_deleted or not product.is_enabled:
         abort(404)
     if not col.is_enabled:
@@ -156,10 +159,12 @@ def product_detail_rewrite(pid):
     """伪静态 /product-12.html（与 /article-{id}.html 同级静态前缀）。"""
     if Setting.get('seo_rewrite_enable') != 'on':
         abort(404)
-    product = Product.query.get_or_404(pid)
+    product = Product.query.filter_by(
+        id=pid, site_id=current_site_id()).first_or_404()
     if product.is_deleted or not product.is_enabled:
         abort(404)
-    col = Column.query.get(product.column_id)
+    col = Column.query.filter_by(
+        id=product.column_id, site_id=current_site_id()).first()
     if col is None or col.is_deleted or not col.is_enabled:
         abort(404)
     return _render_product_detail(col, product)

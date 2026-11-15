@@ -96,6 +96,13 @@ def setting_site():
                 Setting.set(key, val)
                 changed[key] = val
 
+        # v3.2.0 站群：会员归属模式（全局键，仅超管可改）
+        if current_user.is_super:
+            scope = (request.form.get('member_scope') or '').strip()
+            if scope in ('shared', 'isolated') and Setting.get('member_scope') != scope:
+                Setting.set('member_scope', scope)
+                changed['member_scope'] = scope
+
         # LOGO
         logo_file = request.files.get('site_logo')
         if logo_file and logo_file.filename:

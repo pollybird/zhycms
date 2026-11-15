@@ -15,6 +15,8 @@ class RecruitJob(db.Model):
     __tablename__ = 'recruit_jobs'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.0 站群：招聘岗位按站点切分
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     title = db.Column(db.String(200), nullable=False)
     department = db.Column(db.String(100))            # 所属部门（可选）
     location = db.Column(db.String(200))              # 工作地点（可选）

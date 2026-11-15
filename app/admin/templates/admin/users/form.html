@@ -111,6 +111,48 @@
           </div>
         </div>
       </div>
+      {% if sites|length > 1 %}
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{{ _('站点专属权限') }}</h3>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>{{ _('站点（可管理）') }}</th>
+                <th width="90">{{ _('可审核') }}</th>
+                <th width="90">{{ _('可发布') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in sites %}
+              <tr>
+                <td>
+                  <div class="custom-control custom-checkbox">
+                    <input type="checkbox" class="custom-control-input" name="site_ids[]" value="{{ s.id }}" id="site_{{ s.id }}"
+                           {{ 'checked' if user_site_ids is defined and s.id in user_site_ids }}>
+                    <label class="custom-control-label" for="site_{{ s.id }}">{{ s.name }}<small class="text-muted ml-1">{{ s.domain or s.slug }}</small></label>
+                  </div>
+                </td>
+                <td class="text-center">
+                  <input type="checkbox" name="site_can_review_ids[]" value="{{ s.id }}" aria-label="{{ _('可审核') }}"
+                         {{ 'checked' if site_review_map is defined and site_review_map.get(s.id) }}>
+                </td>
+                <td class="text-center">
+                  <input type="checkbox" name="site_can_publish_ids[]" value="{{ s.id }}" aria-label="{{ _('可发布') }}"
+                         {{ 'checked' if site_publish_map is defined and site_publish_map.get(s.id) }}>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="p-3">
+            <small class="form-text text-muted mb-0">{{ _('不勾选任何站点时不受站点限制（拥有全局权限即可访问全部站点）；超管不受站点权限约束') }}</small>
+          </div>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="col-md-4">

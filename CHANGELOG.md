@@ -5,6 +5,40 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.2.0] - 2026-11-15
+
+**站群版**：一个后端实例 + 一个数据库，按「站点」维度切分内容，同一套 CMS 同时服务多个独立前台站点（独立域名或泛解析子域）。**默认站点 `site_id=0` 恒等变换，单站点部署零感知**（URL、行为、SEO 全部不变）。有数据库迁移 `0012`，无新增依赖。
+
+### Added
+
+- **站点注册表 `sites`**：`id`（默认站点固定 0）/ `name` / `slug` / `domain`（精确域名）/ `subdomain`（泛解析子域标签）/ `status`（open / closed）/ `theme` / 站点级 SEO / 排序 / 软删除；默认站点由迁移幂等插入。
+- **站点解析器 `app/sites.py`**：`select_site()` 注册为全局 `before_request`，优先级为「后台 `?site=`（写回 `session['admin_site_id']`）→ Host 精确 `domain` → 子域首标签 `subdomain` → 默认站点 0」；请求级缓存，每请求最多一次站点查询。
+- **后台站点管理**（`/admin/sites`）：列表 / 新建 / 编辑 / 软删除 / 切换当前站点；默认站点禁删、有栏目的站点禁删；`slug`/`domain`/`subdomain` 冲突校验；写操作落审计（模块 `site`）。
+- **后台站点切换器**：顶部导航下拉按 `can_access_site` 过滤可见站点（仅站点数 > 1 时显示），切换写入会话。
+- **站点 RBAC**：新增权限点 `site:manage`（审核员预设默认授予）；新增 `UserSitePermission(user_id, site_id, can_review, can_publish)` 把内容权限收窄到指定站点（镜像 `UserColumnPermission`）。
+- **站点化配置**：`settings` 唯一键由 `key` 改为 `(key, site_id)`；读取按当前站点取值、缺失回退默认站点 `(key, 0)`；`upload_*`/`login_*`/`api_*`/`search_*`/`plugin_*` 等为全局键，恒取站点 0。
+- **前台会员共享/独立**：新增全局设置 `member_scope`（`shared` 默认 / `isolated`，超管可在站点设置页切换）；`members` 加 `site_id`，`username` 改 `(site_id, username)` 唯一——共享模式恒为 0 与现网一致，独立模式各站独立。
+- **插件站群 SDK**：`app.plugin_api` 新增 `current_site_id()`、`site_filter(query, model=None)` 并按需导出 `SiteScopedMixin` / `DEFAULT_SITE_ID`；`docs/PLUGIN_DEV.md` 新增站群章节。
+
+### Changed
+
+- **内容维度列**：`columns` / `articles`（冗余同步）/ `fragments` / `members` / `settings` / `audit_logs` 及内置插件内容表（`forms` / `friend_links` / `products` / `recruit_jobs` / `banner_groups` / `banners`）新增 `site_id`（`NOT NULL DEFAULT 0` + 索引）。
+- **站点内唯一**：`columns.slug` / `fragments.slug` / `forms.slug` / `banner_groups.slug` / `settings.key` / `members.username` 由全局唯一改为站点内唯一（SQLite 用唯一索引、MySQL/PostgreSQL 用复合唯一约束），不同站点可复用 `about`、`news` 等 slug。
+- **前台全链路按站过滤**：首页 / 栏目 / 文章 / 碎片 / 侧栏 / 上下篇 / 站内搜索 / sitemap / 内容 API 均按当前站点取数；站点 `status=closed` 时前台返回 503。
+- **主题按站**：`get_active_theme()` 优先当前站点 `sites.theme`，为空回退全局 `site_theme`。
+- **缓存命名空间**：页面缓存键 `frontend/site<sid>/...`、内容 API 缓存键追加 `|site=<sid>`、插件（轮播）缓存键 `plugin/banner/site<sid>/...`，杜绝串站渲染。
+- **全站搜索按站**：Tantivy schema 新增 `site_id` 字段（schema 版本标记不符时自动重建索引），Meilisearch 新增 `site_id` filterable attribute，SQL 兜底与插件 Provider 结果同样按站过滤。
+- **内置插件**：表单 / 友链 / 产品 / 招聘 / 轮播的后台列表、详情、唯一性校验、新建、批量操作与前台模板函数全部按当前站点过滤；产品与招聘搜索 Provider 输出 `site_id`；会员插件按 `member_scope` 共享或独立。
+
+### 升级注意
+
+- **有数据库迁移 `0012`**（自动执行，可降级回滚）；**无新增依赖**；覆盖代码 + 重启即可。
+- **单站点部署零感知**：迁移把现有栏目/文章/碎片/配置/会员/插件内容全部归入默认站点 `site_id=0`，URL 与行为不变。
+- **启用站群**：后台「站点管理」新建站点并绑定独立域名或子域标签后，用该域名/子域访问即进入对应站点；后台顶部切换器切换管理站点。
+- **重要提醒**：`slug` 唯一性改为站点内唯一后，不同站点可同名；跨站点跳转需使用 `site_url()` 生成绝对地址。
+- **会员模式**：默认 `shared` 与现网完全一致；切换 `isolated` 时存量会员保留 `site_id=0` 归默认站点，新注册按当前站点落库。
+- **测试**：全量 498 项通过（新增 15 项站群隔离回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.0` 三门禁全绿。
+
 ## [3.1.10] - 2026-11-09
 
 **纵深防御与合规加固版本**：修复 SAST 审计遗留的 Low/Info 项与 P3 项共 9 项（7 项代码加固 + 2 项纯文档披露）。**无数据库结构变更、无新增依赖**，覆盖代码重启即可。

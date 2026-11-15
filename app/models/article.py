@@ -13,6 +13,8 @@ class Article(db.Model):
     __tablename__ = 'articles'
 
     id = db.Column(db.Integer, primary_key=True)
+    # 站群模式：冗余站点维度（由所属栏目同步，便于免 join 快速过滤）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     column_id = db.Column(db.Integer, db.ForeignKey('columns.id'), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
     summary = db.Column(db.Text)

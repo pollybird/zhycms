@@ -48,12 +48,13 @@ def dashboard():
         tm = abnormal.get('time') or ''
         flash(_gettext('检测到本次登录可能为异地登录（城市：{0}，IP：{1}，时间：{2}）。若不是本人操作请立即修改密码并联系超级管理员。').format(city, ip, tm), 'warning')
 
+    from ..sites import current_site_id as _sid
     stats = {
         'users': User.query.filter_by(is_deleted=False).count(),
-        'columns': Column.query.filter_by(is_deleted=False).count(),
-        'articles': Article.query.filter_by(is_deleted=False).count(),
+        'columns': Column.query.filter_by(is_deleted=False, site_id=_sid()).count(),
+        'articles': Article.query.filter_by(is_deleted=False, site_id=_sid()).count(),
         'articles_pending_review': Article.query.filter_by(
-            is_deleted=False, status=STATUS_REVIEW
+            is_deleted=False, status=STATUS_REVIEW, site_id=_sid()
         ).count(),
         'pending_submissions': _pending_form_submissions(),
         'recent_logs': LoginLog.query.order_by(LoginLog.created_at.desc()).limit(8).all(),
@@ -63,7 +64,8 @@ def dashboard():
     from ..models.rbac import Role
     dashboard_audit_maps = {
         'roles': {r.id: r.name for r in Role.query.all()},
-        'columns': {c.id: c.name for c in Column.query.filter_by(is_deleted=False).all()},
+        'columns': {c.id: c.name for c in Column.query.filter_by(
+            is_deleted=False, site_id=_sid()).all()},
     }
     try:
         monitor = system_monitor_stats()

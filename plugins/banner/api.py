@@ -14,7 +14,9 @@ def register(api_bp):
         if not plugin_enabled('banner'):
             return api_err(404, '资源不存在')
         from .models import BannerGroup
-        if BannerGroup.query.filter_by(slug=slug).first() is None:
+        from app.sites import current_site_id
+        if BannerGroup.query.filter_by(
+                slug=slug, site_id=current_site_id()).first() is None:
             return api_err(404, '轮播分组不存在')
         from .frontend import banner_items
         return api_ok(banner_items(slug))

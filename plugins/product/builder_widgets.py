@@ -37,6 +37,7 @@ class ProductList(Widget):
 
     def context(self, node, page_ctx):
         from app.models.column import Column
+        from app.sites import current_site_id
         from .models import Product
         from .frontend import product_brief
 
@@ -47,12 +48,14 @@ class ProductList(Widget):
             cid = props.get('column_id')
             try:
                 column = Column.query.filter_by(
-                    id=int(cid), is_deleted=False, is_enabled=True).first() \
+                    id=int(cid), is_deleted=False, is_enabled=True,
+                    site_id=current_site_id()).first() \
                     if cid else None
             except (TypeError, ValueError):
                 column = None
 
-        q = Product.query.filter_by(is_enabled=True, is_deleted=False)
+        q = Product.query.filter_by(
+            is_enabled=True, is_deleted=False, site_id=current_site_id())
         if column is not None:
             col_ids = [column.id]
             if props.get('include_children'):

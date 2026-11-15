@@ -123,8 +123,11 @@ class RecruitPlugin(PluginBase):
             # 插件隔离：清理索引失败不影响禁用流程
             logger.warning('禁用招聘插件时清理搜索索引失败：%s', e)
 
-    def get_sitemap_urls(self):
-        """开放申请的岗位详情页收录（loc 为完整 URL）。"""
+    def get_sitemap_urls(self, site_id=None):
+        """开放申请的岗位详情页收录（loc 为完整 URL）。
+
+        v3.2.0 站群：按 site_id 仅输出当前站点岗位（None 表示不过滤）。
+        """
         from flask import has_request_context, request
         from app.models.setting import Setting
         from .models import RecruitJob
@@ -136,8 +139,10 @@ class RecruitPlugin(PluginBase):
         freq = Setting.get('seo_sitemap_changefreq_article') or 'monthly'
         prio = Setting.get('seo_sitemap_priority_article') or '0.6'
         urls = []
-        for j in RecruitJob.query.filter_by(is_enabled=True, is_deleted=False) \
-                .order_by(RecruitJob.updated_at.desc()).limit(2000):
+        q = RecruitJob.query.filter_by(is_enabled=True, is_deleted=False)
+        if site_id is not None:
+            q = q.filter_by(site_id=site_id)
+        for j in q.order_by(RecruitJob.updated_at.desc()).limit(2000):
             urls.append({
                 'loc': base + recruit_job_url(j),
                 'lastmod': j.updated_at.strftime('%Y-%m-%d')

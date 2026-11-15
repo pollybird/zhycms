@@ -1,7 +1,7 @@
 # 站群模式（多站点 / Site Group）设计方案
 
-> 状态：**设计敲定（含四项产品决策）**，待按 M1–M4 分阶段落地。
-> 适用版本：v3.2.0（拟）。本文是站群模式的**设计依据**，后续拆 issue / 实现 M1 均以本文为准。
+> 状态：**v3.2.0 已落地（M1–M4 全部完成）**。本文档保留设计依据，实现细节与偏差以文末「十四、落地记录」为准。
+> 适用版本：v3.2.0。迁移脚本：`migrations/versions/0012_v3_2_0_sites.py`。
 
 ZhyCMS 当前为**单实例 / 单站点**架构：全站无 `site_id`、子域、域名解析概念（已全局确认）。站群模式的本质是**一个后端实例 + 一个库，按「站点」维度切分内容**，让同一套 CMS 同时服务多个相互独立又共享后台/插件/资产的前台站点。
 
@@ -99,7 +99,6 @@ class SiteScopedMixin:
     """内容按站点切分的统一维度列（镜像 i18n 的 locale 维度）。"""
     site_id = db.Column(db.Integer, nullable=False, default=0,
                         server_default='0', index=True)
-    site = db.relationship('Site', lazy='joined')
 ```
 
 | 表 | 是否加 `site_id` | 理由 |
@@ -224,14 +223,14 @@ def current_site_id():
 
 插件各自 `db.create_all()` 建表（见 `plugins/form/models.py` 约定），不能只靠核心迁移。提供统一接入：
 
-- 插件内容模型直接 **`class Form(SiteScopedMixin, db.Model)`**，一行获得 `site_id`。
-- `plugin_api` 暴露 **`current_site_id()`** 与 `SiteScopedMixin`；文档约定「内容查询按当前站点过滤、slug 类唯一约束改 `(site_id, slug)`」。
-- 插件**各自**加迁移补 `site_id`（沿用核心幂等 `_table_exists` 守卫范式）；内置插件（form / friend_link / product / job / analytics 等）随核心 `0010` 一并处理。
-- 插件后台管理页需按当前站点过滤列表（插件开发者按 SDK 文档自行处理；SDK 提供 `site_filter(model)` 辅助）。
+- 插件内容模型直接 **`class Form(SiteScopedMixin, db.Model)`**，一行获得 `site_id`（`from app.plugin_api import SiteScopedMixin`）。
+- `plugin_api` 暴露 **`current_site_id()`**、**`site_filter(query, model=None)`**（模型无 `site_id` 列时原样返回）与 `SiteScopedMixin` / `DEFAULT_SITE_ID`；文档约定「内容查询按当前站点过滤、slug 类唯一约束改 `(site_id, slug)`」。
+- 插件**各自**加迁移补 `site_id`（沿用核心幂等 `_table_exists` 守卫范式）；内置插件（form / friend_link / product / recruit / banner / member 等）已随核心 `0012` 一并处理。
+- 插件后台管理页需按当前站点过滤列表（插件开发者按 SDK 文档自行处理；SDK 提供 `site_filter(query)` 辅助）。
 
 ---
 
-## 十一、数据迁移方案（Alembic 新迁移 `0010_v3_2_0_sites.py`）
+## 十一、数据迁移方案（Alembic 迁移 `0012_v3_2_0_sites.py`）
 
 沿用 `0001` 基线 + 幂等守卫 + `ensure_*` 回填范式：
 
@@ -261,9 +260,28 @@ def current_site_id():
 
 | 阶段 | 内容 | 回归风险 |
 | --- | --- | --- |
-| **M1** | `sites` 表 + `site_id` 列（columns/articles/fragments/settings/members）+ 迁移 `0010` + 解析器（恒返回 0）+ 查询过滤 | 极低（恒等变换） |
+| **M1** | `sites` 表 + `site_id` 列（columns/articles/fragments/settings/members）+ 迁移 `0012` + 解析器（恒返回 0）+ 查询过滤 | 极低（恒等变换） |
 | **M2** | 后台站点 CRUD + 切换器 + RBAC（`site:manage` / `UserSitePermission`） | 中（权限路径） |
 | **M3** | 站点化 settings/theme/sitemap/search/缓存命名空间 + 会员 `member_scope` 开关 | 中 |
 | **M4** | 插件 SDK（`SiteScopedMixin` + `plugin_api.current_site_id()`）+ 内置插件改造 + 文档 | 中 |
 
 每阶段可独立合并、可回滚（迁移 `downgrade` 对称）。
+
+---
+
+## 十四、落地记录（v3.2.0）
+
+| 里程碑 | 落地内容 | 关键文件 |
+| --- | --- | --- |
+| M1 | `sites` 表 + `site_id` 维度列（columns/articles/fragments/settings/members/audit_logs）+ 迁移 `0012` + 解析器 | `app/models/site.py`、`app/sites.py`、`migrations/versions/0012_v3_2_0_sites.py` |
+| M2 | 后台站点 CRUD / 切换器 / `site:manage` / `UserSitePermission` | `app/admin/system/sites.py`、`app/models/rbac.py`、`admin/base.html` |
+| M3 | 站点化 settings/theme/sitemap/search/缓存命名空间 + `member_scope` | `app/models/setting.py`、`app/utils/themes.py`、`app/utils/search.py`、`app/frontend/views.py` |
+| M4 | 插件 SDK（`current_site_id()` / `site_filter()` / `SiteScopedMixin`）+ 内置插件改造 + 文档 | `app/plugin_api.py`、`plugins/{form,friend_link,product,recruit,banner,member}/`、`docs/PLUGIN_DEV.md` |
+
+实现与设计的三处偏差：
+
+1. **迁移编号**为 `0012`（v3.1.5 已占用 `0011`），不是文中的 `0010`。
+2. **搜索后端**现为 Tantivy（主）/ Meilisearch / SQL 兜底，不存在 Whoosh；Tantivy 通过 schema 版本标记 `.schema_version` 检测到旧索引后自动全量重建。
+3. **SQLite 唯一约束**通过「唯一索引」实现（`CREATE UNIQUE INDEX`），避免 `ALTER TABLE ADD CONSTRAINT` 不支持的问题；MySQL/PostgreSQL 走复合唯一约束。
+
+测试：`tests/test_sites_v320.py`（15 项）覆盖站点解析、后台切换、slug 跨站复用、栏目/文章 API 隔离、站点化配置、全局键、站点关闭 503、站点 CRUD 权限、账号站点权限绑定与审计按站点筛选。

@@ -80,10 +80,12 @@ def product_list_data(column, page=None):
 def product_latest(column_slug, limit=8):
     """指定栏目（按 slug，含其启用子栏目）的最新产品卡片数据；栏目不存在返回 []。"""
     from app.models.column import Column
+    from app.sites import current_site_id
     from .models import Product
 
     col = Column.query.filter_by(slug=column_slug, is_enabled=True,
-                                 is_deleted=False).first()
+                                 is_deleted=False,
+                                 site_id=current_site_id()).first()
     if col is None:
         return []
     col_ids = [col.id]

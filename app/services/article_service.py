@@ -46,10 +46,12 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
 
     is_new = article is None
     if is_new:
-        article = Article(column_id=column.id)
+        article = Article(column_id=column.id, site_id=column.site_id)
     else:
         # 清理旧的自定义字段值，重建
         ArticleFieldValue.query.filter_by(article_id=article.id).delete()
+        # 站群模式：文章栏目变化时同步冗余 site_id
+        article.site_id = column.site_id
 
     article.title = title
     article.summary = (form_data.get('summary') or '').strip()

@@ -15,11 +15,14 @@ from ...models.audit import (
     MODULE_USER, MODULE_ROLE, MODULE_COLUMN, MODULE_ARTICLE, MODULE_FRAGMENT,
     MODULE_FORM, MODULE_FORM_SUBMISSION, MODULE_SETTING,
     MODULE_AUDIT, MODULE_BACKUP, MODULE_UPLOAD, MODULE_OTHER, MODULE_BUILDER,
+    MODULE_SITE,
     OP_LOGIN, OP_LOGOUT, OP_CREATE, OP_UPDATE, OP_DELETE, OP_PUBLISH, OP_ARCHIVE,
     OP_REVIEW_PASS, OP_REVIEW_REJECT, OP_BATCH, OP_ROLLBACK, OP_CONFIG_CHANGE,
     OP_USER_MANAGE, OP_BACKUP_CREATE, OP_BACKUP_RESTORE, OP_EXPORT, OP_UPLOAD, OP_OTHER,
 )
 from ...models.setting import Setting
+from ...models.site import Site
+from ...sites import DEFAULT_SITE_ID
 from ...utils.helpers import permission_required, audit_log
 from ...utils.db_utils import escape_like, LIKE_ESCAPE
 from .. import admin_bp
@@ -39,6 +42,7 @@ MODULE_CHOICES = [
     (MODULE_BACKUP, '备份运维'),
     (MODULE_UPLOAD, '文件上传'),
     (MODULE_BUILDER, '页面构建'),
+    (MODULE_SITE, '站点管理'),
     (MODULE_OTHER, '其他'),
 ]
 
@@ -56,8 +60,11 @@ def audit_index():
     date_from = (request.args.get('date_from') or '').strip()
     date_to = (request.args.get('date_to') or '').strip()
     username = (request.args.get('username') or '').strip()
+    site_id = (request.args.get('site_id') or '').strip()
 
     query = AuditLog.query
+    if site_id.isdigit():
+        query = query.filter_by(site_id=int(site_id))
     if keyword:
         like = f'%{escape_like(keyword)}%'
         query = query.filter(db.or_(
@@ -113,6 +120,9 @@ def audit_index():
         date_from=date_from, date_to=date_to, username=username,
         module_choices=module_choices, op_type_choices=OP_TYPE_CHOICES,
         total_count=total_count, audit_maps=audit_maps,
+        sites=Site.active_sites(), site_id=site_id,
+        default_site_id=DEFAULT_SITE_ID,
+        op_labels=OP_TYPE_LABELS, module_labels=MODULE_LABELS,
     )
 
 
@@ -126,9 +136,12 @@ def audit_export():
     date_from = (request.args.get('date_from') or '').strip()
     date_to = (request.args.get('date_to') or '').strip()
     username = (request.args.get('username') or '').strip()
+    site_id = (request.args.get('site_id') or '').strip()
     fmt = (request.args.get('format') or 'csv').lower()
 
     query = AuditLog.query
+    if site_id.isdigit():
+        query = query.filter_by(site_id=int(site_id))
     if keyword:
         like = f'%{escape_like(keyword)}%'
         query = query.filter(db.or_(
@@ -159,16 +172,18 @@ def audit_export():
 
     # 最多导出 50,000 行，避免内存爆炸
     logs = query.order_by(AuditLog.created_at.desc()).limit(50000).all()
+    site_names = {s.id: s.name for s in Site.active_sites()}
 
     if fmt == 'csv' or True:
         buf = io.StringIO()
         buf.write('\ufeff')  # UTF-8 BOM，Excel 正确识别中文
         writer = csv.writer(buf)
-        writer.writerow(['操作时间', '账号', '昵称', '操作IP', '操作类型', '所属模块',
+        writer.writerow(['操作时间', '站点', '账号', '昵称', '操作IP', '操作类型', '所属模块',
                          '目标ID', '目标名称', 'User-Agent', '操作详情'])
         for log in logs:
             writer.writerow([
                 log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '',
+                site_names.get(log.site_id, str(log.site_id or 0)),
                 log.username or '',
                 log.nickname or '',
                 log.ip or '',
@@ -184,7 +199,8 @@ def audit_export():
         audit_log(OP_EXPORT, MODULE_AUDIT, None, None,
                   {'rows': len(logs), 'filename': filename, 'filters': {
                       'keyword': keyword, 'module': module, 'op_type': op_type,
-                      'date_from': date_from, 'date_to': date_to, 'username': username
+                      'date_from': date_from, 'date_to': date_to,
+                      'username': username, 'site_id': site_id
                   }})
         return send_file(
             io.BytesIO(data),

@@ -1,0 +1,104 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ (_('编辑站点') if site else _('新增站点')) }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ (_('编辑站点') if site else _('新增站点')) }}{% endblock %}
+{% set active_menu = 'site' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.site_index') }}">{{ _('站点管理') }}</a></li>
+<li class="breadcrumb-item active">{{ (_('编辑') if site else _('新增')) }}</li>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{{ url_for('admin.site_edit', sid=site.id) if site else url_for('admin.site_create') }}">
+  <div class="card card-primary card-outline">
+    <div class="card-header"><h3 class="card-title">{{ _('基本信息') }}</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label>{{ _('站点名称') }} <span class="text-danger">*</span></label>
+        <input type="text" name="name" class="form-control" required maxlength="100"
+               value="{{ (form.get('name') if form else None) or (site.name if site else '') }}">
+      </div>
+      <div class="form-group">
+        <label>{{ _('站点标识') }} <span class="text-danger">*</span></label>
+        <input type="text" name="slug" class="form-control" required maxlength="50"
+               pattern="[a-z0-9][a-z0-9_-]{1,49}"
+               value="{{ (form.get('slug') if form else None) or (site.slug if site else '') }}">
+        <small class="form-text text-muted">{{ _('小写字母/数字/连字符/下划线，长度 2-50 位，全局唯一') }}</small>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label>{{ _('独立域名') }}</label>
+            <input type="text" name="domain" class="form-control" maxlength="255"
+                   placeholder="www.example.com"
+                   value="{{ (form.get('domain') if form else None) or (site.domain if site else '') }}">
+            <small class="form-text text-muted">{{ _('按 Host 精确匹配；留空表示不使用独立域名') }}</small>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label>{{ _('子域标签') }}</label>
+            <input type="text" name="subdomain" class="form-control" maxlength="63"
+                   placeholder="news"
+                   value="{{ (form.get('subdomain') if form else None) or (site.subdomain if site else '') }}">
+            <small class="form-text text-muted">{{ _('配合泛解析 *.主域名，取 Host 首标签匹配') }}</small>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label>{{ _('站点状态') }}</label>
+            <select name="status" class="form-control">
+              {% set _status = (form.get('status') if form else None) or (site.status if site else 'open') %}
+              <option value="open" {{ 'selected' if _status == 'open' }}>{{ _('开放') }}</option>
+              <option value="closed" {{ 'selected' if _status == 'closed' }}>{{ _('维护中（前台 503）') }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-group">
+            <label>{{ _('站点主题') }}</label>
+            <select name="theme" class="form-control">
+              <option value="">{{ _('跟随全局默认主题') }}</option>
+              {% set _theme = (form.get('theme') if form else None) or (site.theme if site else '') %}
+              {% for t in themes %}
+              <option value="{{ t }}" {{ 'selected' if _theme == t }}>{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>{{ _('排序权重') }}</label>
+        <input type="number" name="sort_order" class="form-control" style="max-width:200px"
+               value="{{ (form.get('sort_order') if form else None) or (site.sort_order if site else 0) }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3 class="card-title">{{ _('站点级 SEO') }}</h3></div>
+    <div class="card-body">
+      <div class="form-group">
+        <label>{{ _('SEO 标题') }}</label>
+        <input type="text" name="seo_title" class="form-control" maxlength="255"
+               value="{{ (form.get('seo_title') if form else None) or (site.seo_title if site else '') }}">
+      </div>
+      <div class="form-group">
+        <label>{{ _('SEO 关键词') }}</label>
+        <input type="text" name="seo_keywords" class="form-control" maxlength="255"
+               value="{{ (form.get('seo_keywords') if form else None) or (site.seo_keywords if site else '') }}">
+      </div>
+      <div class="form-group">
+        <label>{{ _('SEO 描述') }}</label>
+        <textarea name="seo_description" class="form-control" rows="3" maxlength="500">{{ (form.get('seo_description') if form else None) or (site.seo_description if site else '') }}</textarea>
+      </div>
+    </div>
+    <div class="card-footer">
+      <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> {{ _('保存') }}</button>
+      <a href="{{ url_for('admin.site_index') }}" class="btn btn-default">{{ _('返回') }}</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

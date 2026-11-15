@@ -16,6 +16,8 @@ class Product(db.Model):
     __tablename__ = 'products'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.0 站群：冗余站点维度（由所属栏目同步）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     column_id = db.Column(db.Integer, db.ForeignKey('columns.id'),
                           nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)

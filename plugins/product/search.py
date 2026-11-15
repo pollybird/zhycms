@@ -33,6 +33,7 @@ def _product_doc(product, col, locale):
         content = f'{content}\n{specs_text}' if content else specs_text
     return {
         'id': product.id,
+        'site_id': int(product.site_id or 0),
         'title': title,
         'summary': t_field(product, 'summary', locale) or product.summary or '',
         'content': content,
@@ -60,6 +61,7 @@ def _product_item(product, col, loc):
         'id': product.id,
         'uid': f'{PRODUCT_TYPE}:{product.id}',
         'type': PRODUCT_TYPE,
+        'site_id': int(product.site_id or 0),
         'title': t_field(product, 'title', loc) or product.title or '',
         'summary': t_field(product, 'summary', loc) or '',
         'column_id': product.column_id,

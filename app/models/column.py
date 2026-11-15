@@ -12,8 +12,10 @@ class Column(db.Model):
     __tablename__ = 'columns'
 
     id = db.Column(db.Integer, primary_key=True)
+    # 站群模式：栏目归属站点（slug 站点内唯一）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     name = db.Column(db.String(100), nullable=False)
-    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(100), nullable=False, index=True)
     parent_id = db.Column(db.Integer, db.ForeignKey('columns.id'), nullable=True, index=True)
     type = db.Column(db.String(16), default='page', nullable=False)  # page/list/link
     summary = db.Column(db.Text)
@@ -56,6 +58,11 @@ class Column(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
+    # 站群模式：同一 slug 可在不同站点复用
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'slug', name='uq_column_site_slug'),
+    )
+
     parent = db.relationship(
         'Column', remote_side=[id], backref=db.backref('children', lazy='dynamic')
     )
@@ -94,9 +101,15 @@ class Column(db.Model):
         return ''
 
     @classmethod
-    def get_tree(cls, enabled_only=False, include_deleted=False):
-        """返回排好序的栏目列表（按 parent_id + sort_order + created_at 倒序）。"""
-        query = cls.query
+    def get_tree(cls, enabled_only=False, include_deleted=False, site_id=None):
+        """返回排好序的栏目列表（按 parent_id + sort_order + created_at 倒序）。
+
+        站群模式：默认仅返回当前站点栏目（默认站点 0 与现网行为一致）。
+        """
+        if site_id is None:
+            from ..sites import current_site_id
+            site_id = current_site_id()
+        query = cls.query.filter_by(site_id=site_id)
         if not include_deleted:
             query = query.filter_by(is_deleted=False)
         if enabled_only:
@@ -115,12 +128,14 @@ class Column(db.Model):
         invalidate_tree_cache() 失效当前请求，多 worker 无一致性问题。
         """
         from flask import g, has_app_context
+        from ..sites import current_site_id
         if not has_app_context():
             return cls.get_tree(enabled_only=enabled_only)
-        key = f'_col_tree_{bool(enabled_only)}'
+        sid = current_site_id()
+        key = f'_col_tree_{sid}_{bool(enabled_only)}'
         cached = g.get(key)
         if cached is None:
-            cached = cls.get_tree(enabled_only=enabled_only)
+            cached = cls.get_tree(enabled_only=enabled_only, site_id=sid)
             setattr(g, key, cached)
         return cached
 
@@ -129,7 +144,7 @@ class Column(db.Model):
         """失效当前请求的栏目树缓存（栏目增删改后调用）。"""
         from flask import g, has_app_context
         if has_app_context():
-            for k in cls._TREE_CACHE_KEYS:
+            for k in [k for k in g if k.startswith('_col_tree_')]:
                 g.pop(k, None)
 
     @classmethod

@@ -18,7 +18,9 @@ class Member(db.Model):
     __tablename__ = 'members'
 
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    # v3.2.0 站群：会员归属站点（member_scope=shared 时恒为 0，等价全局唯一）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
+    username = db.Column(db.String(64), nullable=False, index=True)
     password_hash = db.Column(db.String(255))  # 第三方/短信注册用户初始可为空
     nickname = db.Column(db.String(64))
     avatar = db.Column(db.String(255))
@@ -41,6 +43,10 @@ class Member(db.Model):
 
     oauths = db.relationship(
         'MemberOauth', backref='member', cascade='all, delete-orphan', lazy='dynamic'
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'username', name='uq_member_site_username'),
     )
 
     def set_password(self, raw):

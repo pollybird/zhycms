@@ -101,7 +101,9 @@ def list_pages_grouped():
         (p.scope, p.column_id) for p in pages
     }
     available_columns = {'page': [], 'list': []}
-    for col in Column.query.filter_by(is_deleted=False).order_by(
+    from ..sites import current_site_id
+    for col in Column.query.filter_by(
+            is_deleted=False, site_id=current_site_id()).order_by(
             Column.sort_order.desc(), Column.id.asc()).all():
         if col.type in ('page', 'list') and not col.is_parent:
             scopes = {'page': _B.SCOPE_PAGE, 'list': _B.SCOPE_LIST}

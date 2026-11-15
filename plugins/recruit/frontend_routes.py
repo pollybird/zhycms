@@ -22,6 +22,7 @@ from flask import (Blueprint, render_template, abort, redirect, request,
 from flask_babel import gettext as _gettext
 from app.extensions import db
 from app.models.setting import Setting
+from app.sites import current_site_id
 from app.plugin_system import plugin_enabled
 from app.utils.themes import theme_template, get_active_theme, THEMES_DIR
 from app.utils.uploads import save_upload_file
@@ -87,6 +88,7 @@ def job_list():
     jobs = RecruitJob.query.filter(
         RecruitJob.is_deleted == False,   # noqa: E712
         RecruitJob.is_enabled == True,    # noqa: E712
+        RecruitJob.site_id == current_site_id(),
     ).order_by(RecruitJob.sort_order.desc(), RecruitJob.id.desc()).all()
     open_jobs = [j for j in jobs if not j.is_expired()]
     closed_jobs = [j for j in jobs if j.is_expired()]
@@ -97,7 +99,8 @@ def job_list():
 
 
 def _get_open_job(jid):
-    job = RecruitJob.query.get_or_404(jid)
+    job = RecruitJob.query.filter_by(
+        id=jid, site_id=current_site_id()).first_or_404()
     if job.is_deleted or not job.is_enabled:
         abort(404)
     return job

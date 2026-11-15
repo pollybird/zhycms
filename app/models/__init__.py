@@ -1,11 +1,12 @@
 from .user import User, LoginLog
+from .site import Site, SiteScopedMixin, DEFAULT_SITE_ID
 from .column import Column, ColumnField, ColumnFieldValue
 from .article import Article, ArticleFieldValue
 from .fragment import Fragment, FragmentGroup
 # 自定义表单 v2.3.0 起转为内置插件 plugins/form，模型由插件注册
 from .setting import Setting
 from .rbac import (
-    Role, Permission, RolePermission, UserRole, UserColumnPermission,
+    Role, Permission, RolePermission, UserRole, UserColumnPermission, UserSitePermission,
     PRESET_ROLES, PERMISSION_DEFS,
     ROLE_SUPER_ADMIN, ROLE_CONTENT_AUDITOR, ROLE_CONTENT_EDITOR, ROLE_READONLY_VIEWER,
 )
@@ -13,6 +14,7 @@ from .audit import (
     AuditLog, OP_TYPE_CHOICES, MODULE_USER, MODULE_ROLE, MODULE_COLUMN, MODULE_ARTICLE,
     MODULE_FRAGMENT, MODULE_FORM, MODULE_FORM_SUBMISSION, MODULE_SETTING,
     MODULE_AUDIT, MODULE_BACKUP, MODULE_UPLOAD, MODULE_OTHER,
+    MODULE_SITE,
     OP_LOGIN, OP_LOGOUT, OP_CREATE, OP_UPDATE, OP_DELETE, OP_PUBLISH, OP_ARCHIVE,
     OP_REVIEW_PASS, OP_REVIEW_REJECT, OP_BATCH, OP_ROLLBACK, OP_CONFIG_CHANGE,
     OP_USER_MANAGE, OP_BACKUP_CREATE, OP_BACKUP_RESTORE, OP_EXPORT, OP_UPLOAD, OP_OTHER,
@@ -45,12 +47,14 @@ if 'search_index' not in _db.metadata.tables:
 
 __all__ = [
     'User', 'LoginLog',
+    'Site', 'SiteScopedMixin', 'DEFAULT_SITE_ID',
     'Column', 'ColumnField', 'ColumnFieldValue',
     'Article', 'ArticleFieldValue',
     'Fragment', 'FragmentGroup',
     'Setting',
     # RBAC
     'Role', 'Permission', 'RolePermission', 'UserRole', 'UserColumnPermission',
+    'UserSitePermission',
     'PRESET_ROLES', 'PERMISSION_DEFS',
     'ROLE_SUPER_ADMIN', 'ROLE_CONTENT_AUDITOR', 'ROLE_CONTENT_EDITOR', 'ROLE_READONLY_VIEWER',
     # Audit
@@ -58,7 +62,7 @@ __all__ = [
     'MODULE_USER', 'MODULE_ROLE', 'MODULE_COLUMN', 'MODULE_ARTICLE',
     'MODULE_FRAGMENT', 'MODULE_FORM', 'MODULE_FORM_SUBMISSION',
     'MODULE_SETTING', 'MODULE_AUDIT', 'MODULE_BACKUP', 'MODULE_UPLOAD', 'MODULE_OTHER',
-    'MODULE_BUILDER',
+    'MODULE_BUILDER', 'MODULE_SITE',
     'OP_LOGIN', 'OP_LOGOUT', 'OP_CREATE', 'OP_UPDATE', 'OP_DELETE',
     'OP_PUBLISH', 'OP_ARCHIVE', 'OP_REVIEW_PASS', 'OP_REVIEW_REJECT',
     'OP_BATCH', 'OP_ROLLBACK', 'OP_CONFIG_CHANGE', 'OP_USER_MANAGE',

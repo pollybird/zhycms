@@ -16,6 +16,8 @@ from flask_babel import gettext as _gettext
 
 from app.extensions import db
 from app.admin import admin_bp
+from app.sites import current_site_id
+from app.models.setting import Setting
 from app.models.audit import OP_UPDATE, OP_DELETE, OP_CREATE
 from app.models.column import Column
 from app.utils.helpers import permission_required, audit_log, clear_content_cache
@@ -39,6 +41,14 @@ def _gate(view):
 
 # ============ 会员列表 / 编辑 / 删除 ============
 
+
+def _member_site_scope():
+    """v3.2.0 站群：会员管理列表/唯一性校验的站点范围。"""
+    if Setting.get('member_scope') == 'isolated':
+        return current_site_id()
+    return 0
+
+
 @admin_bp.route('/members')
 @_gate
 @permission_required('member:manage')
@@ -47,7 +57,7 @@ def member_index():
     keyword = (request.args.get('keyword') or '').strip()
     status = (request.args.get('status') or '').strip()
 
-    query = Member.query.filter_by(is_deleted=False)
+    query = Member.query.filter_by(is_deleted=False, site_id=_member_site_scope())
     if keyword:
         # v3.1.9 VULN-010：转义 LIKE 通配符
         like = f'%{escape_like(keyword)}%'
@@ -76,7 +86,7 @@ def member_index():
 @permission_required('member:manage')
 def member_edit(mid):
     member = db.session.get(Member, mid)
-    if member is None or member.is_deleted:
+    if member is None or member.is_deleted or member.site_id != _member_site_scope():
         abort(404)
 
     if request.method == 'POST':
@@ -90,11 +100,13 @@ def member_edit(mid):
             flash(_gettext('昵称必填'), 'danger')
         elif phone and Member.query.filter(
                 Member.phone == phone, Member.id != member.id,
-                Member.is_deleted == False).first():
+                Member.is_deleted == False,
+                Member.site_id == _member_site_scope()).first():
             flash(_gettext('手机号已被其他会员使用'), 'danger')
         elif email and Member.query.filter(
                 Member.email == email, Member.id != member.id,
-                Member.is_deleted == False).first():
+                Member.is_deleted == False,
+                Member.site_id == _member_site_scope()).first():
             flash(_gettext('邮箱已被其他会员使用'), 'danger')
         elif new_password and len(new_password) < 6:
             flash(_gettext('新密码至少 6 位'), 'danger')
@@ -175,7 +187,8 @@ def member_columns():
                 visible_ids.add(int(raw))
             except (TypeError, ValueError):
                 continue
-        columns = Column.query.filter_by(is_deleted=False).all()
+        columns = Column.query.filter_by(
+            is_deleted=False, site_id=current_site_id()).all()
         changed = 0
         for col in columns:
             flag = col.id in visible_ids

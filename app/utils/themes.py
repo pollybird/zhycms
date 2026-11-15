@@ -1,12 +1,16 @@
 """主题与模板辅助工具：管理多主题、列出可用模板、主题包上传校验。"""
 import json
+import logging
 import os
 import re
 from functools import lru_cache
 
 from flask import current_app
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..models.setting import Setting
+
+logger = logging.getLogger(__name__)
 
 # 模板根目录（app/frontend/templates/themes）
 THEMES_DIR = os.path.join(
@@ -134,8 +138,19 @@ TEMPLATE_CATEGORIES = {
 
 
 def get_active_theme():
-    """获取当前启用的主题名称。"""
-    theme = (Setting.get('site_theme') or 'default').strip()
+    """获取当前启用的主题名称（v3.2.0：站点主题 → 全局主题 fallback）。"""
+    theme = ''
+    try:
+        from ..sites import current_site
+        site = current_site()
+        if site is not None and site.theme:
+            theme = site.theme.strip()
+    except (ImportError, RuntimeError, SQLAlchemyError) as e:
+        # 站群不可用（迁移/初始化/无请求上下文）时回退全局主题
+        logger.warning('读取站点主题失败，回退全局主题：%s', e)
+        theme = ''
+    if not theme:
+        theme = (Setting.get('site_theme') or 'default').strip()
     # 校验主题目录存在
     if not os.path.isdir(os.path.join(THEMES_DIR, theme)):
         return 'default'

@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.1.10-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.0-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-483%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-498%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.1.10**（纵深防御与合规加固：模板审计下标拼接检测、加密 fail-open 高可见度告警、CORS 通配符收紧、后台管理员 12 位密码策略、CI Actions pin 完整 SHA、dependabot 依赖治理、TestingConfig 密钥防护；无迁移、无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.0**（站群版：一个实例 + 一个库按站点切分内容，支持独立域名与泛解析子域、后台站点管理与切换、站点化配置/主题/搜索/缓存、会员共享或独立、插件站群 SDK；默认站点 `site_id=0` 单站点部署零感知；数据库迁移 `0012`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -106,11 +106,16 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **前台会员体系** | 社区插件 `member`：注册/登录/资料/改密/找回密码、微信/QQ 一键登录、短信验证码登录、注册协议、栏目会员可见性 | v2.6.4 |
 | **插件依赖治理** | `manifest.json` 支持 `requires`/`extends`/`min_core_version`，启用强校验 + 禁用反向依赖校验 | v2.6.4 |
 | **可视化页面构建器** | 自研轻量拖拽构建器：24 个 Bootstrap4 组件、四页面类型（首页/单页/列表/文章详情）、草稿/发布/修订回滚、中英双语与会员可见性、iframe 内服务端真实渲染；插件可注册自有组件并贡献默认布局片段（启用即开箱即用） | v3.0.0 |
+| **站群模式（多站点）** | 一个后端实例 + 一个库按站点切分内容：独立域名 / 泛解析子域解析、后台站点 CRUD 与切换、站点级配置/主题/SEO、搜索与缓存按站隔离、会员共享或独立、插件站群 SDK；默认站点 0 单站点部署零感知 | v3.2.0 |
 | **数据库迁移插件** | 内置插件 `db_migrator`（默认不启用）：后台一键把 SQLite 开发库迁移到 MySQL/PostgreSQL，建表+数据复制+序列重置，目标库非空保护，支持迁移后免重启热切换 | v3.1.0 |
 
 ---
 
 ## 版本速览
+
+### v3.2.0（2026-11-15）
+
+站群版。新增站点注册表 `sites` 与 `site_id` 内容维度：请求按「后台切换 → 精确域名 → 子域标签 → 默认站点 0」解析站点，栏目/文章/碎片/配置/会员/内置插件内容全部按站隔离；后台新增站点管理（CRUD + 切换器）与站点级权限 `site:manage` / `UserSitePermission`；站点化配置、主题、sitemap、全站搜索与缓存命名空间；会员支持共享（默认，与现网一致）或独立；插件 SDK 提供 `SiteScopedMixin` / `current_site_id()` / `site_filter()`。默认站点 `site_id=0` 恒等变换，单站点部署 URL 与行为完全不变。数据库迁移 `0012`，无新增依赖。
 
 ### v3.1.10（2026-11-09）
 

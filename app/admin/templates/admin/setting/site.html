@@ -36,6 +36,16 @@
             <label>{{ _('关闭原因（站点关闭时显示）') }}</label>
             <textarea name="site_close_reason" rows="2" class="form-control">{{ settings.site_close_reason }}</textarea>
           </div>
+          {% if current_user.is_super %}
+          <div class="form-group">
+            <label>{{ _('前台会员归属') }} <span class="badge badge-secondary">{{ _('全局') }}</span></label>
+            <select name="member_scope" class="form-control">
+              <option value="shared" {{ 'selected' if settings.member_scope == 'shared' }}>{{ _('全站共享（推荐，会员跨站点通用）') }}</option>
+              <option value="isolated" {{ 'selected' if settings.member_scope == 'isolated' }}>{{ _('按站点独立（各站会员互不相通）') }}</option>
+            </select>
+            <small class="form-text text-muted">{{ _('切换为「按站点独立」后，存量会员保留在默认站点，新注册会员归属当前站点。') }}</small>
+          </div>
+          {% endif %}
           <div class="callout callout-info py-2 px-3" style="font-size:14px;">
             <b>{{ _('前台主题') }}</b>{{ _('的切换入口已迁移到：') }}
             <a href="{{ url_for('admin.theme_index') }}">

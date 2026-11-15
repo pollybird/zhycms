@@ -8,9 +8,23 @@ from sqlalchemy.exc import IntegrityError
 
 from ..extensions import db
 from ..models.user import User
-from ..models.rbac import Role, UserRole, UserColumnPermission
+from ..models.rbac import Role, UserRole, UserColumnPermission, UserSitePermission
 from ..utils.helpers import audit_log
 from ..models.audit import OP_CREATE, OP_UPDATE, MODULE_USER
+
+
+def _apply_site_permissions(user, form_data):
+    """v3.2.0 站群：按表单重建账号的站点专属权限（每站可审核/可发布）。"""
+    UserSitePermission.query.filter_by(user_id=user.id).delete()
+    site_ids = [int(x) for x in form_data.getlist('site_ids[]') if x.isdigit()]
+    can_review_ids = set(form_data.getlist('site_can_review_ids[]'))
+    can_publish_ids = set(form_data.getlist('site_can_publish_ids[]'))
+    for sid in site_ids:
+        db.session.add(UserSitePermission(
+            user_id=user.id, site_id=sid,
+            can_review=str(sid) in can_review_ids,
+            can_publish=str(sid) in can_publish_ids,
+        ))
 
 
 def _requested_super(form_data):
@@ -91,6 +105,9 @@ def create_user(*, form_data):
             can_publish=str(cid) in can_publish_ids,
         ))
 
+    # 站点专属权限（v3.2.0 站群）
+    _apply_site_permissions(user, form_data)
+
     try:
         db.session.commit()
     except IntegrityError:
@@ -166,6 +183,9 @@ def update_user(user, *, form_data):
             can_review=str(cid) in can_review_ids,
             can_publish=str(cid) in can_publish_ids,
         ))
+
+    # 站点专属权限（v3.2.0 站群）
+    _apply_site_permissions(user, form_data)
 
     db.session.commit()
     _flash(_gettext('账号保存成功'), 'success')

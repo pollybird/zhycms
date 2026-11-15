@@ -8,3 +8,5 @@ from . import users  # noqa: F401
 from . import audit  # noqa: F401
 from . import backup  # noqa: F401
 from . import themes  # noqa: F401
+# v3.2.0 站群：站点管理
+from . import sites  # noqa: F401

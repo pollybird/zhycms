@@ -27,6 +27,7 @@ from ...models.workflow import (
 from ...utils.helpers import (
     permission_required, audit_log, clear_content_cache, safe_int,
 )
+from ...sites import current_site_id
 from ...utils.db_utils import escape_like, LIKE_ESCAPE
 from ...utils.search import reindex_article
 from ...utils.word_import import convert_docx_to_html
@@ -47,7 +48,7 @@ from .. import admin_bp
 # ============================================================
 
 def _col_or_404(cid):
-    col = Column.query.get_or_404(cid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     if col.type != 'list':
         flash(_gettext('该栏目不是列表栏目，无法管理文章'), 'warning')
         abort(400) if False else None
@@ -66,8 +67,8 @@ def _build_tree_with_depth(columns, parent_id=None, depth=0):
 
 def _get_article(cid, aid):
     """取文章并校验归属栏目与删除状态（工作流动作共用）。"""
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
+    article = Article.query.filter_by(id=aid, site_id=current_site_id()).first_or_404()
     if article.column_id != col.id or article.is_deleted:
         abort(404)
     return article
@@ -94,7 +95,7 @@ def _run_transition(cid, aid, action):
 @admin_bp.route('/columns/<int:cid>/articles')
 @permission_required('content:edit', column_id_arg='cid')
 def article_index(cid):
-    col = Column.query.get_or_404(cid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     if col.type != 'list':
         flash(_gettext('该栏目不是列表栏目，无法管理文章'), 'warning')
         return redirect(url_for('admin.column_index'))
@@ -103,7 +104,7 @@ def article_index(cid):
     keyword = (request.args.get('keyword') or '').strip()
     status = request.args.get('status', '')
 
-    query = Article.query.filter_by(column_id=cid, is_deleted=False)
+    query = Article.query.filter_by(column_id=cid, is_deleted=False, site_id=current_site_id())
     if keyword:
         # v3.1.9 VULN-010：转义 LIKE 通配符
         query = query.filter(Article.title.like(
@@ -121,7 +122,7 @@ def article_index(cid):
     ).paginate(page=page, per_page=15, error_out=False)
 
     # 批量移动目标栏目：当前用户可见的列表栏目（树形带缩进）
-    cols = Column.query.filter_by(type='list', is_deleted=False).all()
+    cols = Column.query.filter_by(type='list', is_deleted=False, site_id=current_site_id()).all()
     if not getattr(current_user, 'is_super', False):
         allowed = current_user.get_allowed_column_ids()
         if allowed is not None:
@@ -143,7 +144,7 @@ def article_index(cid):
 @admin_bp.route('/columns/<int:cid>/articles/create', methods=['GET', 'POST'])
 @permission_required('content:create', column_id_arg='cid')
 def article_create(cid):
-    col = Column.query.get_or_404(cid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     if col.type != 'list':
         flash(_gettext('该栏目不是列表栏目'), 'warning')
         return redirect(url_for('admin.column_index'))
@@ -178,8 +179,8 @@ def article_create(cid):
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/edit', methods=['GET', 'POST'])
 @permission_required('content:edit', column_id_arg='cid')
 def article_edit(cid, aid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
+    article = Article.query.filter_by(id=aid, site_id=current_site_id()).first_or_404()
     if article.column_id != col.id or article.is_deleted:
         abort(404)
 
@@ -254,8 +255,8 @@ def article_archive(cid, aid):
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/versions')
 @permission_required('content:rollback', column_id_arg='cid')
 def article_versions(cid, aid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
+    article = Article.query.filter_by(id=aid, site_id=current_site_id()).first_or_404()
     if article.column_id != col.id or article.is_deleted:
         abort(404)
     page = max(safe_int(request.args.get('page'), 1), 1)
@@ -270,8 +271,8 @@ def article_versions(cid, aid):
                 methods=['POST'])
 @permission_required('content:rollback', column_id_arg='cid')
 def article_rollback(cid, aid, vid):
-    col = Column.query.get_or_404(cid)
-    article = Article.query.get_or_404(aid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
+    article = Article.query.filter_by(id=aid, site_id=current_site_id()).first_or_404()
     v = ArticleVersion.query.get_or_404(vid)
     if article.column_id != col.id or article.is_deleted or v.article_id != article.id:
         abort(404)
@@ -311,7 +312,7 @@ def article_rollback(cid, aid, vid):
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/delete', methods=['POST'])
 @permission_required('content:delete', column_id_arg='cid')
 def article_delete(cid, aid):
-    article = Article.query.get_or_404(aid)
+    article = Article.query.filter_by(id=aid, site_id=current_site_id()).first_or_404()
     article.is_deleted = True
     article.updated_by = getattr(current_user, 'id', None)
     db.session.commit()
@@ -324,7 +325,7 @@ def article_delete(cid, aid):
 @admin_bp.route('/columns/<int:cid>/articles/<int:aid>/toggle', methods=['POST'])
 @permission_required('content:publish', column_id_arg='cid')
 def article_toggle(cid, aid):
-    article = Article.query.get_or_404(aid)
+    article = Article.query.filter_by(id=aid, site_id=current_site_id()).first_or_404()
     article.is_enabled = not article.is_enabled
     # 同步回 status：启用即视为已发布
     if article.is_enabled:
@@ -410,7 +411,7 @@ def article_batch(cid):
             flash(_gettext('目标栏目无效'), 'danger')
             return redirect(url_for('admin.article_index', cid=cid))
         # 目标栏目必须是 list 类型且操作者有权限
-        target_col = Column.query.filter_by(id=target_cid, is_deleted=False).first()
+        target_col = Column.query.filter_by(id=target_cid, is_deleted=False, site_id=current_site_id()).first()
         if target_col is None or target_col.type != 'list':
             flash(_gettext('目标栏目不存在或不是列表栏目'), 'danger')
             return redirect(url_for('admin.article_index', cid=cid))
@@ -454,7 +455,7 @@ def article_batch(cid):
 @permission_required('column:manage')
 def api_list_columns():
     """给批量移动、用户权限分配等场景返回可选列表栏目（含层级）。"""
-    cols = Column.query.filter_by(type='list', is_deleted=False).all()
+    cols = Column.query.filter_by(type='list', is_deleted=False, site_id=current_site_id()).all()
     # 过滤当前用户可见的栏目
     u = current_user
     if not getattr(u, 'is_super', False):
@@ -474,7 +475,7 @@ def api_list_columns():
 @admin_bp.route('/columns/<int:cid>/articles/import-word', methods=['POST'])
 @permission_required('content:create', column_id_arg='cid')
 def article_import_word(cid):
-    Column.query.get_or_404(cid)
+    Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     file_storage = request.files.get('docx')
     if not file_storage or not file_storage.filename:
         return jsonify({'error': '未选择文件'}), 400

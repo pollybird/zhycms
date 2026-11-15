@@ -36,6 +36,10 @@ class User(UserMixin, db.Model):
     column_permissions = db.relationship(
         'UserColumnPermission', backref='user', cascade='all, delete-orphan', lazy='dynamic'
     )
+    # 关联：站点专属权限（v3.2.0 站群模式）
+    site_permissions = db.relationship(
+        'UserSitePermission', backref='user', cascade='all, delete-orphan', lazy='dynamic'
+    )
 
     def set_password(self, raw):
         self.password_hash = generate_password_hash(raw)

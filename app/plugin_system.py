@@ -748,15 +748,25 @@ def frontend_guard():
     return None
 
 
-def collect_sitemap_urls():
-    """sitemap.xml 聚合：启用插件贡献的 URL。"""
+def collect_sitemap_urls(site_id=None):
+    """sitemap.xml 聚合：启用插件贡献的 URL。
+
+    v3.2.0 站群：插件钩子可选接收 `site_id` 关键字（未声明则按原签名调用），
+    保证既有插件零改动兼容。
+    """
+    import inspect
     current = enabled_slugs()
     urls = []
     for rec in _registry:
         if rec.slug not in current or rec.instance is None:
             continue
         try:
-            urls.extend(rec.instance.get_sitemap_urls() or [])
+            hook = rec.instance.get_sitemap_urls
+            accepts_site = 'site_id' in inspect.signature(hook).parameters
+            if site_id is not None and accepts_site:
+                urls.extend(hook(site_id=site_id) or [])
+            else:
+                urls.extend(hook() or [])
         except Exception as e:
             # 插件隔离：sitemap 钩子异常时跳过该插件
             logger.warning('插件 %s sitemap URL 采集失败，已跳过：%s', rec.slug, e)

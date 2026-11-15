@@ -38,6 +38,7 @@ def _job_doc(job, locale):
         return None
     return {
         'id': job.id,
+        'site_id': int(job.site_id or 0),
         'title': title,
         'summary': _job_summary(job, locale),
         'content': t_field(job, 'description', locale) or job.description or '',
@@ -54,6 +55,7 @@ def _job_item(job, loc):
         'id': job.id,
         'uid': f'{RECRUIT_TYPE}:{job.id}',
         'type': RECRUIT_TYPE,
+        'site_id': int(job.site_id or 0),
         'title': t_field(job, 'title', loc) or job.title or '',
         'summary': _job_summary(job, loc),
         'column_id': None,

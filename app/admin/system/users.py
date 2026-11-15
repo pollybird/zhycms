@@ -10,8 +10,10 @@ from flask_login import current_user
 from ...extensions import db
 from ...models.user import User
 from ...models.column import Column
+from ...sites import current_site_id
+from ...models.site import Site
 from ...models.rbac import (
-    Role, Permission, UserRole, UserColumnPermission,
+    Role, Permission, UserRole, UserColumnPermission, UserSitePermission,
     ROLE_SUPER_ADMIN, ROLE_CONTENT_EDITOR,
 )
 from ...utils.helpers import permission_required, audit_log
@@ -44,8 +46,14 @@ def _get_roles_for_form():
 
 
 def _get_all_columns_tree():
-    cols = Column.query.filter_by(is_deleted=False).all()
+    cols = Column.query.filter_by(
+        is_deleted=False, site_id=current_site_id()).all()
     return _build_tree_with_depth(cols)
+
+
+def _get_sites_for_form():
+    """站点专属权限可选站点（v3.2.0 站群）。"""
+    return Site.active_sites()
 
 
 # ============================================================
@@ -115,6 +123,7 @@ def user_create():
         'admin/users/form.html',
         user=None, roles=_get_roles_for_form(),
         columns=_get_all_columns_tree(),
+        sites=_get_sites_for_form(),
     )
 
 
@@ -143,15 +152,24 @@ def user_edit(uid):
     user_column_ids = {p.column_id for p in col_perms}
     can_review_map = {p.column_id: p.can_review for p in col_perms}
     can_publish_map = {p.column_id: p.can_publish for p in col_perms}
+    # 当前分配的站点权限（v3.2.0 站群）
+    site_perms = UserSitePermission.query.filter_by(user_id=user.id).all()
+    user_site_ids = {p.site_id for p in site_perms}
+    site_review_map = {p.site_id: p.can_review for p in site_perms}
+    site_publish_map = {p.site_id: p.can_publish for p in site_perms}
 
     return render_template(
         'admin/users/form.html',
         user=user, roles=_get_roles_for_form(),
         columns=_get_all_columns_tree(),
+        sites=_get_sites_for_form(),
         user_role_ids=user_role_ids,
         user_column_ids=user_column_ids,
         can_review_map=can_review_map,
         can_publish_map=can_publish_map,
+        user_site_ids=user_site_ids,
+        site_review_map=site_review_map,
+        site_publish_map=site_publish_map,
     )
 
 

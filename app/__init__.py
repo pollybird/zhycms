@@ -525,12 +525,10 @@ def _maybe_rebuild_search_index(app):
         from .models.setting import Setting
         if Setting.get('search_engine', _S.DEFAULT_ENGINE) != _S.ENGINE_TANTIVY:
             return
-        from .utils.search import _get_index_root, rebuild_all
-        from .utils.i18n_content import get_default_locale
+        from .utils.search import _get_index_root, rebuild_all, index_needs_rebuild
         root = _get_index_root()
-        meta = os.path.join(root, get_default_locale(), 'meta.json')
-        if os.path.exists(meta):
-            return  # 索引已存在，无需重建
+        if not index_needs_rebuild():
+            return  # 索引已存在且 schema 版本匹配，无需重建
         building = os.path.join(root, '.tantivy_building')
         try:
             fd = os.open(building, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -781,6 +779,7 @@ def create_app(config_name=None):
         from .models.fragment import Fragment
         from .models.column import Column
         from .utils.themes import get_active_theme
+        from .sites import current_site, current_site_id, accessible_sites
 
         settings = Setting.get_dict()
         fragments = Fragment.get_dict()
@@ -794,6 +793,10 @@ def create_app(config_name=None):
             current_user=current_user,
             current_theme=theme,
             theme_base=f'themes/{theme}/base.html',
+            # v3.2.0 站群：当前站点与后台可切换站点列表
+            current_site=current_site(),
+            current_site_id=current_site_id(),
+            admin_sites=accessible_sites(current_user) if current_user.is_authenticated else [],
             # CMS 自身标识（后台使用，与前台企业名称/版权严格区分，固定不可改）
             cms_name=Setting.CMS_NAME,
             cms_copyright=Setting.CMS_COPYRIGHT,
@@ -816,6 +819,11 @@ def create_app(config_name=None):
     # v2.6.1：蓝图注册 + 插件加载 + 错误处理（抽离至 app/blueprints.py）
     from .blueprints import register_blueprints
     register_blueprints(app)
+
+    # v3.2.0 站群：站点解析必须先于任何内容查询与模板渲染
+    # （app 级 before_request 先于蓝图级执行，保证 check_site_status 拿到站点）
+    from .sites import select_site
+    app.before_request(select_site)
 
     # 应用 url_for 动态前缀（模块5：路由修改即时生效）
     _patch_jinja_url_for(app)

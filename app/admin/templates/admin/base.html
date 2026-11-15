@@ -42,6 +42,23 @@
     </ul>
 
     <ul class="navbar-nav ml-auto">
+      {% if admin_sites and admin_sites|length > 1 %}
+      <li class="nav-item dropdown">
+        <a class="nav-link" data-toggle="dropdown" href="#">
+          <i class="fas fa-building"></i> {{ current_site.name if current_site else _('默认站点') }}
+        </a>
+        <div class="dropdown-menu dropdown-menu-right">
+          {% for s in admin_sites %}
+          <form method="post" action="{{ url_for('admin.site_switch') }}" class="m-0">
+            <input type="hidden" name="site_id" value="{{ s.id }}">
+            <button type="submit" class="dropdown-item {{ 'active' if s.id == current_site_id }}">
+              {{ s.name }}{% if s.is_default %} <span class="badge badge-info">{{ _('默认') }}</span>{% endif %}
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+      </li>
+      {% endif %}
       {% set _locales = available_locales() %}
       {% if _locales %}
       <li class="nav-item dropdown">
@@ -206,6 +223,13 @@
                   <i class="far fa-circle nav-icon"></i><p>{{ _('网站设置') }}</p>
                 </a>
               </li>
+              {% if current_user.has_permission('site:manage') %}
+              <li class="nav-item">
+                <a href="{{ url_for('admin.site_index') }}" class="nav-link {{ 'active' if active_menu == 'site' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('站点管理') }}</p>
+                </a>
+              </li>
+              {% endif %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_seo') }}" class="nav-link {{ 'active' if active_menu == 'setting_seo' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('SEO 默认配置') }}</p>
