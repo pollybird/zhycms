@@ -12,11 +12,14 @@ import re
 from flask import (render_template, redirect, url_for, request, flash, session,
                    current_app)
 from flask_babel import gettext as _gettext
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from ...extensions import db, cache
 from ...models.site import Site, DEFAULT_SITE_ID
 from ...models.column import Column
+from ...models.article import Article
+from ...models.fragment import Fragment
 from ...models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_SITE
 from ...utils.helpers import permission_required, audit_log
 from ...utils.themes import list_theme_records
@@ -25,7 +28,13 @@ from .. import admin_bp
 
 SLUG_RE = re.compile(r'^[a-z0-9][a-z0-9_-]{1,49}$')
 SUBDOMAIN_RE = re.compile(r'^[a-z0-9][a-z0-9-]{0,62}$')
-DOMAIN_RE = re.compile(r'^[a-z0-9.-]{1,253}$')
+
+# 删除站点前检查的插件内容表（存在且有 site_id 时计数）
+_PLUGIN_SITE_TABLES = (
+    ('表单', 'forms'), ('友情链接', 'friend_links'), ('产品', 'products'),
+    ('招聘职位', 'recruit_jobs'), ('轮播组', 'banner_groups'),
+    ('轮播图', 'banners'), ('会员', 'members'),
+)
 
 
 def _theme_slugs():
@@ -45,8 +54,8 @@ def _validate(data, site=None):
     errors = []
     name = _clean(data.get('name'))
     slug = _clean(data.get('slug')).lower()
-    domain = _clean(data.get('domain')).lower().rstrip('.')
-    subdomain = _clean(data.get('subdomain')).lower()
+    domain = Site.normalize_host(data.get('domain'))
+    subdomain = Site.normalize_host(data.get('subdomain'))
     status = _clean(data.get('status')) or 'open'
     theme = _clean(data.get('theme'))
 
@@ -54,7 +63,7 @@ def _validate(data, site=None):
         errors.append(_gettext('站点名称不能为空'))
     if not SLUG_RE.match(slug):
         errors.append(_gettext('站点标识只能包含小写字母/数字/连字符/下划线，长度 2-50 位'))
-    if domain and not DOMAIN_RE.match(domain):
+    if domain and not Site.is_valid_domain(domain):
         errors.append(_gettext('域名格式不合法（示例：www.example.com）'))
     if subdomain and not SUBDOMAIN_RE.match(subdomain):
         errors.append(_gettext('子域标签格式不合法（示例：news）'))
@@ -62,6 +71,14 @@ def _validate(data, site=None):
         status = 'open'
     if theme and theme not in _theme_slugs():
         errors.append(_gettext('主题目录不存在：themes/{}').format(theme))
+
+    # v3.2.1：sort_order 表单层解析，非法值给出提示并兜底 0（不再延迟到 DB 报错）
+    sort_raw = _clean(data.get('sort_order'))
+    try:
+        sort_order = int(sort_raw) if sort_raw else 0
+    except ValueError:
+        errors.append(_gettext('排序值必须为整数'))
+        sort_order = 0
 
     # 唯一性校验（排除自身）
     if slug:
@@ -93,7 +110,7 @@ def _validate(data, site=None):
         'seo_title': _clean(data.get('seo_title'))[:255] or None,
         'seo_keywords': _clean(data.get('seo_keywords'))[:255] or None,
         'seo_description': _clean(data.get('seo_description'))[:500] or None,
-        'sort_order': data.get('sort_order') or 0,
+        'sort_order': sort_order,
     }
     return errors, cleaned
 
@@ -105,6 +122,32 @@ def _invalidate_all():
         cache.clear()
     except Exception as e:
         current_app.logger.warning('站点变更后清空前台缓存失败：%s', e)
+
+
+def _site_content_counts(site_id):
+    """统计站点下的内容量（核心内容 + 已安装插件的 site_id 表）。
+
+    删除站点前用于拦截，避免软删除站点后留下无法访问的孤儿内容。
+    """
+    counts = {}
+    try:
+        for label, model in (('栏目', Column), ('文章', Article), ('碎片', Fragment)):
+            n = db.session.query(model).filter(model.site_id == site_id).count()
+            if n:
+                counts[label] = n
+        insp = inspect(db.engine)
+        for label, table in _PLUGIN_SITE_TABLES:
+            if not insp.has_table(table):
+                continue
+            n = db.session.execute(
+                text(f'SELECT COUNT(*) FROM {table} WHERE site_id = :sid'),
+                {'sid': site_id}).scalar()
+            if n:
+                counts[label] = n
+    except SQLAlchemyError as e:
+        current_app.logger.warning('统计站点 %s 内容量失败：%s', site_id, e)
+        return {}
+    return counts
 
 
 @admin_bp.route('/sites')
@@ -197,9 +240,12 @@ def site_delete(sid):
     if site.id == DEFAULT_SITE_ID or site.is_default:
         flash(_gettext('默认站点不可删除'), 'danger')
         return redirect(url_for('admin.site_index'))
-    has_content = Column.query.filter_by(site_id=site.id, is_deleted=False).first()
-    if has_content is not None:
-        flash(_gettext('该站点下仍有栏目，请先删除栏目后再删除站点'), 'danger')
+    # v3.2.1：删除前检查全部内容（栏目/文章/碎片/插件内容），避免留下孤儿数据
+    counts = _site_content_counts(site.id)
+    if counts:
+        detail = '、'.join(f'{k} {v} 条' for k, v in counts.items())
+        flash(_gettext('该站点下仍有内容（{}），请先清空后再删除站点').format(detail),
+              'danger')
         return redirect(url_for('admin.site_index'))
 
     site.is_deleted = True

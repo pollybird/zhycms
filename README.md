@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.2.0-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.1-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-498%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-516%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.0**（站群版：一个实例 + 一个库按站点切分内容，支持独立域名与泛解析子域、后台站点管理与切换、站点化配置/主题/搜索/缓存、会员共享或独立、插件站群 SDK；默认站点 `site_id=0` 单站点部署零感知；数据库迁移 `0012`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.1**（站群缺陷修复版：闭环站点权限 `?site=` 绕过、关闭站点未覆盖 API/插件、独立会员会话跨站、站点 SEO 不生效、0012 降级半回滚等问题；新增迁移 `0013`（子域唯一索引），无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -112,6 +112,10 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.2.1（2026-11-16）
+
+站群缺陷修复。闭环第三方测试报告的 P0/P1/P2 共 5 项：站点权限 `?site=` 越权（解析层校验 + 后台统一守卫）、`status=closed` 未覆盖 API 与插件前台蓝本（提升为 app 级校验，API 返回 503 JSON、healthz 固定 200）、独立会员会话跨站有效（`current_member()` 校验站点）、站点 SEO 字段不生效（前台与 API 接入站点 SEO 回退链）、`0012` 降级半回滚（DDL 前预检跨站重复）；另加固子域唯一约束、域名校验、删站内容检查、`accessible_sites` N+1、JWT 首启告警等边界项。新增迁移 `0013`，无新增依赖。
 
 ### v3.2.0（2026-11-15）
 

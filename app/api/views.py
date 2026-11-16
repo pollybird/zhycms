@@ -309,22 +309,31 @@ def _get_enabled_column(slug):
 @api_read_limit
 @api_cache('site')
 def site_info():
-    from ..sites import current_site_id
+    from ..sites import current_site, current_site_id
     s = Setting.get_dict()
+    site = current_site()
     root_columns = Column.query.filter_by(
         parent_id=None, is_enabled=True, is_deleted=False,
         site_id=current_site_id()
     ).order_by(Column.sort_order.desc()).all()
     return api_ok({
+        'site_id': current_site_id(),
         'name': s.get('site_name', ''),
         'subtitle': s.get('site_subtitle', ''),
         'logo': _abs_url(s.get('site_logo', '')),
         'copyright': s.get('footer_copyright', ''),
         'seo': {
-            'title': s.get('seo_title', ''),
-            'keywords': s.get('seo_keywords', ''),
-            'description': s.get('seo_description', ''),
+            # v3.2.1：站点 SEO 优先，空值回退全局设置
+            'title': (site.seo_title if site is not None and site.seo_title
+                      else s.get('seo_title', '')),
+            'keywords': (site.seo_keywords if site is not None and site.seo_keywords
+                         else s.get('seo_keywords', '')),
+            'description': (site.seo_description if site is not None and site.seo_description
+                            else s.get('seo_description', '')),
         },
+        'seo_title': (site.seo_title if site is not None and site.seo_title else ''),
+        'seo_keywords': (site.seo_keywords if site is not None and site.seo_keywords else ''),
+        'seo_description': (site.seo_description if site is not None and site.seo_description else ''),
         'nav': [_column_brief(c, with_children=True) for c in root_columns],
     })
 

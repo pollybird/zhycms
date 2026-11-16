@@ -22,6 +22,7 @@ Create Date: 2026-11-15
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.exc import SQLAlchemyError
 
 # revision identifiers, used by Alembic.
 revision = '0012'
@@ -46,6 +47,37 @@ _SITE_UNIQUE = (
     ('forms', 'slug', 'uq_form_site_slug', ['site_id', 'slug']),
     ('banner_groups', 'slug', 'uq_banner_group_site_slug', ['site_id', 'slug']),
 )
+
+
+# 降级时需要恢复全局唯一约束的 (表名, 单列唯一字段)
+_DOWNGRADE_UNIQUE = (
+    ('columns', 'slug'), ('fragments', 'slug'), ('settings', 'key'),
+    ('forms', 'slug'), ('banner_groups', 'slug'), ('members', 'username'),
+)
+
+
+def _find_downgrade_conflicts(conn):
+    """v3.2.1：降级前预检跨站重复值，返回冲突描述列表（空表示可安全降级）。
+
+    降级会恢复全局唯一索引，多站点数据下同 slug/key/username 可能跨站重复；
+    直接执行 DDL 会半途失败并把数据库留在「部分降级」状态，因此在任何 DDL
+    之前先做本检查。
+    """
+    insp = sa.inspect(conn)
+    conflicts = []
+    for table, column in _DOWNGRADE_UNIQUE:
+        if not insp.has_table(table):
+            continue
+        try:
+            rows = conn.execute(sa.text(
+                f'SELECT {column}, COUNT(*) AS c FROM {table} '
+                f'GROUP BY {column} HAVING COUNT(*) > 1')).fetchall()
+        except SQLAlchemyError:
+            # 列不存在（旧版插件表结构）时跳过，不影响其余表预检
+            continue
+        for row in rows:
+            conflicts.append(f'{table}.{column}={row[0]}（{row[1]} 条）')
+    return conflicts
 
 
 def _dialect():
@@ -188,6 +220,13 @@ def upgrade():
 
 def downgrade():
     bind = op.get_bind()
+    # v3.2.1：先预检跨站重复值，冲突时在任何 DDL 之前中止（避免半降级）
+    conflicts = _find_downgrade_conflicts(bind)
+    if conflicts:
+        raise RuntimeError(
+            '0012 降级中止：存在跨站重复值，无法恢复全局唯一约束。'
+            '请先合并/清理后重试：' + '；'.join(conflicts[:20]))
+
     # 还原唯一约束
     for table, column, unique_name, _cols in _SITE_UNIQUE:
         if not _has_table(table):

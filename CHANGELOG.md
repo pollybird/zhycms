@@ -5,6 +5,26 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.2.1] - 2026-11-16
+
+**站群缺陷修复版**：闭环 v3.2.0 第三方测试报告中的 3 个隔离/权限缺口（P0/P1）与 2 个中等问题（P2），并加固若干低风险边界项。**新增迁移 `0013`（子域唯一索引）、无新增依赖**，覆盖代码 + 重启即可。
+
+### Fixed
+
+- **站点权限可被 `?site=` 绕过（P0）**：`select_site()` 在写回 `session['admin_site_id']` 前校验 `can_access_site()`；显式访问无权站点由后台统一守卫返回 403；`admin_bp` 新增 `before_request` 统一站点授权（含插件后台路由），会话站点被回收时 GET 自动回退到首个可访问站点。
+- **未绑定站点账号的兼容语义**：没有任何 `UserSitePermission` 行的存量账号保持全站可见（升级不锁定现有编辑），存在绑定行的账号仅限绑定站点。
+- **`status=closed` 未覆盖 API/插件（P1）**：站点关闭校验由 `frontend` 蓝本钩子提升为 app 级 `before_request`，统一覆盖前台页面、内容 API 与插件前台蓝本；API 返回 503 JSON、`/healthz` 固定 200、后台与站点根文件/静态资源豁免。
+- **独立会员会话跨站有效（P1）**：新增 `plugins/member/scope.py` 统一会员站点口径；`member_scope=isolated` 时 `current_member()` 校验会员 `site_id` 与当前站点一致，不一致清会话按未登录处理。
+- **站点 SEO 不生效（P2）**：`_seo()` 基线改为「站点 `seo_*` 优先、空值回退全局设置」（文章/栏目自身 SEO 仍最优先）；内容 API `/api/v1/site` 增加 `site_id` 与站点 SEO 字段。
+- **`0012` 降级不能对称回滚（P2）**：降级在任何 DDL 之前预检跨站重复的 `slug/key/username`，冲突时中止并输出清单（不再半降级）；`UPGRADE.md` 同步回滚口径。
+- **低风险边界项（P3）**：`accessible_sites()` 批量化（消除 N+1，请求级缓存）；`sites.subdomain` 增加唯一约束（迁移 `0013`，空白转 NULL）；域名按 DNS label 规则校验并统一大小写/尾点规范化；`sort_order` 表单层整数校验；删除站点前检查栏目/文章/碎片/插件内容；`site_url()` 支持仅有子域的站点；开发环境支持 `b.localhost`；JWT 配置读取移至 Alembic bootstrap 之后，消除升级首启临时密钥告警。
+
+### 升级注意
+
+- **新增迁移 `0013`**（子域唯一索引，自动执行；存在重复子域时会预检中止并提示清理）。
+- 单站点部署零感知；站点权限仅在账号做过站点绑定时生效。
+- **测试**：全量 516 项通过（新增 18 项 v3.2.1 回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.1` 三门禁全绿。
+
 ## [3.2.0] - 2026-11-15
 
 **站群版**：一个后端实例 + 一个数据库，按「站点」维度切分内容，同一套 CMS 同时服务多个独立前台站点（独立域名或泛解析子域）。**默认站点 `site_id=0` 恒等变换，单站点部署零感知**（URL、行为、SEO 全部不变）。有数据库迁移 `0012`，无新增依赖。

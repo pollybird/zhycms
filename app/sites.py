@@ -66,6 +66,25 @@ def _match_site(rows, ident):
     return None
 
 
+def _user_can_access(site_id):
+    """当前登录用户是否可访问指定站点（未登录/校验异常按放行处理）。"""
+    try:
+        from flask_login import current_user
+        if not current_user.is_authenticated:
+            return True
+        return can_access_site(current_user, site_id)
+    except Exception as e:
+        logger.debug('站点权限校验失败，按放行处理：%s', e)
+        return True
+
+
+def _first_accessible_site(rows):
+    for s in rows:
+        if _user_can_access(s.id):
+            return s
+    return None
+
+
 def _resolve_site_id():
     rows = _site_rows()
     if not rows:
@@ -83,15 +102,32 @@ def _resolve_site_id():
     if raw and (admin or session.get('_user_id')):
         site = _match_site(rows, raw)
         if site is not None:
-            session[SESSION_KEY] = site.id
-            return site.id
+            # v3.2.1：切换前校验站点权限，避免 ?site= 越权写会话
+            if _user_can_access(site.id):
+                session[SESSION_KEY] = site.id
+                return site.id
+            if admin:
+                # 显式指定无权站点：标记越权，由 admin 守卫返回 403
+                g._site_access_denied = True
+            logger.warning('拒绝切换到无权站点：user=%s site=%s',
+                           session.get('_user_id'), site.id)
 
-    # ② 后台以 session 为准
+    # ② 后台以 session 为准（权限被回收后自动回退到可访问站点）
     if admin:
+        if getattr(g, '_site_access_denied', False):
+            # 显式越权：不再写会话/回退，交由 admin 守卫返回 403
+            return default_id
         sid = session.get(SESSION_KEY)
         for s in rows:
             if s.id == sid:
-                return s.id
+                if _user_can_access(s.id):
+                    return s.id
+                break
+        if sid is not None:
+            fallback = _first_accessible_site(rows)
+            if fallback is not None:
+                session[SESSION_KEY] = fallback.id
+                return fallback.id
         return default_id
 
     # ③ Host 精确匹配
@@ -102,7 +138,9 @@ def _resolve_site_id():
                 return s.id
         # ④ 子域首标签匹配（泛解析：b.main.com → subdomain=b）
         labels = host.split('.')
-        if len(labels) >= 3:
+        # v3.2.1：开发环境允许两段式 b.localhost
+        dev_two_label = len(labels) == 2 and labels[1] == 'localhost'
+        if len(labels) >= 3 or dev_two_label:
             sub = labels[0]
             for s in rows:
                 if s.subdomain and s.subdomain.strip().lower() == sub:
@@ -152,6 +190,8 @@ def invalidate_site_cache():
     if has_app_context():
         g.pop('_sites_all', None)
         g.pop('current_site_id', None)
+        for k in [k for k in g if str(k).startswith('_accessible_sites_')]:
+            g.pop(k, None)
 
 
 def current_site():
@@ -172,7 +212,8 @@ def current_site():
 def site_url(site_id, endpoint='frontend.index', **values):
     """生成跨站点绝对 URL（站群互链/站点导航用）。
 
-    站点配置了 `domain` 时返回 `scheme://domain<path>`；否则回退相对 URL。
+    优先使用 `sites.domain`；仅有 `subdomain` 时基于 `Setting.site_url`
+    的主机名拼子域；两者都无则回退相对 URL。
     """
     from flask import url_for
     path = url_for(endpoint, **values)
@@ -184,10 +225,25 @@ def site_url(site_id, endpoint='frontend.index', **values):
     except Exception as e:
         logger.debug('站点 URL 生成失败：%s', e)
         return path
-    if site is None or not site.domain:
+    if site is None:
         return path
+
+    host = Site.normalize_host(site.domain)
     scheme = 'https' if (has_request_context() and request.is_secure) else 'http'
-    return f'{scheme}://{site.domain.strip()}{path}'
+    if not host and site.subdomain:
+        from urllib.parse import urlparse
+        from .models.setting import Setting
+        base = (Setting.get('site_url') or '').strip()
+        parsed = urlparse(base)
+        base_host = (parsed.netloc or parsed.path).split('/', 1)[0].split(':', 1)[0]
+        sub = Site.normalize_host(site.subdomain)
+        if base_host and sub:
+            host = f'{sub}.{base_host}'
+            scheme = parsed.scheme or scheme
+    if not host:
+        logger.debug('站点 %s 未配置 domain/subdomain，跨站 URL 回退相对路径', site.id)
+        return path
+    return f'{scheme}://{host}{path}'
 
 
 def can_access_site(user, site_id):
@@ -218,14 +274,19 @@ def can_access_site(user, site_id):
                   if getattr(r, 'role', None) is not None}
     if ROLE_READONLY_VIEWER in role_codes:
         return True
-    # 向后兼容：全局内容权限且未做任何站点绑定 → 不限制
-    if not rows and user.has_permission('content_manage:all_columns'):
+    # v3.2.1 向后兼容：未做任何站点绑定 → 保持 v3.2.0 前的全站可见语义，
+    # 避免升级后把存量编辑锁死（需要限制时在账号页勾选站点即可）。
+    if not rows:
         return True
     return False
 
 
 def accessible_sites(user):
-    """返回用户可见站点列表（后台切换器数据源）。"""
+    """返回用户可见站点列表（后台切换器数据源）。
+
+    v3.2.1：站点列表与站点权限各查一次，内存过滤（消除 N+1）；
+    结果缓存在请求级 g，站点/用户权限变更后由 invalidate_site_cache() 清理。
+    """
     from .models.site import Site
     try:
         sites = Site.active_sites()
@@ -236,4 +297,27 @@ def accessible_sites(user):
         return []
     if getattr(user, 'is_super', False) or user.has_permission('site:manage'):
         return sites
-    return [s for s in sites if can_access_site(user, s.id)]
+
+    cache_key = f'_accessible_sites_{getattr(user, "id", 0)}'
+    if has_app_context():
+        cached = g.get(cache_key)
+        if cached is not None:
+            return cached
+
+    from .models.rbac import UserSitePermission, ROLE_READONLY_VIEWER
+    try:
+        rows = UserSitePermission.query.filter_by(user_id=user.id).all()
+    except Exception as e:
+        logger.debug('站点权限表不可用，按全站可见处理：%s', e)
+        return sites
+    role_codes = {getattr(r.role, 'code', '') for r in (user.role_assignments or [])
+                  if getattr(r, 'role', None) is not None}
+    if not rows or ROLE_READONLY_VIEWER in role_codes:
+        # 未绑定任何站点（legacy）或只读查看员：全站可见
+        result = sites
+    else:
+        allowed = {r.site_id for r in rows}
+        result = [s for s in sites if s.id in allowed]
+    if has_app_context():
+        setattr(g, cache_key, result)
+    return result

@@ -285,3 +285,17 @@ def current_site_id():
 3. **SQLite 唯一约束**通过「唯一索引」实现（`CREATE UNIQUE INDEX`），避免 `ALTER TABLE ADD CONSTRAINT` 不支持的问题；MySQL/PostgreSQL 走复合唯一约束。
 
 测试：`tests/test_sites_v320.py`（15 项）覆盖站点解析、后台切换、slug 跨站复用、栏目/文章 API 隔离、站点化配置、全局键、站点关闭 503、站点 CRUD 权限、账号站点权限绑定与审计按站点筛选。
+
+## 十五、缺陷修复（v3.2.1）
+
+v3.2.0 第三方测试报告的缺口已在 v3.2.1 闭环，实现口径如下（回归测试见 `tests/test_sites_v321.py`）：
+
+| 问题 | 修复口径 | 关键文件 |
+| --- | --- | --- |
+| 站点权限可被 `?site=` 绕过 | 解析层写会话前校验 `can_access_site()`；`admin_bp` 统一 `before_request` 校验当前站点（GET 越权回退、显式越权与写请求 403），插件后台自动继承 | `app/sites.py`、`app/admin/__init__.py` |
+| 未绑定账号的兼容 | 无任何 `UserSitePermission` 行 → 全站可见（升级不锁定存量编辑）；有绑定行 → 仅绑定站点 | `app/sites.py` |
+| `status=closed` 覆盖不全 | 关闭校验提升为 app 级 `before_request`：前台/API/插件前台蓝本统一 503；API 返回 JSON、`healthz` 固定 200、后台与根文件豁免 | `app/frontend/views.py`、`app/__init__.py` |
+| 独立会员会话跨站 | `member_scope=isolated` 时 `current_member()` 校验会员站点，不一致清会话 | `plugins/member/scope.py`、`plugins/member/security.py` |
+| 站点 SEO 不生效 | `_seo()` 与 `/api/v1/site` 采用「站点 SEO → 全局设置」回退链 | `app/frontend/views.py`、`app/api/views.py` |
+| `0012` 降级半回滚 | 降级任何 DDL 前预检跨站重复 `slug/key/username`，冲突即中止并输出清单 | `migrations/versions/0012_v3_2_0_sites.py` |
+| P3 边界项 | `accessible_sites` 批量化、`subdomain` 唯一（迁移 `0013`）、域名 DNS label 校验、`sort_order` 表单校验、删站内容检查、`site_url()` 子域支持、`b.localhost`、JWT 配置延后读取 | 见 CHANGELOG v3.2.1 |

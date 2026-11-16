@@ -294,48 +294,72 @@ def _build_nav():
 
 
 def _seo(column=None, article=None):
-    """获取页面 SEO 信息（v2.5.0：按当前 locale 取翻译，无翻译回退主表字段）。"""
+    """获取页面 SEO 信息（v2.5.0：按当前 locale 取翻译，无翻译回退主表字段）。
+
+    v3.2.1 站群：基线为「站点 SEO 优先，空值回退全局设置」；
+    文章/栏目自身 SEO 仍优先于站点基线。
+    """
     from ..utils.i18n_content import t_field
     s = Setting.get_dict()
+    site = current_site()
+    base = {
+        'title': (site.seo_title if site is not None and site.seo_title
+                  else s.get('seo_title', '')),
+        'keywords': (site.seo_keywords if site is not None and site.seo_keywords
+                     else s.get('seo_keywords', '')),
+        'description': (site.seo_description if site is not None and site.seo_description
+                        else s.get('seo_description', '')),
+    }
     if article:
         return {
-            'title': t_field(article, 'seo_title') or t_field(article, 'title') or s.get('seo_title', ''),
-            'keywords': t_field(article, 'seo_keywords') or s.get('seo_keywords', ''),
-            'description': t_field(article, 'seo_description') or t_field(article, 'summary') or s.get('seo_description', ''),
+            'title': t_field(article, 'seo_title') or t_field(article, 'title') or base['title'],
+            'keywords': t_field(article, 'seo_keywords') or base['keywords'],
+            'description': (t_field(article, 'seo_description')
+                            or t_field(article, 'summary') or base['description']),
         }
     if column:
         return {
-            'title': t_field(column, 'seo_title') or t_field(column, 'name') or s.get('seo_title', ''),
-            'keywords': t_field(column, 'seo_keywords') or s.get('seo_keywords', ''),
-            'description': t_field(column, 'seo_description') or t_field(column, 'summary') or s.get('seo_description', ''),
+            'title': t_field(column, 'seo_title') or t_field(column, 'name') or base['title'],
+            'keywords': t_field(column, 'seo_keywords') or base['keywords'],
+            'description': (t_field(column, 'seo_description')
+                            or t_field(column, 'summary') or base['description']),
         }
-    return {
-        'title': s.get('seo_title', ''),
-        'keywords': s.get('seo_keywords', ''),
-        'description': s.get('seo_description', ''),
-    }
+    return base
 
 
-@frontend_bp.before_request
 def check_site_status():
-    """站点维护模式拦截（除首页提示外，所有前台路由都跳到关闭页）。
+    """站点维护模式拦截（v3.2.1：提升为 app 级 before_request）。
 
-    v3.2.0 站群：优先遵循 `sites.status`（站点级维护），
-    再回退站点化 `site_status` 配置；默认站点行为与现网一致。
+    覆盖前台页面、内容 API 与插件前台蓝本；站点根文件、静态资源、
+    healthz 探针与后台（admin/admin_auth）不受影响。
     """
     from ..utils.admin_prefix import load_admin_prefix
-    # 站点根文件（favicon/robots/sitemap）不受维护模式影响，保证收录与图标正常
-    if request.endpoint in ('frontend.favicon', 'frontend.robots', 'frontend.sitemap'):
-        return
+
+    # CORS 预检不能被 503 打断
+    if request.method == 'OPTIONS':
+        return None
+    # 站点根文件与健康探针不受维护模式影响
+    if request.endpoint in ('static', 'frontend.favicon', 'frontend.robots',
+                            'frontend.sitemap', 'frontend.healthz'):
+        return None
+    # 后台（含插件后台路由）始终可访问
+    if request.blueprint in ('admin', 'admin_auth'):
+        return None
+    admin_prefix = load_admin_prefix()
+    if admin_prefix and request.path.startswith('/' + admin_prefix):
+        return None
+
     site = current_site()
     closed = (site is not None and site.status == 'closed') or \
         Setting.get('site_status') == 'closed'
-    if closed:
-        # 允许访问 admin 蓝本（已在另一个蓝本注册，这里不影响）
-        admin_prefix = load_admin_prefix()
-        if request.path.startswith('/' + admin_prefix):
-            return
-        return render_template(theme_template('closed'), seo=_seo()), 503
+    if not closed:
+        return None
+
+    # 内容 API 返回统一 JSON 503，不返回 HTML 关闭页
+    if request.path.startswith('/api/'):
+        from ..api.views import api_err
+        return api_err(503, '站点维护中，暂时无法访问', http=503)
+    return render_template(theme_template('closed'), seo=_seo()), 503
 
 
 # 首页行业区块：slug → 展示条数（与演示数据栏目对应，缺失栏目返回 (None, [])）

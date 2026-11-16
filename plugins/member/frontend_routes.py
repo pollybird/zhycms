@@ -73,16 +73,9 @@ def _safe_next(target, default='/member'):
 
 
 def _member_scope_site():
-    """v3.2.0 站群：返回会员查询应使用的 site_id。
-
-    shared（默认）：返回 0 哨兵（全站共享，等价现网全局唯一）；
-    isolated：返回当前站点 id（各站会员互不相通）。
-    """
-    from app.models.setting import Setting
-    if Setting.get('member_scope') == 'isolated':
-        from app.sites import current_site_id
-        return current_site_id()
-    return 0
+    """v3.2.0 站群：返回会员查询应使用的 site_id（v3.2.1 收口到 scope 模块）。"""
+    from .scope import scope_site_id
+    return scope_site_id()
 
 
 def _find_member(identifier):

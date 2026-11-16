@@ -41,6 +41,12 @@ def current_member():
         session.pop(SESSION_KEY, None)
         g._member = None
         return None
+    # v3.2.1：独立会员模式下，会员会话必须与当前站点一致，否则按未登录处理
+    from .scope import check_session_member_scope
+    if not check_session_member_scope(member):
+        session.pop(SESSION_KEY, None)
+        g._member = None
+        return None
     g._member = member
     return member
 

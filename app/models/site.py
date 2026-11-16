@@ -9,6 +9,7 @@ MySQL 注意：显式插入 id=0 需要会话级 `NO_AUTO_VALUE_ON_ZERO`，
 由迁移 0012 负责设置；SQLite / PostgreSQL 原生支持。
 """
 from datetime import datetime
+import re
 
 from ..extensions import db
 
@@ -25,8 +26,8 @@ class Site(db.Model):
     slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
     # 全量域名（精确匹配），如 www.b.com；空表示不按独立域名寻址
     domain = db.Column(db.String(255), unique=True)
-    # 子域标签（配合泛解析 *.main.com），如 b
-    subdomain = db.Column(db.String(100), index=True)
+    # 子域标签（配合泛解析 *.main.com），如 b；空值存 NULL（多 NULL 可共存）
+    subdomain = db.Column(db.String(100), unique=True, index=True)
     status = db.Column(db.String(16), default='open', nullable=False)  # open / closed
     theme = db.Column(db.String(64))  # 站点主题，空则回退全局 site_theme
     is_default = db.Column(db.Boolean, default=False, nullable=False)
@@ -49,6 +50,28 @@ class Site(db.Model):
         """返回未删除站点（按 sort_order 降序、id 升序）。"""
         return cls.query.filter_by(is_deleted=False).order_by(
             cls.sort_order.desc(), cls.id.asc()).all()
+
+    @staticmethod
+    def normalize_host(value):
+        """域名/子域规范化：去空白、转小写、去尾点；空串返回 None。"""
+        if not value:
+            return None
+        host = str(value).strip().lower().rstrip('.')
+        return host or None
+
+    @staticmethod
+    def is_valid_domain(value):
+        """按 DNS label 规则校验完整域名（不含协议与路径）。"""
+        if not value or len(value) > 253 or '..' in value:
+            return False
+        for label in value.split('.'):
+            if not label or len(label) > 63:
+                return False
+            if label[0] == '-' or label[-1] == '-':
+                return False
+            if not re.fullmatch(r'[a-z0-9-]+', label):
+                return False
+        return True
 
     def __repr__(self):
         return f'<Site {self.id} {self.slug}>'
