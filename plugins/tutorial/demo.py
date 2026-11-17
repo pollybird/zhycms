@@ -11,9 +11,12 @@ from .models import TutorialCategory, Tutorial
 
 
 def generate(industry):
-    # 幂等：清理本插件全部数据
-    Tutorial.query.delete()
-    TutorialCategory.query.delete()
+    from app.sites import current_site_id
+    sid = current_site_id()
+    # 幂等：只清理当前站点的本插件数据（不能影响其他站点）
+    Tutorial.query.filter_by(site_id=sid).delete(synchronize_session=False)
+    TutorialCategory.query.filter_by(site_id=sid).delete(
+        synchronize_session=False)
     db.session.flush()
 
     if industry != 'education':
@@ -25,15 +28,15 @@ def generate(industry):
 
     # 分类
     cat_programming = TutorialCategory(
-        name='编程启蒙', slug='programming',
+        site_id=sid, name='编程启蒙', slug='programming',
         description='Scratch 图形化编程与 Python 基础',
         sort_order=100, is_enabled=True)
     cat_english = TutorialCategory(
-        name='英语口语', slug='oral-english',
+        site_id=sid, name='英语口语', slug='oral-english',
         description='外教口语与听力训练',
         sort_order=90, is_enabled=True)
     cat_math = TutorialCategory(
-        name='数学思维', slug='math-thinking',
+        site_id=sid, name='数学思维', slug='math-thinking',
         description='逻辑思维与奥数启蒙',
         sort_order=80, is_enabled=True)
     db.session.add_all([cat_programming, cat_english, cat_math])

@@ -108,7 +108,7 @@ class ProductSearchProvider(SearchProvider):
 
     # ---- SQL 兜底 ----
 
-    def sql_search(self, keyword, locale, page=1, per_page=20):
+    def sql_search(self, keyword, locale, page=1, per_page=20, site_id=None):
         """产品 LIKE 检索（非默认语言同时匹配 product_translations）。"""
         from .models import Product, ProductTranslation
         like = f'%{escape_like(keyword)}%'
@@ -117,6 +117,8 @@ class ProductSearchProvider(SearchProvider):
             Product.is_deleted == False,  # noqa: E712
             Product.is_enabled == True,   # noqa: E712
         )
+        if site_id is not None:
+            q = q.filter(Product.site_id == site_id)
         main_match = db.or_(
             Product.title.like(like, escape=LIKE_ESCAPE),
             Product.summary.like(like, escape=LIKE_ESCAPE),

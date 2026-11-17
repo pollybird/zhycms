@@ -262,6 +262,11 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
     # 0. v3.1.2 M2：子目录二次校验（防 ../ 穿越到任意目录写文件）
     sub_dir = _safe_sub_dir(sub_dir)
 
+    # v3.2.2 站群：上传索引与物理路径均按站点隔离
+    from ..sites import current_site_id
+    site_id = current_site_id()
+    site_prefix = f'site{site_id}'
+
     # 1. 大小限制（优先级：参数 > 后台配置单文件MB > Setting.upload_max_size）
     try:
         cfg_mb = int(Setting.get('upload_single_max_size_mb', '0') or 0)
@@ -341,7 +346,7 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
     # 4. 内容去重（模块6）：SHA-256 查找已上传同内容文件
     content_hash = _sha256_of_stream(file_storage.stream) if Setting.get('upload_enable_dedup') == 'on' else ''
     if content_hash:
-        dup = UploadedFile.find_by_hash(content_hash)
+        dup = UploadedFile.find_by_hash(content_hash, site_id=site_id)
         if dup and _file_still_exists(dup):
             # 复用已有文件：引用计数+1，返回原 URL（云端文件 URL 不随驱动切换失效）
             try:
@@ -356,7 +361,8 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
     # 5. 按日期分子目录，UUID 命名保存
     now = datetime.now()
     date_dir = now.strftime('%Y%m%d')
-    save_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], sub_dir, date_dir)
+    save_dir = os.path.join(current_app.config['UPLOAD_FOLDER'],
+                            site_prefix, sub_dir, date_dir)
     os.makedirs(save_dir, exist_ok=True)
 
     new_name = f'{uuid.uuid4().hex}.{ext}'
@@ -389,7 +395,7 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
             current_app.logger.warning('读取图片尺寸失败（%s）：%s', save_path, e)
 
     # 7. 发布到存储驱动（本地 no-op；云驱动上传，失败显式报错不静默回退）
-    rel_path = f'uploads/{sub_dir}/{date_dir}/{new_name}'.replace('//', '/')
+    rel_path = f'uploads/{site_prefix}/{sub_dir}/{date_dir}/{new_name}'.replace('//', '/')
     thumb_abs = os.path.join(save_dir, f'thumb_{new_name}') if thumb_rel else None
     driver = LocalStorageDriver() if storage_scope == 'local' else get_driver()
     try:
@@ -423,6 +429,7 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
     # 8. 写入 UploadedFile 索引
     try:
         u = UploadedFile(
+            site_id=site_id,
             original_name=original_name,
             stored_name=rel_path,
             storage=driver.name,

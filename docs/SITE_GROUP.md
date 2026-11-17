@@ -299,3 +299,21 @@ v3.2.0 第三方测试报告的缺口已在 v3.2.1 闭环，实现口径如下�
 | 站点 SEO 不生效 | `_seo()` 与 `/api/v1/site` 采用「站点 SEO → 全局设置」回退链 | `app/frontend/views.py`、`app/api/views.py` |
 | `0012` 降级半回滚 | 降级任何 DDL 前预检跨站重复 `slug/key/username`，冲突即中止并输出清单 | `migrations/versions/0012_v3_2_0_sites.py` |
 | P3 边界项 | `accessible_sites` 批量化、`subdomain` 唯一（迁移 `0013`）、域名 DNS label 校验、`sort_order` 表单校验、删站内容检查、`site_url()` 子域支持、`b.localhost`、JWT 配置延后读取 | 见 CHANGELOG v3.2.1 |
+
+## 十六、缺陷修复（v3.2.2）
+
+v3.2.1 潜在威胁报告的 11 项缺口已在 v3.2.2 闭环：v3.2.1 解决「查询带站点」，v3.2.2 补齐「表结构与写入带站点」（回归测试见 `tests/test_sites_v322.py`，迁移 `0014`）：
+
+| 问题 | 修复口径 | 关键文件 |
+| --- | --- | --- |
+| 教程跨站可见/可改（P0） | 两表补 `site_id`，`slug` 改站内唯一；前台/后台/模板函数/构建器组件按站过滤；演示数据只清当前站 | `plugins/tutorial/models.py`、`plugins/tutorial/*.py` |
+| 页面构建跨站读写（P0） | `builder_pages` 补 `site_id`，唯一约束改 `(site_id, scope, column_id)`；服务层按站查询，跨站编辑器 404；卸载检查仍跨站扫描 | `app/models/builder.py`、`app/builder/service.py`、`app/admin/builder/__init__.py` |
+| 上传跨站复用（P0） | `uploaded_files` 补 `site_id` + `(site_id, content_hash)` 索引；去重按站；新路径 `uploads/site{N}/...` | `app/models/upload.py`、`app/utils/uploads.py` |
+| 删站检查遗漏（P1） | 补充教程/构建/上传索引/OAuth 表计数 | `app/admin/system/sites.py` |
+| 会员删除无站点校验（P1） | 删除与编辑一致校验所属站点 | `plugins/member/admin.py` |
+| OAuth 跨站串号（P1） | `member_oauths` 补 `site_id`，唯一约束改 `(site_id, provider, openid)`，口径走 `scope_site_id()` | `plugins/member/models.py`、`plugins/member/frontend_routes.py` |
+| 备份/监控权限过宽（P1） | 收敛为超管或 `site:manage`，后台守卫加平台入口豁免 | `app/admin/system/backup.py`、`app/admin/__init__.py` |
+| 缓存失效键不匹配（P1） | 按 `frontend/site{N}/*` 前缀失效，不支持模式删除时回退整体清空 | `app/utils/helpers.py` |
+| 浏览量全局单键（P1） | 键改 `article:viewed:pending:site{N}`，按站合并并过滤文章 | `app/frontend/views.py` |
+| 插件 SQL 搜索无站点条件（P1） | `sql_search` 增可选 `site_id`，上层签名探测兼容旧插件 | `app/utils/search.py`、`plugins/product/search.py`、`plugins/recruit/search.py` |
+| 平台入口被站点守卫误拦（P2） | 站点/插件/存储/迁移/翻译/统计/备份/监控入口豁免 | `app/admin/__init__.py` |

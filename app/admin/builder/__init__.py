@@ -34,7 +34,9 @@ def _json_error(message, code=400):
 
 
 def _page_or_404(pid):
-    page = BuilderPage.query.get(pid)
+    # v3.2.2 站群：跨站页面一律 404，避免通过 pid 打开/编辑他站布局
+    page = BuilderPage.query.filter_by(
+        id=pid, site_id=current_site_id()).first()
     if page is None:
         abort(404)
     return page

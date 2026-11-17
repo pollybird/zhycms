@@ -94,7 +94,7 @@ class RecruitSearchProvider(SearchProvider):
 
     # ---- SQL 兜底 ----
 
-    def sql_search(self, keyword, locale, page=1, per_page=20):
+    def sql_search(self, keyword, locale, page=1, per_page=20, site_id=None):
         """岗位 LIKE 检索（非默认语言同时匹配 recruit_job_translations）。"""
         from .models import RecruitJob, RecruitJobTranslation
         like = f'%{escape_like(keyword)}%'
@@ -103,6 +103,8 @@ class RecruitSearchProvider(SearchProvider):
             RecruitJob.is_deleted == False,  # noqa: E712
             RecruitJob.is_enabled == True,   # noqa: E712
         )
+        if site_id is not None:
+            q = q.filter(RecruitJob.site_id == site_id)
         main_match = db.or_(
             RecruitJob.title.like(like, escape=LIKE_ESCAPE),
             RecruitJob.description.like(like, escape=LIKE_ESCAPE),

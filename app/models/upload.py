@@ -9,6 +9,9 @@ class UploadedFile(db.Model):
     __tablename__ = 'uploaded_files'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.2 站群：上传记录按站点隔离（去重与物理路径均按站）
+    site_id = db.Column(db.Integer, nullable=False, default=0,
+                        server_default='0', index=True)
     original_name = db.Column(db.String(255))        # 原始文件名
     stored_name = db.Column(db.String(255), nullable=False)  # 存储相对路径/对象 key，如 uploads/article/20260101/uuid.jpg
     storage = db.Column(db.String(16), nullable=False, default='local',
@@ -31,10 +34,23 @@ class UploadedFile(db.Model):
 
     uploader = db.relationship('User', backref=db.backref('uploaded_files', lazy='dynamic'))
 
-    @classmethod
-    def find_by_hash(cls, content_hash):
-        return cls.query.filter_by(content_hash=content_hash).first()
+    __table_args__ = (
+        db.Index('ix_uploaded_file_site_hash', 'site_id', 'content_hash'),
+    )
 
     @classmethod
-    def find_by_url(cls, url):
-        return cls.query.filter_by(url=url).first()
+    def find_by_hash(cls, content_hash, site_id=None):
+        """按内容 hash 查找（缺省限当前站点，避免跨站复用他站文件）。"""
+        if site_id is None:
+            from ..sites import current_site_id
+            site_id = current_site_id()
+        return cls.query.filter_by(
+            content_hash=content_hash, site_id=site_id).first()
+
+    @classmethod
+    def find_by_url(cls, url, site_id=None):
+        """按 URL 查找（缺省限当前站点）。"""
+        if site_id is None:
+            from ..sites import current_site_id
+            site_id = current_site_id()
+        return cls.query.filter_by(url=url, site_id=site_id).first()

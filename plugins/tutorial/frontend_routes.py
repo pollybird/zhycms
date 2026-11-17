@@ -24,6 +24,7 @@ from flask import (
 
 from app.extensions import db
 from app.plugin_system import plugin_enabled
+from app.sites import current_site_id
 from app.utils.themes import theme_template, get_active_theme, THEMES_DIR
 
 from .models import TutorialCategory, Tutorial
@@ -76,12 +77,14 @@ def tutorial_list():
     keyword = (request.args.get('keyword') or '').strip()
     difficulty = (request.args.get('difficulty') or '').strip()
 
-    query = Tutorial.query.filter_by(is_deleted=False, is_enabled=True)
+    query = Tutorial.query.filter_by(
+        is_deleted=False, is_enabled=True, site_id=current_site_id())
 
     category = None
     if category_slug:
         category = TutorialCategory.query.filter_by(
-            slug=category_slug, is_deleted=False, is_enabled=True).first()
+            slug=category_slug, is_deleted=False, is_enabled=True,
+            site_id=current_site_id()).first()
         if category is not None:
             query = query.filter_by(category_id=category.id)
 
@@ -95,7 +98,7 @@ def tutorial_list():
     ).paginate(page=page, per_page=per_page, error_out=False)
 
     categories = TutorialCategory.query.filter_by(
-        is_deleted=False, is_enabled=True
+        is_deleted=False, is_enabled=True, site_id=current_site_id()
     ).order_by(TutorialCategory.sort_order.desc()).all()
 
     return render_template(
@@ -116,17 +119,19 @@ def tutorial_list():
 def tutorial_category(slug):
     """分类下教程列表（复用 list 模板）。"""
     category = TutorialCategory.query.filter_by(
-        slug=slug, is_deleted=False, is_enabled=True).first_or_404()
+        slug=slug, is_deleted=False, is_enabled=True,
+        site_id=current_site_id()).first_or_404()
 
     page = max(int(request.args.get('page', 1)), 1)
     pagination = Tutorial.query.filter_by(
-        category_id=category.id, is_deleted=False, is_enabled=True
+        category_id=category.id, is_deleted=False, is_enabled=True,
+        site_id=current_site_id()
     ).order_by(
         Tutorial.sort_order.desc(), Tutorial.created_at.desc()
     ).paginate(page=page, per_page=12, error_out=False)
 
     categories = TutorialCategory.query.filter_by(
-        is_deleted=False, is_enabled=True
+        is_deleted=False, is_enabled=True, site_id=current_site_id()
     ).order_by(TutorialCategory.sort_order.desc()).all()
 
     return render_template(
@@ -147,7 +152,8 @@ def tutorial_category(slug):
 def tutorial_detail(slug):
     """教程详情：浏览量 +1，相邻教程导航。"""
     tutorial = Tutorial.query.filter_by(
-        slug=slug, is_deleted=False, is_enabled=True).first_or_404()
+        slug=slug, is_deleted=False, is_enabled=True,
+        site_id=current_site_id()).first_or_404()
 
     # 浏览量自增
     tutorial.view_count = (tutorial.view_count or 0) + 1

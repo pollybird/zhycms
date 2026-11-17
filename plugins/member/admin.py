@@ -132,12 +132,14 @@ def member_edit(mid):
 @permission_required('member:manage')
 def member_delete(mid):
     member = db.session.get(Member, mid)
-    if member is not None and not member.is_deleted:
-        member.is_deleted = True
-        member.is_enabled = False
-        db.session.commit()
-        audit_log(OP_DELETE, MODULE_MEMBER, member.id, member.username, None)
-        flash(_gettext('会员已删除'), 'success')
+    # v3.2.2：与编辑一致做站点校验，禁止跨站删除会员
+    if member is None or member.is_deleted or member.site_id != _member_site_scope():
+        abort(404)
+    member.is_deleted = True
+    member.is_enabled = False
+    db.session.commit()
+    audit_log(OP_DELETE, MODULE_MEMBER, member.id, member.username, None)
+    flash(_gettext('会员已删除'), 'success')
     return redirect(url_for('admin.member_index'))
 
 

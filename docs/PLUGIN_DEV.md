@@ -462,8 +462,10 @@ class NoticeSearchProvider(SearchProvider):
         n = db.session.get(Notice, obj_id)
         return self._doc(n, locale) if n and not n.is_deleted else None
 
-    def sql_search(self, keyword, locale, page=1, per_page=20):
+    def sql_search(self, keyword, locale, page=1, per_page=20, site_id=None):
         ...                              # 索引故障时的 LIKE 兜底，返回 (items, total)
+        # v3.2.2：请按 site_id 过滤（None 表示不限站点）；
+        # 未声明该参数的旧插件仍可运行，核心会做签名探测与结果兜底过滤。
 
     def build_url(self, item):
         return f'/notice-{item["id"]}.html'   # 或 url_for(...)

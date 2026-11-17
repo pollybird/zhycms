@@ -334,13 +334,15 @@ def oauth_callback(provider):
         flash(_gettext('第三方登录失败：%(err)s', err=str(e)), 'danger')
         return redirect(url_for('member_frontend.login'))
 
+    site_id = _member_scope_site()
     binding = MemberOauth.query.filter_by(
-        provider=provider, openid=profile['openid']).first()
+        provider=provider, openid=profile['openid'], site_id=site_id).first()
 
     # 已绑定 → 直接登录
     if binding is not None:
         member = db.session.get(Member, binding.member_id)
-        if member is None or member.is_deleted or not member.is_enabled:
+        if (member is None or member.is_deleted or not member.is_enabled
+                or member.site_id != site_id):
             flash(_gettext('账号不可用，请联系管理员'), 'danger')
             return redirect(url_for('member_frontend.login'))
         oauth_next = session.pop('oauth_next', '')
@@ -364,7 +366,7 @@ def oauth_callback(provider):
         username=_unique_oauth_username(provider, profile['openid']),
         nickname=profile['nickname'] or provider,
         avatar=profile['avatar'] or None,
-        site_id=_member_scope_site(),
+        site_id=site_id,
     )
     db.session.add(member)
     db.session.commit()
@@ -378,6 +380,7 @@ def oauth_callback(provider):
 def _bind_oauth(member, provider, profile):
     row = MemberOauth(
         member_id=member.id, provider=provider, openid=profile['openid'],
+        site_id=getattr(member, 'site_id', 0) or 0,
         unionid=profile.get('unionid') or '',
         nickname=profile.get('nickname') or '',
         avatar=profile.get('avatar') or '',

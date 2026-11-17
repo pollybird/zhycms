@@ -77,10 +77,14 @@ class TutorialPlugin(PluginBase):
 
             category: 分类 slug 字符串，None=全部；limit: 条数上限。
             """
-            query = Tutorial.query.filter_by(is_deleted=False, is_enabled=True)
+            from app.sites import current_site_id
+            sid = current_site_id()
+            query = Tutorial.query.filter_by(
+                is_deleted=False, is_enabled=True, site_id=sid)
             if category:
                 cat = TutorialCategory.query.filter_by(
-                    slug=category, is_deleted=False, is_enabled=True).first()
+                    slug=category, is_deleted=False, is_enabled=True,
+                    site_id=sid).first()
                 if cat is not None:
                     query = query.filter_by(category_id=cat.id)
             return query.order_by(

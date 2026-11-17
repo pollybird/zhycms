@@ -34,6 +34,10 @@ _PLUGIN_SITE_TABLES = (
     ('表单', 'forms'), ('友情链接', 'friend_links'), ('产品', 'products'),
     ('招聘职位', 'recruit_jobs'), ('轮播组', 'banner_groups'),
     ('轮播图', 'banners'), ('会员', 'members'),
+    # v3.2.2：教程、页面构建、上传索引、第三方绑定
+    ('教程分类', 'tutorial_categories'), ('教程', 'tutorials'),
+    ('页面构建', 'builder_pages'), ('上传文件', 'uploaded_files'),
+    ('第三方绑定', 'member_oauths'),
 )
 
 
@@ -139,9 +143,13 @@ def _site_content_counts(site_id):
         for label, table in _PLUGIN_SITE_TABLES:
             if not insp.has_table(table):
                 continue
-            n = db.session.execute(
-                text(f'SELECT COUNT(*) FROM {table} WHERE site_id = :sid'),
-                {'sid': site_id}).scalar()
+            try:
+                n = db.session.execute(
+                    text(f'SELECT COUNT(*) FROM {table} WHERE site_id = :sid'),
+                    {'sid': site_id}).scalar()
+            except SQLAlchemyError:
+                # 旧版插件表尚未迁移出 site_id：跳过该表，不影响其余统计
+                continue
             if n:
                 counts[label] = n
     except SQLAlchemyError as e:

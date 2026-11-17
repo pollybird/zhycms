@@ -37,15 +37,19 @@ class TutorialList(Widget):
 
     def context(self, node, page_ctx):
         from .models import Tutorial, TutorialCategory
+        from app.sites import current_site_id
 
         props = node.get('props') or {}
         limit = max(int(props.get('limit') or 6), 1)
-        q = Tutorial.query.filter_by(is_deleted=False, is_enabled=True)
+        sid = current_site_id()
+        q = Tutorial.query.filter_by(
+            is_deleted=False, is_enabled=True, site_id=sid)
         cat = None
         slug = (props.get('category') or '').strip()
         if slug:
             cat = TutorialCategory.query.filter_by(
-                slug=slug, is_deleted=False, is_enabled=True).first()
+                slug=slug, is_deleted=False, is_enabled=True,
+                site_id=sid).first()
             if cat is not None:
                 q = q.filter_by(category_id=cat.id)
         tutorials = q.order_by(

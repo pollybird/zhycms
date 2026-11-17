@@ -67,7 +67,8 @@ class SearchProvider:
     def get_doc(self, obj_id, locale):
         return None
 
-    def sql_search(self, keyword, locale, page=1, per_page=20):
+    def sql_search(self, keyword, locale, page=1, per_page=20, site_id=None):
+        """SQL 兜底检索。site_id 为 None 表示不限站点（含旧版插件兼容）。"""
         return [], 0
 
     def build_url(self, item):
@@ -360,11 +361,20 @@ class SqlLikeBackend(SearchBackend):
         # 各来源取前 page*per_page 条，保证归并后当前页数据完整
         window = page * per_page
         items, total = self._search_articles(like, loc, 1, window, site_id=site_id)
+        import inspect
         for prov in get_search_providers().values():
             try:
-                p_items, p_total = prov.sql_search(keyword, loc,
-                                                   page=1, per_page=window)
+                # v3.2.2：向插件传递 site_id；旧版插件签名无该参数时保持兼容
+                kwargs = {'page': 1, 'per_page': window}
+                try:
+                    params = inspect.signature(prov.sql_search).parameters
+                except (TypeError, ValueError):
+                    params = {}
+                if 'site_id' in params:
+                    kwargs['site_id'] = site_id
+                p_items, p_total = prov.sql_search(keyword, loc, **kwargs)
                 if site_id is not None:
+                    # 纵深防御：即使插件未按站点过滤，也不让跨站结果串出
                     p_items = [x for x in p_items or []
                                if int(x.get('site_id') or 0) == int(site_id)]
                     p_total = len(p_items)

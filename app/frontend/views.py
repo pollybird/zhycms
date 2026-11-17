@@ -155,31 +155,41 @@ def _try_cache(key, ttl_setting_key, default_ttl=600, view_arg=None):
 
 # ---- v3.1.3 M8：浏览量缓存累加 + 合并回 DB（GitCode issue #3）----
 
-_VIEW_PENDING_KEY = 'article:viewed:pending'
+# v3.2.2 站群：待合并浏览量按站点分键，避免多站点共用一个键导致
+# 计数互相覆盖/合并到错误站点。
 # 待合并增量达到该值时在请求内直接触发合并（多 worker 无调度器场景兜底）
 _VIEW_FLUSH_THRESHOLD = 200
 # 兜底过期：调度器长期停止时缓存增量最多滞留 24h，避免内存累积
 _VIEW_PENDING_TTL = 86400
 
 
+def _view_pending_key(site_id=None):
+    from ..sites import current_site_id
+    sid = current_site_id() if site_id is None else site_id
+    return f'article:viewed:pending:site{sid}'
+
+
 def _incr_view(aid):
     """浏览量计数：优先缓存累加（消除每详情请求一次写事务）；
     缓存不可用时回落旧行为直接递增 DB。"""
     from ..extensions import cache
+    from ..sites import current_site_id
 
+    sid = current_site_id()
+    key = _view_pending_key(sid)
     try:
-        pending = cache.get(_VIEW_PENDING_KEY)
+        pending = cache.get(key)
         pending = dict(pending) if isinstance(pending, dict) else {}
         pending[aid] = pending.get(aid, 0) + 1
-        cache.set(_VIEW_PENDING_KEY, pending, timeout=_VIEW_PENDING_TTL)
+        cache.set(key, pending, timeout=_VIEW_PENDING_TTL)
         if sum(pending.values()) >= _VIEW_FLUSH_THRESHOLD:
-            _flush_view_counts()
+            _flush_site_views(sid)
     except Exception as e:
         # 浏览计数隔离：缓存不可用时回退直接递增 DB，不影响页面响应
         current_app.logger.warning('浏览量缓存累加失败，回退 DB 递增：%s', e)
         try:
             article = Article.query.filter_by(
-                id=aid, site_id=current_site_id()).first()
+                id=aid, site_id=sid).first()
             if article is not None:
                 article.viewed = (article.viewed or 0) + 1
                 db.session.commit()
@@ -188,25 +198,21 @@ def _incr_view(aid):
             current_app.logger.warning('浏览量 DB 递增失败（文章 %s）：%s', aid, e2)
 
 
-def _flush_view_counts():
-    """把缓存累加的浏览量增量合并回 DB（APScheduler 周期任务 / 阈值触发）。
-
-    先取后删之间存在微小竞态窗口：窗口内到达的增量可能随删除丢失，
-    对浏览量这类近似统计可接受（与 issue 方案 A「临时键+过期合并」一致）；
-    合并失败时增量放回缓存，避免丢数。
-    """
+def _flush_site_views(site_id):
+    """把指定站点的浏览量增量合并回 DB。"""
     from ..extensions import cache
     from sqlalchemy import func
 
+    key = _view_pending_key(site_id)
     try:
-        pending = cache.get(_VIEW_PENDING_KEY)
+        pending = cache.get(key)
     except Exception as e:
         current_app.logger.warning('读取待合并浏览量失败：%s', e)
         return
     if not isinstance(pending, dict) or not pending:
         return
     try:
-        cache.delete(_VIEW_PENDING_KEY)
+        cache.delete(key)
     except Exception as e:
         current_app.logger.warning('清理待合并浏览量键失败：%s', e)
         return
@@ -214,7 +220,8 @@ def _flush_view_counts():
         for aid, n in pending.items():
             if not n:
                 continue
-            db.session.query(Article).filter(Article.id == aid).update(
+            db.session.query(Article).filter(
+                Article.id == aid, Article.site_id == site_id).update(
                 {Article.viewed: func.coalesce(Article.viewed, 0) + n},
                 synchronize_session=False,
             )
@@ -224,14 +231,31 @@ def _flush_view_counts():
         current_app.logger.warning('浏览量增量合并回 DB 失败：%s', e)
         # 合并失败：增量放回缓存（与期间新增量合并），等下一轮
         try:
-            back = cache.get(_VIEW_PENDING_KEY)
+            back = cache.get(key)
             merged = dict(pending)
             if isinstance(back, dict):
                 for k, v in back.items():
                     merged[k] = merged.get(k, 0) + v
-            cache.set(_VIEW_PENDING_KEY, merged, timeout=_VIEW_PENDING_TTL)
+            cache.set(key, merged, timeout=_VIEW_PENDING_TTL)
         except Exception as e2:
             current_app.logger.warning('浏览量增量回写缓存失败：%s', e2)
+
+
+def _flush_view_counts():
+    """把所有站点的浏览量增量合并回 DB（APScheduler 周期任务 / 阈值触发）。
+
+    先取后删之间存在微小竞态窗口：窗口内到达的增量可能随删除丢失，
+    对浏览量这类近似统计可接受（与 issue 方案 A「临时键+过期合并」一致）；
+    合并失败时增量放回缓存，避免丢数。
+    """
+    from ..models.site import Site
+    try:
+        site_ids = [s.id for s in Site.active_sites()]
+    except Exception as e:
+        current_app.logger.warning('读取站点列表失败，仅合并默认站点：%s', e)
+        site_ids = [0]
+    for sid in site_ids or [0]:
+        _flush_site_views(sid)
 
 
 def _inject_default_alt(html):
