@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.2.2 使用手册</title>
+<title>ZhyCMS v3.2.3 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -162,7 +162,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.2.2</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.2.3</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -371,6 +371,9 @@ docker compose -f docker-compose.postgresql.yml up -d
   <li><b>多角色并集</b>：一个用户可绑定多个角色，权限取并集。</li>
   <li><b>内容粒度授权</b>：可按栏目授予文章管理权限（如「只管理新闻中心」）。</li>
   <li><b>超级管理员</b>：内置超管不受权限限制；未授权菜单不可见，接口返回 403 并记录审计。</li>
+  <li><b>站点管理员（v3.2.3）</b>：拥有指定站点的全部后台管理权限（设置、用户、审计、栏目、内容、页面构建、表单），不含站点增删改与备份迁移等平台级功能。</li>
+  <li><b>角色按站分配（v3.2.3）</b>：站点管理员、内容审核员、内容编辑、只读查看员均绑定到具体站点；同一账号可拥有多个站点角色，登录后切换站点生效。</li>
+  <li><b>添加边界（v3.2.3）</b>：超级管理员可为任意站点分配角色；站点管理员只能在自己有权限的站点内添加角色，也只能管理角色全部落在该范围内的账号；「角色权限」页仅平台管理员可访问。</li>
 </ul>
 <div class="note">角色删除前自动解除用户绑定；用户禁用后立即无法登录，已有会话下次请求时失效。</div>
 </section>

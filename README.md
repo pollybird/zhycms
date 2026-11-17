@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.2.2-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.3-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-539%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-553%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.2**（站群内容隔离补全版：教程、页面构建、上传索引、第三方绑定补齐 `site_id` 与站点级唯一约束，删站检查、缓存失效、浏览量合并、插件 SQL 搜索与平台级后台入口同步收敛；新增迁移 `0014`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.3**（角色体系站点化版：新增「站点管理员」预设角色，账号角色按站点分配并支持一人多站多角色；站点管理员仅能在授权站点内管理账号，角色配置保留为平台级功能；新增迁移 `0015`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -112,6 +112,10 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.2.3（2026-11-17）
+
+角色体系站点化。新增「站点管理员」预设角色：拥有指定站点的全部后台管理权限（站点设置、用户、审计、栏目、内容、页面构建、表单），不含站点增删改与备份运维等平台级功能；内容审核员/内容编辑/只读查看员同样绑定到具体站点。`user_roles` 新增 `site_id` 并改为 `(user_id, role_id, site_id)` 唯一（迁移 `0015`），支持一人多站多角色；账号表单为每个站点提供角色下拉。超级管理员可为任意站点分配角色，站点管理员只能在自己有权限的站点内添加/管理账号，角色配置页仅平台管理员可访问。存量 `site_id IS NULL` 的全局角色保持全站语义。无新增依赖。
 
 ### v3.2.2（2026-11-17）
 

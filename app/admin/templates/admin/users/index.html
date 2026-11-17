@@ -11,7 +11,9 @@
     <h3 class="card-title">{{ _('账号列表') }}</h3>
     <div class="card-tools">
       <a href="{{ url_for('admin.user_create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> {{ _('新增账号') }}</a>
+      {% if platform_admin %}
       <a href="{{ url_for('admin.role_index') }}" class="btn btn-default btn-sm"><i class="fas fa-user-tag"></i> {{ _('角色权限') }}</a>
+      {% endif %}
     </div>
   </div>
   <div class="card-body p-0">
@@ -38,7 +40,9 @@
           </td>
           <td>{{ u.nickname or '-' }}</td>
           <td>
-            {% for r in u._roles %}<span class="badge badge-secondary mr-1">{{ r.name }}</span>{% endfor %}
+            {% for r, site_name in u._roles %}
+            <span class="badge badge-secondary mr-1">{{ r.name }}{% if site_name %}<small> · {{ site_name }}</small>{% endif %}</span>
+            {% endfor %}
           </td>
           <td><code>{{ u.last_login_ip or '-' }}</code></td>
           <td>{{ u.last_login_at|datetime_format if u.last_login_at else '-' }}</td>

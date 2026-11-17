@@ -23,10 +23,12 @@ import tarfile
 import tempfile
 import zipfile
 from datetime import datetime
+from functools import wraps
 
 from flask import (render_template, redirect, url_for, request, flash,
-                   current_app, send_file)
+                   current_app, send_file, abort)
 from flask_babel import gettext as _gettext
+from flask_login import current_user
 from werkzeug.utils import secure_filename
 
 from ..models.audit import OP_UPDATE, OP_UPLOAD, OP_DELETE, OP_EXPORT, MODULE_PLUGIN
@@ -47,8 +49,20 @@ _PLUGIN_SLUG_RE = re.compile(r'^[a-zA-Z0-9_-]{2,32}$')
 _PLUGIN_REQUIRED_FILES = ('manifest.json', '__init__.py')
 
 
+def _platform_only(view):
+    """v3.2.3：插件安装/启停/卸载属于平台级功能，站点管理员不可操作。"""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not (current_user.is_super
+                or current_user.has_permission('site:manage')):
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapper
+
+
 @admin_bp.route('/plugins')
 @permission_required('system:settings')
+@_platform_only
 def plugin_index():
     from ..models.setting import Setting
     return render_template('admin/plugin/index.html',
@@ -60,6 +74,7 @@ def plugin_index():
 
 @admin_bp.route('/plugins/upload-toggle', methods=['POST'])
 @permission_required('system:settings')
+@_platform_only
 def plugin_upload_toggle():
     """v3.1.8（VULN-002）：直传插件包开关（默认关闭）。
 
@@ -81,6 +96,7 @@ def plugin_upload_toggle():
 
 @admin_bp.route('/plugins/<slug>/toggle', methods=['POST'])
 @permission_required('system:settings')
+@_platform_only
 def plugin_toggle(slug):
     rec = plugin_system.get_record(slug)
     if rec is None:
@@ -111,6 +127,7 @@ def plugin_toggle(slug):
 
 @admin_bp.route('/plugins/<slug>/delete', methods=['POST'])
 @permission_required('system:settings')
+@_platform_only
 def plugin_delete(slug):
     """卸载插件：验证码确认后物理删除 plugins/<slug>/ 目录。
 
@@ -177,6 +194,7 @@ def plugin_delete(slug):
 
 @admin_bp.route('/plugins/<slug>/download')
 @permission_required('system:settings')
+@_platform_only
 def plugin_download(slug):
     """打包下载插件目录为 zip（单目录形态，可在其他站点直接上传复用）。"""
     if not _PLUGIN_SLUG_RE.match(slug or ''):
@@ -207,6 +225,7 @@ def plugin_download(slug):
 
 @admin_bp.route('/plugins/upload', methods=['POST'])
 @permission_required('system:settings')
+@_platform_only
 def plugin_upload():
     """插件压缩包上传入口。全程校验不通过时不写入 plugins/ 目录。"""
     # 0. v3.1.8（VULN-002）：直传开关（默认关闭），杜绝后台被攻破后直接 RCE

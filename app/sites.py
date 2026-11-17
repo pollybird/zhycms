@@ -271,11 +271,12 @@ def site_url(site_id, endpoint='frontend.index', **values):
 def can_access_site(user, site_id):
     """判断后台用户是否可访问指定站点。
 
-    规则（镜像 `can_access_column`）：
+    规则（v3.2.3 站点级角色）：
       - 超级管理员 / `site:manage` 权限：全站点；
-      - 只读查看员：默认全站点可见；
-      - 其他角色：需有 `UserSitePermission` 绑定行，或全局
-        `content_manage:all_columns` 且无任何站点绑定（向后兼容）。
+      - 有站点级角色分配（user_roles.site_id）：仅被分配的站点；
+      - 有全局角色分配（user_roles.site_id IS NULL）：保持全站可见（存量兼容）；
+      - 只读查看员且无站点级分配：默认全站点可见；
+      - 其他角色：需有 `UserSitePermission` 绑定行；未做任何绑定时全站可见（兼容）。
     """
     if user is None or not getattr(user, 'is_authenticated', False):
         return False
@@ -284,6 +285,9 @@ def can_access_site(user, site_id):
     if user.has_permission('site:manage'):
         return True
     from .models.rbac import UserSitePermission, ROLE_READONLY_VIEWER
+    scoped_sites = user.site_scoped_role_sites()
+    if site_id in scoped_sites:
+        return True
     try:
         rows = UserSitePermission.query.filter_by(user_id=user.id).all()
     except Exception as e:
@@ -291,14 +295,17 @@ def can_access_site(user, site_id):
         rows = []
     if any(r.site_id == site_id for r in rows):
         return True
-    # 只读查看员默认全站点可见
+    # 全局角色（site_id 为空）：存量兼容——没有显式站点绑定时全站可见；
+    # 一旦存在 UserSitePermission 绑定行，仍以显式绑定为准（v3.2.0 语义）。
+    if any(r.site_id is None for r in (user.role_assignments or [])):
+        return not rows
     role_codes = {getattr(r.role, 'code', '') for r in (user.role_assignments or [])
                   if getattr(r, 'role', None) is not None}
-    if ROLE_READONLY_VIEWER in role_codes:
+    # 只读查看员且未做站点级分配：保持全站可见（存量兼容）
+    if ROLE_READONLY_VIEWER in role_codes and not scoped_sites:
         return True
-    # v3.2.1 向后兼容：未做任何站点绑定 → 保持 v3.2.0 前的全站可见语义，
-    # 避免升级后把存量编辑锁死（需要限制时在账号页勾选站点即可）。
-    if not rows:
+    # 未做任何站点绑定 → 保持 v3.2.0 前的全站可见语义
+    if not rows and not scoped_sites:
         return True
     return False
 
@@ -307,6 +314,7 @@ def accessible_sites(user):
     """返回用户可见站点列表（后台切换器数据源）。
 
     v3.2.1：站点列表与站点权限各查一次，内存过滤（消除 N+1）；
+    v3.2.3：站点级角色分配（user_roles.site_id）纳入可见范围。
     结果缓存在请求级 g，站点/用户权限变更后由 invalidate_site_cache() 清理。
     """
     from .models.site import Site
@@ -327,19 +335,42 @@ def accessible_sites(user):
             return cached
 
     from .models.rbac import UserSitePermission, ROLE_READONLY_VIEWER
-    try:
-        rows = UserSitePermission.query.filter_by(user_id=user.id).all()
-    except Exception as e:
-        logger.debug('站点权限表不可用，按全站可见处理：%s', e)
-        return sites
-    role_codes = {getattr(r.role, 'code', '') for r in (user.role_assignments or [])
-                  if getattr(r, 'role', None) is not None}
-    if not rows or ROLE_READONLY_VIEWER in role_codes:
-        # 未绑定任何站点（legacy）或只读查看员：全站可见
-        result = sites
-    else:
-        allowed = {r.site_id for r in rows}
+    scoped_sites = user.site_scoped_role_sites()
+    has_global_role = any(r.site_id is None for r in (user.role_assignments or []))
+    if has_global_role:
+        # 全局角色（存量）：无显式站点绑定时全站可见；有绑定时以绑定为准
+        try:
+            rows = UserSitePermission.query.filter_by(user_id=user.id).all()
+        except Exception as e:
+            logger.debug('站点权限表不可用：%s', e)
+            rows = []
+        if rows:
+            allowed = {r.site_id for r in rows} | set(scoped_sites)
+            result = [s for s in sites if s.id in allowed]
+        else:
+            result = sites
+    elif scoped_sites:
+        allowed = set(scoped_sites)
+        try:
+            allowed |= {r.site_id for r in UserSitePermission.query.filter_by(
+                user_id=user.id).all()}
+        except Exception as e:
+            logger.debug('站点权限表不可用：%s', e)
         result = [s for s in sites if s.id in allowed]
+    else:
+        try:
+            rows = UserSitePermission.query.filter_by(user_id=user.id).all()
+        except Exception as e:
+            logger.debug('站点权限表不可用，按全站可见处理：%s', e)
+            return sites
+        role_codes = {getattr(r.role, 'code', '') for r in (user.role_assignments or [])
+                      if getattr(r, 'role', None) is not None}
+        if not rows or ROLE_READONLY_VIEWER in role_codes:
+            # 未绑定任何站点（legacy）或只读查看员：全站可见
+            result = sites
+        else:
+            allowed = {r.site_id for r in rows}
+            result = [s for s in sites if s.id in allowed]
     if has_app_context():
         setattr(g, cache_key, result)
     return result

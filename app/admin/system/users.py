@@ -22,7 +22,10 @@ from ...models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_USER_MANAGE,
     MODULE_USER, MODULE_ROLE,
 )
-from ...services.user_service import create_user, update_user
+from ...services.user_service import (
+    assignable_site_roles, create_user, is_platform_admin,
+    managed_site_ids, update_user, user_in_scope,
+)
 from .. import admin_bp
 
 
@@ -52,8 +55,17 @@ def _get_all_columns_tree():
 
 
 def _get_sites_for_form():
-    """站点专属权限可选站点（v3.2.0 站群）。"""
-    return Site.active_sites()
+    """站点专属权限可选站点（v3.2.3：平台管理员全部，站点管理员仅授权站点）。"""
+    if is_platform_admin():
+        return Site.active_sites()
+    from ...sites import accessible_sites
+    return accessible_sites(current_user)
+
+
+def _require_platform_admin():
+    """角色/权限配置属于平台级功能，站点管理员不可访问。"""
+    if not is_platform_admin():
+        abort(403)
 
 
 # ============================================================
@@ -69,6 +81,23 @@ def user_index():
     status_filter = request.args.get('status', '')
 
     query = User.query.filter_by(is_deleted=False)
+    platform_admin = is_platform_admin()
+    # v3.2.3：站点管理员只能看到完全处于自己站点范围内的账号
+    if not platform_admin:
+        managed = managed_site_ids()
+        if managed:
+            in_scope = db.session.query(UserRole.user_id).filter(
+                UserRole.site_id.in_(list(managed)))
+            out_scope = db.session.query(UserRole.user_id).filter(db.or_(
+                UserRole.site_id.is_(None),
+                UserRole.site_id.notin_(list(managed))))
+            query = query.filter(
+                User.is_super.is_(False),
+                User.id.in_(in_scope),
+                ~User.id.in_(out_scope),
+            )
+        else:
+            query = query.filter(User.id < 0)
     if keyword:
         # v3.1.9 VULN-010：转义 LIKE 通配符
         like = f'%{escape_like(keyword)}%'
@@ -87,13 +116,19 @@ def user_index():
     )
     users = pagination.items
 
-    # 预加载角色信息
+    # 预加载角色信息（含站点级角色所属站点）
     user_ids = [u.id for u in users]
     if user_ids:
         links = UserRole.query.filter(UserRole.user_id.in_(user_ids)).all()
+        site_ids = {l.site_id for l in links if l.site_id is not None}
+        site_names = {}
+        if site_ids:
+            site_names = {s.id: s.name for s in Site.query.filter(
+                Site.id.in_(site_ids)).all()}
         user_roles = {}
         for l in links:
-            user_roles.setdefault(l.user_id, []).append(l.role)
+            user_roles.setdefault(l.user_id, []).append(
+                (l.role, site_names.get(l.site_id)))
         for u in users:
             u._roles = user_roles.get(u.id, [])
     else:
@@ -105,7 +140,7 @@ def user_index():
         'admin/users/index.html',
         users=users, pagination=pagination,
         keyword=keyword, role_filter=role_filter, status_filter=status_filter,
-        roles=roles,
+        roles=roles, platform_admin=platform_admin,
     )
 
 
@@ -124,6 +159,8 @@ def user_create():
         user=None, roles=_get_roles_for_form(),
         columns=_get_all_columns_tree(),
         sites=_get_sites_for_form(),
+        site_roles=assignable_site_roles(),
+        platform_admin=is_platform_admin(),
     )
 
 
@@ -133,6 +170,9 @@ def user_edit(uid):
     user = User.query.filter_by(id=uid, is_deleted=False).first()
     if user is None:
         abort(404)
+    # v3.2.3：站点管理员只能管理自己站点范围内的账号
+    if not user_in_scope(user):
+        abort(403)
     # 禁止修改自己的权限（防止越权操作，让超级管理员之间互改）
     if user.id == current_user.id and not current_user.is_super:
         flash(_gettext('不能修改自己的账号权限，请联系其他超级管理员'), 'warning')
@@ -145,8 +185,11 @@ def user_edit(uid):
         if updated is not None:
             return redirect(url_for('admin.user_index'))
 
-    # 当前分配的角色ID集合
-    user_role_ids = {r.role_id for r in UserRole.query.filter_by(user_id=user.id).all()}
+    # 当前分配的全局角色ID集合（站点级角色在站点表中单独展示）
+    user_role_ids = {r.role_id for r in UserRole.query.filter_by(
+        user_id=user.id, site_id=None).all()}
+    site_role_map = {r.site_id: r.role_id for r in UserRole.query.filter(
+        UserRole.user_id == user.id, UserRole.site_id.isnot(None)).all()}
     # 当前分配的栏目权限
     col_perms = UserColumnPermission.query.filter_by(user_id=user.id).all()
     user_column_ids = {p.column_id for p in col_perms}
@@ -163,7 +206,10 @@ def user_edit(uid):
         user=user, roles=_get_roles_for_form(),
         columns=_get_all_columns_tree(),
         sites=_get_sites_for_form(),
+        site_roles=assignable_site_roles(),
+        platform_admin=is_platform_admin(),
         user_role_ids=user_role_ids,
+        site_role_map=site_role_map,
         user_column_ids=user_column_ids,
         can_review_map=can_review_map,
         can_publish_map=can_publish_map,
@@ -177,6 +223,8 @@ def user_edit(uid):
 @permission_required('system:user_manage')
 def user_toggle(uid):
     user = User.query.filter_by(id=uid, is_deleted=False).first() or abort(404)
+    if not user_in_scope(user):
+        abort(403)
     if user.id == current_user.id:
         flash(_gettext('不能禁用自己的账号'), 'warning')
         return redirect(url_for('admin.user_index'))
@@ -193,6 +241,8 @@ def user_toggle(uid):
 @permission_required('system:user_manage')
 def user_delete(uid):
     user = User.query.filter_by(id=uid, is_deleted=False).first() or abort(404)
+    if not user_in_scope(user):
+        abort(403)
     if user.id == current_user.id:
         flash(_gettext('不能删除自己的账号'), 'warning')
         return redirect(url_for('admin.user_index'))
@@ -210,8 +260,10 @@ def user_delete(uid):
 @admin_bp.route('/users/<int:uid>/reset-password', methods=['POST'])
 @permission_required('system:user_manage')
 def user_reset_password(uid):
-    """超级管理员重置指定账号密码。"""
+    """超级管理员/站点管理员重置指定账号密码。"""
     user = User.query.filter_by(id=uid, is_deleted=False).first() or abort(404)
+    if not user_in_scope(user):
+        abort(403)
     new_pwd = request.form.get('new_password') or ''
     # v3.1.10 VULN-015：后台新密码策略（12 位 + 四类字符）
     from ...utils.password_policy import validate_password
@@ -236,6 +288,7 @@ def user_reset_password(uid):
 @admin_bp.route('/roles')
 @permission_required('system:user_manage')
 def role_index():
+    _require_platform_admin()
     roles = Role.query.filter_by(is_deleted=False).order_by(Role.id.asc()).all()
     perms = Permission.query.order_by(Permission.group.asc(), Permission.code.asc()).all()
     # 按 group 分组展示
@@ -249,6 +302,7 @@ def role_index():
 @admin_bp.route('/roles/<int:rid>/permissions', methods=['POST'])
 @permission_required('system:user_manage')
 def role_save_permissions(rid):
+    _require_platform_admin()
     role = Role.query.filter_by(id=rid, is_deleted=False).first() or abort(404)
     if role.code == ROLE_SUPER_ADMIN:
         flash(_gettext('超级管理员角色权限不可修改（由 is_super 字段兜底）'), 'warning')
@@ -269,6 +323,7 @@ def role_save_permissions(rid):
 @admin_bp.route('/roles/create', methods=['GET', 'POST'])
 @permission_required('system:user_manage')
 def role_create():
+    _require_platform_admin()
     if request.method == 'POST':
         code = (request.form.get('code') or '').strip().lower()
         name = (request.form.get('name') or '').strip()
@@ -296,6 +351,7 @@ def role_create():
 @admin_bp.route('/roles/<int:rid>/edit', methods=['GET', 'POST'])
 @permission_required('system:user_manage')
 def role_edit(rid):
+    _require_platform_admin()
     role = Role.query.filter_by(id=rid, is_deleted=False).first() or abort(404)
     if request.method == 'POST':
         if role.is_system:
@@ -334,6 +390,7 @@ def role_edit(rid):
 @admin_bp.route('/roles/<int:rid>/delete', methods=['POST'])
 @permission_required('system:user_manage')
 def role_delete(rid):
+    _require_platform_admin()
     role = Role.query.filter_by(id=rid, is_deleted=False).first() or abort(404)
     if role.is_system:
         flash(_gettext('系统预设角色不可删除'), 'danger')

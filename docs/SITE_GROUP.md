@@ -197,7 +197,7 @@ def current_site_id():
 
 ## 八、RBAC 与站点权限
 
-1. 新增权限点 **`site:manage`**（站点管理：增删改站点、配置域名），授予超管/审核员。
+1. 新增权限点 **`site:manage`**（站点管理：增删改站点、配置域名），仅授予超管或显式勾选该权限的自定义角色（v3.2.3 起审核员不再默认拥有）。
 2. 新增 **`UserSitePermission(user_id, site_id, can_review, can_publish, unique(user_id,site_id))`**，把内容编辑/审核**收窄到指定站点**（镜像 `UserColumnPermission`）。
 3. 访问判定 `can_access_site(user, site_id)`：
    - 超管（`is_super`）全通；
@@ -318,3 +318,36 @@ v3.2.1 潜在威胁报告的 11 项缺口已在 v3.2.2 闭环：v3.2.1 解决「
 | 插件 SQL 搜索无站点条件（P1） | `sql_search` 增可选 `site_id`，上层签名探测兼容旧插件 | `app/utils/search.py`、`plugins/product/search.py`、`plugins/recruit/search.py` |
 | 平台入口被站点守卫误拦（P2） | 站点/插件/存储/迁移/翻译/统计/备份/监控入口豁免 | `app/admin/__init__.py` |
 | 后台域名登录不落对应站点 | 后台未显式选择站点时也按 Host 解析（domain → 子域），默认管理当前域名站点；显式切换仍以 session 为准；无权站点回退可访问站点 | `app/sites.py` |
+
+## 十七、角色体系站点化（v3.2.3）
+
+用户管理的分组重新规划：新增「站点管理员」，内容审核员/内容编辑/只读查看员也绑定到具体站点。迁移 `0015`，回归测试见 `tests/test_rbac_sites.py`。
+
+### 17.1 角色边界
+
+| 角色 | 范围 | 关键权限 |
+| --- | --- | --- |
+| 超级管理员 `super_admin` | 整个系统 | 全部权限（`is_super` 兜底），含 `site:manage`、`system:backup` |
+| 站点管理员 `site_admin` | 指定站点 | 站点内全部后台功能：设置、用户、审计、栏目、内容、页面构建、表单；**不含** `site:manage` / `system:backup` |
+| 内容审核员 `content_auditor` | 指定站点 | 审核/发布/归档/回滚、栏目、页面构建发布；v3.2.3 移除全局 `site:manage` |
+| 内容编辑 `content_editor` | 指定站点 | 创建/编辑/提交审核、页面构建草稿 |
+| 只读查看员 `readonly_viewer` | 指定站点 | 只读查看、表单数据与审计日志列表 |
+
+### 17.2 数据模型
+
+- `user_roles.site_id`：`NULL` = 平台级/全局角色（兼容存量与超管），非空 = 只在指定站点生效。
+- 唯一约束：`(user_id, role_id, site_id)`，支持一人多站多角色。
+- `User.has_permission(perm_code, site_id=None)`：传 `site_id` 时只认「全局角色 + 该站点角色」；不传时按全部角色判断（菜单可见性）。
+
+### 17.3 站点可见性
+
+- `can_access_site(user, site_id)`：超管/`site:manage` 全通；命中 `user_roles.site_id` 或 `UserSitePermission` 行即可访问；存量全局角色（`site_id IS NULL`）在无显式站点绑定时全站可见，有绑定时以绑定为准。
+- `accessible_sites(user)`：平台管理员 → 全部；站点级角色 → 角色所属站点 ∪ `UserSitePermission`；存量全局角色 → 全部（有绑定时取绑定）。
+
+### 17.4 账号管理边界
+
+- 平台管理员（超管或 `site:manage`）：可查看全部账号，分配全局角色与任意站点角色。
+- 站点管理员：账号列表只显示「角色全部落在自己可管理站点、且无全局角色」的账号；新增/编辑时只能选择自己管理的站点与四种站点角色；不能授予超管或越权站点。
+- 角色与权限配置页（`/admin/roles`）仅平台管理员可用，站点管理员访问返回 403。
+- 插件安装/启停/卸载（`/admin/plugins`）、备份恢复、系统监控与数据库迁移属于平台级功能，站点管理员访问返回 403。
+- 站点管理员保存账号时，不会删除其看不到的其他站点授权（范围外 `user_roles` 行保持不动）。
