@@ -30,7 +30,7 @@ python run.py
 - **删除站点**：存在教程、页面构建、上传索引或第三方绑定时会阻止删除并提示条数。
 - **备份/系统监控**：收敛为平台级运维，仅超管或拥有 `site:manage` 的账号可用。
 - **搜索**：产品/招聘的 SQL 兜底检索按当前站点过滤；旧版第三方插件的 `sql_search` 无 `site_id` 参数时仍兼容。
-- **测试**：全量 535 项通过；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.2` 三门禁全绿。
+- **测试**：全量 539 项通过；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.2` 三门禁全绿。
 
 ---
 

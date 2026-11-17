@@ -4,7 +4,8 @@
 每请求首调一次、结果缓存于 `g.current_site_id`、无上下文兜底默认站点 0。
 
 解析优先级：
-  后台请求：`?site=<slug|id>` → `session['admin_site_id']` → 默认 0
+  后台请求：`?site=<slug|id>` → `session['admin_site_id']` →
+            Host 匹配（domain/子域，仅未显式选择过站点时）→ 默认 0
   前台请求：`?site=<slug|id>`（仅登录后台用户可临时切换）→
             Host 精确匹配 `sites.domain` → 子域首标签匹配 `sites.subdomain` → 默认 0
 """
@@ -85,6 +86,26 @@ def _first_accessible_site(rows):
     return None
 
 
+def _match_host_site(rows):
+    """按当前请求 Host 匹配站点 id：精确 domain → 子域首标签。无匹配返回 None。"""
+    host = (request.host or '').split(':', 1)[0].strip().lower()
+    if not host:
+        return None
+    for s in rows:
+        if s.domain and s.domain.strip().lower() == host:
+            return s.id
+    # 子域首标签匹配（泛解析：b.main.com → subdomain=b）
+    labels = host.split('.')
+    # v3.2.1：开发环境允许两段式 b.localhost
+    dev_two_label = len(labels) == 2 and labels[1] == 'localhost'
+    if len(labels) >= 3 or dev_two_label:
+        sub = labels[0]
+        for s in rows:
+            if s.subdomain and s.subdomain.strip().lower() == sub:
+                return s.id
+    return None
+
+
 def _resolve_site_id():
     rows = _site_rows()
     if not rows:
@@ -128,23 +149,24 @@ def _resolve_site_id():
             if fallback is not None:
                 session[SESSION_KEY] = fallback.id
                 return fallback.id
+        else:
+            # v3.2.2：从未显式选择站点时，按当前 Host 匹配站点——用非默认站点的
+            # 域名登录后台，后台即默认管理该域名对应站点。显式 ?site= 切换写入
+            # session 后仍以 session 为准（切换器不被域名覆盖）。
+            host_sid = _match_host_site(rows)
+            if host_sid is not None:
+                if _user_can_access(host_sid):
+                    return host_sid
+                # 当前域名站点无权访问：回退到第一个可访问站点，不进入无权站点
+                fallback = _first_accessible_site(rows)
+                if fallback is not None:
+                    return fallback.id
         return default_id
 
-    # ③ Host 精确匹配
-    host = (request.host or '').split(':', 1)[0].strip().lower()
-    if host:
-        for s in rows:
-            if s.domain and s.domain.strip().lower() == host:
-                return s.id
-        # ④ 子域首标签匹配（泛解析：b.main.com → subdomain=b）
-        labels = host.split('.')
-        # v3.2.1：开发环境允许两段式 b.localhost
-        dev_two_label = len(labels) == 2 and labels[1] == 'localhost'
-        if len(labels) >= 3 or dev_two_label:
-            sub = labels[0]
-            for s in rows:
-                if s.subdomain and s.subdomain.strip().lower() == sub:
-                    return s.id
+    # ③ Host 精确匹配 → ④ 子域首标签匹配（泛解析）
+    host_sid = _match_host_site(rows)
+    if host_sid is not None:
+        return host_sid
 
     return default_id
 

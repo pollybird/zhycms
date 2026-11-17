@@ -317,3 +317,4 @@ v3.2.1 潜在威胁报告的 11 项缺口已在 v3.2.2 闭环：v3.2.1 解决「
 | 浏览量全局单键（P1） | 键改 `article:viewed:pending:site{N}`，按站合并并过滤文章 | `app/frontend/views.py` |
 | 插件 SQL 搜索无站点条件（P1） | `sql_search` 增可选 `site_id`，上层签名探测兼容旧插件 | `app/utils/search.py`、`plugins/product/search.py`、`plugins/recruit/search.py` |
 | 平台入口被站点守卫误拦（P2） | 站点/插件/存储/迁移/翻译/统计/备份/监控入口豁免 | `app/admin/__init__.py` |
+| 后台域名登录不落对应站点 | 后台未显式选择站点时也按 Host 解析（domain → 子域），默认管理当前域名站点；显式切换仍以 session 为准；无权站点回退可访问站点 | `app/sites.py` |

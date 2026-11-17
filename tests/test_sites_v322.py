@@ -29,10 +29,10 @@ DEFAULT_SITE_ID = 0
 # 辅助
 # ============================================================
 
-def _mk_site(app, slug='site-b', name='站点B'):
+def _mk_site(app, slug='site-b', name='站点B', domain=None, subdomain=None):
     from app.models.site import Site
     with app.app_context():
-        site = Site(name=name, slug=slug)
+        site = Site(name=name, slug=slug, domain=domain, subdomain=subdomain)
         db.session.add(site)
         db.session.commit()
         return site.id
@@ -481,3 +481,52 @@ def test_backup_requires_platform_ops(client, app):
     _login(client, uid)
     assert client.get('/admin/backups').status_code == 403
     assert client.get('/admin/monitor').status_code == 403
+
+
+# ============================================================
+# 后台域名解析（v3.2.2 实测缺陷）
+# ============================================================
+
+def _resolve_admin_host(app, monkeypatch, host, session_site=None, user_id=None):
+    """在模拟后台请求（指定 Host）下解析站点 id。"""
+    from app import sites as sites_mod
+    from flask import session
+    monkeypatch.setattr(sites_mod, '_is_admin_request', lambda: True)
+    with app.test_request_context('/admin/', headers={'Host': host}):
+        if session_site is not None:
+            session['admin_site_id'] = session_site
+        if user_id is not None:
+            session['_user_id'] = str(user_id)
+        return sites_mod._resolve_site_id()
+
+
+def test_admin_host_defaults_to_domain_site(app, monkeypatch):
+    """用非默认站点域名登录后台：未显式选过站点时默认管理该域名站点。"""
+    sid = _mk_site(app, slug='site-b', domain='b.example.com')
+    assert _resolve_admin_host(app, monkeypatch, 'b.example.com') == sid
+    # 带端口的 Host 同样生效
+    assert _resolve_admin_host(app, monkeypatch, 'b.example.com:8080') == sid
+    # 未配置域名的 Host 回退默认站点
+    assert _resolve_admin_host(app, monkeypatch, 'other.example.com') == 0
+
+
+def test_admin_host_subdomain_match(app, monkeypatch):
+    sid = _mk_site(app, slug='site-b', subdomain='b')
+    assert _resolve_admin_host(app, monkeypatch, 'b.example.com') == sid
+
+
+def test_admin_explicit_session_choice_beats_host(app, monkeypatch):
+    """用户已用切换器显式选择站点：session 优先，域名不得覆盖切换器。"""
+    sid = _mk_site(app, slug='site-b', domain='b.example.com')
+    assert _resolve_admin_host(app, monkeypatch, 'b.example.com',
+                               session_site=0) == 0
+    assert _resolve_admin_host(app, monkeypatch, 'b.example.com',
+                               session_site=sid) == sid
+
+
+def test_admin_host_denied_site_falls_back(app, monkeypatch):
+    """当前域名站点无权访问：回退到可访问站点，不进入无权站点。"""
+    sid = _mk_site(app, slug='site-b', domain='b.example.com')
+    uid = _mk_role_user(app, 'v322-host-user', ['system:backup'])  # 仅绑定默认站 0
+    assert _resolve_admin_host(app, monkeypatch, 'b.example.com',
+                               user_id=uid) == 0
