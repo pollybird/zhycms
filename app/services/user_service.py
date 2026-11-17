@@ -40,6 +40,30 @@ def managed_site_ids(user=None):
     return {s.id for s in accessible_sites(u)}
 
 
+def log_visible_site_ids(user=None):
+    """审计/登录日志可见站点范围。
+
+    返回 None 表示不限（超级管理员、具备 site:manage 的平台管理员、或持有
+    存量全局「站点管理员」角色）；返回 set() 表示没有任何可见站点。
+    站点管理员仅能看到自己被授予 site_admin 角色的站点。
+    """
+    u = user or current_user
+    if not getattr(u, 'is_authenticated', False):
+        return set()
+    if getattr(u, 'is_super', False) or u.has_permission('site:manage'):
+        return None
+    managed, has_global = set(), False
+    for assignment in (u.role_assignments or []):
+        role = getattr(assignment, 'role', None)
+        if role is None or role.code != 'site_admin':
+            continue
+        if assignment.site_id is None:
+            has_global = True
+        else:
+            managed.add(assignment.site_id)
+    return None if has_global else managed
+
+
 def assignable_site_roles():
     """站点内可分配的角色（站点管理员/审核员/编辑/只读查看员）。"""
     return (Role.query

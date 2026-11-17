@@ -259,6 +259,31 @@ def test_site_admin_cannot_access_plugin_management(app, client):
     assert client.get('/admin/plugins').status_code == 403
 
 
+def test_admin_menu_separates_site_and_global_settings(app, admin_client):
+    """v3.2.4：侧边栏将「站点设置」与「全局设置」分区，不再混在「系统设置」。"""
+    resp = admin_client.get('/admin/')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '站点设置' in html
+    assert '全局设置' in html
+    assert '系统设置' not in html
+
+
+def test_site_admin_menu_hides_platform_items(app, client):
+    """站点管理员看到两类设置分区，但看不到平台级的站点/插件管理入口。"""
+    sid_a = _mk_site(app, 'rbac3-a')
+    admin_uid = _mk_user(app, 'rbac3-siteadmin', [('site_admin', sid_a)])
+    _login(client, admin_uid)
+    _set_site(client, sid_a)
+
+    resp = client.get('/admin/')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '站点设置' in html and '全局设置' in html
+    assert '插件管理' not in html
+    assert '站点管理' not in html
+
+
 def test_site_admin_cannot_edit_out_of_scope_user(app, client):
     sid_a = _mk_site(app, 'rbac3-a')
     sid_b = _mk_site(app, 'rbac3-b')

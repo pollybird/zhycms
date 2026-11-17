@@ -24,7 +24,7 @@ import logging
 import os
 import threading
 
-from flask import request, session
+from flask import has_request_context, request, session
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +217,11 @@ def select_locale():
                  (Setting.get('i18n_available_locales') or 'zh').split(',')
                  if c.strip()]
     if not available:
+        return Setting.get('i18n_default_locale') or 'zh'
+
+    # 无请求上下文（CLI / 后台任务 / 单测裸调用）时直接按默认语种，
+    # 避免下方 request/session 访问抛出 RuntimeError。
+    if not has_request_context():
         return Setting.get('i18n_default_locale') or 'zh'
 
     # 1. URL ?lang=xx（一次性，写回 session）

@@ -21,10 +21,16 @@ from flask_login import current_user
 from ...extensions import db
 from ...models.user import User, LoginLog
 from ...models.setting import Setting
+from ...models.site import Site
+from ...services.user_service import log_visible_site_ids
 from ...utils.helpers import admin_required, permission_required, audit_log, clear_content_cache
 from ...utils.uploads import save_upload_file
 from ...utils.themes import list_theme_templates
 from ...utils.admin_prefix import load_admin_prefix, validate_prefix, save_admin_prefix
+from ...utils.password_policy import (
+    DEFAULT_MIN_LENGTH, MIN_LENGTH_LOWER, MIN_LENGTH_UPPER,
+    get_password_policy,
+)
 from ...models.audit import (
     OP_CONFIG_CHANGE, OP_UPDATE, MODULE_SETTING,
 )
@@ -390,7 +396,24 @@ def setting_security():
         if Setting.get('login_abnormal_city_alert') != val:
             Setting.set('login_abnormal_city_alert', val)
             changed['login_abnormal_city_alert'] = val
-        # 3. CSP 第三方源白名单（v3.1.8 F-001）：整体校验，失败不落库并提示行号
+        # 3. 密码复杂度策略（v3.2.4，仅超级管理员可调整，全局生效）
+        policy_min = None
+        if current_user.is_super:
+            policy_min = max(MIN_LENGTH_LOWER, min(
+                MIN_LENGTH_UPPER,
+                _int_safe('password_min_length', default=DEFAULT_MIN_LENGTH)))
+            policy_values = {
+                'password_min_length': str(policy_min),
+                'password_require_upper': _onoff('password_require_upper'),
+                'password_require_lower': _onoff('password_require_lower'),
+                'password_require_digit': _onoff('password_require_digit'),
+                'password_require_special': _onoff('password_require_special'),
+            }
+            for key, value in policy_values.items():
+                if Setting.get(key) != value:
+                    Setting.set(key, value)
+                    changed[key] = value
+        # 4. CSP 第三方源白名单（v3.1.8 F-001）：整体校验，失败不落库并提示行号
         from app.utils.admin_prefix import load_admin_prefix as _lap
         csp_values = {}
         for key in _CSP_SETTING_KEYS:
@@ -412,8 +435,11 @@ def setting_security():
         if changed:
             audit_log(OP_CONFIG_CHANGE, MODULE_SETTING, None, None,
                       {'category': 'security', 'changed': changed})
-        if 'admin_prefix' not in changed and not (set(changed.keys()) - {'admin_prefix'}):
+        if 'admin_prefix' not in changed:
             flash(_gettext('登录安全配置已保存'), 'success')
+        if policy_min is not None and policy_min < 8:
+            flash(_gettext('密码最低位数低于 8 位，已按您的设置保存，请注意账号安全风险。'),
+                  'warning')
         # 若改变了前缀，url_for 在本次请求中使用的旧 URL adapter 已与新 url_map 不匹配，
         # 直接字面量拼新前缀下的 security 设置页 URL，避免 BuildError。
         return redirect('/' + _lap() + '/settings/security')
@@ -425,7 +451,8 @@ def setting_security():
         except (TypeError, ValueError):
             settings[k] = d
     return render_template('admin/setting/security.html',
-                           admin_prefix=load_admin_prefix(), settings=settings)
+                           admin_prefix=load_admin_prefix(), settings=settings,
+                           password_policy=get_password_policy())
 
 
 # ============ 消息通知（模块7）============
@@ -771,10 +798,13 @@ def setting_editor():
 def setting_redis():
     """Redis 缓存运行状态（v2.5.0，只读）。
 
+    v3.2.6：Redis 为平台级基础设施，仅超级管理员可查看。
     自动检测：环境变量 REDIS_URL 有值且 Redis 可达 → 已启用；
     否则未启用，提示用户安装 Redis 并设置环境变量。
     不提供手动开关——Redis 后端在应用启动时初始化，运行时不可切换。
     """
+    if not current_user.is_super:
+        abort(403)
     env_redis_url = os.environ.get('REDIS_URL', '').strip()
     # 当前运行时状态
     runtime_active = bool(current_app.config.get('SESSION_TYPE') == 'redis')
@@ -860,7 +890,19 @@ def password():
 @permission_required('system:audit_log')
 def logs():
     page = max(int(request.args.get('page', 1)), 1)
-    pagination = LoginLog.query.order_by(LoginLog.created_at.desc()).paginate(
+    site_id = (request.args.get('site_id') or '').strip()
+    scope_site_ids = log_visible_site_ids()
+
+    query = LoginLog.query
+    if scope_site_ids is not None:
+        query = query.filter(LoginLog.site_id.in_(list(scope_site_ids)))
+    if site_id.isdigit():
+        query = query.filter_by(site_id=int(site_id))
+    pagination = query.order_by(LoginLog.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False
     )
-    return render_template('admin/setting/logs.html', logs=pagination.items, pagination=pagination)
+    sites = (Site.active_sites() if scope_site_ids is None else
+             Site.query.filter(Site.id.in_(list(scope_site_ids))).all())
+    return render_template(
+        'admin/setting/logs.html', logs=pagination.items, pagination=pagination,
+        sites=sites, site_id=site_id)

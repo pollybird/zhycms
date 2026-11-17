@@ -6,7 +6,7 @@
 {% block breadcrumb %}<li class="breadcrumb-item active">{{ _('后台安全') }}</li>{% endblock %}
 
 {% block content %}
-<form method="post">
+<form method="post"{% if current_user.is_super %} onsubmit="return confirmWeakPassword(this)"{% endif %}>
   <div class="row">
     <div class="col-md-8">
       <div class="card">
@@ -36,6 +36,40 @@
           </div>
         </div>
       </div>
+
+      {% if current_user.is_super %}
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">{{ _('管理员密码复杂度') }}</h3></div>
+        <div class="card-body">
+          <p class="text-muted">
+            {{ _('默认沿用严格策略：至少 12 位，且同时包含大写字母、小写字母、数字和特殊字符。可按实际需要放宽，策略对全部后台账号生效。') }}
+          </p>
+          <div class="form-group">
+            <label class="required-mark">{{ _('密码最低位数') }}</label>
+            <input type="number" name="password_min_length" class="form-control"
+                   min="6" max="64" value="{{ password_policy.min_length }}" required>
+            <small class="form-text text-muted">{{ _('允许 6-64 位；低于 8 位时保存前会提示安全风险。') }}</small>
+          </div>
+          <div class="form-group mb-0">
+            <label class="d-block">{{ _('必须包含的字符类型') }}</label>
+            {% for key, label in [
+              ('require_upper', _('大写字母')),
+              ('require_lower', _('小写字母')),
+              ('require_digit', _('数字')),
+              ('require_special', _('特殊字符')),
+            ] %}
+            <div class="custom-control custom-checkbox">
+              <input type="checkbox" class="custom-control-input"
+                     name="password_{{ key }}" id="password_{{ key }}"
+                     {{ 'checked' if password_policy[key] }}>
+              <label class="custom-control-label" for="password_{{ key }}">{{ label }}</label>
+            </div>
+            {% endfor %}
+            <small class="form-text text-muted">{{ _('全部不勾选时仅校验最低位数。') }}</small>
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="card">
         <div class="card-header"><h3 class="card-title">{{ _('CSP 第三方资源白名单') }}</h3></div>
@@ -99,4 +133,18 @@
     </div>
   </div>
 </form>
+
+{% if current_user.is_super %}
+<script>
+function confirmWeakPassword(form) {
+  var input = form.querySelector('input[name="password_min_length"]');
+  if (!input) { return true; }
+  var value = parseInt(input.value, 10);
+  if (!isNaN(value) && value < 8) {
+    return confirm('{{ _('密码最低位数低于 8 位，复杂度过低可能导致安全隐患。确定要调整吗？') }}');
+  }
+  return true;
+}
+</script>
+{% endif %}
 {% endblock %}
