@@ -16,6 +16,7 @@ from ...models.audit import (
     OP_PUBLISH, OP_ROLLBACK,
 )
 from ...utils.helpers import permission_required, audit_log
+from ...sites import current_site_id
 from ...builder import service as svc
 from ...builder import registry, schema
 from .. import admin_bp
@@ -33,7 +34,9 @@ def _json_error(message, code=400):
 
 
 def _page_or_404(pid):
-    page = BuilderPage.query.get(pid)
+    # v3.2.2 站群：跨站页面一律 404，避免通过 pid 打开/编辑他站布局
+    page = BuilderPage.query.filter_by(
+        id=pid, site_id=current_site_id()).first()
     if page is None:
         abort(404)
     return page
@@ -70,7 +73,8 @@ def builder_page_create():
             column_id = int(column_id)
         except (TypeError, ValueError):
             abort(404)
-        if Column.query.filter_by(id=column_id, is_deleted=False).first() is None:
+        if Column.query.filter_by(id=column_id, is_deleted=False,
+                                  site_id=current_site_id()).first() is None:
             abort(404)
     elif scope == _B.SCOPE_ARTICLE:
         column_id = None  # 全局默认详情布局
@@ -172,7 +176,8 @@ def builder_api_widgets():
 def builder_api_columns():
     """栏目选择器数据：list 用于文章列表绑定；all 用于链接选择器。"""
     ctype = request.args.get('type', 'list')
-    q = Column.query.filter_by(is_enabled=True, is_deleted=False)
+    q = Column.query.filter_by(is_enabled=True, is_deleted=False,
+                               site_id=current_site_id())
     if ctype == 'all':
         q = q.filter(Column.type.in_(('list', 'page')))
     else:
@@ -313,7 +318,9 @@ def _front_url(page):
     try:
         if page.scope == _B.SCOPE_HOME:
             return url_for('frontend.index')
-        col = Column.query.get(page.column_id) if page.column_id else None
+        col = Column.query.filter_by(
+            id=page.column_id, site_id=current_site_id()).first() \
+            if page.column_id else None
         if col is not None and page.scope in (_B.SCOPE_PAGE, _B.SCOPE_LIST):
             return url_for('frontend.column_detail', slug=col.slug)
         if page.scope == _B.SCOPE_ARTICLE and col is not None:
@@ -335,7 +342,8 @@ def _build_preview_ctx(page):
     col = None
     if page.column_id:
         col = Column.query.filter_by(
-            id=page.column_id, is_deleted=False).first()
+            id=page.column_id, is_deleted=False,
+            site_id=current_site_id()).first()
     if col is not None:
         ctx['column'] = col
         ctx['seo'] = _seo(column=col)
@@ -346,7 +354,8 @@ def _build_preview_ctx(page):
         if col.type == 'list':
             per_page = col.page_size or 10
             pagination = Article.query.filter_by(
-                column_id=col.id, is_deleted=False, status=STATUS_PUBLISHED
+                column_id=col.id, is_deleted=False, status=STATUS_PUBLISHED,
+                site_id=col.site_id
             ).order_by(
                 Article.sort_order.desc(), Article.published_at.desc()
             ).paginate(page=1, per_page=per_page, error_out=False)
@@ -357,11 +366,13 @@ def _build_preview_ctx(page):
         article = None
         if col is not None:
             article = Article.query.filter_by(
-                column_id=col.id, is_deleted=False, status=STATUS_PUBLISHED
+                column_id=col.id, is_deleted=False, status=STATUS_PUBLISHED,
+                site_id=col.site_id
             ).order_by(Article.published_at.desc()).first()
         if article is None:
             article = Article.query.filter_by(
-                is_deleted=False, status=STATUS_PUBLISHED
+                is_deleted=False, status=STATUS_PUBLISHED,
+                site_id=current_site_id()
             ).order_by(Article.published_at.desc()).first()
         if article is not None:
             art_col = col or Column.query.get(article.column_id)

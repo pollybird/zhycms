@@ -13,35 +13,52 @@
   <div class="card-body">
     <form method="get" class="form-row">
       <div class="col-md-3">
+        <label class="small">{{ _('关键词') }}</label>
+        <input type="text" name="keyword" class="form-control form-control-sm" value="{{ keyword or '' }}" placeholder="{{ _('详情/目标/账号/IP') }}">
+      </div>
+      <div class="col-md-2">
         <label class="small">{{ _('操作人') }}</label>
-        <select name="uid" class="form-control form-control-sm" onchange="this.form.submit()">
-          <option value="">{{ _('全部') }}</option>
-          {% for u in user_options %}
-          <option value="{{ u.id }}" {{ 'selected' if filter.uid == u.id }}>{{ u.username }}</option>
-          {% endfor %}
-        </select>
+        <input type="text" name="username" class="form-control form-control-sm" value="{{ username or '' }}">
       </div>
-      <div class="col-md-3">
-        <label class="small">{{ _('操作类型') }}</label>
-        <select name="action" class="form-control form-control-sm" onchange="this.form.submit()">
-          <option value="">{{ _('全部') }}</option>
-          {% for v, label in action_options %}
-          <option value="{{ v }}" {{ 'selected' if filter.action == v }}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="small">{{ _('模块') }}</label>
-        <select name="module" class="form-control form-control-sm" onchange="this.form.submit()">
+        <select name="module" class="form-control form-control-sm">
           <option value="">{{ _('全部') }}</option>
-          {% for v, label in module_options %}
-          <option value="{{ v }}" {{ 'selected' if filter.module == v }}>{{ label }}</option>
+          {% for v, label in module_choices %}
+          <option value="{{ v }}" {{ 'selected' if module == v }}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3 pt-4">
+      <div class="col-md-2">
+        <label class="small">{{ _('操作类型') }}</label>
+        <select name="op_type" class="form-control form-control-sm">
+          <option value="">{{ _('全部') }}</option>
+          {% for v, label in op_type_choices %}
+          <option value="{{ v }}" {{ 'selected' if op_type == v }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="small">{{ _('站点') }}</label>
+        <select name="site_id" class="form-control form-control-sm">
+          <option value="">{{ _('全部站点') }}</option>
+          {% for s in sites %}
+          <option value="{{ s.id }}" {{ 'selected' if site_id == s.id|string }}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="small">{{ _('开始日期') }}</label>
+        <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from or '' }}">
+      </div>
+      <div class="col-md-2">
+        <label class="small">{{ _('结束日期') }}</label>
+        <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to or '' }}">
+      </div>
+      <div class="col-md-8 pt-4">
         <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search"></i> {{ _('筛选') }}</button>
         <a href="{{ url_for('admin.audit_index') }}" class="btn btn-default btn-sm">{{ _('重置') }}</a>
+        <a href="{{ url_for('admin.audit_export', **request.args) }}" class="btn btn-success btn-sm"><i class="fas fa-file-export"></i> {{ _('导出') }}</a>
         <button type="button" class="btn btn-danger btn-sm" data-toggle="modal" data-target="#clean-modal"><i class="fas fa-broom"></i> {{ _('清理') }}</button>
       </div>
     </form>
@@ -57,6 +74,7 @@
       <thead>
         <tr>
           <th width="60">ID</th>
+          <th width="120">{{ _('站点') }}</th>
           <th width="140">{{ _('操作人') }}</th>
           <th width="100">{{ _('类型') }}</th>
           <th width="100">{{ _('模块') }}</th>
@@ -71,19 +89,23 @@
         <tr>
           <td>{{ log.id }}</td>
           <td>
-            {% if log.user %}<span>{{ log.user.username }}</span>
-            {% if log.user.is_superadmin %}<span class="badge badge-danger ml-1" style="font-size:10px;">{{ _('超管') }}</span>{% endif %}
+            {% for s in sites %}{% if s.id == log.site_id %}{{ s.name }}{% endif %}{% endfor %}
+            {% if log.site_id == default_site_id and not sites %}{{ _('默认站点') }}{% endif %}
+          </td>
+          <td>
+            {% if log.username %}<span>{{ log.nickname or log.username }}</span>
+            {% if log.user_id and log.user and log.user.is_super %}<span class="badge badge-danger ml-1" style="font-size:10px;">{{ _('超管') }}</span>{% endif %}
             {% else %}<span class="text-muted">{{ _('系统') }}</span>{% endif %}
           </td>
-          <td><span class="badge badge-info">{{ log.action_label }}</span></td>
-          <td>{{ log.module_label }}</td>
+          <td><span class="badge badge-info">{{ op_labels.get(log.op_type, log.op_type or '') }}</span></td>
+          <td>{{ module_labels.get(log.module, log.module or '') }}</td>
           <td>{{ log.target_id or '-' }}</td>
-          <td>{{ log.detail or '-' }}</td>
+          <td>{{ log.target_name or '' }}{% if log.detail %} <span class="text-muted small">{{ log.detail }}</span>{% endif %}</td>
           <td><code>{{ log.ip }}</code></td>
           <td>{{ log.created_at|datetime_format }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="8" class="text-center text-muted py-4">{{ _('暂无审计记录') }}</td></tr>
+        <tr><td colspan="9" class="text-center text-muted py-4">{{ _('暂无审计记录') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

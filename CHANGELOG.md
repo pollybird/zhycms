@@ -5,6 +5,110 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.2.3] - 2026-11-17
+
+**角色体系站点化版**：重新规划后台角色分组。新增「站点管理员」预设角色，拥有指定站点的全部后台管理权限；内容审核员/内容编辑/只读查看员同样绑定到具体站点。超级管理员可为任意账号分配多个站点角色，站点管理员只能在自己有权限的站点内添加/管理账号与角色。**新增迁移 `0015`、无新增依赖**，覆盖代码 + 重启即可。
+
+### Added
+
+- **站点管理员角色**：`roles.site_admin` 预设（`PRESET_ROLES` / `PRESET_ROLE_PERMISSIONS`），拥有站点内的设置、用户、审计、栏目、内容、页面构建与表单管理权限；明确不含 `site:manage`（站点增删改）与 `system:backup`（备份运维）等平台级功能。
+- **用户角色支持站点维度**：`user_roles` 新增 `site_id`（NULL = 平台级/全局角色，非空 = 只在指定站点生效），唯一约束调整为 `(user_id, role_id, site_id)`（迁移 `0015`）；支持一人多站、多角色。
+- **站点级权限求值**：`User.has_permission(perm_code, site_id=None)` 支持按站点判断；`User.site_role_ids()` / `has_site_role()` / `site_scoped_role_sites()` 提供角色归属查询。
+- **账号表单按站授权**：站点表新增「站点角色」下拉（`site_role_<站点id>`），超级管理员可逐站分配站点管理员/审核员/编辑/只读查看员；全局角色卡仅平台管理员可见。
+
+### Changed
+
+- **站点可见范围**：`can_access_site()` / `accessible_sites()` 纳入站点级角色分配；拥有全局角色的存量账号仍全站可见，存在 `UserSitePermission` 显式绑定时以绑定为准（保持 v3.2.0 语义）。
+- **内容审核员权限收敛**：移除预设中的全局 `site:manage`，审核员只能访问被分配的站点。
+- **账号管理边界**：站点管理员仅能查看/编辑/启停/删除/重置自己站点范围内且没有全局角色的账号；角色权限页（`/admin/roles`）仅平台管理员可访问。
+
+### 升级注意
+
+- **新增迁移 `0015`**（`user_roles.site_id` + 唯一约束站点化，自动执行可降级）。
+- **存量兼容**：升级后已有 `site_id IS NULL` 的角色保持原有全站语义，不会锁定现有账号；新分配建议按站点下拉授权。
+- **降级**：恢复 `(user_id, role_id)` 全局唯一；若同一账号同一角色被分配到多个站点，会在任何 DDL 前预检中止（不会半降级）。
+- **测试**：全量 553 项通过（新增 14 项 v3.2.3 回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.3` 三门禁全绿。
+
+## [3.2.2] - 2026-11-17
+
+**站群内容隔离补全版**：闭环 v3.2.1 潜在威胁报告中的 11 项缺口。v3.2.1 修的是「查询带站点」，本版补齐「表结构与写入带站点」：教程、页面构建、上传索引、第三方绑定新增 `site_id` 并按站唯一；删除站点检查、缓存失效、浏览量合并、插件 SQL 搜索、平台级后台入口同步收敛。**新增迁移 `0014`、无新增依赖**，覆盖代码 + 重启即可。
+
+### Fixed
+
+- **教程插件跨站可见/可改（P0）**：`tutorial_categories` / `tutorials` 新增 `site_id`，`slug` 由全局唯一改为站内唯一（`uq_tutorial_category_site_slug` / `uq_tutorial_site_slug`）；前台列表/分类/详情、后台 CRUD、模板函数与构建器组件全部按当前站点过滤；演示数据只清理当前站点，不再清空他站教程。
+- **页面构建跨站读写（P0）**：`builder_pages` 新增 `site_id`，唯一约束改为 `(site_id, scope, column_id)`；`get_page/get_or_create_page/list_pages_grouped` 按站查询，跨站页面在编辑器中一律 404；插件卸载检查仍有意跨站扫描，避免遗漏引用。
+- **上传跨站复用（P0/P1）**：`uploaded_files` 新增 `site_id` 与 `(site_id, content_hash)` 索引，去重按站隔离；新上传物理路径改为 `uploads/site{N}/<sub_dir>/<date>/<uuid>`，旧文件路径保持不变（历史 URL 继续可用）。
+- **删除站点检查遗漏（P1）**：删站内容检查补充教程分类/教程、页面构建、上传索引、第三方绑定，存在数据时阻止删除并返回条数。
+- **会员删除缺少站点校验（P1）**：`member_delete` 与编辑一致校验会员所属站点，跨站删除返回 404。
+- **OAuth 绑定跨站串号（P1）**：`member_oauths` 新增 `site_id`，唯一约束改为 `(site_id, provider, openid)`；回调按 `scope_site_id()` 查询与写入（`shared` 模式统一为 0，行为不变）。
+- **备份/监控站点管理员可操作（P1）**：备份、恢复、备份计划、系统监控收敛为平台级运维（超管或 `site:manage`），并在后台站点守卫中豁免对应入口。
+- **缓存失效键不匹配（P1）**：`clear_content_cache()` 改为按 `frontend/site{N}/*` 前缀失效；后端不支持模式删除时回退整体清空。
+- **浏览量全局单键（P1）**：待合并浏览量键改为 `article:viewed:pending:site{N}`，合并时按站点过滤文章，避免多站点增量互相覆盖。
+- **插件 SQL 搜索无站点条件（P1）**：`SearchProvider.sql_search` 增加可选 `site_id`；产品/招聘实现按站过滤，上层按签名探测调用并保留内存过滤兜底（旧插件无需改动）。
+- **平台级后台入口被站点守卫误拦（P2）**：站点管理、插件管理、对象存储、数据库迁移、翻译、访问统计、备份/监控等入口加入豁免白名单（各自内部再做权限校验）。
+- **后台域名登录不落对应站点（实测缺陷）**：此前域名匹配只在前台生效，用非默认站点域名登录后台总是落到默认站点。现在后台在未显式选择过站点时也按 Host 解析（精确 domain → 子域首标签），即默认管理当前域名对应站点；显式 `?site=` 切换仍以 session 为准（切换器不被域名覆盖），域名站点无权访问时回退到可访问站点。
+
+### 升级注意
+
+- **新增迁移 `0014`**（5 张表补 `site_id`、唯一约束站点化，自动执行；建唯一索引前预检站内重复，冲突时中止并提示清理）。
+- 新上传文件路径增加 `uploads/site{N}/` 前缀；历史文件与 URL 不受影响。
+- 降级会恢复全局唯一约束，存在跨站重复数据时预检中止（不会半降级）。
+- **测试**：全量 539 项通过（新增 23 项 v3.2.2 回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.2` 三门禁全绿。
+
+## [3.2.1] - 2026-11-16
+
+**站群缺陷修复版**：闭环 v3.2.0 第三方测试报告中的 3 个隔离/权限缺口（P0/P1）与 2 个中等问题（P2），并加固若干低风险边界项。**新增迁移 `0013`（子域唯一索引）、无新增依赖**，覆盖代码 + 重启即可。
+
+### Fixed
+
+- **站点权限可被 `?site=` 绕过（P0）**：`select_site()` 在写回 `session['admin_site_id']` 前校验 `can_access_site()`；显式访问无权站点由后台统一守卫返回 403；`admin_bp` 新增 `before_request` 统一站点授权（含插件后台路由），会话站点被回收时 GET 自动回退到首个可访问站点。
+- **未绑定站点账号的兼容语义**：没有任何 `UserSitePermission` 行的存量账号保持全站可见（升级不锁定现有编辑），存在绑定行的账号仅限绑定站点。
+- **`status=closed` 未覆盖 API/插件（P1）**：站点关闭校验由 `frontend` 蓝本钩子提升为 app 级 `before_request`，统一覆盖前台页面、内容 API 与插件前台蓝本；API 返回 503 JSON、`/healthz` 固定 200、后台与站点根文件/静态资源豁免。
+- **独立会员会话跨站有效（P1）**：新增 `plugins/member/scope.py` 统一会员站点口径；`member_scope=isolated` 时 `current_member()` 校验会员 `site_id` 与当前站点一致，不一致清会话按未登录处理。
+- **站点 SEO 不生效（P2）**：`_seo()` 基线改为「站点 `seo_*` 优先、空值回退全局设置」（文章/栏目自身 SEO 仍最优先）；内容 API `/api/v1/site` 增加 `site_id` 与站点 SEO 字段。
+- **`0012` 降级不能对称回滚（P2）**：降级在任何 DDL 之前预检跨站重复的 `slug/key/username`，冲突时中止并输出清单（不再半降级）；`UPGRADE.md` 同步回滚口径。
+- **低风险边界项（P3）**：`accessible_sites()` 批量化（消除 N+1，请求级缓存）；`sites.subdomain` 增加唯一约束（迁移 `0013`，空白转 NULL）；域名按 DNS label 规则校验并统一大小写/尾点规范化；`sort_order` 表单层整数校验；删除站点前检查栏目/文章/碎片/插件内容；`site_url()` 支持仅有子域的站点；开发环境支持 `b.localhost`；JWT 配置读取移至 Alembic bootstrap 之后，消除升级首启临时密钥告警。
+
+### 升级注意
+
+- **新增迁移 `0013`**（子域唯一索引，自动执行；存在重复子域时会预检中止并提示清理）。
+- 单站点部署零感知；站点权限仅在账号做过站点绑定时生效。
+- **测试**：全量 516 项通过（新增 18 项 v3.2.1 回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.1` 三门禁全绿。
+
+## [3.2.0] - 2026-11-15
+
+**站群版**：一个后端实例 + 一个数据库，按「站点」维度切分内容，同一套 CMS 同时服务多个独立前台站点（独立域名或泛解析子域）。**默认站点 `site_id=0` 恒等变换，单站点部署零感知**（URL、行为、SEO 全部不变）。有数据库迁移 `0012`，无新增依赖。
+
+### Added
+
+- **站点注册表 `sites`**：`id`（默认站点固定 0）/ `name` / `slug` / `domain`（精确域名）/ `subdomain`（泛解析子域标签）/ `status`（open / closed）/ `theme` / 站点级 SEO / 排序 / 软删除；默认站点由迁移幂等插入。
+- **站点解析器 `app/sites.py`**：`select_site()` 注册为全局 `before_request`，优先级为「后台 `?site=`（写回 `session['admin_site_id']`）→ Host 精确 `domain` → 子域首标签 `subdomain` → 默认站点 0」；请求级缓存，每请求最多一次站点查询。
+- **后台站点管理**（`/admin/sites`）：列表 / 新建 / 编辑 / 软删除 / 切换当前站点；默认站点禁删、有栏目的站点禁删；`slug`/`domain`/`subdomain` 冲突校验；写操作落审计（模块 `site`）。
+- **后台站点切换器**：顶部导航下拉按 `can_access_site` 过滤可见站点（仅站点数 > 1 时显示），切换写入会话。
+- **站点 RBAC**：新增权限点 `site:manage`（审核员预设默认授予）；新增 `UserSitePermission(user_id, site_id, can_review, can_publish)` 把内容权限收窄到指定站点（镜像 `UserColumnPermission`）。
+- **站点化配置**：`settings` 唯一键由 `key` 改为 `(key, site_id)`；读取按当前站点取值、缺失回退默认站点 `(key, 0)`；`upload_*`/`login_*`/`api_*`/`search_*`/`plugin_*` 等为全局键，恒取站点 0。
+- **前台会员共享/独立**：新增全局设置 `member_scope`（`shared` 默认 / `isolated`，超管可在站点设置页切换）；`members` 加 `site_id`，`username` 改 `(site_id, username)` 唯一——共享模式恒为 0 与现网一致，独立模式各站独立。
+- **插件站群 SDK**：`app.plugin_api` 新增 `current_site_id()`、`site_filter(query, model=None)` 并按需导出 `SiteScopedMixin` / `DEFAULT_SITE_ID`；`docs/PLUGIN_DEV.md` 新增站群章节。
+
+### Changed
+
+- **内容维度列**：`columns` / `articles`（冗余同步）/ `fragments` / `members` / `settings` / `audit_logs` 及内置插件内容表（`forms` / `friend_links` / `products` / `recruit_jobs` / `banner_groups` / `banners`）新增 `site_id`（`NOT NULL DEFAULT 0` + 索引）。
+- **站点内唯一**：`columns.slug` / `fragments.slug` / `forms.slug` / `banner_groups.slug` / `settings.key` / `members.username` 由全局唯一改为站点内唯一（SQLite 用唯一索引、MySQL/PostgreSQL 用复合唯一约束），不同站点可复用 `about`、`news` 等 slug。
+- **前台全链路按站过滤**：首页 / 栏目 / 文章 / 碎片 / 侧栏 / 上下篇 / 站内搜索 / sitemap / 内容 API 均按当前站点取数；站点 `status=closed` 时前台返回 503。
+- **主题按站**：`get_active_theme()` 优先当前站点 `sites.theme`，为空回退全局 `site_theme`。
+- **缓存命名空间**：页面缓存键 `frontend/site<sid>/...`、内容 API 缓存键追加 `|site=<sid>`、插件（轮播）缓存键 `plugin/banner/site<sid>/...`，杜绝串站渲染。
+- **全站搜索按站**：Tantivy schema 新增 `site_id` 字段（schema 版本标记不符时自动重建索引），Meilisearch 新增 `site_id` filterable attribute，SQL 兜底与插件 Provider 结果同样按站过滤。
+- **内置插件**：表单 / 友链 / 产品 / 招聘 / 轮播的后台列表、详情、唯一性校验、新建、批量操作与前台模板函数全部按当前站点过滤；产品与招聘搜索 Provider 输出 `site_id`；会员插件按 `member_scope` 共享或独立。
+
+### 升级注意
+
+- **有数据库迁移 `0012`**（自动执行，可降级回滚）；**无新增依赖**；覆盖代码 + 重启即可。
+- **单站点部署零感知**：迁移把现有栏目/文章/碎片/配置/会员/插件内容全部归入默认站点 `site_id=0`，URL 与行为不变。
+- **启用站群**：后台「站点管理」新建站点并绑定独立域名或子域标签后，用该域名/子域访问即进入对应站点；后台顶部切换器切换管理站点。
+- **重要提醒**：`slug` 唯一性改为站点内唯一后，不同站点可同名；跨站点跳转需使用 `site_url()` 生成绝对地址。
+- **会员模式**：默认 `shared` 与现网完全一致；切换 `isolated` 时存量会员保留 `site_id=0` 归默认站点，新注册按当前站点落库。
+- **测试**：全量 498 项通过（新增 15 项站群隔离回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.0` 三门禁全绿。
+
 ## [3.1.10] - 2026-11-09
 
 **纵深防御与合规加固版本**：修复 SAST 审计遗留的 Low/Info 项与 P3 项共 9 项（7 项代码加固 + 2 项纯文档披露）。**无数据库结构变更、无新增依赖**，覆盖代码重启即可。

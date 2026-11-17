@@ -17,6 +17,9 @@ class BuilderPage(db.Model):
     __tablename__ = 'builder_pages'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.2 站群：页面构建记录按站点隔离
+    site_id = db.Column(db.Integer, nullable=False, default=0,
+                        server_default='0', index=True)
     # 作用域：home/page/list/article
     scope = db.Column(db.String(16), nullable=False, index=True)
     # 绑定栏目：home 恒为 NULL；article 为 NULL 表示全局默认详情布局
@@ -53,7 +56,8 @@ class BuilderPage(db.Model):
     )
 
     __table_args__ = (
-        db.UniqueConstraint('scope', 'column_id', name='uq_builder_page_scope_column'),
+        db.UniqueConstraint('site_id', 'scope', 'column_id',
+                            name='uq_builder_page_site_scope_column'),
     )
 
     @property

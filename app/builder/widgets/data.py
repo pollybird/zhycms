@@ -9,8 +9,10 @@ def _column_by_id(column_id):
         return None
     try:
         from ...models.column import Column
+        from ...sites import current_site_id
         return Column.query.filter_by(
-            id=int(column_id), is_deleted=False, is_enabled=True).first()
+            id=int(column_id), is_deleted=False, is_enabled=True,
+            site_id=current_site_id()).first()
     except (TypeError, ValueError):
         return None
 
@@ -41,8 +43,10 @@ def _query_articles(node, page_ctx, column):
             return cache[key]
         from ...models.article import Article
         from ...models.workflow import STATUS_PUBLISHED
+        from ...sites import current_site_id
         items = Article.query.filter_by(
-            is_deleted=False, status=STATUS_PUBLISHED
+            is_deleted=False, status=STATUS_PUBLISHED,
+            site_id=current_site_id()
         ).order_by(
             Article.sort_order.desc(), Article.published_at.desc()
         ).offset(offset).limit(limit).all()
@@ -193,10 +197,12 @@ class FragmentBlock(Widget):
 
     def context(self, node, page_ctx):
         from ...models.fragment import Fragment
+        from ...sites import current_site_id
         slug = self.prop(node, 'slug', '')
         value = ''
         frag = Fragment.query.filter_by(
-            slug=slug, is_enabled=True, is_deleted=False).first()
+            slug=slug, is_enabled=True, is_deleted=False,
+            site_id=current_site_id()).first()
         if frag is not None:
             value = frag.value or ''
         return {'fragment_value': value}

@@ -21,10 +21,16 @@ class Setting(db.Model):
     __tablename__ = 'settings'
 
     id = db.Column(db.Integer, primary_key=True)
-    key = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    # 站群模式：站点维度（全局键恒为 0；站点键为当前站点 id）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
+    key = db.Column(db.String(64), nullable=False, index=True)
     value = db.Column(db.Text)
     description = db.Column(db.String(255))
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('key', 'site_id', name='uq_setting_key_site'),
+    )
 
     # ==== CMS 自身标识（固定常量，后台使用，永远不可通过设置或演示数据修改）====
     # 与前台的“网站名称 / 前台版权”严格区分：
@@ -33,7 +39,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.1.10'
+    CMS_VERSION = '3.2.3'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -136,6 +142,11 @@ class Setting(db.Model):
         'i18n_default_locale': 'zh',         # 默认语种（zh 中文 / en 英文）
         'i18n_available_locales': 'zh',      # 可用语种清单，逗号分隔，如 zh,en
 
+        # ===== v3.2.0：站群会员归属模式 =====
+        # shared=所有站点共享会员（默认，site_id=0 哨兵，等价现网全局唯一）
+        # isolated=会员归属当前站点（各站独立唯一）
+        'member_scope': 'shared',
+
         # ===== v2.4.0：全文搜索（v3.1.4 引擎切换为 Tantivy）=====
         'search_engine': 'tantivy',            # tantivy / meilisearch / sql
         'search_meili_url': '',                # Meilisearch 服务地址
@@ -177,6 +188,36 @@ class Setting(db.Model):
         'security_csp_frame_src': '',
     }
 
+    # ===== v3.2.0 站群模式：全局键（每实例一份，与站点无关）=====
+    # 全局键恒读写 site_id=0；其余键为「站点键」，读写当前站点，
+    # 站点键缺失时回退 (key, 0)（默认站点/迁移前存量值），保证单站点零变化。
+    GLOBAL_KEYS_EXPLICIT = frozenset({
+        'member_scope',
+        'editor_default_mode',
+    })
+    GLOBAL_KEY_PREFIXES = (
+        'upload_', 'login_', 'api_', 'jwt_', 'i18n_', 'search_',
+        'storage_', 'oss_', 'audit_', 'backup_', 'security_', 'redis_',
+        'notify_', 'plugin_', 'smtp_', 'mail_',
+        'member_sms_', 'member_wechat_', 'member_oauth', 'member_captcha',
+    )
+
+    @classmethod
+    def _is_global_key(cls, key):
+        if not key:
+            return False
+        if key in cls.GLOBAL_KEYS_EXPLICIT:
+            return True
+        return key.startswith(cls.GLOBAL_KEY_PREFIXES)
+
+    @classmethod
+    def _key_site_id(cls, key):
+        """返回该配置键应归属的 site_id（全局键恒 0）。"""
+        if cls._is_global_key(key):
+            return 0
+        from ..sites import current_site_id
+        return current_site_id()
+
     # ===== v3.1.8：敏感键入库加密（VULN-003，GitCode issue #12）=====
     # 判定规则：显式集合 + 后缀匹配（覆盖 oss_*_secret、*_password、
     # member_sms_aliyun_key_secret、member_wechat_secret 等插件敏感键）。
@@ -197,7 +238,7 @@ class Setting(db.Model):
         return key.endswith(cls.SENSITIVE_KEY_SUFFIXES)
 
     @classmethod
-    def _resolve_sensitive(cls, key, raw, cache_map=None):
+    def _resolve_sensitive(cls, key, raw, cache_map=None, site_id=0):
         """敏感键读取处理：密文解密返回明文；历史明文惰性加密回写。
 
         惰性迁移（v3.1.8 决策）：无需 Alembic 脚本，首次读取明文敏感值时
@@ -211,7 +252,7 @@ class Setting(db.Model):
         # 惰性迁移：明文 → 加密回写
         encrypted = encrypt_value(raw)
         if encrypted != raw:
-            item = cls.query.filter_by(key=key).first()
+            item = cls.query.filter_by(key=key, site_id=site_id).first()
             if item is not None and item.value == raw:
                 item.value = encrypted
                 try:
@@ -229,15 +270,16 @@ class Setting(db.Model):
     def _request_cache_map(cls):
         """v3.1.3 M7（GitCode issue #3）：请求级整表缓存（g）。
 
-        单页渲染链路 Setting.get() 调用 20+ 次，逐次 first() 造成写放大；
-        同一请求内首查整表建映射，后续读零 SQL。set() 写后失效（见 set），
-        仅失效当前请求，多 worker 天然无一致性问题。
+        v3.2.0 站群：映射结构改为 `{site_id: {key: value}}`，
+        首查整表建映射，后续读零 SQL；set() 写后失效当前请求。
         """
         if not has_app_context():
             return None
         cache_map = g.get('_settings_map')
         if cache_map is None:
-            cache_map = {r.key: (r.value or '') for r in cls.query.all()}
+            cache_map = {}
+            for r in cls.query.all():
+                cache_map.setdefault(r.site_id or 0, {})[r.key] = (r.value or '')
             setattr(g, '_settings_map', cache_map)
         return cache_map
 
@@ -245,23 +287,29 @@ class Setting(db.Model):
     def get(cls, key, default=None):
         resolved = None
         found = False
+        sid = cls._key_site_id(key)
         cache_map = cls._request_cache_map()
         if cache_map is not None:
-            if key in cache_map:
-                resolved = cache_map[key]
+            site_map = cache_map.setdefault(sid, {})
+            if key in site_map:
+                resolved = site_map[key]
                 found = True
             else:
-                # 键不在 DB 整表映射中：解析默认值并回填映射，避免同请求重复落库查询
-                item = cls.query.filter_by(key=key).first()
+                # 键不在缓存：查当前站点，站点键缺失时回退全局 (key, 0)
+                item = cls.query.filter_by(key=key, site_id=sid).first()
+                if item is None and sid != 0:
+                    item = cls.query.filter_by(key=key, site_id=0).first()
                 if item is not None:
                     resolved = item.value or ''
                     found = True
                 else:
                     resolved = default if default is not None else cls.DEFAULTS.get(key, '')
-                cache_map[key] = resolved
+                site_map[key] = resolved
         else:
             # 无应用上下文（CLI / 单测裸调用）：保持原有逐键查询行为
-            item = cls.query.filter_by(key=key).first()
+            item = cls.query.filter_by(key=key, site_id=sid).first()
+            if item is None and sid != 0:
+                item = cls.query.filter_by(key=key, site_id=0).first()
             if item is not None:
                 resolved = item.value or ''
                 found = True
@@ -269,22 +317,29 @@ class Setting(db.Model):
                 resolved = default if default is not None else cls.DEFAULTS.get(key, '')
         # v3.1.8 VULN-003：敏感键解密/惰性迁移（仅处理来自 DB 的值，默认值不回写）
         if found and resolved and cls._is_sensitive_key(key):
-            return cls._resolve_sensitive(key, resolved, cache_map)
+            site_map = cache_map.get(sid) if cache_map is not None else None
+            return cls._resolve_sensitive(key, resolved, site_map, site_id=sid)
         return resolved
 
     @classmethod
     def get_dict(cls):
+        from ..sites import current_site_id
+        sid = current_site_id()
         result = dict(cls.DEFAULTS)
         cache_map = cls._request_cache_map()
         if cache_map is not None:
-            result.update(cache_map)
+            result.update(cache_map.get(0) or {})
+            if sid != 0:
+                result.update(cache_map.get(sid) or {})
         else:
-            for item in cls.query.all():
+            for item in cls.query.filter(cls.site_id.in_([0, sid])).all():
                 result[item.key] = item.value or ''
         # v3.1.8 VULN-003：模板注入的 site_settings 需拿到明文
         for k in list(result):
             if result[k] and cls._is_sensitive_key(k):
-                result[k] = cls._resolve_sensitive(k, result[k], cache_map)
+                owner = 0 if cls._is_global_key(k) else sid
+                result[k] = cls._resolve_sensitive(
+                    k, result[k], (cache_map or {}).get(owner), site_id=owner)
         return result
 
     @classmethod
@@ -295,13 +350,50 @@ class Setting(db.Model):
             from ..utils.crypto import FERNET_PREFIX, encrypt_value
             if not stored.startswith(FERNET_PREFIX):
                 stored = encrypt_value(stored)
-        item = cls.query.filter_by(key=key).first()
+        sid = cls._key_site_id(key)
+        item = cls.query.filter_by(key=key, site_id=sid).first()
         if item is None:
-            item = cls(key=key, value=stored)
+            item = cls(key=key, site_id=sid, value=stored)
             db.session.add(item)
         else:
             item.value = stored
         # v3.1.3 M7：写后失效当前请求的整表缓存，同请求内后续读立即可见
+        if has_app_context():
+            g.pop('_settings_map', None)
+        return item
+
+    @classmethod
+    def get_for_site(cls, key, site_id, default=None):
+        """按指定站点读取配置（站点管理/跨站展示用）。"""
+        item = cls.query.filter_by(key=key, site_id=site_id).first()
+        if item is None and site_id != 0:
+            item = cls.query.filter_by(key=key, site_id=0).first()
+        if item is None:
+            return default if default is not None else cls.DEFAULTS.get(key, '')
+        raw = item.value or ''
+        if raw and cls._is_sensitive_key(key):
+            return cls._resolve_sensitive(key, raw, None, site_id=site_id)
+        return raw
+
+    @classmethod
+    def set_for_site(cls, key, value, site_id):
+        """按指定站点写入配置（站点管理用）。"""
+        cls.set_site_override(key, value, site_id)
+
+    @classmethod
+    def set_site_override(cls, key, value, site_id):
+        """直接写入指定站点的配置行（不做当前站点推断）。"""
+        stored = str(value) if value is not None else ''
+        if stored and cls._is_sensitive_key(key):
+            from ..utils.crypto import FERNET_PREFIX, encrypt_value
+            if not stored.startswith(FERNET_PREFIX):
+                stored = encrypt_value(stored)
+        item = cls.query.filter_by(key=key, site_id=site_id).first()
+        if item is None:
+            item = cls(key=key, site_id=site_id, value=stored)
+            db.session.add(item)
+        else:
+            item.value = stored
         if has_app_context():
             g.pop('_settings_map', None)
         return item

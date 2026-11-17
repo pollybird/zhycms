@@ -18,7 +18,9 @@ class Member(db.Model):
     __tablename__ = 'members'
 
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    # v3.2.0 站群：会员归属站点（member_scope=shared 时恒为 0，等价全局唯一）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
+    username = db.Column(db.String(64), nullable=False, index=True)
     password_hash = db.Column(db.String(255))  # 第三方/短信注册用户初始可为空
     nickname = db.Column(db.String(64))
     avatar = db.Column(db.String(255))
@@ -41,6 +43,10 @@ class Member(db.Model):
 
     oauths = db.relationship(
         'MemberOauth', backref='member', cascade='all, delete-orphan', lazy='dynamic'
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'username', name='uq_member_site_username'),
     )
 
     def set_password(self, raw):
@@ -79,6 +85,9 @@ class MemberOauth(db.Model):
     __tablename__ = 'member_oauths'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.2 站群：绑定记录按站点隔离（shared 模式下统一为 0）
+    site_id = db.Column(db.Integer, nullable=False, default=0,
+                        server_default='0', index=True)
     member_id = db.Column(db.Integer, db.ForeignKey('members.id'), nullable=False, index=True)
     provider = db.Column(db.String(20), nullable=False)  # wechat / qq
     openid = db.Column(db.String(128), nullable=False)
@@ -90,7 +99,8 @@ class MemberOauth(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
     __table_args__ = (
-        db.UniqueConstraint('provider', 'openid', name='uq_member_oauth_openid'),
+        db.UniqueConstraint('site_id', 'provider', 'openid',
+                            name='uq_member_oauth_site_openid'),
     )
 
 

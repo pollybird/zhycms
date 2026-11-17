@@ -70,10 +70,13 @@ class Roles:
     """预设角色 slug。"""
 
     SUPER_ADMIN = 'super_admin'
+    SITE_ADMIN = 'site_admin'
     CONTENT_AUDITOR = 'content_auditor'
     CONTENT_EDITOR = 'content_editor'
     READONLY_VIEWER = 'readonly_viewer'
-    ALL = (SUPER_ADMIN, CONTENT_AUDITOR, CONTENT_EDITOR, READONLY_VIEWER)
+    ALL = (SUPER_ADMIN, SITE_ADMIN, CONTENT_AUDITOR, CONTENT_EDITOR, READONLY_VIEWER)
+    # v3.2.3 站点内可分配的角色（不含超管）
+    SITE_ASSIGNABLE = (SITE_ADMIN, CONTENT_AUDITOR, CONTENT_EDITOR, READONLY_VIEWER)
 
 
 class Pagination:

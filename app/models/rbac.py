@@ -23,6 +23,7 @@ from ..constants import Roles as _R
 # ============================================================
 
 ROLE_SUPER_ADMIN = _R.SUPER_ADMIN        # 超级管理员
+ROLE_SITE_ADMIN = _R.SITE_ADMIN          # 站点管理员（v3.2.3）
 ROLE_CONTENT_AUDITOR = _R.CONTENT_AUDITOR   # 内容审核员
 ROLE_CONTENT_EDITOR = _R.CONTENT_EDITOR     # 内容编辑
 ROLE_READONLY_VIEWER = _R.READONLY_VIEWER   # 只读查看员
@@ -31,6 +32,11 @@ PRESET_ROLES = {
     ROLE_SUPER_ADMIN: {
         'name': '超级管理员',
         'description': '拥有系统全部权限，不可删除',
+        'is_system': True,
+    },
+    ROLE_SITE_ADMIN: {
+        'name': '站点管理员',
+        'description': '拥有指定站点的全部管理权限（不含插件安装/备份/迁移等平台级功能）',
         'is_system': True,
     },
     ROLE_CONTENT_AUDITOR: {
@@ -60,6 +66,8 @@ PERMISSION_DEFS = [
     ('system:user_manage',     '用户管理',    '后台账号与角色权限管理'),
     ('system:backup',          '备份运维',    '数据库备份恢复与系统监控'),
     ('system:audit_log',       '审计日志',    '查看/导出/清理操作审计日志'),
+    # v3.2.0 站群模式：站点管理
+    ('site:manage',            '站点管理',    '站群站点增删改、域名/子域绑定与站点切换授权'),
     # 栏目管理
     ('column:manage',          '栏目管理',    '栏目增删改、字段配置、排序启用禁用'),
     # 内容发布
@@ -82,11 +90,24 @@ PERMISSION_DEFS = [
     ('builder:publish',        '页面构建发布', '发布/回滚可视化构建的页面布局'),
 ]
 
-# 四种预设角色的默认权限（超级管理员所有权限在运行时由 is_super 兜底，不必写全）
+# 五种预设角色的默认权限（超级管理员所有权限在运行时由 is_super 兜底，不必写全）
 PRESET_ROLE_PERMISSIONS = {
     ROLE_SUPER_ADMIN: [p[0] for p in PERMISSION_DEFS],
+    # v3.2.3：站点管理员 = 站点内全部后台功能（站点设置/用户/审计/栏目/内容/构建/表单），
+    # 明确不含站点增删改（site:manage）、备份运维（system:backup）等平台级权限。
+    ROLE_SITE_ADMIN: [
+        'system:settings', 'system:user_manage', 'system:audit_log',
+        'column:manage', 'content_manage:all_columns',
+        'content:create', 'content:edit', 'content:delete',
+        'content:submit_review', 'content:review',
+        'content:publish', 'content:archive', 'content:batch',
+        'content:rollback',
+        'builder:manage', 'builder:publish',
+        'form:view', 'form:manage',
+    ],
     ROLE_CONTENT_AUDITOR: [
         'system:audit_log',
+        # v3.2.3：收回全局站点管理权限——审核员只能访问被分配的站点
         'column:manage',
         'content_manage:all_columns',
         'content:create', 'content:edit', 'content:delete',
@@ -227,16 +248,22 @@ class RolePermission(db.Model):
 
 
 class UserRole(db.Model):
-    """用户-角色 多对多 关联。"""
+    """用户-角色 关联（v3.2.3 起支持按站点分配）。
+
+    site_id 为 NULL 表示平台级/全局角色（兼容存量数据与超管）；
+    非空表示该角色仅在指定站点内生效（站点管理员/审核员/编辑/只读查看员）。
+    """
     __tablename__ = 'user_roles'
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False, index=True)
+    site_id = db.Column(db.Integer, db.ForeignKey('sites.id'), nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
 
     __table_args__ = (
-        db.UniqueConstraint('user_id', 'role_id', name='uq_user_role'),
+        db.UniqueConstraint('user_id', 'role_id', 'site_id',
+                            name='uq_user_role_site'),
     )
 
     role = db.relationship('Role')
@@ -259,3 +286,25 @@ class UserColumnPermission(db.Model):
     )
 
     column = db.relationship('Column')
+
+
+class UserSitePermission(db.Model):
+    """用户-站点专属权限（v3.2.0 站群模式，镜像 UserColumnPermission）。
+
+    把内容编辑/审核范围收窄到指定站点；未绑定任何行的用户按全局权限判定。
+    """
+    __tablename__ = 'user_site_permissions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    site_id = db.Column(db.Integer, db.ForeignKey('sites.id'), nullable=False, index=True)
+    # 细粒度：是否允许在该站点审核/发布
+    can_review = db.Column(db.Boolean, default=False, nullable=False)
+    can_publish = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'site_id', name='uq_user_site'),
+    )
+
+    site = db.relationship('Site')

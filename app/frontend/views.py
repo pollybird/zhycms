@@ -31,6 +31,7 @@ from ..utils.themes import (
 )
 from ..utils.captcha import generate_captcha
 from ..utils.helpers import safe_int
+from ..sites import current_site_id, current_site
 from . import frontend_bp
 
 
@@ -118,7 +119,7 @@ def _try_cache(key, ttl_setting_key, default_ttl=600, view_arg=None):
                 ttl = int(Setting.get(ttl_setting_key, default_ttl))
             except (TypeError, ValueError):
                 ttl = default_ttl
-            cache_key = f'frontend/{key}/' + '/'.join(
+            cache_key = f'frontend/site{current_site_id()}/{key}/' + '/'.join(
                 [str(v) for v in args] + [f'{k}={v}' for k, v in sorted(kwargs.items())]
             ) + request.query_string.decode('utf-8', errors='ignore')
             # v2.5.0：缓存键包含当前 locale，避免不同语言命中同一缓存
@@ -154,30 +155,41 @@ def _try_cache(key, ttl_setting_key, default_ttl=600, view_arg=None):
 
 # ---- v3.1.3 M8：浏览量缓存累加 + 合并回 DB（GitCode issue #3）----
 
-_VIEW_PENDING_KEY = 'article:viewed:pending'
+# v3.2.2 站群：待合并浏览量按站点分键，避免多站点共用一个键导致
+# 计数互相覆盖/合并到错误站点。
 # 待合并增量达到该值时在请求内直接触发合并（多 worker 无调度器场景兜底）
 _VIEW_FLUSH_THRESHOLD = 200
 # 兜底过期：调度器长期停止时缓存增量最多滞留 24h，避免内存累积
 _VIEW_PENDING_TTL = 86400
 
 
+def _view_pending_key(site_id=None):
+    from ..sites import current_site_id
+    sid = current_site_id() if site_id is None else site_id
+    return f'article:viewed:pending:site{sid}'
+
+
 def _incr_view(aid):
     """浏览量计数：优先缓存累加（消除每详情请求一次写事务）；
     缓存不可用时回落旧行为直接递增 DB。"""
     from ..extensions import cache
+    from ..sites import current_site_id
 
+    sid = current_site_id()
+    key = _view_pending_key(sid)
     try:
-        pending = cache.get(_VIEW_PENDING_KEY)
+        pending = cache.get(key)
         pending = dict(pending) if isinstance(pending, dict) else {}
         pending[aid] = pending.get(aid, 0) + 1
-        cache.set(_VIEW_PENDING_KEY, pending, timeout=_VIEW_PENDING_TTL)
+        cache.set(key, pending, timeout=_VIEW_PENDING_TTL)
         if sum(pending.values()) >= _VIEW_FLUSH_THRESHOLD:
-            _flush_view_counts()
+            _flush_site_views(sid)
     except Exception as e:
         # 浏览计数隔离：缓存不可用时回退直接递增 DB，不影响页面响应
         current_app.logger.warning('浏览量缓存累加失败，回退 DB 递增：%s', e)
         try:
-            article = Article.query.get(aid)
+            article = Article.query.filter_by(
+                id=aid, site_id=sid).first()
             if article is not None:
                 article.viewed = (article.viewed or 0) + 1
                 db.session.commit()
@@ -186,25 +198,21 @@ def _incr_view(aid):
             current_app.logger.warning('浏览量 DB 递增失败（文章 %s）：%s', aid, e2)
 
 
-def _flush_view_counts():
-    """把缓存累加的浏览量增量合并回 DB（APScheduler 周期任务 / 阈值触发）。
-
-    先取后删之间存在微小竞态窗口：窗口内到达的增量可能随删除丢失，
-    对浏览量这类近似统计可接受（与 issue 方案 A「临时键+过期合并」一致）；
-    合并失败时增量放回缓存，避免丢数。
-    """
+def _flush_site_views(site_id):
+    """把指定站点的浏览量增量合并回 DB。"""
     from ..extensions import cache
     from sqlalchemy import func
 
+    key = _view_pending_key(site_id)
     try:
-        pending = cache.get(_VIEW_PENDING_KEY)
+        pending = cache.get(key)
     except Exception as e:
         current_app.logger.warning('读取待合并浏览量失败：%s', e)
         return
     if not isinstance(pending, dict) or not pending:
         return
     try:
-        cache.delete(_VIEW_PENDING_KEY)
+        cache.delete(key)
     except Exception as e:
         current_app.logger.warning('清理待合并浏览量键失败：%s', e)
         return
@@ -212,7 +220,8 @@ def _flush_view_counts():
         for aid, n in pending.items():
             if not n:
                 continue
-            db.session.query(Article).filter(Article.id == aid).update(
+            db.session.query(Article).filter(
+                Article.id == aid, Article.site_id == site_id).update(
                 {Article.viewed: func.coalesce(Article.viewed, 0) + n},
                 synchronize_session=False,
             )
@@ -222,14 +231,31 @@ def _flush_view_counts():
         current_app.logger.warning('浏览量增量合并回 DB 失败：%s', e)
         # 合并失败：增量放回缓存（与期间新增量合并），等下一轮
         try:
-            back = cache.get(_VIEW_PENDING_KEY)
+            back = cache.get(key)
             merged = dict(pending)
             if isinstance(back, dict):
                 for k, v in back.items():
                     merged[k] = merged.get(k, 0) + v
-            cache.set(_VIEW_PENDING_KEY, merged, timeout=_VIEW_PENDING_TTL)
+            cache.set(key, merged, timeout=_VIEW_PENDING_TTL)
         except Exception as e2:
             current_app.logger.warning('浏览量增量回写缓存失败：%s', e2)
+
+
+def _flush_view_counts():
+    """把所有站点的浏览量增量合并回 DB（APScheduler 周期任务 / 阈值触发）。
+
+    先取后删之间存在微小竞态窗口：窗口内到达的增量可能随删除丢失，
+    对浏览量这类近似统计可接受（与 issue 方案 A「临时键+过期合并」一致）；
+    合并失败时增量放回缓存，避免丢数。
+    """
+    from ..models.site import Site
+    try:
+        site_ids = [s.id for s in Site.active_sites()]
+    except Exception as e:
+        current_app.logger.warning('读取站点列表失败，仅合并默认站点：%s', e)
+        site_ids = [0]
+    for sid in site_ids or [0]:
+        _flush_site_views(sid)
 
 
 def _inject_default_alt(html):
@@ -292,41 +318,72 @@ def _build_nav():
 
 
 def _seo(column=None, article=None):
-    """获取页面 SEO 信息（v2.5.0：按当前 locale 取翻译，无翻译回退主表字段）。"""
+    """获取页面 SEO 信息（v2.5.0：按当前 locale 取翻译，无翻译回退主表字段）。
+
+    v3.2.1 站群：基线为「站点 SEO 优先，空值回退全局设置」；
+    文章/栏目自身 SEO 仍优先于站点基线。
+    """
     from ..utils.i18n_content import t_field
     s = Setting.get_dict()
+    site = current_site()
+    base = {
+        'title': (site.seo_title if site is not None and site.seo_title
+                  else s.get('seo_title', '')),
+        'keywords': (site.seo_keywords if site is not None and site.seo_keywords
+                     else s.get('seo_keywords', '')),
+        'description': (site.seo_description if site is not None and site.seo_description
+                        else s.get('seo_description', '')),
+    }
     if article:
         return {
-            'title': t_field(article, 'seo_title') or t_field(article, 'title') or s.get('seo_title', ''),
-            'keywords': t_field(article, 'seo_keywords') or s.get('seo_keywords', ''),
-            'description': t_field(article, 'seo_description') or t_field(article, 'summary') or s.get('seo_description', ''),
+            'title': t_field(article, 'seo_title') or t_field(article, 'title') or base['title'],
+            'keywords': t_field(article, 'seo_keywords') or base['keywords'],
+            'description': (t_field(article, 'seo_description')
+                            or t_field(article, 'summary') or base['description']),
         }
     if column:
         return {
-            'title': t_field(column, 'seo_title') or t_field(column, 'name') or s.get('seo_title', ''),
-            'keywords': t_field(column, 'seo_keywords') or s.get('seo_keywords', ''),
-            'description': t_field(column, 'seo_description') or t_field(column, 'summary') or s.get('seo_description', ''),
+            'title': t_field(column, 'seo_title') or t_field(column, 'name') or base['title'],
+            'keywords': t_field(column, 'seo_keywords') or base['keywords'],
+            'description': (t_field(column, 'seo_description')
+                            or t_field(column, 'summary') or base['description']),
         }
-    return {
-        'title': s.get('seo_title', ''),
-        'keywords': s.get('seo_keywords', ''),
-        'description': s.get('seo_description', ''),
-    }
+    return base
 
 
-@frontend_bp.before_request
 def check_site_status():
-    """站点维护模式拦截（除首页提示外，所有前台路由都跳到关闭页）。"""
-    if Setting.get('site_status') == 'closed':
-        # 允许访问 admin 蓝本（已在另一个蓝本注册，这里不影响）
-        from ..utils.admin_prefix import load_admin_prefix
-        admin_prefix = load_admin_prefix()
-        if request.path.startswith('/' + admin_prefix):
-            return
-        # 站点根文件（favicon/robots/sitemap）不受维护模式影响，保证收录与图标正常
-        if request.endpoint in ('frontend.favicon', 'frontend.robots', 'frontend.sitemap'):
-            return
-        return render_template(theme_template('closed'), seo=_seo()), 503
+    """站点维护模式拦截（v3.2.1：提升为 app 级 before_request）。
+
+    覆盖前台页面、内容 API 与插件前台蓝本；站点根文件、静态资源、
+    healthz 探针与后台（admin/admin_auth）不受影响。
+    """
+    from ..utils.admin_prefix import load_admin_prefix
+
+    # CORS 预检不能被 503 打断
+    if request.method == 'OPTIONS':
+        return None
+    # 站点根文件与健康探针不受维护模式影响
+    if request.endpoint in ('static', 'frontend.favicon', 'frontend.robots',
+                            'frontend.sitemap', 'frontend.healthz'):
+        return None
+    # 后台（含插件后台路由）始终可访问
+    if request.blueprint in ('admin', 'admin_auth'):
+        return None
+    admin_prefix = load_admin_prefix()
+    if admin_prefix and request.path.startswith('/' + admin_prefix):
+        return None
+
+    site = current_site()
+    closed = (site is not None and site.status == 'closed') or \
+        Setting.get('site_status') == 'closed'
+    if not closed:
+        return None
+
+    # 内容 API 返回统一 JSON 503，不返回 HTML 关闭页
+    if request.path.startswith('/api/'):
+        from ..api.views import api_err
+        return api_err(503, '站点维护中，暂时无法访问', http=503)
+    return render_template(theme_template('closed'), seo=_seo()), 503
 
 
 # 首页行业区块：slug → 展示条数（与演示数据栏目对应，缺失栏目返回 (None, [])）
@@ -345,8 +402,10 @@ def _home_section_data():
     返回 {slug: (col_or_None, articles)}，模板上下文契约与原 _home_column_articles 一致。
     """
     slugs = list(_HOME_SECTION_LIMITS)
+    sid = current_site_id()
     cols = Column.query.filter(
         Column.slug.in_(slugs),
+        Column.site_id == sid,
         Column.is_enabled == True,
         Column.is_deleted == False,
     ).all()
@@ -355,6 +414,7 @@ def _home_section_data():
     if parent_ids:
         for ch in Column.query.filter(
             Column.parent_id.in_(parent_ids),
+            Column.site_id == sid,
             Column.is_deleted == False,
             Column.is_enabled == True,
         ).all():
@@ -367,6 +427,7 @@ def _home_section_data():
     if all_ids:
         for a in Article.query.filter(
             Article.column_id.in_(all_ids),
+            Article.site_id == sid,
             Article.is_deleted == False,
             Article.status == STATUS_PUBLISHED,
         ).order_by(Article.sort_order.desc(), Article.published_at.desc()).all():
@@ -422,14 +483,15 @@ def index():
         })
 
     top_pages = Column.query.filter_by(
-        parent_id=None, type='page', is_enabled=True, is_deleted=False
+        parent_id=None, type='page', is_enabled=True, is_deleted=False,
+        site_id=current_site_id()
     ).order_by(Column.sort_order.desc()).first()
 
     # 友情链接改由 friend_link 插件提供（模板全局函数 friend_links()，禁用时返回 []）
 
     # v3.1.3 M9：前 3 个 list 栏目的最新文章批量拉取，替代逐栏目子查询
     list_columns = Column.query.filter_by(
-        type='list', is_enabled=True, is_deleted=False
+        type='list', is_enabled=True, is_deleted=False, site_id=current_site_id()
     ).all()
     latest_articles = []
     latest_cols = list_columns[:3]
@@ -438,6 +500,7 @@ def index():
         by_col = {}
         for a in Article.query.filter(
             Article.column_id.in_(lc_ids),
+            Article.site_id == current_site_id(),
             Article.is_deleted == False,
             Article.status == STATUS_PUBLISHED,
         ).order_by(Article.published_at.desc()).all():
@@ -449,7 +512,7 @@ def index():
     # v3.1.3 M9：行业主题首页数据批量拉取（原 9 次 _home_column_articles → 3 条 SQL）
     sections = _home_section_data()
     about_col = Column.query.filter_by(
-        slug='about', is_enabled=True, is_deleted=False
+        slug='about', is_enabled=True, is_deleted=False, site_id=current_site_id()
     ).first()
     products_col, products = sections['products']
     services_col, services = sections['services']
@@ -514,10 +577,10 @@ def rewrite_article(aid):
     """伪静态：/article-123.html。"""
     if Setting.get('seo_rewrite_enable') != 'on':
         abort(404)
-    article = Article.query.get_or_404(aid)
+    article = Article.query.filter_by(id=aid, site_id=current_site_id()).first_or_404()
     if article.is_deleted or article.status != STATUS_PUBLISHED:
         abort(404)
-    col = Column.query.get(article.column_id)
+    col = Column.query.filter_by(id=article.column_id, site_id=current_site_id()).first()
     if col is None or col.is_deleted or not col.is_enabled:
         abort(404)
     # 直接按栏目详情渲染，避免跳回动态参数 URL（伪静态的意义就在于此）
@@ -531,7 +594,8 @@ def rewrite_article(aid):
 @frontend_bp.route('/column/<slug>')
 @_try_cache('column', 'cache_ttl_column', 600)
 def column_detail(slug, page=None):
-    col = Column.query.filter_by(slug=slug, is_deleted=False).first_or_404()
+    col = Column.query.filter_by(
+        slug=slug, is_deleted=False, site_id=current_site_id()).first_or_404()
     if not col.is_enabled:
         abort(404)
 
@@ -548,7 +612,9 @@ def column_detail(slug, page=None):
 
     # 父栏目：根据模式处理
     if col.is_parent:
-        children = col.children.filter_by(is_deleted=False, is_enabled=True).order_by(
+        children = col.children.filter_by(
+            is_deleted=False, is_enabled=True, site_id=col.site_id
+        ).order_by(
             Column.sort_order.desc(), Column.created_at.desc()
         ).all()
         if not children:
@@ -593,7 +659,8 @@ def column_detail(slug, page=None):
             page = 1
         per_page = col.page_size or 10
         pagination = Article.query.filter_by(
-            column_id=col.id, is_deleted=False, status=STATUS_PUBLISHED
+            column_id=col.id, site_id=col.site_id,
+            is_deleted=False, status=STATUS_PUBLISHED
         ).order_by(
             Article.sort_order.desc(), Article.published_at.desc()
         ).paginate(page=page, per_page=per_page, error_out=False)
@@ -622,8 +689,10 @@ def column_detail(slug, page=None):
 @frontend_bp.route('/column/<slug>/article/<int:aid>')
 @_try_cache('article', 'cache_ttl_article', 900, view_arg='aid')
 def article_detail(slug, aid):
-    col = Column.query.filter_by(slug=slug, is_deleted=False).first_or_404()
-    article = Article.query.get_or_404(aid)
+    col = Column.query.filter_by(
+        slug=slug, is_deleted=False, site_id=current_site_id()).first_or_404()
+    article = Article.query.filter_by(
+        id=aid, site_id=current_site_id()).first_or_404()
     if article.column_id != col.id or article.is_deleted or article.status != STATUS_PUBLISHED:
         abort(404)
 
@@ -642,18 +711,20 @@ def article_detail(slug, aid):
 
     # 侧边栏最新文章
     latest_articles = col.articles.filter_by(
-        is_deleted=False, status=STATUS_PUBLISHED
+        is_deleted=False, status=STATUS_PUBLISHED, site_id=col.site_id
     ).order_by(Article.published_at.desc()).limit(8).all()
 
     # 上一篇/下一篇
     prev_article = Article.query.filter(
         Article.column_id == col.id,
+        Article.site_id == col.site_id,
         Article.is_deleted == False,
         Article.status == STATUS_PUBLISHED,
         Article.id < article.id
     ).order_by(Article.id.desc()).first()
     next_article = Article.query.filter(
         Article.column_id == col.id,
+        Article.site_id == col.site_id,
         Article.is_deleted == False,
         Article.status == STATUS_PUBLISHED,
         Article.id > article.id
@@ -691,7 +762,8 @@ def article_detail(slug, aid):
 # 兼容更短的 URL：/article/<aid>
 @frontend_bp.route('/article/<int:aid>')
 def article_short(aid):
-    article = Article.query.get_or_404(aid)
+    article = Article.query.filter_by(
+        id=aid, site_id=current_site_id()).first_or_404()
     if article.is_deleted or article.status != STATUS_PUBLISHED:
         abort(404)
     return redirect(url_for('frontend.article_detail',
@@ -748,7 +820,8 @@ def search():
         from ..utils.search import search_articles, build_result_url
         from ..i18n import select_locale
         results, total = search_articles(
-            keyword, page=page, per_page=per_page, locale=select_locale()
+            keyword, page=page, per_page=per_page, locale=select_locale(),
+            site_id=current_site_id()
         )
     # 为每个结果生成 URL（文章 → 文章详情；产品等插件内容 → 插件路由）
     for r in results:
@@ -824,6 +897,7 @@ def sitemap():
 
     # 栏目页（排除链接栏目）
     columns = Column.query.filter(
+        Column.site_id == current_site_id(),
         Column.is_enabled == True,
         Column.is_deleted == False,
         Column.type != 'link',
@@ -843,6 +917,7 @@ def sitemap():
 
     # 文章页
     articles = Article.query.filter(
+        Article.site_id == current_site_id(),
         Article.status == STATUS_PUBLISHED,
         Article.is_deleted == False,
     ).order_by(Article.published_at.desc()).all()
@@ -863,7 +938,7 @@ def sitemap():
     # v2.2.0：聚合启用插件贡献的 URL（轮播图无详情页、产品详情页等）
     try:
         from ..plugin_system import collect_sitemap_urls
-        urls.extend(collect_sitemap_urls())
+        urls.extend(collect_sitemap_urls(site_id=current_site_id()))
     except Exception as e:
         # 插件隔离：插件 URL 收集失败时仅生成本站内置页面
         current_app.logger.warning('收集插件 Sitemap URL 失败，已跳过：%s', e)

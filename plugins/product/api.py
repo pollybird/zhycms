@@ -87,8 +87,10 @@ def register(api_bp):
         if not plugin_enabled('product'):
             return api_err(404, '资源不存在')
         from .models import Product
+        from app.sites import current_site_id
 
-        p = Product.query.get(pid)
+        p = Product.query.filter_by(
+            id=pid, site_id=current_site_id()).first()
         if p is None or p.is_deleted or not p.is_enabled:
             return api_err(404, '产品不存在')
         col = p.column

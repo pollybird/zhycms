@@ -20,9 +20,12 @@ def banner_items(slug, limit=None):
     """
     from app.extensions import db
     from app.models.setting import Setting
+    from app.sites import current_site_id
     from .models import BannerGroup, Banner
 
-    group = BannerGroup.query.filter_by(slug=slug, is_enabled=True).first()
+    sid = current_site_id()
+    group = BannerGroup.query.filter_by(
+        slug=slug, is_enabled=True, site_id=sid).first()
     if group is None:
         return []
 
@@ -56,7 +59,7 @@ def banner_items(slug, limit=None):
 
     from app.extensions import cache
     stamp = group.updated_at.strftime('%Y%m%d%H%M%S') if group.updated_at else '0'
-    key = f'plugin/banner/items/{slug}/{int(limit or 0)}/{stamp}'
+    key = f'plugin/banner/site{sid}/items/{slug}/{int(limit or 0)}/{stamp}'
     try:
         cached = cache.get(key)
         if cached is not None:

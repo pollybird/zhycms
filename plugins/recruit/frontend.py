@@ -30,10 +30,12 @@ def recruit_jobs(limit=10, only_open=False):
     返回 [{id,title,department,location,headcount,salary,url,
            is_expired,deadline}]；插件未启用时守卫返回 []。
     """
+    from app.sites import current_site_id
     from .models import RecruitJob
 
     q = RecruitJob.query.filter(RecruitJob.is_deleted == False,  # noqa: E712
-                                RecruitJob.is_enabled == True)   # noqa: E712
+                                RecruitJob.is_enabled == True,   # noqa: E712
+                                RecruitJob.site_id == current_site_id())
     if only_open:
         q = q.filter((RecruitJob.deadline.is_(None))
                      | (RecruitJob.deadline > datetime.now()))

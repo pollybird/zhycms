@@ -72,13 +72,20 @@ def _safe_next(target, default='/member'):
     return default
 
 
+def _member_scope_site():
+    """v3.2.0 站群：返回会员查询应使用的 site_id（v3.2.1 收口到 scope 模块）。"""
+    from .scope import scope_site_id
+    return scope_site_id()
+
+
 def _find_member(identifier):
-    """按用户名 / 手机号 / 邮箱查找会员。"""
+    """按用户名 / 手机号 / 邮箱查找会员（按会员归属模式限定站点）。"""
     return Member.query.filter(
         (Member.username == identifier)
         | (Member.phone == identifier)
         | (Member.email == identifier),
         Member.is_deleted == False,
+        Member.site_id == _member_scope_site(),
     ).first()
 
 
@@ -117,11 +124,14 @@ def register():
             flash(_gettext('手机号格式不正确'), 'danger')
         elif email and not EMAIL_RE.match(email):
             flash(_gettext('邮箱格式不正确'), 'danger')
-        elif Member.query.filter_by(username=username, is_deleted=False).first():
+        elif Member.query.filter_by(username=username, is_deleted=False,
+                                    site_id=_member_scope_site()).first():
             flash(_gettext('用户名已被注册'), 'danger')
-        elif phone and Member.query.filter_by(phone=phone, is_deleted=False).first():
+        elif phone and Member.query.filter_by(phone=phone, is_deleted=False,
+                                              site_id=_member_scope_site()).first():
             flash(_gettext('手机号已被注册'), 'danger')
-        elif email and Member.query.filter_by(email=email, is_deleted=False).first():
+        elif email and Member.query.filter_by(email=email, is_deleted=False,
+                                              site_id=_member_scope_site()).first():
             flash(_gettext('邮箱已被注册'), 'danger')
         elif not request.form.get('agree'):
             flash(_gettext('请阅读并同意注册协议'), 'danger')
@@ -129,6 +139,7 @@ def register():
             member = Member(
                 username=username, nickname=username,
                 phone=phone or None, email=email or None,
+                site_id=_member_scope_site(),
             )
             member.set_password(password)
             db.session.add(member)
@@ -166,13 +177,15 @@ def login():
                 flash(_gettext('验证码错误或已失效'), 'danger')
             else:
                 member = Member.query.filter_by(
-                    phone=phone, is_deleted=False).first()
+                    phone=phone, is_deleted=False,
+                    site_id=_member_scope_site()).first()
                 if member is None:
                     if not cfg.is_on('member_auto_register_sms'):
                         flash(_gettext('该手机号尚未注册'), 'danger')
                     else:
                         member = Member(
-                            username='m' + phone, nickname=phone, phone=phone)
+                            username='m' + phone, nickname=phone, phone=phone,
+                            site_id=_member_scope_site())
                         db.session.add(member)
                         db.session.commit()
                 if member is not None:
@@ -261,7 +274,8 @@ def forgot_password():
         password = request.form.get('password') or ''
         confirm = request.form.get('password_confirm') or ''
 
-        member = Member.query.filter_by(phone=phone, is_deleted=False).first()
+        member = Member.query.filter_by(phone=phone, is_deleted=False,
+                                        site_id=_member_scope_site()).first()
         if not sms_svc.valid_phone(phone):
             flash(_gettext('手机号格式不正确'), 'danger')
         elif member is None:
@@ -320,13 +334,15 @@ def oauth_callback(provider):
         flash(_gettext('第三方登录失败：%(err)s', err=str(e)), 'danger')
         return redirect(url_for('member_frontend.login'))
 
+    site_id = _member_scope_site()
     binding = MemberOauth.query.filter_by(
-        provider=provider, openid=profile['openid']).first()
+        provider=provider, openid=profile['openid'], site_id=site_id).first()
 
     # 已绑定 → 直接登录
     if binding is not None:
         member = db.session.get(Member, binding.member_id)
-        if member is None or member.is_deleted or not member.is_enabled:
+        if (member is None or member.is_deleted or not member.is_enabled
+                or member.site_id != site_id):
             flash(_gettext('账号不可用，请联系管理员'), 'danger')
             return redirect(url_for('member_frontend.login'))
         oauth_next = session.pop('oauth_next', '')
@@ -350,6 +366,7 @@ def oauth_callback(provider):
         username=_unique_oauth_username(provider, profile['openid']),
         nickname=profile['nickname'] or provider,
         avatar=profile['avatar'] or None,
+        site_id=site_id,
     )
     db.session.add(member)
     db.session.commit()
@@ -363,6 +380,7 @@ def oauth_callback(provider):
 def _bind_oauth(member, provider, profile):
     row = MemberOauth(
         member_id=member.id, provider=provider, openid=profile['openid'],
+        site_id=getattr(member, 'site_id', 0) or 0,
         unionid=profile.get('unionid') or '',
         nickname=profile.get('nickname') or '',
         avatar=profile.get('avatar') or '',
@@ -376,7 +394,8 @@ def _unique_oauth_username(provider, openid):
     base = re.sub(r'[^A-Za-z0-9_\-]', '_', base)[:32]
     name = base
     i = 1
-    while Member.query.filter_by(username=name, is_deleted=False).first():
+    while Member.query.filter_by(username=name, is_deleted=False,
+                                 site_id=_member_scope_site()).first():
         suffix = f'_{i}'
         name = (base[:32 - len(suffix)] + suffix)
         i += 1
@@ -416,11 +435,13 @@ def profile():
             flash(_gettext('手机号格式不正确'), 'danger')
         elif email and Member.query.filter(
                 Member.email == email, Member.id != member.id,
-                Member.is_deleted == False).first():
+                Member.is_deleted == False,
+                Member.site_id == _member_scope_site()).first():
             flash(_gettext('邮箱已被其他账号使用'), 'danger')
         elif phone and Member.query.filter(
                 Member.phone == phone, Member.id != member.id,
-                Member.is_deleted == False).first():
+                Member.is_deleted == False,
+                Member.site_id == _member_scope_site()).first():
             flash(_gettext('手机号已被其他账号使用'), 'danger')
         else:
             member.nickname = nickname

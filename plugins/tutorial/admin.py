@@ -20,6 +20,7 @@ from flask_babel import gettext as _gettext
 from app.extensions import db
 from app.admin import admin_bp
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE
+from app.sites import current_site_id
 from app.utils.helpers import permission_required, audit_log
 from app.utils.uploads import save_upload_file
 from app.constants import Upload as _Upload
@@ -56,7 +57,8 @@ def tutorial_index():
     category_id = request.args.get('category', '')
     keyword = (request.args.get('keyword') or '').strip()
 
-    query = Tutorial.query.filter_by(is_deleted=False)
+    query = Tutorial.query.filter_by(
+        is_deleted=False, site_id=current_site_id())
     if category_id and category_id.isdigit():
         query = query.filter_by(category_id=int(category_id))
     if keyword:
@@ -66,7 +68,8 @@ def tutorial_index():
         Tutorial.sort_order.desc(), Tutorial.created_at.desc()
     ).paginate(page=page, per_page=15, error_out=False)
 
-    categories = TutorialCategory.query.filter_by(is_deleted=False).order_by(
+    categories = TutorialCategory.query.filter_by(
+        is_deleted=False, site_id=current_site_id()).order_by(
         TutorialCategory.sort_order.desc()).all()
 
     return render_template(
@@ -85,7 +88,8 @@ def tutorial_create():
         if tutorial is None:
             return redirect(url_for('admin.tutorial_create'))
         return redirect(url_for('admin.tutorial_edit', tid=tutorial.id))
-    categories = TutorialCategory.query.filter_by(is_deleted=False).order_by(
+    categories = TutorialCategory.query.filter_by(
+        is_deleted=False, site_id=current_site_id()).order_by(
         TutorialCategory.sort_order.desc()).all()
     return render_template(
         'admin/tutorial/form.html', tutorial=None,
@@ -97,13 +101,15 @@ def tutorial_create():
 @_gate
 @permission_required('tutorial:manage')
 def tutorial_edit(tid):
-    tutorial = Tutorial.query.get_or_404(tid)
+    tutorial = Tutorial.query.filter_by(
+        id=tid, site_id=current_site_id()).first_or_404()
     if tutorial.is_deleted:
         abort(404)
     if request.method == 'POST':
         _save_tutorial(tutorial)
         return redirect(url_for('admin.tutorial_edit', tid=tid))
-    categories = TutorialCategory.query.filter_by(is_deleted=False).order_by(
+    categories = TutorialCategory.query.filter_by(
+        is_deleted=False, site_id=current_site_id()).order_by(
         TutorialCategory.sort_order.desc()).all()
     return render_template(
         'admin/tutorial/form.html', tutorial=tutorial,
@@ -123,14 +129,16 @@ def _save_tutorial(tutorial):
         flash(_gettext('正文内容必填'), 'danger')
         return None
 
-    existing = Tutorial.query.filter_by(slug=slug, is_deleted=False).first()
+    sid = current_site_id()
+    existing = Tutorial.query.filter_by(
+        slug=slug, is_deleted=False, site_id=sid).first()
     if existing and (tutorial is None or existing.id != tutorial.id):
         flash(_gettext('教程标识已存在'), 'danger')
         return None
 
     is_new = tutorial is None
     if is_new:
-        tutorial = Tutorial(slug=slug)
+        tutorial = Tutorial(slug=slug, site_id=sid)
         db.session.add(tutorial)
 
     tutorial.title = title
@@ -173,7 +181,8 @@ def _save_tutorial(tutorial):
 @_gate
 @permission_required('tutorial:manage')
 def tutorial_delete(tid):
-    tutorial = Tutorial.query.get_or_404(tid)
+    tutorial = Tutorial.query.filter_by(
+        id=tid, site_id=current_site_id()).first_or_404()
     tutorial.is_deleted = True
     db.session.commit()
     flash(_gettext('教程已删除'), 'success')
@@ -187,7 +196,8 @@ def tutorial_delete(tid):
 @_gate
 @permission_required('tutorial:view')
 def tutorial_categories():
-    categories = TutorialCategory.query.filter_by(is_deleted=False).order_by(
+    categories = TutorialCategory.query.filter_by(
+        is_deleted=False, site_id=current_site_id()).order_by(
         TutorialCategory.sort_order.desc()).all()
     return render_template('admin/tutorial/categories.html', categories=categories)
 
@@ -208,7 +218,8 @@ def tutorial_category_create():
 @_gate
 @permission_required('tutorial:manage')
 def tutorial_category_edit(cid):
-    category = TutorialCategory.query.get_or_404(cid)
+    category = TutorialCategory.query.filter_by(
+        id=cid, site_id=current_site_id()).first_or_404()
     if category.is_deleted:
         abort(404)
     if request.method == 'POST':
@@ -224,14 +235,16 @@ def _save_category(category):
         flash(_gettext('名称和标识必填'), 'danger')
         return None
 
-    existing = TutorialCategory.query.filter_by(slug=slug, is_deleted=False).first()
+    sid = current_site_id()
+    existing = TutorialCategory.query.filter_by(
+        slug=slug, is_deleted=False, site_id=sid).first()
     if existing and (category is None or existing.id != category.id):
         flash(_gettext('分类标识已存在'), 'danger')
         return None
 
     is_new = category is None
     if is_new:
-        category = TutorialCategory(slug=slug)
+        category = TutorialCategory(slug=slug, site_id=sid)
         db.session.add(category)
 
     category.name = name
@@ -254,10 +267,12 @@ def _save_category(category):
 @_gate
 @permission_required('tutorial:manage')
 def tutorial_category_delete(cid):
-    category = TutorialCategory.query.get_or_404(cid)
+    category = TutorialCategory.query.filter_by(
+        id=cid, site_id=current_site_id()).first_or_404()
     # 若分类下有未删除的教程，禁止删除
     has_tutorials = Tutorial.query.filter_by(
-        category_id=cid, is_deleted=False).count() > 0
+        category_id=cid, is_deleted=False,
+        site_id=current_site_id()).count() > 0
     if has_tutorials:
         flash(_gettext('该分类下仍有教程，无法删除'), 'danger')
         return redirect(url_for('admin.tutorial_categories'))

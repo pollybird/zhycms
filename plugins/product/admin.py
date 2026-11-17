@@ -16,6 +16,7 @@ from flask import render_template, redirect, url_for, request, flash, abort
 from app.extensions import db
 from app.admin import admin_bp
 from app.models.column import Column
+from app.sites import current_site_id
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log, clear_content_cache
 from app.utils.db_utils import escape_like, LIKE_ESCAPE
@@ -49,8 +50,9 @@ def _gate(view):
 
 def _visible_list_columns():
     """当前用户可管理的列表栏目（树序由模板缩进处理，这里按 id 排）。"""
-    cols = Column.query.filter_by(type='list', is_deleted=False) \
-        .order_by(Column.id).all()
+    cols = Column.query.filter_by(
+        type='list', is_deleted=False, site_id=current_site_id()
+    ).order_by(Column.id).all()
     from flask_login import current_user
     if getattr(current_user, 'is_super', False):
         return cols
@@ -127,14 +129,16 @@ def product_index():
     col = None
     cid = request.args.get('cid', type=int)
     if cid:
-        col = Column.query.filter_by(id=cid, is_deleted=False).first_or_404()
+        col = Column.query.filter_by(
+            id=cid, is_deleted=False, site_id=current_site_id()).first_or_404()
         _check_column_access(col.id)
 
     page = max(_to_int(request.args.get('page'), 1), 1)
     keyword = (request.args.get('keyword') or '').strip()
     status = request.args.get('status', '')
 
-    query = Product.query.filter_by(is_deleted=False)
+    query = Product.query.filter_by(
+        is_deleted=False, site_id=current_site_id())
     if col is not None:
         query = query.filter_by(column_id=col.id)
     else:
@@ -171,7 +175,8 @@ def product_index():
                              'content:delete', 'content:batch'])
 def product_column_index(cid):
     """栏目维度入口（同文章习惯）：转到全局列表页并锁定该栏目。"""
-    Column.query.get_or_404(cid)
+    Column.query.filter_by(
+        id=cid, site_id=current_site_id()).first_or_404()
     return redirect(url_for('admin.product_index', cid=cid))
 
 
@@ -192,7 +197,8 @@ def product_create():
     cid = request.args.get('cid', type=int)
     pre_col = None
     if cid:
-        pre_col = Column.query.filter_by(id=cid, is_deleted=False).first()
+        pre_col = Column.query.filter_by(
+            id=cid, is_deleted=False, site_id=current_site_id()).first()
         if pre_col is not None:
             _check_column_access(pre_col.id)
     return render_template('product/form.html', product=None,
@@ -206,7 +212,8 @@ def product_create():
 @_gate
 @permission_required('content:edit')
 def product_edit(pid):
-    product = Product.query.get_or_404(pid)
+    product = Product.query.filter_by(
+        id=pid, site_id=current_site_id()).first_or_404()
     if product.is_deleted:
         abort(404)
     if request.method == 'POST':
@@ -235,8 +242,8 @@ def _save_product(product):
     if not title:
         flash(_gettext('标题必填'), 'danger')
         return None
-    col = Column.query.filter_by(id=column_id or 0,
-                                 is_deleted=False).first() if column_id else None
+    col = Column.query.filter_by(id=column_id or 0, is_deleted=False,
+                                 site_id=current_site_id()).first() if column_id else None
     if col is None or col.type != 'list':
         flash(_gettext('请选择有效的列表栏目'), 'danger')
         return None
@@ -289,6 +296,7 @@ def _save_product(product):
         return None
 
     product.column_id = col.id
+    product.site_id = col.site_id
     product.title = title
     product.summary = (request.form.get('summary') or '').strip()
     product.content = request.form.get('content') or ''
@@ -377,7 +385,8 @@ def _save_product_translations(product):
 @_gate
 @permission_required('content:delete')
 def product_delete(pid):
-    product = Product.query.get_or_404(pid)
+    product = Product.query.filter_by(
+        id=pid, site_id=current_site_id()).first_or_404()
     if product.is_deleted:
         abort(404)
     _check_column_access(product.column_id)
@@ -404,7 +413,8 @@ def product_batch():
         return redirect(url_for('admin.product_index'))
 
     products = Product.query.filter(Product.id.in_(ids),
-                                    Product.is_deleted == False).all()  # noqa: E712
+                                    Product.is_deleted == False,  # noqa: E712
+                                    Product.site_id == current_site_id()).all()
     if not products:
         flash(_gettext('未找到可选产品'), 'warning')
         return redirect(url_for('admin.product_index'))
@@ -426,13 +436,15 @@ def product_batch():
     elif action == 'move':
         target_id = request.form.get('target_column_id', type=int)
         target = Column.query.filter_by(id=target_id or 0, type='list',
-                                        is_deleted=False).first()
+                                        is_deleted=False,
+                                        site_id=current_site_id()).first()
         if target is None:
             flash(_gettext('目标栏目无效'), 'danger')
             return redirect(url_for('admin.product_index'))
         _check_column_access(target.id)
         for p in products:
             p.column_id = target.id
+            p.site_id = target.site_id
         col_ids.add(target.id)
     else:
         flash(_gettext('未知批量操作'), 'warning')

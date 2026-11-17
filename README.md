@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.1.10-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.3-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-483%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-553%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.1.10**（纵深防御与合规加固：模板审计下标拼接检测、加密 fail-open 高可见度告警、CORS 通配符收紧、后台管理员 12 位密码策略、CI Actions pin 完整 SHA、dependabot 依赖治理、TestingConfig 密钥防护；无迁移、无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.3**（角色体系站点化版：新增「站点管理员」预设角色，账号角色按站点分配并支持一人多站多角色；站点管理员仅能在授权站点内管理账号，角色配置保留为平台级功能；新增迁移 `0015`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -106,11 +106,28 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **前台会员体系** | 社区插件 `member`：注册/登录/资料/改密/找回密码、微信/QQ 一键登录、短信验证码登录、注册协议、栏目会员可见性 | v2.6.4 |
 | **插件依赖治理** | `manifest.json` 支持 `requires`/`extends`/`min_core_version`，启用强校验 + 禁用反向依赖校验 | v2.6.4 |
 | **可视化页面构建器** | 自研轻量拖拽构建器：24 个 Bootstrap4 组件、四页面类型（首页/单页/列表/文章详情）、草稿/发布/修订回滚、中英双语与会员可见性、iframe 内服务端真实渲染；插件可注册自有组件并贡献默认布局片段（启用即开箱即用） | v3.0.0 |
+| **站群模式（多站点）** | 一个后端实例 + 一个库按站点切分内容：独立域名 / 泛解析子域解析、后台站点 CRUD 与切换、站点级配置/主题/SEO、搜索与缓存按站隔离、会员共享或独立、插件站群 SDK；默认站点 0 单站点部署零感知 | v3.2.0 |
 | **数据库迁移插件** | 内置插件 `db_migrator`（默认不启用）：后台一键把 SQLite 开发库迁移到 MySQL/PostgreSQL，建表+数据复制+序列重置，目标库非空保护，支持迁移后免重启热切换 | v3.1.0 |
 
 ---
 
 ## 版本速览
+
+### v3.2.3（2026-11-17）
+
+角色体系站点化。新增「站点管理员」预设角色：拥有指定站点的全部后台管理权限（站点设置、用户、审计、栏目、内容、页面构建、表单），不含站点增删改与备份运维等平台级功能；内容审核员/内容编辑/只读查看员同样绑定到具体站点。`user_roles` 新增 `site_id` 并改为 `(user_id, role_id, site_id)` 唯一（迁移 `0015`），支持一人多站多角色；账号表单为每个站点提供角色下拉。超级管理员可为任意站点分配角色，站点管理员只能在自己有权限的站点内添加/管理账号，角色配置页仅平台管理员可访问。存量 `site_id IS NULL` 的全局角色保持全站语义。无新增依赖。
+
+### v3.2.2（2026-11-17）
+
+站群内容隔离补全。闭环潜在威胁报告 11 项：教程/页面构建/上传索引/第三方绑定新增 `site_id` 并改为站点级唯一（迁移 `0014`），前台、后台、模板函数与构建器组件全部按站过滤；跨站页面 404、去重与物理路径按站隔离、删站检查补齐、会员删除与 OAuth 绑定站点化、备份/监控收敛为平台级运维、缓存按 `frontend/site{N}/*` 失效、浏览量按站分键、插件 `sql_search` 支持 `site_id`、平台级后台入口豁免。无新增依赖。
+
+### v3.2.1（2026-11-16）
+
+站群缺陷修复。闭环第三方测试报告的 P0/P1/P2 共 5 项：站点权限 `?site=` 越权（解析层校验 + 后台统一守卫）、`status=closed` 未覆盖 API 与插件前台蓝本（提升为 app 级校验，API 返回 503 JSON、healthz 固定 200）、独立会员会话跨站有效（`current_member()` 校验站点）、站点 SEO 字段不生效（前台与 API 接入站点 SEO 回退链）、`0012` 降级半回滚（DDL 前预检跨站重复）；另加固子域唯一约束、域名校验、删站内容检查、`accessible_sites` N+1、JWT 首启告警等边界项。新增迁移 `0013`，无新增依赖。
+
+### v3.2.0（2026-11-15）
+
+站群版。新增站点注册表 `sites` 与 `site_id` 内容维度：请求按「后台切换 → 精确域名 → 子域标签 → 默认站点 0」解析站点，栏目/文章/碎片/配置/会员/内置插件内容全部按站隔离；后台新增站点管理（CRUD + 切换器）与站点级权限 `site:manage` / `UserSitePermission`；站点化配置、主题、sitemap、全站搜索与缓存命名空间；会员支持共享（默认，与现网一致）或独立；插件 SDK 提供 `SiteScopedMixin` / `current_site_id()` / `site_filter()`。默认站点 `site_id=0` 恒等变换，单站点部署 URL 与行为完全不变。数据库迁移 `0012`，无新增依赖。
 
 ### v3.1.10（2026-11-09）
 

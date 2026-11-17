@@ -12,6 +12,7 @@ from flask import render_template, redirect, url_for, request, flash, abort
 from app.extensions import db
 from app.admin import admin_bp
 from app.models.upload import UploadedFile
+from app.sites import current_site_id
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE
 from app.utils.helpers import permission_required, audit_log
 from app.utils.uploads import save_upload_file
@@ -79,7 +80,8 @@ def _to_int(val, default=0):
 @_gate
 @permission_required('banner:manage')
 def banner_group_index():
-    groups = BannerGroup.query.order_by(BannerGroup.created_at.desc()).all()
+    groups = BannerGroup.query.filter_by(
+        site_id=current_site_id()).order_by(BannerGroup.created_at.desc()).all()
     return render_template('banner/group_index.html', groups=groups)
 
 
@@ -99,7 +101,7 @@ def banner_group_create():
 @_gate
 @permission_required('banner:manage')
 def banner_group_edit(gid):
-    group = BannerGroup.query.get_or_404(gid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
     if request.method == 'POST':
         updated = _save_group(group)
         if updated is None:
@@ -118,6 +120,7 @@ def _save_group(group):
         flash(_gettext('调用标识须以字母开头，仅含字母、数字、中划线或下划线'), 'danger')
         return None
     exists = BannerGroup.query.filter(
+        BannerGroup.site_id == current_site_id(),
         BannerGroup.slug == slug,
         BannerGroup.id != (group.id if group else 0),
     ).first()
@@ -127,7 +130,7 @@ def _save_group(group):
 
     is_new = group is None
     if is_new:
-        group = BannerGroup()
+        group = BannerGroup(site_id=current_site_id())
     group.name = name
     group.slug = slug
     group.remark = (request.form.get('remark') or '').strip()
@@ -145,7 +148,7 @@ def _save_group(group):
 @_gate
 @permission_required('banner:manage')
 def banner_group_delete(gid):
-    group = BannerGroup.query.get_or_404(gid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
     name = group.name
     for item in group.items.all():
         _release_image(item)
@@ -164,7 +167,7 @@ def banner_group_delete(gid):
 @_gate
 @permission_required('banner:manage')
 def banner_group_items(gid):
-    group = BannerGroup.query.get_or_404(gid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
     items = group.items.all()
     return render_template('banner/items.html', group=group, items=items)
 
@@ -173,7 +176,7 @@ def banner_group_items(gid):
 @_gate
 @permission_required('banner:manage')
 def banner_item_create(gid):
-    group = BannerGroup.query.get_or_404(gid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
     if request.method == 'POST':
         item = _save_item(group, None)
         if item is None:
@@ -186,8 +189,8 @@ def banner_item_create(gid):
 @_gate
 @permission_required('banner:manage')
 def banner_item_edit(gid, bid):
-    group = BannerGroup.query.get_or_404(gid)
-    item = Banner.query.get_or_404(bid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
+    item = Banner.query.filter_by(id=bid, site_id=current_site_id()).first_or_404()
     if item.group_id != group.id:
         abort(404)
     if request.method == 'POST':
@@ -201,7 +204,7 @@ def banner_item_edit(gid, bid):
 def _save_item(group, item):
     is_new = item is None
     if is_new:
-        item = Banner(group_id=group.id)
+        item = Banner(group_id=group.id, site_id=group.site_id)
 
     item.title = (request.form.get('title') or '').strip()
     item.link_url = (request.form.get('link_url') or '').strip()
@@ -250,8 +253,8 @@ def _save_item(group, item):
 @_gate
 @permission_required('banner:manage')
 def banner_item_delete(gid, bid):
-    group = BannerGroup.query.get_or_404(gid)
-    item = Banner.query.get_or_404(bid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
+    item = Banner.query.filter_by(id=bid, site_id=current_site_id()).first_or_404()
     if item.group_id != group.id:
         abort(404)
     _release_image(item)
@@ -269,8 +272,8 @@ def banner_item_delete(gid, bid):
 @_gate
 @permission_required('banner:manage')
 def banner_item_toggle(gid, bid):
-    group = BannerGroup.query.get_or_404(gid)
-    item = Banner.query.get_or_404(bid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
+    item = Banner.query.filter_by(id=bid, site_id=current_site_id()).first_or_404()
     if item.group_id != group.id:
         abort(404)
     item.is_enabled = not item.is_enabled
@@ -283,14 +286,14 @@ def banner_item_toggle(gid, bid):
 @_gate
 @permission_required('banner:manage')
 def banner_item_batch(gid):
-    group = BannerGroup.query.get_or_404(gid)
+    group = BannerGroup.query.filter_by(id=gid, site_id=current_site_id()).first_or_404()
     action = request.form.get('action')
     ids = [int(i) for i in request.form.getlist('ids[]') if i.isdigit()]
     if not ids:
         flash(_gettext('未选择'), 'warning')
         return redirect(url_for('admin.banner_group_items', gid=gid))
 
-    items = Banner.query.filter(Banner.id.in_(ids),
+    items = Banner.query.filter(Banner.id.in_(ids), Banner.site_id == current_site_id(),
                                 Banner.group_id == group.id).all()
     if action == 'enable':
         for it in items:

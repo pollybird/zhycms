@@ -12,6 +12,7 @@ from flask import (render_template, redirect, url_for, request, flash, abort,
 from flask_babel import gettext as _gettext
 from app.extensions import db
 from app.admin import admin_bp
+from app.sites import current_site_id
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log
 from app.utils.db_utils import escape_like, LIKE_ESCAPE
@@ -73,7 +74,8 @@ def recruit_job_index():
     keyword = (request.args.get('keyword') or '').strip()
     status = request.args.get('status', '')
 
-    query = RecruitJob.query.filter_by(is_deleted=False)
+    query = RecruitJob.query.filter_by(
+        is_deleted=False, site_id=current_site_id())
     if keyword:
         query = query.filter(RecruitJob.title.like(
             f'%{escape_like(keyword)}%', escape=LIKE_ESCAPE))
@@ -113,7 +115,8 @@ def recruit_job_create():
 @_gate
 @permission_required('recruit:manage')
 def recruit_job_edit(jid):
-    job = RecruitJob.query.get_or_404(jid)
+    job = RecruitJob.query.filter_by(
+        id=jid, site_id=current_site_id()).first_or_404()
     if job.is_deleted:
         abort(404)
     if request.method == 'POST':
@@ -132,7 +135,7 @@ def _save_job(job):
 
     is_new = job is None
     if is_new:
-        job = RecruitJob()
+        job = RecruitJob(site_id=current_site_id())
 
     title = (request.form.get('title') or '').strip()
     if not title:
@@ -213,7 +216,8 @@ def _save_job_translations(job):
 @_gate
 @permission_required('recruit:manage')
 def recruit_job_delete(jid):
-    job = RecruitJob.query.get_or_404(jid)
+    job = RecruitJob.query.filter_by(
+        id=jid, site_id=current_site_id()).first_or_404()
     if job.is_deleted:
         abort(404)
     job.is_deleted = True
@@ -234,8 +238,9 @@ def recruit_job_batch():
     if not ids:
         flash(_gettext('未选择岗位'), 'warning')
         return redirect(url_for('admin.recruit_job_index'))
-    jobs = RecruitJob.query.filter(RecruitJob.id.in_(ids),
-                                   RecruitJob.is_deleted == False).all()  # noqa: E712
+    jobs = RecruitJob.query.filter(
+        RecruitJob.id.in_(ids), RecruitJob.is_deleted == False,  # noqa: E712
+        RecruitJob.site_id == current_site_id()).all()
     if action == 'enable':
         for j in jobs:
             j.is_enabled = True
@@ -274,9 +279,11 @@ def recruit_application_index():
     job_id = request.args.get('job_id', type=int)
     status = request.args.get('status', '')
 
-    query = RecruitApplication.query
+    query = RecruitApplication.query.filter(
+        RecruitApplication.job.has(site_id=current_site_id()))
     if job_id:
-        job = RecruitJob.query.get(job_id)
+        job = RecruitJob.query.filter_by(
+            id=job_id, site_id=current_site_id()).first()
         if job is None or job.is_deleted:
             abort(404)
         query = query.filter_by(job_id=job_id)
@@ -286,8 +293,9 @@ def recruit_application_index():
     pagination = query.order_by(
         RecruitApplication.id.desc()
     ).paginate(page=page, per_page=20, error_out=False)
-    jobs = RecruitJob.query.filter_by(is_deleted=False) \
-        .order_by(RecruitJob.id.desc()).all()
+    jobs = RecruitJob.query.filter_by(
+        is_deleted=False, site_id=current_site_id()
+    ).order_by(RecruitJob.id.desc()).all()
     return render_template('recruit/applications.html',
                            apps=pagination.items, pagination=pagination,
                            jobs=jobs, filter_job_id=job_id, status=status)
@@ -299,6 +307,8 @@ def recruit_application_index():
 def recruit_application_resume(aid):
     """下载申请简历附件（download_name 用投递时的原始文件名）。"""
     app_row = RecruitApplication.query.get_or_404(aid)
+    if app_row.job is None or app_row.job.site_id != current_site_id():
+        abort(404)
     path = resume_abs_path(app_row)
     if path is None:
         flash(_gettext('简历文件不存在或已丢失'), 'warning')
@@ -313,6 +323,8 @@ def recruit_application_resume(aid):
 def recruit_application_status(aid):
     """标记申请处理状态。"""
     app_row = RecruitApplication.query.get_or_404(aid)
+    if app_row.job is None or app_row.job.site_id != current_site_id():
+        abort(404)
     new_status = request.form.get('status', '')
     if new_status not in RecruitApplication.STATUS_LABELS:
         flash(_gettext('未知状态'), 'warning')
@@ -334,6 +346,8 @@ def recruit_application_status(aid):
 def recruit_application_delete(aid):
     """删除申请记录（硬删除；简历文件保留于上传目录，可按需清理）。"""
     app_row = RecruitApplication.query.get_or_404(aid)
+    if app_row.job is None or app_row.job.site_id != current_site_id():
+        abort(404)
     name = app_row.name
     job_title = app_row.job.title if app_row.job else ''
     db.session.delete(app_row)

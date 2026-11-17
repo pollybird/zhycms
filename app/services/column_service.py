@@ -13,6 +13,7 @@ from ..utils.uploads import save_upload_file
 from ..utils.i18n_content import get_available_locales, get_default_locale
 from ..utils.markdown_render import apply_editor_form
 from ..models.audit import OP_CREATE, OP_UPDATE, MODULE_COLUMN
+from ..sites import current_site_id
 
 
 def save_column(column, *, form_data, files_data):
@@ -40,8 +41,9 @@ def save_column(column, *, form_data, files_data):
         _flash(_gettext('栏目标识必填'), 'danger')
         return None, messages
 
-    # 唯一性校验
-    existing = Column.query.filter_by(slug=slug, is_deleted=False).first()
+    # 唯一性校验（站群：slug 仅在站点内唯一）
+    sid = column.site_id if column is not None else current_site_id()
+    existing = Column.query.filter_by(slug=slug, site_id=sid, is_deleted=False).first()
     if existing and (column is None or existing.id != column.id):
         _flash(_gettext('栏目标识已存在，请更换'), 'danger')
         return None, messages
@@ -64,7 +66,7 @@ def save_column(column, *, form_data, files_data):
 
     is_new = column is None
     if is_new:
-        column = Column(slug=slug)
+        column = Column(slug=slug, site_id=current_site_id())
 
     column.name = name
     column.parent_id = parent_id

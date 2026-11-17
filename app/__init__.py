@@ -487,6 +487,46 @@ def _alembic_bootstrap(app):
 # 主入口
 # ============================================================
 
+def _init_jwt_config(app):
+    """v3.2.1：JWT 密钥/过期时间初始化。
+
+    必须在 Alembic bootstrap 之后调用，避免升级首启时 `settings` 表尚无
+    `site_id` 列导致读取失败而回退临时密钥（并产生误导性告警）。
+    """
+    try:
+        import secrets as _secrets
+        from .models.setting import Setting
+        jwt_secret = Setting.get('jwt_secret_key')
+        if not jwt_secret:
+            jwt_secret = _secrets.token_urlsafe(32)
+            try:
+                Setting.set('jwt_secret_key', jwt_secret)
+                db.session.commit()
+                app.logger.warning(
+                    'jwt_secret_key 未配置，已自动生成并持久化（加密存储）；'
+                    '建议在后台「安全设置」中显式设置独立密钥')
+            except Exception as e:
+                db.session.rollback()
+                app.logger.warning('jwt_secret_key 自动持久化失败，本次运行使用临时密钥：%s', e)
+        app.config['JWT_SECRET_KEY'] = jwt_secret
+        # 过期时间从 Setting 读取（分钟/天）
+        try:
+            app.config['JWT_ACCESS_TOKEN_EXPIRES'] = int(
+                Setting.get('jwt_access_expires_minutes', '15')) * 60
+        except (TypeError, ValueError):
+            pass
+        try:
+            app.config['JWT_REFRESH_TOKEN_EXPIRES'] = int(
+                Setting.get('jwt_refresh_expires_days', '7')) * 24 * 3600
+        except (TypeError, ValueError):
+            pass
+    except Exception as e:
+        # DB 不可用（如初始化向导阶段）：使用本次运行临时随机密钥，绝不回退 SECRET_KEY
+        import secrets as _secrets
+        app.logger.warning('读取 JWT 配置失败，本次运行使用临时随机密钥：%s', e)
+        app.config['JWT_SECRET_KEY'] = _secrets.token_urlsafe(32)
+
+
 def _resolve_redis_url(app):
     """v2.5.0：检测环境是否有可用的 Redis，返回 Redis URL 或 None。
 
@@ -525,12 +565,10 @@ def _maybe_rebuild_search_index(app):
         from .models.setting import Setting
         if Setting.get('search_engine', _S.DEFAULT_ENGINE) != _S.ENGINE_TANTIVY:
             return
-        from .utils.search import _get_index_root, rebuild_all
-        from .utils.i18n_content import get_default_locale
+        from .utils.search import _get_index_root, rebuild_all, index_needs_rebuild
         root = _get_index_root()
-        meta = os.path.join(root, get_default_locale(), 'meta.json')
-        if os.path.exists(meta):
-            return  # 索引已存在，无需重建
+        if not index_needs_rebuild():
+            return  # 索引已存在且 schema 版本匹配，无需重建
         building = os.path.join(root, '.tantivy_building')
         try:
             fd = os.open(building, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
@@ -697,41 +735,8 @@ def create_app(config_name=None):
 
     # v2.6.3：API JWT 鉴权初始化
     # v3.1.8 VULN-006：JWT 密钥与 SECRET_KEY 严格隔离，不再回退复用。
-    # 未配置时启动自动生成随机密钥并持久化到 Setting（敏感键，加密入库），
-    # 避免 SECRET_KEY 泄露即可伪造 API token 的连锁风险。
-    with app.app_context():
-        try:
-            import secrets as _secrets
-            from .models.setting import Setting
-            jwt_secret = Setting.get('jwt_secret_key')
-            if not jwt_secret:
-                jwt_secret = _secrets.token_urlsafe(32)
-                try:
-                    Setting.set('jwt_secret_key', jwt_secret)
-                    db.session.commit()
-                    app.logger.warning(
-                        'jwt_secret_key 未配置，已自动生成并持久化（加密存储）；'
-                        '建议在后台「安全设置」中显式设置独立密钥')
-                except Exception as e:
-                    db.session.rollback()
-                    app.logger.warning('jwt_secret_key 自动持久化失败，本次运行使用临时密钥：%s', e)
-            app.config['JWT_SECRET_KEY'] = jwt_secret
-            # 过期时间从 Setting 读取（分钟/天）
-            try:
-                app.config['JWT_ACCESS_TOKEN_EXPIRES'] = int(
-                    Setting.get('jwt_access_expires_minutes', '15')) * 60
-            except (TypeError, ValueError):
-                pass
-            try:
-                app.config['JWT_REFRESH_TOKEN_EXPIRES'] = int(
-                    Setting.get('jwt_refresh_expires_days', '7')) * 24 * 3600
-            except (TypeError, ValueError):
-                pass
-        except Exception as e:
-            # DB 不可用（如初始化向导阶段）：使用本次运行临时随机密钥，绝不回退 SECRET_KEY
-            import secrets as _secrets
-            app.logger.warning('读取 JWT 配置失败，本次运行使用临时随机密钥：%s', e)
-            app.config['JWT_SECRET_KEY'] = _secrets.token_urlsafe(32)
+    # v3.2.1：密钥读取抽为 _init_jwt_config()，在 Alembic bootstrap 之后调用
+    #（见下方 app_context 内），避免升级首启 settings 表结构未就绪时告警。
     jwt.init_app(app)
 
     # v3.1.9 VULN-007：JWT 服务端吊销。
@@ -781,6 +786,7 @@ def create_app(config_name=None):
         from .models.fragment import Fragment
         from .models.column import Column
         from .utils.themes import get_active_theme
+        from .sites import current_site, current_site_id, accessible_sites
 
         settings = Setting.get_dict()
         fragments = Fragment.get_dict()
@@ -794,6 +800,10 @@ def create_app(config_name=None):
             current_user=current_user,
             current_theme=theme,
             theme_base=f'themes/{theme}/base.html',
+            # v3.2.0 站群：当前站点与后台可切换站点列表
+            current_site=current_site(),
+            current_site_id=current_site_id(),
+            admin_sites=accessible_sites(current_user) if current_user.is_authenticated else [],
             # CMS 自身标识（后台使用，与前台企业名称/版权严格区分，固定不可改）
             cms_name=Setting.CMS_NAME,
             cms_copyright=Setting.CMS_COPYRIGHT,
@@ -816,6 +826,14 @@ def create_app(config_name=None):
     # v2.6.1：蓝图注册 + 插件加载 + 错误处理（抽离至 app/blueprints.py）
     from .blueprints import register_blueprints
     register_blueprints(app)
+
+    # v3.2.0 站群：站点解析必须先于任何内容查询与模板渲染
+    # （app 级 before_request 先于蓝图级执行，保证 check_site_status 拿到站点）
+    from .sites import select_site
+    app.before_request(select_site)
+    # v3.2.1：站点关闭校验提升到 app 级，统一覆盖前台/API/插件前台蓝本
+    from .frontend.views import check_site_status
+    app.before_request(check_site_status)
 
     # 应用 url_for 动态前缀（模块5：路由修改即时生效）
     _patch_jinja_url_for(app)
@@ -875,6 +893,9 @@ def create_app(config_name=None):
             _alembic_bootstrap(app)
         except Exception as e:
             app.logger.warning('Alembic bootstrap 跳过（非致命）: %s', e)
+
+        # ===== v3.2.1：JWT 配置（迁移完成后读取，避免首启临时密钥告警）=====
+        _init_jwt_config(app)
 
         # ===== v3.1.10 VULN-025：敏感配置加密可用性启动检查 =====
         # 密钥缺失时不拒绝启动（避免存量容器/多实例未配 ZHYCMS_ENC_KEY 升级后

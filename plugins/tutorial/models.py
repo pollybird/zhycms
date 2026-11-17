@@ -15,8 +15,11 @@ class TutorialCategory(db.Model):
     __tablename__ = 'tutorial_categories'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.2 站群：教程内容按站点隔离
+    site_id = db.Column(db.Integer, nullable=False, default=0,
+                        server_default='0', index=True)
     name = db.Column(db.String(100), nullable=False)
-    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(100), nullable=False, index=True)
     description = db.Column(db.Text)
     sort_order = db.Column(db.Integer, default=0, nullable=False)
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
@@ -30,6 +33,10 @@ class TutorialCategory(db.Model):
         order_by='Tutorial.sort_order.desc(), Tutorial.created_at.desc()'
     )
 
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'slug', name='uq_tutorial_category_site_slug'),
+    )
+
 
 class Tutorial(db.Model):
     """教程内容。
@@ -40,10 +47,13 @@ class Tutorial(db.Model):
     __tablename__ = 'tutorials'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.2 站群：教程内容按站点隔离
+    site_id = db.Column(db.Integer, nullable=False, default=0,
+                        server_default='0', index=True)
     category_id = db.Column(db.Integer, db.ForeignKey('tutorial_categories.id'),
                             nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)
-    slug = db.Column(db.String(200), unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(200), nullable=False, index=True)
     summary = db.Column(db.String(500))
     content = db.Column(db.Text, nullable=False)
     cover = db.Column(db.String(500))
@@ -55,6 +65,10 @@ class Tutorial(db.Model):
     view_count = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'slug', name='uq_tutorial_site_slug'),
+    )
 
     DIFFICULTY_LABELS = {
         'beginner': '入门',

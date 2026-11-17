@@ -58,6 +58,12 @@ def api_cache(key_prefix):
                 cache_key += '|loc=' + select_locale()
             except Exception as e:
                 current_app.logger.warning('API 缓存键附加语言失败：%s', e)
+            # v3.2.0 站群：缓存键包含当前站点，避免跨站内容串扰
+            try:
+                from ..sites import current_site_id
+                cache_key += '|site=' + str(current_site_id())
+            except Exception as e:
+                current_app.logger.warning('API 缓存键附加站点失败：%s', e)
             try:
                 cached = cache.get(cache_key)
                 if cached is not None:
@@ -287,7 +293,9 @@ def _pagination_meta(pagination):
 
 
 def _get_enabled_column(slug):
-    col = Column.query.filter_by(slug=slug, is_deleted=False).first()
+    from ..sites import current_site_id
+    col = Column.query.filter_by(
+        slug=slug, is_deleted=False, site_id=current_site_id()).first()
     if col is None or not col.is_enabled or col.type == 'link':
         return None
     return col
@@ -301,20 +309,31 @@ def _get_enabled_column(slug):
 @api_read_limit
 @api_cache('site')
 def site_info():
+    from ..sites import current_site, current_site_id
     s = Setting.get_dict()
+    site = current_site()
     root_columns = Column.query.filter_by(
-        parent_id=None, is_enabled=True, is_deleted=False
+        parent_id=None, is_enabled=True, is_deleted=False,
+        site_id=current_site_id()
     ).order_by(Column.sort_order.desc()).all()
     return api_ok({
+        'site_id': current_site_id(),
         'name': s.get('site_name', ''),
         'subtitle': s.get('site_subtitle', ''),
         'logo': _abs_url(s.get('site_logo', '')),
         'copyright': s.get('footer_copyright', ''),
         'seo': {
-            'title': s.get('seo_title', ''),
-            'keywords': s.get('seo_keywords', ''),
-            'description': s.get('seo_description', ''),
+            # v3.2.1：站点 SEO 优先，空值回退全局设置
+            'title': (site.seo_title if site is not None and site.seo_title
+                      else s.get('seo_title', '')),
+            'keywords': (site.seo_keywords if site is not None and site.seo_keywords
+                         else s.get('seo_keywords', '')),
+            'description': (site.seo_description if site is not None and site.seo_description
+                            else s.get('seo_description', '')),
         },
+        'seo_title': (site.seo_title if site is not None and site.seo_title else ''),
+        'seo_keywords': (site.seo_keywords if site is not None and site.seo_keywords else ''),
+        'seo_description': (site.seo_description if site is not None and site.seo_description else ''),
         'nav': [_column_brief(c, with_children=True) for c in root_columns],
     })
 
@@ -322,14 +341,17 @@ def site_info():
 @api_bp.route('/columns')
 @api_cache('columns')
 def columns_index():
+    from ..sites import current_site_id
+    sid = current_site_id()
     if request.args.get('tree') == '1':
         roots = Column.query.filter_by(
-            parent_id=None, is_enabled=True, is_deleted=False
+            parent_id=None, is_enabled=True, is_deleted=False, site_id=sid
         ).order_by(Column.sort_order.desc()).all()
         return api_ok([_column_brief(c, with_children=True) for c in roots])
 
     q = Column.query.filter(Column.is_enabled == True,  # noqa: E712
-                            Column.is_deleted == False)  # noqa: E712
+                            Column.is_deleted == False,  # noqa: E712
+                            Column.site_id == sid)
     parent_id = request.args.get('parent_id')
     if parent_id is not None and parent_id != '':
         q = q.filter(Column.parent_id == parent_id)
@@ -395,8 +417,11 @@ def column_articles(slug):
 @api_bp.route('/articles/<int:aid>')
 @api_cache('article')
 def article_detail(aid):
+    from ..sites import current_site_id
     a = db.session.get(Article, aid)
     if a is None or a.is_deleted or a.status != STATUS_PUBLISHED:
+        return api_err(404, '文章不存在')
+    if int(a.site_id or 0) != int(current_site_id()):
         return api_err(404, '文章不存在')
     col = a.column
     if col is None or col.is_deleted or not col.is_enabled:

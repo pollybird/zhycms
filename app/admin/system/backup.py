@@ -22,6 +22,19 @@ from ...models.audit import (
 from .. import admin_bp
 
 
+def _require_platform_ops():
+    """v3.2.2：备份/恢复/系统监控是平台级运维，不允许站点级管理员操作。
+
+    备份文件包含全库（所有站点）数据，按站过滤无意义，因此收敛为：
+    超管或拥有 site:manage 的平台管理员。
+    """
+    if getattr(current_user, 'is_super', False):
+        return
+    if current_user.is_authenticated and current_user.has_permission('site:manage'):
+        return
+    abort(403)
+
+
 # ============================================================
 # 备份列表与操作
 # ============================================================
@@ -29,6 +42,7 @@ from .. import admin_bp
 @admin_bp.route('/backups')
 @permission_required('system:backup')
 def backup_index():
+    _require_platform_ops()
     page = max(int(request.args.get('page', 1)), 1)
     status_filter = request.args.get('status', '')
     trigger_filter = request.args.get('trigger', '')
@@ -66,6 +80,7 @@ def backup_index():
 @permission_required('system:backup')
 def backup_manual():
     """一键手动备份。"""
+    _require_platform_ops()
     remark = (request.form.get('remark') or '').strip()
     record, err = create_backup(trigger=TRIGGER_MANUAL, remark=remark,
                                 created_by=getattr(current_user, 'id', None))
@@ -84,6 +99,7 @@ def backup_manual():
 @admin_bp.route('/backups/<int:bid>/download')
 @permission_required('system:backup')
 def backup_download(bid):
+    _require_platform_ops()
     record = BackupRecord.query.get_or_404(bid)
     if record.status != 'ok':
         flash(_gettext('该备份文件状态异常，无法下载'), 'warning')
@@ -138,6 +154,7 @@ def backup_restore(bid):
 @permission_required('system:backup')
 def backup_restore_upload():
     """上传备份文件后恢复。"""
+    _require_platform_ops()
     if not current_user.is_super:
         abort(403)
     f = request.files.get('backup_file')
@@ -195,6 +212,7 @@ def backup_restore_upload():
 @permission_required('system:backup')
 def backup_delete(bid):
     """手动删除单条备份记录 + 物理文件。"""
+    _require_platform_ops()
     record = BackupRecord.query.get_or_404(bid)
     # 先删物理文件
     try:
@@ -219,6 +237,7 @@ def backup_delete(bid):
 @permission_required('system:backup')
 def setting_backup_save():
     """保存备份周期配置。"""
+    _require_platform_ops()
     Setting.set('backup_enable_scheduled', request.form.get('backup_enable_scheduled') or 'off')
     Setting.set('backup_schedule_mode', request.form.get('backup_schedule_mode') or 'daily')
     time_val = (request.form.get('backup_schedule_time') or '03:00').strip()
@@ -280,6 +299,7 @@ def setting_backup_save():
 @permission_required('system:backup')
 def monitor_index():
     """系统监控页：服务器/磁盘/数据库状态。"""
+    _require_platform_ops()
     import platform, sys as _sys, time as _time, os as _os
     from ...config import BASE_DIR
     stats = system_monitor_stats()
@@ -336,4 +356,5 @@ def monitor_index():
 @admin_bp.route('/api/monitor')
 @permission_required('system:backup')
 def monitor_api():
+    _require_platform_ops()
     return jsonify(system_monitor_stats())

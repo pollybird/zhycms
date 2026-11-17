@@ -15,6 +15,7 @@ from ...utils.helpers import permission_required, audit_log, clear_content_cache
 from ...utils.themes import list_theme_templates, TEMPLATE_CATEGORIES
 from ...models.audit import OP_UPDATE, OP_DELETE, OP_BATCH, MODULE_COLUMN
 from ...services.column_service import save_column
+from ...sites import current_site_id
 from .. import admin_bp
 
 
@@ -107,7 +108,7 @@ def column_create():
 @admin_bp.route('/columns/<int:cid>/edit', methods=['GET', 'POST'])
 @permission_required('column:manage')
 def column_edit(cid):
-    col = Column.query.get_or_404(cid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     if col.is_deleted:
         abort(404)
 
@@ -137,7 +138,7 @@ def column_edit(cid):
 @admin_bp.route('/columns/<int:cid>/delete', methods=['POST'])
 @permission_required('column:manage')
 def column_delete(cid):
-    col = Column.query.get_or_404(cid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     if col.is_parent:
         flash(_gettext('该栏目存在子栏目，请先删除子栏目后再操作'), 'danger')
         return redirect(url_for('admin.column_index'))
@@ -153,7 +154,7 @@ def column_delete(cid):
 @admin_bp.route('/columns/<int:cid>/toggle', methods=['POST'])
 @permission_required('column:manage')
 def column_toggle(cid):
-    col = Column.query.get_or_404(cid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     col.is_enabled = not col.is_enabled
     db.session.commit()
     clear_content_cache(column_id=cid)
@@ -173,7 +174,7 @@ def column_batch():
         flash(_gettext('未选择任何栏目'), 'warning')
         return redirect(url_for('admin.column_index'))
 
-    cols = Column.query.filter(Column.id.in_(ids)).all()
+    cols = Column.query.filter(Column.id.in_(ids), Column.site_id == current_site_id()).all()
     if action == 'enable':
         for c in cols:
             c.is_enabled = True
@@ -199,7 +200,7 @@ def column_batch():
 @permission_required('content:edit', column_id_arg='cid')
 def column_fields(cid):
     """只读返回栏目的自定义字段列表（用于前台编辑文章时动态加载）。"""
-    col = Column.query.get_or_404(cid)
+    col = Column.query.filter_by(id=cid, site_id=current_site_id()).first_or_404()
     fields = [
         {
             'id': f.id,

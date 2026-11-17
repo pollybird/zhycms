@@ -13,8 +13,10 @@ class BannerGroup(db.Model):
     __tablename__ = 'banner_groups'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.0 站群：分组按站点切分（slug 站点内唯一）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     name = db.Column(db.String(100), nullable=False)            # 如「首页大图」
-    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(100), nullable=False, index=True)
     remark = db.Column(db.String(255))
     is_enabled = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
@@ -26,12 +28,18 @@ class BannerGroup(db.Model):
         cascade='all, delete-orphan',
         order_by='Banner.sort_order.asc(), Banner.id.asc()')
 
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'slug', name='uq_banner_group_site_slug'),
+    )
+
 
 class Banner(db.Model):
     """单张轮播图。"""
     __tablename__ = 'banners'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.0 站群：冗余站点维度（由分组同步，便于快速过滤）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     group_id = db.Column(db.Integer, db.ForeignKey('banner_groups.id'),
                          nullable=False, index=True)
     title = db.Column(db.String(200))                            # alt 文案

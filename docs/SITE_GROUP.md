@@ -1,7 +1,7 @@
 # 站群模式（多站点 / Site Group）设计方案
 
-> 状态：**设计敲定（含四项产品决策）**，待按 M1–M4 分阶段落地。
-> 适用版本：v3.2.0（拟）。本文是站群模式的**设计依据**，后续拆 issue / 实现 M1 均以本文为准。
+> 状态：**v3.2.0 已落地（M1–M4 全部完成）**。本文档保留设计依据，实现细节与偏差以文末「十四、落地记录」为准。
+> 适用版本：v3.2.0。迁移脚本：`migrations/versions/0012_v3_2_0_sites.py`。
 
 ZhyCMS 当前为**单实例 / 单站点**架构：全站无 `site_id`、子域、域名解析概念（已全局确认）。站群模式的本质是**一个后端实例 + 一个库，按「站点」维度切分内容**，让同一套 CMS 同时服务多个相互独立又共享后台/插件/资产的前台站点。
 
@@ -99,7 +99,6 @@ class SiteScopedMixin:
     """内容按站点切分的统一维度列（镜像 i18n 的 locale 维度）。"""
     site_id = db.Column(db.Integer, nullable=False, default=0,
                         server_default='0', index=True)
-    site = db.relationship('Site', lazy='joined')
 ```
 
 | 表 | 是否加 `site_id` | 理由 |
@@ -198,7 +197,7 @@ def current_site_id():
 
 ## 八、RBAC 与站点权限
 
-1. 新增权限点 **`site:manage`**（站点管理：增删改站点、配置域名），授予超管/审核员。
+1. 新增权限点 **`site:manage`**（站点管理：增删改站点、配置域名），仅授予超管或显式勾选该权限的自定义角色（v3.2.3 起审核员不再默认拥有）。
 2. 新增 **`UserSitePermission(user_id, site_id, can_review, can_publish, unique(user_id,site_id))`**，把内容编辑/审核**收窄到指定站点**（镜像 `UserColumnPermission`）。
 3. 访问判定 `can_access_site(user, site_id)`：
    - 超管（`is_super`）全通；
@@ -224,14 +223,14 @@ def current_site_id():
 
 插件各自 `db.create_all()` 建表（见 `plugins/form/models.py` 约定），不能只靠核心迁移。提供统一接入：
 
-- 插件内容模型直接 **`class Form(SiteScopedMixin, db.Model)`**，一行获得 `site_id`。
-- `plugin_api` 暴露 **`current_site_id()`** 与 `SiteScopedMixin`；文档约定「内容查询按当前站点过滤、slug 类唯一约束改 `(site_id, slug)`」。
-- 插件**各自**加迁移补 `site_id`（沿用核心幂等 `_table_exists` 守卫范式）；内置插件（form / friend_link / product / job / analytics 等）随核心 `0010` 一并处理。
-- 插件后台管理页需按当前站点过滤列表（插件开发者按 SDK 文档自行处理；SDK 提供 `site_filter(model)` 辅助）。
+- 插件内容模型直接 **`class Form(SiteScopedMixin, db.Model)`**，一行获得 `site_id`（`from app.plugin_api import SiteScopedMixin`）。
+- `plugin_api` 暴露 **`current_site_id()`**、**`site_filter(query, model=None)`**（模型无 `site_id` 列时原样返回）与 `SiteScopedMixin` / `DEFAULT_SITE_ID`；文档约定「内容查询按当前站点过滤、slug 类唯一约束改 `(site_id, slug)`」。
+- 插件**各自**加迁移补 `site_id`（沿用核心幂等 `_table_exists` 守卫范式）；内置插件（form / friend_link / product / recruit / banner / member 等）已随核心 `0012` 一并处理。
+- 插件后台管理页需按当前站点过滤列表（插件开发者按 SDK 文档自行处理；SDK 提供 `site_filter(query)` 辅助）。
 
 ---
 
-## 十一、数据迁移方案（Alembic 新迁移 `0010_v3_2_0_sites.py`）
+## 十一、数据迁移方案（Alembic 迁移 `0012_v3_2_0_sites.py`）
 
 沿用 `0001` 基线 + 幂等守卫 + `ensure_*` 回填范式：
 
@@ -261,9 +260,94 @@ def current_site_id():
 
 | 阶段 | 内容 | 回归风险 |
 | --- | --- | --- |
-| **M1** | `sites` 表 + `site_id` 列（columns/articles/fragments/settings/members）+ 迁移 `0010` + 解析器（恒返回 0）+ 查询过滤 | 极低（恒等变换） |
+| **M1** | `sites` 表 + `site_id` 列（columns/articles/fragments/settings/members）+ 迁移 `0012` + 解析器（恒返回 0）+ 查询过滤 | 极低（恒等变换） |
 | **M2** | 后台站点 CRUD + 切换器 + RBAC（`site:manage` / `UserSitePermission`） | 中（权限路径） |
 | **M3** | 站点化 settings/theme/sitemap/search/缓存命名空间 + 会员 `member_scope` 开关 | 中 |
 | **M4** | 插件 SDK（`SiteScopedMixin` + `plugin_api.current_site_id()`）+ 内置插件改造 + 文档 | 中 |
 
 每阶段可独立合并、可回滚（迁移 `downgrade` 对称）。
+
+---
+
+## 十四、落地记录（v3.2.0）
+
+| 里程碑 | 落地内容 | 关键文件 |
+| --- | --- | --- |
+| M1 | `sites` 表 + `site_id` 维度列（columns/articles/fragments/settings/members/audit_logs）+ 迁移 `0012` + 解析器 | `app/models/site.py`、`app/sites.py`、`migrations/versions/0012_v3_2_0_sites.py` |
+| M2 | 后台站点 CRUD / 切换器 / `site:manage` / `UserSitePermission` | `app/admin/system/sites.py`、`app/models/rbac.py`、`admin/base.html` |
+| M3 | 站点化 settings/theme/sitemap/search/缓存命名空间 + `member_scope` | `app/models/setting.py`、`app/utils/themes.py`、`app/utils/search.py`、`app/frontend/views.py` |
+| M4 | 插件 SDK（`current_site_id()` / `site_filter()` / `SiteScopedMixin`）+ 内置插件改造 + 文档 | `app/plugin_api.py`、`plugins/{form,friend_link,product,recruit,banner,member}/`、`docs/PLUGIN_DEV.md` |
+
+实现与设计的三处偏差：
+
+1. **迁移编号**为 `0012`（v3.1.5 已占用 `0011`），不是文中的 `0010`。
+2. **搜索后端**现为 Tantivy（主）/ Meilisearch / SQL 兜底，不存在 Whoosh；Tantivy 通过 schema 版本标记 `.schema_version` 检测到旧索引后自动全量重建。
+3. **SQLite 唯一约束**通过「唯一索引」实现（`CREATE UNIQUE INDEX`），避免 `ALTER TABLE ADD CONSTRAINT` 不支持的问题；MySQL/PostgreSQL 走复合唯一约束。
+
+测试：`tests/test_sites_v320.py`（15 项）覆盖站点解析、后台切换、slug 跨站复用、栏目/文章 API 隔离、站点化配置、全局键、站点关闭 503、站点 CRUD 权限、账号站点权限绑定与审计按站点筛选。
+
+## 十五、缺陷修复（v3.2.1）
+
+v3.2.0 第三方测试报告的缺口已在 v3.2.1 闭环，实现口径如下（回归测试见 `tests/test_sites_v321.py`）：
+
+| 问题 | 修复口径 | 关键文件 |
+| --- | --- | --- |
+| 站点权限可被 `?site=` 绕过 | 解析层写会话前校验 `can_access_site()`；`admin_bp` 统一 `before_request` 校验当前站点（GET 越权回退、显式越权与写请求 403），插件后台自动继承 | `app/sites.py`、`app/admin/__init__.py` |
+| 未绑定账号的兼容 | 无任何 `UserSitePermission` 行 → 全站可见（升级不锁定存量编辑）；有绑定行 → 仅绑定站点 | `app/sites.py` |
+| `status=closed` 覆盖不全 | 关闭校验提升为 app 级 `before_request`：前台/API/插件前台蓝本统一 503；API 返回 JSON、`healthz` 固定 200、后台与根文件豁免 | `app/frontend/views.py`、`app/__init__.py` |
+| 独立会员会话跨站 | `member_scope=isolated` 时 `current_member()` 校验会员站点，不一致清会话 | `plugins/member/scope.py`、`plugins/member/security.py` |
+| 站点 SEO 不生效 | `_seo()` 与 `/api/v1/site` 采用「站点 SEO → 全局设置」回退链 | `app/frontend/views.py`、`app/api/views.py` |
+| `0012` 降级半回滚 | 降级任何 DDL 前预检跨站重复 `slug/key/username`，冲突即中止并输出清单 | `migrations/versions/0012_v3_2_0_sites.py` |
+| P3 边界项 | `accessible_sites` 批量化、`subdomain` 唯一（迁移 `0013`）、域名 DNS label 校验、`sort_order` 表单校验、删站内容检查、`site_url()` 子域支持、`b.localhost`、JWT 配置延后读取 | 见 CHANGELOG v3.2.1 |
+
+## 十六、缺陷修复（v3.2.2）
+
+v3.2.1 潜在威胁报告的 11 项缺口已在 v3.2.2 闭环：v3.2.1 解决「查询带站点」，v3.2.2 补齐「表结构与写入带站点」（回归测试见 `tests/test_sites_v322.py`，迁移 `0014`）：
+
+| 问题 | 修复口径 | 关键文件 |
+| --- | --- | --- |
+| 教程跨站可见/可改（P0） | 两表补 `site_id`，`slug` 改站内唯一；前台/后台/模板函数/构建器组件按站过滤；演示数据只清当前站 | `plugins/tutorial/models.py`、`plugins/tutorial/*.py` |
+| 页面构建跨站读写（P0） | `builder_pages` 补 `site_id`，唯一约束改 `(site_id, scope, column_id)`；服务层按站查询，跨站编辑器 404；卸载检查仍跨站扫描 | `app/models/builder.py`、`app/builder/service.py`、`app/admin/builder/__init__.py` |
+| 上传跨站复用（P0） | `uploaded_files` 补 `site_id` + `(site_id, content_hash)` 索引；去重按站；新路径 `uploads/site{N}/...` | `app/models/upload.py`、`app/utils/uploads.py` |
+| 删站检查遗漏（P1） | 补充教程/构建/上传索引/OAuth 表计数 | `app/admin/system/sites.py` |
+| 会员删除无站点校验（P1） | 删除与编辑一致校验所属站点 | `plugins/member/admin.py` |
+| OAuth 跨站串号（P1） | `member_oauths` 补 `site_id`，唯一约束改 `(site_id, provider, openid)`，口径走 `scope_site_id()` | `plugins/member/models.py`、`plugins/member/frontend_routes.py` |
+| 备份/监控权限过宽（P1） | 收敛为超管或 `site:manage`，后台守卫加平台入口豁免 | `app/admin/system/backup.py`、`app/admin/__init__.py` |
+| 缓存失效键不匹配（P1） | 按 `frontend/site{N}/*` 前缀失效，不支持模式删除时回退整体清空 | `app/utils/helpers.py` |
+| 浏览量全局单键（P1） | 键改 `article:viewed:pending:site{N}`，按站合并并过滤文章 | `app/frontend/views.py` |
+| 插件 SQL 搜索无站点条件（P1） | `sql_search` 增可选 `site_id`，上层签名探测兼容旧插件 | `app/utils/search.py`、`plugins/product/search.py`、`plugins/recruit/search.py` |
+| 平台入口被站点守卫误拦（P2） | 站点/插件/存储/迁移/翻译/统计/备份/监控入口豁免 | `app/admin/__init__.py` |
+| 后台域名登录不落对应站点 | 后台未显式选择站点时也按 Host 解析（domain → 子域），默认管理当前域名站点；显式切换仍以 session 为准；无权站点回退可访问站点 | `app/sites.py` |
+
+## 十七、角色体系站点化（v3.2.3）
+
+用户管理的分组重新规划：新增「站点管理员」，内容审核员/内容编辑/只读查看员也绑定到具体站点。迁移 `0015`，回归测试见 `tests/test_rbac_sites.py`。
+
+### 17.1 角色边界
+
+| 角色 | 范围 | 关键权限 |
+| --- | --- | --- |
+| 超级管理员 `super_admin` | 整个系统 | 全部权限（`is_super` 兜底），含 `site:manage`、`system:backup` |
+| 站点管理员 `site_admin` | 指定站点 | 站点内全部后台功能：设置、用户、审计、栏目、内容、页面构建、表单；**不含** `site:manage` / `system:backup` |
+| 内容审核员 `content_auditor` | 指定站点 | 审核/发布/归档/回滚、栏目、页面构建发布；v3.2.3 移除全局 `site:manage` |
+| 内容编辑 `content_editor` | 指定站点 | 创建/编辑/提交审核、页面构建草稿 |
+| 只读查看员 `readonly_viewer` | 指定站点 | 只读查看、表单数据与审计日志列表 |
+
+### 17.2 数据模型
+
+- `user_roles.site_id`：`NULL` = 平台级/全局角色（兼容存量与超管），非空 = 只在指定站点生效。
+- 唯一约束：`(user_id, role_id, site_id)`，支持一人多站多角色。
+- `User.has_permission(perm_code, site_id=None)`：传 `site_id` 时只认「全局角色 + 该站点角色」；不传时按全部角色判断（菜单可见性）。
+
+### 17.3 站点可见性
+
+- `can_access_site(user, site_id)`：超管/`site:manage` 全通；命中 `user_roles.site_id` 或 `UserSitePermission` 行即可访问；存量全局角色（`site_id IS NULL`）在无显式站点绑定时全站可见，有绑定时以绑定为准。
+- `accessible_sites(user)`：平台管理员 → 全部；站点级角色 → 角色所属站点 ∪ `UserSitePermission`；存量全局角色 → 全部（有绑定时取绑定）。
+
+### 17.4 账号管理边界
+
+- 平台管理员（超管或 `site:manage`）：可查看全部账号，分配全局角色与任意站点角色。
+- 站点管理员：账号列表只显示「角色全部落在自己可管理站点、且无全局角色」的账号；新增/编辑时只能选择自己管理的站点与四种站点角色；不能授予超管或越权站点。
+- 角色与权限配置页（`/admin/roles`）仅平台管理员可用，站点管理员访问返回 403。
+- 插件安装/启停/卸载（`/admin/plugins`）、备份恢复、系统监控与数据库迁移属于平台级功能，站点管理员访问返回 403。
+- 站点管理员保存账号时，不会删除其看不到的其他站点授权（范围外 `user_roles` 行保持不动）。

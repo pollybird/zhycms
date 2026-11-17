@@ -11,6 +11,7 @@ from flask import render_template, redirect, url_for, request, flash, abort
 
 from app.extensions import db
 from app.admin import admin_bp
+from app.sites import current_site_id
 from app.models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, OP_BATCH
 from app.utils.helpers import permission_required, audit_log
 from app.utils.uploads import save_upload_file
@@ -39,7 +40,9 @@ def _gate(view):
 @_gate
 @permission_required('friend_link:manage')
 def friend_link_index():
-    links = FriendLink.query.filter_by(is_deleted=False).order_by(
+    links = FriendLink.query.filter_by(
+        is_deleted=False, site_id=current_site_id()
+    ).order_by(
         FriendLink.sort_order.desc(), FriendLink.created_at.desc()
     ).all()
     return render_template('friend_link/index.html', links=links)
@@ -63,7 +66,8 @@ def friend_link_create():
 @_gate
 @permission_required('friend_link:manage')
 def friend_link_edit(lid):
-    link = FriendLink.query.get_or_404(lid)
+    link = FriendLink.query.filter_by(
+        id=lid, site_id=current_site_id()).first_or_404()
     if request.method == 'POST':
         updated = _save_link(link)
         if updated is None:
@@ -94,7 +98,7 @@ def _save_link(link):
 
     is_new = link is None
     if is_new:
-        link = FriendLink()
+        link = FriendLink(site_id=current_site_id())
 
     link.name = name
     link.url = url
@@ -152,7 +156,8 @@ def _save_link_translations(link):
 @_gate
 @permission_required('friend_link:manage')
 def friend_link_delete(lid):
-    link = FriendLink.query.get_or_404(lid)
+    link = FriendLink.query.filter_by(
+        id=lid, site_id=current_site_id()).first_or_404()
     link.is_deleted = True
     db.session.commit()
     audit_log(OP_DELETE, AUDIT_MODULE, link.id, link.name, {'action': '链接'})
@@ -164,7 +169,8 @@ def friend_link_delete(lid):
 @_gate
 @permission_required('friend_link:manage')
 def friend_link_toggle(lid):
-    link = FriendLink.query.get_or_404(lid)
+    link = FriendLink.query.filter_by(
+        id=lid, site_id=current_site_id()).first_or_404()
     link.is_enabled = not link.is_enabled
     db.session.commit()
     audit_log(OP_UPDATE, AUDIT_MODULE, link.id, link.name,
@@ -182,7 +188,10 @@ def friend_link_batch():
         flash(_gettext('未选择'), 'warning')
         return redirect(url_for('admin.friend_link_index'))
 
-    links = FriendLink.query.filter(FriendLink.id.in_(ids)).all()
+    links = FriendLink.query.filter(
+        FriendLink.id.in_(ids),
+        FriendLink.site_id == current_site_id(),
+    ).all()
     if action == 'enable':
         for l in links:
             l.is_enabled = True

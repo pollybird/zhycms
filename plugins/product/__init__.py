@@ -92,8 +92,11 @@ class ProductPlugin(PluginBase):
         from . import api as _api
         _api.register(api_bp)
 
-    def get_sitemap_urls(self):
-        """启用产品详情页收录（频率/优先级沿用文章规则，loc 为完整 URL）。"""
+    def get_sitemap_urls(self, site_id=None):
+        """启用产品详情页收录（频率/优先级沿用文章规则，loc 为完整 URL）。
+
+        v3.2.0 站群：按 site_id 仅输出当前站点产品（None 表示不过滤）。
+        """
         from flask import has_request_context, request
         from app.models.setting import Setting
         from .models import Product
@@ -105,8 +108,10 @@ class ProductPlugin(PluginBase):
         freq = Setting.get('seo_sitemap_changefreq_article') or 'monthly'
         prio = Setting.get('seo_sitemap_priority_article') or '0.6'
         urls = []
-        q = Product.query.filter_by(is_enabled=True, is_deleted=False) \
-            .order_by(Product.updated_at.desc()).limit(2000)
+        q = Product.query.filter_by(is_enabled=True, is_deleted=False)
+        if site_id is not None:
+            q = q.filter_by(site_id=site_id)
+        q = q.order_by(Product.updated_at.desc()).limit(2000)
         for p in q:
             urls.append({
                 'loc': base + frontend_product_url(p),

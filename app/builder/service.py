@@ -28,10 +28,17 @@ _FIXTURE_FILES = {
 # 查询
 # ============================================================
 
-def get_page(scope, column_id=None):
+def _site_id():
+    """当前站点 id（无请求上下文时为默认站点 0）。"""
+    from ..sites import current_site_id
+    return current_site_id()
+
+
+def get_page(scope, column_id=None, site_id=None):
     if scope not in _B.SCOPES:
         return None
-    q = BuilderPage.query.filter_by(scope=scope)
+    sid = _site_id() if site_id is None else site_id
+    q = BuilderPage.query.filter_by(scope=scope, site_id=sid)
     if column_id is None:
         q = q.filter(BuilderPage.column_id.is_(None))
     else:
@@ -41,7 +48,8 @@ def get_page(scope, column_id=None):
 
 def get_or_create_page(scope, column_id=None, name='', commit=True):
     """取页面记录，不存在则创建（空草稿）。"""
-    page = get_page(scope, column_id)
+    sid = _site_id()
+    page = get_page(scope, column_id, site_id=sid)
     if page is not None:
         return page, False
     if scope not in _B.SCOPES:
@@ -49,6 +57,7 @@ def get_or_create_page(scope, column_id=None, name='', commit=True):
     if scope == _B.SCOPE_HOME and column_id is not None:
         raise LayoutError('首页不能绑定栏目')
     page = BuilderPage(
+        site_id=sid,
         scope=scope, column_id=column_id, name=name or _default_name(scope, column_id),
         status=_B.STATUS_DRAFT,
     )
@@ -91,7 +100,9 @@ def list_pages_grouped():
     """页面管理列表：已构建页面 + 可初始化的栏目。"""
     from ..models.column import Column
 
-    pages = BuilderPage.query.order_by(BuilderPage.scope, BuilderPage.id).all()
+    sid = _site_id()
+    pages = BuilderPage.query.filter_by(site_id=sid).order_by(
+        BuilderPage.scope, BuilderPage.id).all()
     by_scope = {s: [] for s in _B.SCOPES}
     for p in pages:
         by_scope[p.scope].append(p)
@@ -101,7 +112,8 @@ def list_pages_grouped():
         (p.scope, p.column_id) for p in pages
     }
     available_columns = {'page': [], 'list': []}
-    for col in Column.query.filter_by(is_deleted=False).order_by(
+    for col in Column.query.filter_by(
+            is_deleted=False, site_id=sid).order_by(
             Column.sort_order.desc(), Column.id.asc()).all():
         if col.type in ('page', 'list') and not col.is_parent:
             scopes = {'page': _B.SCOPE_PAGE, 'list': _B.SCOPE_LIST}
@@ -259,6 +271,8 @@ def pages_referencing_widget_types(widget_types):
     """扫描全部草稿/已发布布局，返回引用了给定组件类型的 BuilderPage 列表。
 
     用于插件卸载前的安全检查（插件组件会随卸载注销，引用会导致布局校验失败）。
+    注意：这里**有意跨站点扫描**——插件组件是平台级注册的，任一站点引用都
+    会在卸载后失效，因此不能按当前站点过滤。
     """
     types = set(widget_types or [])
     if not types:

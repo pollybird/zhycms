@@ -22,6 +22,7 @@ from openpyxl import Workbook
 
 from app.extensions import db
 from app.admin import admin_bp
+from app.sites import current_site_id
 from app.models.audit import (
     OP_CREATE, OP_UPDATE, OP_DELETE, OP_EXPORT, OP_BATCH,
 )
@@ -64,7 +65,9 @@ def _gate(view):
 @_gate
 @permission_required('form:view')
 def form_index():
-    forms = Form.query.filter_by(is_deleted=False).order_by(Form.created_at.desc()).all()
+    forms = Form.query.filter_by(
+        is_deleted=False, site_id=current_site_id()
+    ).order_by(Form.created_at.desc()).all()
     return render_template('admin/form/index.html', forms=forms)
 
 
@@ -87,7 +90,7 @@ def form_create():
 @_gate
 @permission_required('form:manage')
 def form_edit(fid):
-    form = Form.query.get_or_404(fid)
+    form = Form.query.filter_by(id=fid, site_id=current_site_id()).first_or_404()
     if form.is_deleted:
         abort(404)
     if request.method == 'POST':
@@ -109,14 +112,15 @@ def _save_form(form):
         flash(_gettext('名称和标识必填'), 'danger')
         return None
 
-    existing = Form.query.filter_by(slug=slug, is_deleted=False).first()
+    existing = Form.query.filter_by(
+        slug=slug, is_deleted=False, site_id=current_site_id()).first()
     if existing and (form is None or existing.id != form.id):
         flash(_gettext('表单标识已存在'), 'danger')
         return None
 
     is_new = form is None
     if is_new:
-        form = Form(slug=slug)
+        form = Form(slug=slug, site_id=current_site_id())
         db.session.add(form)
 
     form.name = name
@@ -255,7 +259,7 @@ def _save_form_fields(form):
 @_gate
 @permission_required('form:manage')
 def form_delete(fid):
-    form = Form.query.get_or_404(fid)
+    form = Form.query.filter_by(id=fid, site_id=current_site_id()).first_or_404()
     form.is_deleted = True
     db.session.commit()
     flash(_gettext('表单已删除'), 'success')
@@ -269,7 +273,7 @@ def form_delete(fid):
 @_gate
 @permission_required('form:view')
 def form_submissions(fid):
-    form = Form.query.get_or_404(fid)
+    form = Form.query.filter_by(id=fid, site_id=current_site_id()).first_or_404()
     page = max(int(request.args.get('page', 1)), 1)
     is_read = request.args.get('is_read', '')
 
@@ -297,6 +301,8 @@ def form_submission_detail(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
     if sub.form_id != fid or sub.is_deleted:
         abort(404)
+    if sub.form is None or sub.form.site_id != current_site_id():
+        abort(404)
     if not sub.is_read:
         sub.is_read = True
         db.session.commit()
@@ -311,6 +317,8 @@ def form_submission_toggle_read(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
     if sub.form_id != fid:
         abort(404)
+    if sub.form is None or sub.form.site_id != current_site_id():
+        abort(404)
     sub.is_read = not sub.is_read
     db.session.commit()
     return redirect(url_for('admin.form_submissions', fid=fid))
@@ -321,6 +329,8 @@ def form_submission_toggle_read(fid, sid):
 @permission_required('form:manage')
 def form_submission_delete(fid, sid):
     sub = FormSubmission.query.get_or_404(sid)
+    if sub.form is None or sub.form.site_id != current_site_id():
+        abort(404)
     sub.is_deleted = True
     db.session.commit()
     flash(_gettext('已删除'), 'success')
@@ -337,7 +347,10 @@ def form_submission_batch(fid):
         flash(_gettext('未选择记录'), 'warning')
         return redirect(url_for('admin.form_submissions', fid=fid))
 
-    subs = FormSubmission.query.filter(FormSubmission.id.in_(ids), FormSubmission.form_id == fid).all()
+    subs = FormSubmission.query.filter(
+        FormSubmission.id.in_(ids), FormSubmission.form_id == fid,
+        FormSubmission.form.has(site_id=current_site_id()),
+    ).all()
     if action == 'read':
         for s in subs: s.is_read = True
     elif action == 'unread':
@@ -354,7 +367,7 @@ def form_submission_batch(fid):
 @permission_required('form:view')
 def form_export(fid):
     """导出表单数据为 Excel。"""
-    form = Form.query.get_or_404(fid)
+    form = Form.query.filter_by(id=fid, site_id=current_site_id()).first_or_404()
     fields = form.fields.filter_by(is_deleted=False).order_by(FormField.sort_order.asc()).all()
     subs = FormSubmission.query.filter_by(form_id=fid, is_deleted=False).order_by(
         FormSubmission.created_at.desc()

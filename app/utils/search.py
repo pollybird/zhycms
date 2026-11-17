@@ -67,7 +67,8 @@ class SearchProvider:
     def get_doc(self, obj_id, locale):
         return None
 
-    def sql_search(self, keyword, locale, page=1, per_page=20):
+    def sql_search(self, keyword, locale, page=1, per_page=20, site_id=None):
+        """SQL 兜底检索。site_id 为 None 表示不限站点（含旧版插件兼容）。"""
         return [], 0
 
     def build_url(self, item):
@@ -202,6 +203,7 @@ def _build_doc(article, col, locale, meili=False):
         'column_id': article.column_id,
         'column_name': fields['column_name'],
         'column_slug': fields['column_slug'],
+        'site_id': int(getattr(article, 'site_id', 0) or 0),
         'published_at': published.isoformat() if meili else published,
         'status': article.status or STATUS_PUBLISHED,
     }
@@ -227,6 +229,7 @@ def _provider_doc(prov, raw, meili=False):
         'column_id': raw.get('column_id'),
         'column_name': raw.get('column_name') or '',
         'column_slug': raw.get('column_slug') or '',
+        'site_id': int(raw.get('site_id') or 0),
         'published_at': published.isoformat() if meili else published,
         'status': STATUS_PUBLISHED,
     }
@@ -274,9 +277,10 @@ class SearchBackend:
         """从全部语言索引中移除插件内容单条记录。"""
         pass
 
-    def search(self, keyword, page=1, per_page=20, locale=None):
+    def search(self, keyword, page=1, per_page=20, locale=None, site_id=None):
         """搜索，返回 (items, total)。
         items: [{id, uid, type, title, summary, column_id, column_name, published_at}]
+        v3.2.0：site_id 非 None 时仅返回该站点内容。
         """
         raise NotImplementedError
 
@@ -302,13 +306,15 @@ class SqlLikeBackend(SearchBackend):
     def unindex_article(self, article_id):
         pass
 
-    def _search_articles(self, like, loc, page, per_page):
+    def _search_articles(self, like, loc, page, per_page, site_id=None):
         """文章 LIKE 检索（非默认语言同时匹配翻译表）。返回 (items, total)。"""
         from .i18n_content import t_field, get_default_locale
         q = Article.query.filter(
             Article.is_deleted == False,  # noqa: E712
             Article.status == STATUS_PUBLISHED,
         )
+        if site_id is not None:
+            q = q.filter(Article.site_id == site_id)
         main_match = db.or_(
             Article.title.like(like, escape=LIKE_ESCAPE),
             Article.summary.like(like, escape=LIKE_ESCAPE),
@@ -347,18 +353,31 @@ class SqlLikeBackend(SearchBackend):
             })
         return items, pagination.total
 
-    def search(self, keyword, page=1, per_page=20, locale=None):
+    def search(self, keyword, page=1, per_page=20, locale=None, site_id=None):
         """合并检索文章与启用插件内容（各来源取当前页窗口后按时间归并排序）。"""
         # v3.1.9 VULN-010：转义 LIKE 通配符，避免 %/_ 放大结果集
         like = f'%{escape_like(keyword)}%'
         loc = _search_locale(locale)
         # 各来源取前 page*per_page 条，保证归并后当前页数据完整
         window = page * per_page
-        items, total = self._search_articles(like, loc, 1, window)
+        items, total = self._search_articles(like, loc, 1, window, site_id=site_id)
+        import inspect
         for prov in get_search_providers().values():
             try:
-                p_items, p_total = prov.sql_search(keyword, loc,
-                                                   page=1, per_page=window)
+                # v3.2.2：向插件传递 site_id；旧版插件签名无该参数时保持兼容
+                kwargs = {'page': 1, 'per_page': window}
+                try:
+                    params = inspect.signature(prov.sql_search).parameters
+                except (TypeError, ValueError):
+                    params = {}
+                if 'site_id' in params:
+                    kwargs['site_id'] = site_id
+                p_items, p_total = prov.sql_search(keyword, loc, **kwargs)
+                if site_id is not None:
+                    # 纵深防御：即使插件未按站点过滤，也不让跨站结果串出
+                    p_items = [x for x in p_items or []
+                               if int(x.get('site_id') or 0) == int(site_id)]
+                    p_total = len(p_items)
                 items.extend(p_items or [])
                 total += (p_total or 0)
             except Exception:
@@ -391,6 +410,28 @@ class SqlLikeBackend(SearchBackend):
 _tantivy_indexes = {}  # {locale: Index} 单例缓存
 _tantivy_schema = None
 
+# v3.2.0 站群：schema 版本标记（新增 site_id 字段）。标记不一致视为索引陈旧，
+# 启动自检时触发后台重建，避免旧 schema 索引读取异常。
+_SCHEMA_VERSION = '2'
+
+
+def _schema_marker_path(index_dir):
+    return os.path.join(index_dir, '.schema_version')
+
+
+def index_needs_rebuild():
+    """索引缺失或 schema 版本陈旧时返回 True（供启动自检使用）。"""
+    from .i18n_content import get_default_locale
+    index_dir = _get_index_dir(get_default_locale())
+    if not os.path.exists(os.path.join(index_dir, 'meta.json')):
+        return True
+    try:
+        with open(_schema_marker_path(index_dir), 'r', encoding='utf-8') as f:
+            return f.read().strip() != _SCHEMA_VERSION
+    except OSError:
+        return True
+
+
 _WRITER_HEAP = 50_000_000  # tantivy writer 堆内存（50MB 默认值，CMS 量级充裕）
 
 
@@ -411,6 +452,10 @@ def _get_tantivy_schema():
         sb.add_text_field('content')     # 仅索引
         sb.add_text_field('summary')     # 仅索引
         sb.add_text_field('status', tokenizer_name='raw')  # 仅过滤
+        # v3.2.0 站群：站点维度仅索引/存储，检索时按 site_id 过滤
+        # 注：用有符号整数（i64）而非 unsigned——tantivy-py 的 Document
+        # 构造对 u64 字段要求显式无符号类型，i64 可同时存站点 id 并支持过滤
+        sb.add_integer_field('site_id', stored=True, indexed=True)
         _tantivy_schema = sb.build()
     return _tantivy_schema
 
@@ -427,6 +472,15 @@ def _get_tantivy_index(locale, create=False):
     import tantivy
     index_dir = _get_index_dir(locale)
     has_index = os.path.exists(os.path.join(index_dir, 'meta.json'))
+    if has_index:
+        # v3.2.0：schema 版本不符（如新增 site_id）视为陈旧索引
+        try:
+            with open(_schema_marker_path(index_dir), 'r', encoding='utf-8') as f:
+                stale = f.read().strip() != _SCHEMA_VERSION
+        except OSError:
+            stale = True
+        if stale:
+            has_index = False
     if not has_index:
         if not create:
             return None
@@ -434,6 +488,12 @@ def _get_tantivy_index(locale, create=False):
         shutil.rmtree(index_dir, ignore_errors=True)
         os.makedirs(index_dir, exist_ok=True)
     idx = tantivy.Index(_get_tantivy_schema(), path=index_dir)
+    if not has_index:
+        try:
+            with open(_schema_marker_path(index_dir), 'w', encoding='utf-8') as f:
+                f.write(_SCHEMA_VERSION)
+        except OSError:
+            pass
     _tantivy_indexes[locale] = idx
     return idx
 
@@ -452,6 +512,7 @@ def _to_tantivy_doc(doc):
         content=tokenize(doc.get('content') or ''),
         summary=tokenize(doc.get('summary') or ''),
         status=doc.get('status') or STATUS_PUBLISHED,
+        site_id=int(doc.get('site_id') or 0),
     )
 
 
@@ -476,7 +537,7 @@ class TantivyBackend(SearchBackend):
                     writer.add_document(doc)
                 writer.commit()
             except Exception:
-                writer.cancel()
+                writer.rollback()
                 raise
             index.reload()
 
@@ -512,7 +573,7 @@ class TantivyBackend(SearchBackend):
                 writer.delete_documents_by_term('uid', uid)
                 writer.commit()
             except Exception as e:
-                writer.cancel()
+                writer.rollback()
                 current_app.logger.warning('移除索引 %s 失败：%s', uid, e)
             index.reload()
 
@@ -526,11 +587,12 @@ class TantivyBackend(SearchBackend):
             return default
         return values[0]
 
-    def _hydrate(self, hits, loc):
+    def _hydrate(self, hits, loc, site_id=None):
         """按 uid/type/id 回库水合展示字段（保持 tantivy 相关度顺序）。
 
         文章：一次 IN 查询取回、逐栏目缓存、t_field 按当前语言解析；
         插件内容：走提供者 get_doc（协议本身即按 locale 产出本地化字段）。
+        v3.2.0：site_id 非 None 时二次过滤，杜绝跨站内容串出。
         """
         article_ids = [oid for _uid, type_, oid in hits if type_ == TYPE_ARTICLE]
         articles = {}
@@ -545,6 +607,8 @@ class TantivyBackend(SearchBackend):
                 a = articles.get(oid)
                 if a is None:
                     continue  # 索引残影（刚删除未提交），跳过
+                if site_id is not None and int(a.site_id or 0) != int(site_id):
+                    continue
                 if a.column_id not in columns:
                     columns[a.column_id] = Column.query.get(a.column_id)
                 col = columns[a.column_id]
@@ -566,6 +630,8 @@ class TantivyBackend(SearchBackend):
                 raw = prov.get_doc(oid, loc) if prov is not None else None
                 if raw is None:
                     continue
+                if site_id is not None and int(raw.get('site_id') or 0) != int(site_id):
+                    continue
                 items.append({
                     'id': raw.get('id'),
                     'uid': uid,
@@ -580,7 +646,7 @@ class TantivyBackend(SearchBackend):
                 })
         return items
 
-    def search(self, keyword, page=1, per_page=20, locale=None):
+    def search(self, keyword, page=1, per_page=20, locale=None, site_id=None):
         loc = _search_locale(locale)
         index = _get_tantivy_index(loc)
         if index is None:
@@ -595,9 +661,10 @@ class TantivyBackend(SearchBackend):
             return [], 0
         # tokenize 已剥离标点并小写化（免疫查询语法/大写运算符），
         # 仍兜底 ValueError 防绑定层边界行为
+        site_filter = f' AND site_id:{int(site_id)}' if site_id is not None else ''
         try:
             query = index.parse_query(
-                f'({tokenized}) AND status:{STATUS_PUBLISHED}',
+                f'({tokenized}) AND status:{STATUS_PUBLISHED}{site_filter}',
                 ['title', 'content', 'summary'])
         except ValueError:
             return [], 0
@@ -616,7 +683,7 @@ class TantivyBackend(SearchBackend):
                 self._doc_first(doc, 'type', TYPE_ARTICLE),
                 self._doc_first(doc, 'id', 0),
             ))
-        return self._hydrate(hits, loc), result.count
+        return self._hydrate(hits, loc, site_id=site_id), result.count
 
     # ---------- 运维 ----------
 
@@ -662,7 +729,7 @@ class TantivyBackend(SearchBackend):
                             '插件 %s 索引文档产出失败', prov.type)
                 writer.commit()
             except Exception:
-                writer.cancel()
+                writer.rollback()
                 raise
             index.reload()
         return indexed, errors
@@ -764,16 +831,19 @@ class MeilisearchBackend(SearchBackend):
                 current_app.logger.warning(
                     'Meili 移除索引 %s#%s（%s）失败：%s', type_, obj_id, loc, e)
 
-    def search(self, keyword, page=1, per_page=20, locale=None):
+    def search(self, keyword, page=1, per_page=20, locale=None, site_id=None):
         import requests
         loc = _search_locale(locale)
+        filters = ['status = published', 'is_deleted = false']
+        if site_id is not None:
+            filters.append(f'site_id = {int(site_id)}')
         resp = requests.post(
             f'{self._get_url()}/indexes/{self.INDEX_NAME}_{loc}/search',
             json={
                 'q': keyword,
                 'page': page,
                 'hitsPerPage': per_page,
-                'filter': 'status = published AND is_deleted = false',
+                'filter': ' AND '.join(filters),
             },
             headers=self._headers(), timeout=10
         )
@@ -794,6 +864,14 @@ class MeilisearchBackend(SearchBackend):
             # 创建索引（如不存在）；主键用 uid（文章/产品跨类型唯一）。
             # 注意：已存在且含文档的旧索引主键无法在线变更，需在 Meili 侧
             # 删除索引后重建，否则跨类型同 id 会互相覆盖（搜索仍可用）。
+            try:
+                requests.patch(
+                    f'{self._get_url()}/indexes/{index_name}/settings/filterable-attributes',
+                    json=['status', 'is_deleted', 'site_id'],
+                    headers=self._headers(), timeout=10
+                )
+            except Exception as e:
+                current_app.logger.warning('Meili 索引 %s 过滤字段设置失败：%s', index_name, e)
             try:
                 requests.patch(
                     f'{self._get_url()}/indexes/{index_name}',
@@ -857,9 +935,10 @@ def get_backend():
     return backend
 
 
-def search_articles(keyword, page=1, per_page=20, locale=None):
+def search_articles(keyword, page=1, per_page=20, locale=None, site_id=None):
     """公共搜索 API：返回 (items, total)。
     后端故障时自动回退到 SQL LIKE。locale 为当前语言代码。
+    v3.2.0：site_id 非 None 时仅检索该站点内容（前台按当前站点隔离）。
 
     兜底策略：索引后端（Tantivy/Meilisearch）零命中时，再用实时 SQL 查一次。
     索引可能未建立或陈旧（如升级到多语言版本后未点「重建索引」），导致
@@ -872,17 +951,19 @@ def search_articles(keyword, page=1, per_page=20, locale=None):
     sql_backend = SqlLikeBackend()
     if not isinstance(backend, SqlLikeBackend):
         try:
-            items, total = backend.search(kw, page=page, per_page=per_page, locale=locale)
+            items, total = backend.search(
+                kw, page=page, per_page=per_page, locale=locale, site_id=site_id)
             if total > 0:
                 return items, total
         except Exception as e:
             current_app.logger.warning('搜索后端 %s 故障，回退到 SQL LIKE: %s',
                                        type(backend).__name__, e)
-            return sql_backend.search(kw, page=page, per_page=per_page, locale=locale)
+            return sql_backend.search(
+                kw, page=page, per_page=per_page, locale=locale, site_id=site_id)
         # 索引零命中：用实时 SQL 兜底（索引未建/陈旧场景）
         try:
             sql_items, sql_total = sql_backend.search(
-                kw, page=page, per_page=per_page, locale=locale)
+                kw, page=page, per_page=per_page, locale=locale, site_id=site_id)
             if sql_total > 0:
                 current_app.logger.info(
                     '索引后端零命中，SQL 兜底召回 %d 条（关键词 %s，locale=%s）',
@@ -892,7 +973,8 @@ def search_articles(keyword, page=1, per_page=20, locale=None):
             current_app.logger.exception('SQL 兜底搜索失败')
         return items, total
     try:
-        return sql_backend.search(kw, page=page, per_page=per_page, locale=locale)
+        return sql_backend.search(
+            kw, page=page, per_page=per_page, locale=locale, site_id=site_id)
     except Exception as e:
         current_app.logger.warning('SQL LIKE 搜索失败: %s', e)
         return [], 0

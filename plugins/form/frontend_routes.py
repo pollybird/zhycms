@@ -20,6 +20,7 @@ from flask import (
 from flask_babel import gettext as _gettext
 from app.extensions import db
 from app.models.setting import Setting
+from app.sites import current_site_id
 from app.plugin_system import plugin_enabled
 from app.utils.themes import theme_template
 from app.utils.uploads import save_upload_file
@@ -44,7 +45,8 @@ def _gate(view):
 @form_frontend.route('/form/<slug>', methods=['GET', 'POST'])
 @_gate
 def form_submit(slug):
-    form = Form.query.filter_by(slug=slug, is_deleted=False).first_or_404()
+    form = Form.query.filter_by(
+        slug=slug, is_deleted=False, site_id=current_site_id()).first_or_404()
     if not form.is_open:
         return render_template(theme_template('form_closed'), form=form,
                                nav=_build_nav(), seo=_seo()), 403

@@ -13,6 +13,7 @@ from ...utils.helpers import permission_required, audit_log, clear_content_cache
 from ...utils.markdown_render import apply_editor_form
 from ...utils.uploads import save_upload_file
 from ...models.audit import OP_CREATE, OP_UPDATE, OP_DELETE, MODULE_FRAGMENT
+from ...sites import current_site_id
 from .. import admin_bp
 
 
@@ -82,7 +83,7 @@ def fragment_group_delete(gid):
 @permission_required('system:settings')
 def fragment_index():
     gid = request.args.get('gid', type=int)
-    query = Fragment.query.filter_by(is_deleted=False)
+    query = Fragment.query.filter_by(is_deleted=False, site_id=current_site_id())
     if gid:
         query = query.filter_by(group_id=gid)
     fragments = query.order_by(
@@ -117,7 +118,7 @@ def fragment_create():
 @admin_bp.route('/fragments/<int:fid>/edit', methods=['GET', 'POST'])
 @permission_required('system:settings')
 def fragment_edit(fid):
-    frag = Fragment.query.get_or_404(fid)
+    frag = Fragment.query.filter_by(id=fid, site_id=current_site_id()).first_or_404()
     if frag.is_deleted:
         abort(404)
     groups = FragmentGroup.query.filter_by(is_deleted=False).order_by(
@@ -142,7 +143,8 @@ def _save_fragment(fragment):
         flash(_gettext('名称和标识必填'), 'danger')
         return None
 
-    existing = Fragment.query.filter_by(slug=slug, is_deleted=False).first()
+    existing = Fragment.query.filter_by(
+        slug=slug, site_id=current_site_id(), is_deleted=False).first()
     if existing and (fragment is None or existing.id != fragment.id):
         flash(_gettext('标识已存在'), 'danger')
         return None
@@ -156,7 +158,7 @@ def _save_fragment(fragment):
 
     is_new = fragment is None
     if is_new:
-        fragment = Fragment(slug=slug)
+        fragment = Fragment(slug=slug, site_id=current_site_id())
         db.session.add(fragment)
 
     fragment.name = name
@@ -224,7 +226,7 @@ def _save_fragment_translations(fragment):
 @admin_bp.route('/fragments/<int:fid>/delete', methods=['POST'])
 @permission_required('system:settings')
 def fragment_delete(fid):
-    frag = Fragment.query.get_or_404(fid)
+    frag = Fragment.query.filter_by(id=fid, site_id=current_site_id()).first_or_404()
     frag.is_deleted = True
     db.session.commit()
     # v3.1.9 VULN-021：删除属破坏性操作，补审计日志
@@ -236,7 +238,7 @@ def fragment_delete(fid):
 @admin_bp.route('/fragments/<int:fid>/toggle', methods=['POST'])
 @permission_required('system:settings')
 def fragment_toggle(fid):
-    frag = Fragment.query.get_or_404(fid)
+    frag = Fragment.query.filter_by(id=fid, site_id=current_site_id()).first_or_404()
     frag.is_enabled = not frag.is_enabled
     db.session.commit()
     # v3.1.9 VULN-021：启停影响前台展示，补审计日志

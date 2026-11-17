@@ -21,9 +21,11 @@ class Fragment(db.Model):
     __tablename__ = 'fragments'
 
     id = db.Column(db.Integer, primary_key=True)
+    # 站群模式：碎片按站点切分（slug 站点内唯一）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     group_id = db.Column(db.Integer, db.ForeignKey('fragment_groups.id'), nullable=True, index=True)
     name = db.Column(db.String(100), nullable=False)
-    slug = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(100), nullable=False, index=True)
     field_type = db.Column(db.String(32), nullable=False)
     # text/textarea/richtext/image/url/number/file
     value = db.Column(db.Text)
@@ -42,11 +44,19 @@ class Fragment(db.Model):
         cascade='all, delete-orphan', lazy='selectin'
     )
 
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'slug', name='uq_fragment_site_slug'),
+    )
+
     @classmethod
-    def get_dict(cls):
-        """返回 {slug: value} 用于模板调用。"""
+    def get_dict(cls, site_id=None):
+        """返回当前站点 {slug: value} 用于模板调用。"""
+        if site_id is None:
+            from ..sites import current_site_id
+            site_id = current_site_id()
         result = {}
-        for frag in cls.query.filter_by(is_deleted=False, is_enabled=True).all():
+        for frag in cls.query.filter_by(
+                site_id=site_id, is_deleted=False, is_enabled=True).all():
             result[frag.slug] = {
                 'id': frag.id,
                 'name': frag.name,

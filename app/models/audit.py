@@ -62,6 +62,7 @@ MODULE_BACKUP = 'backup'
 MODULE_UPLOAD = 'upload'
 MODULE_PLUGIN = 'plugin'   # v2.2.0 插件管理
 MODULE_BUILDER = 'builder'  # v3.0.0 可视化页面构建器
+MODULE_SITE = 'site'       # v3.2.0 站群站点管理
 MODULE_OTHER = 'other'
 
 
@@ -70,6 +71,8 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_logs'
 
     id = db.Column(db.Integer, primary_key=True)
+    # v3.2.0 站群模式：溯源「操作发生在哪个站点」（表本身全局）
+    site_id = db.Column(db.Integer, nullable=False, default=0, server_default='0', index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), index=True)   # 操作人
     username = db.Column(db.String(64), index=True)                            # 冗余存储，便于查
     nickname = db.Column(db.String(64))
@@ -88,7 +91,7 @@ class AuditLog(db.Model):
 
     @classmethod
     def record(cls, op_type, module, target_id=None, target_name=None, detail=None,
-               user=None, ip=None, user_agent=None):
+               user=None, ip=None, user_agent=None, site_id=None):
         """快捷记录一条审计日志。
 
         user 可取 current_user；ip/user_agent 留空时从 request 填充。
@@ -108,7 +111,11 @@ class AuditLog(db.Model):
             _ua = user_agent
             if _ua is None and has_request_context() and request.user_agent:
                 _ua = request.user_agent.string[:255]
+            if site_id is None:
+                from ..sites import current_site_id
+                site_id = current_site_id()
             log = cls(
+                site_id=site_id,
                 user_id=u.id if u else None,
                 username=u.username if u else '',
                 nickname=u.nickname if u else '',

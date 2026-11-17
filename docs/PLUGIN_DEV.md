@@ -380,7 +380,7 @@ plugins/notice/
 | `get_admin_menu()` | list | 后台菜单：`{'label','endpoint','icon','permission','active_prefix'}` |
 | `get_frontend_menu()` | list | 前台导航：`{'label','url','target'}`，仅启用时聚合 |
 | `get_frontend_guard()` | dict/None | v2.6.4 前台登录守卫（会员体系）：`{'is_authenticated': callable, 'login_url': callable}` |
-| `get_sitemap_urls()` | yield dict | `{'loc','lastmod','changefreq','priority'}`，loc 为完整 URL |
+| `get_sitemap_urls(site_id=None)` | yield dict | `{'loc','lastmod','changefreq','priority'}`，loc 为完整 URL；v3.2.0 收到 `site_id` 时应只输出该站点内容 |
 | `get_search_provider()` | SearchProvider/None | v2.5.2 全站搜索提供者（见 §8.3） |
 | `get_migration_files()` | list | 自动发现 `migrations/versions/*.py`，一般无需覆写 |
 | `get_storage_drivers()` | list | 存储驱动类注册（oss_storage 插件使用） |
@@ -401,6 +401,8 @@ plugins/notice/
 | `save_upload_file(file, exts)` | `app.utils.helpers` | 安全上传（从原始文件名取后缀，兼容中文文件名） |
 | `api_ok(data)` / `api_err(code, msg)` / `api_cache(type)` | API 工具 | REST 端点统一响应与缓存 |
 | `t_field(obj, field)` | `app.utils.i18n_content` | 内容级多语言取值（空回退主表） |
+| `current_site_id()` | `app.plugin_api` | v3.2.0 站群：当前站点 id（默认站点 0） |
+| `site_filter(query, model=None)` | `app.plugin_api` | v3.2.0 站群：为查询追加当前站点过滤（模型无 `site_id` 列时原样返回） |
 
 ---
 
@@ -410,6 +412,7 @@ plugins/notice/
 2. **schema 变更**：新字段直接加列对 SQLite 无效，需在 `plugins/<slug>/migrations/versions/` 放 Alembic 脚本，核心启动自动合并进 `version_locations`（见运维 FAQ「迁移失败处理」）。
 3. **多语言**：主表存默认语言，翻译表存非默认语言（`<table>_translations`，含 `locale` 与外键 `ondelete='CASCADE'`）；前台用全局 `t(obj, 'field')`、Python 用 `t_field`，查不到翻译自动回退主表。
 4. **软删除**：内容类数据用 `is_deleted`，与核心行为一致；展示查询统一过滤。
+5. **站群（v3.2.0）**：新建内容表须带 `site_id` 维度列，见 §8.9。含栏目归属的插件（如 product/recruit）建议 `Product(site_id=column.site_id)` 与栏目保持同步。
 
 ---
 
@@ -459,8 +462,10 @@ class NoticeSearchProvider(SearchProvider):
         n = db.session.get(Notice, obj_id)
         return self._doc(n, locale) if n and not n.is_deleted else None
 
-    def sql_search(self, keyword, locale, page=1, per_page=20):
+    def sql_search(self, keyword, locale, page=1, per_page=20, site_id=None):
         ...                              # 索引故障时的 LIKE 兜底，返回 (items, total)
+        # v3.2.2：请按 site_id 过滤（None 表示不限站点）；
+        # 未声明该参数的旧插件仍可运行，核心会做签名探测与结果兜底过滤。
 
     def build_url(self, item):
         return f'/notice-{item["id"]}.html'   # 或 url_for(...)
@@ -593,6 +598,73 @@ plugins/<slug>/
 - 可参考内置实现：banner（prepend 轮播）、product/recruit/tutorial
   （append 区块），测试范例见 `tests/test_builder_contrib.py`，
   完整机制说明见 [PAGE_BUILDER.md](PAGE_BUILDER.md) §9。
+
+### 8.9 站群兼容（v3.2.0）
+
+核心 v3.2.0 起支持「一个实例 + 一个库，按站点切分内容」。插件要支持站群，按下列清单接入：
+
+**1）内容模型加 `site_id`**
+
+```python
+from app.extensions import db
+from app.plugin_api import SiteScopedMixin
+
+
+class Article(SiteScopedMixin, db.Model):
+    __tablename__ = 'myplugin_articles'
+    id = db.Column(db.Integer, primary_key=True)
+    slug = db.Column(db.String(100), nullable=False, index=True)  # 去掉 unique=True
+    ...
+    # 站点内唯一（SQLite 为唯一索引，MySQL/PostgreSQL 为复合唯一约束）
+    __table_args__ = (
+        db.UniqueConstraint('site_id', 'slug', name='uq_myplugin_article_site_slug'),
+    )
+```
+
+- `SiteScopedMixin` 自带 `site_id`（`NOT NULL DEFAULT 0`，带索引），默认站点为 0。
+- 原有 `unique=True` 的 slug/name 类字段必须改为 `(site_id, xxx)` 复合唯一，否则不同站点无法复用同名标识。
+- 第三方插件升级时在 `plugins/<slug>/migrations/versions/` 加幂等迁移补列（参考核心 `0012` 的 `_has_column` 守卫写法）。
+
+**2）查询按当前站点过滤**
+
+```python
+from app.plugin_api import current_site_id, site_filter
+
+# 新建时写入当前站点
+obj = MyModel(title=title, site_id=current_site_id())
+
+# 列表/前台查询
+items = site_filter(MyModel.query.filter_by(is_deleted=False)).all()
+
+# 详情页必须防跨站越权
+obj = MyModel.query.filter_by(
+    id=oid, site_id=current_site_id()).first_or_404()
+```
+
+- 后台列表、详情、编辑、删除、批量操作、唯一性校验、前台模板函数与 API 端点**全部**按当前站点过滤。
+- 归属核心栏目的插件（product/recruit 等）建议 `site_id` 与栏目的 `site_id` 同步，栏目移动时一并更新。
+- 搜索 `SearchProvider` 的 `get_doc()` / `iter_docs()` 输出须包含 `'site_id': int(obj.site_id or 0)`，SQL 兜底结果由核心按该字段二次过滤。
+- sitemap 钩子签名改为 `get_sitemap_urls(self, site_id=None)`，按传入站点过滤（核心对旧签名插件自动兼容传参）。
+
+**3）缓存键加站点前缀**
+
+插件自建缓存（如页面片段、列表缓存）键必须含站点，例如
+`plugin/<slug>/site{current_site_id()}/...`，否则多站点会串数据。
+
+**4）站点化配置**
+
+插件设置项如属站点级（如各站统计代码、客服电话），用
+`Setting.get(key)` / `Setting.set(key, value)`（自动按当前站点读写）；
+全局级（API Key、第三方账号）以 `upload_`、`api_`、`plugin_` 等前缀命名，
+会自动落站点 0 并全局共享。
+
+**5）自测**
+
+- [ ] 新建站点 B 后，插件后台列表只显示当前站点数据；切换回默认站点数据不受影响
+- [ ] 相同 slug 可在默认站点与站点 B 各建一条
+- [ ] 跨站访问详情页（用 A 站 id 访问 B 站域名）返回 404
+- [ ] 前台输出/API/搜索/sitemap 不串站
+- [ ] 禁用插件后行为与改造前一致
 
 ## 9. 打包、上传与生命周期
 

@@ -139,7 +139,8 @@ class TestMSubDirWhitelist:
         except _json.JSONDecodeError:
             pytest.fail(f'响应不是 JSON：{body[:200]}')
         path = payload.get('path', '')
-        assert path.startswith('uploads/common/'), \
+        # v3.2.2：上传物理路径带站点前缀（site0 = 默认站点）
+        assert path.startswith('uploads/site0/common/'), \
             f'type=../etc/passwd 应回退到 common，实际 path={path}'
 
 

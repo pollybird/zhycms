@@ -285,23 +285,35 @@ def clear_content_cache(column_id=None, article_id=None):
             current_app.logger.exception('reindex_article failed')
     if Setting.get('cache_enable') != 'on':
         return
-    keys = []
-    # 首页
-    keys.append('frontend/index')
+    # v3.2.2：前台视图缓存键为 frontend/site{sid}/...，按当前站点前缀清理；
+    # 不支持模式删除的缓存后端回退为整体清空（与原行为一致）。
+    from ..sites import current_site_id
+    sid = current_site_id()
+    prefix = f'frontend/site{sid}'
+    cleared = False
+    try:
+        if hasattr(cache, 'delete_pattern'):
+            cache.delete_pattern(f'{prefix}/*')
+            cleared = True
+    except Exception as e:
+        current_app.logger.warning('按站点清理页面缓存失败：%s', e)
+    # 兼容 v3.2.1 及更早版本的全局键（升级后残留 TTL 内仍可能命中）
+    legacy_keys = ['frontend/index']
     if column_id:
-        keys.append(f'frontend/column/{column_id}')
+        legacy_keys.append(f'frontend/column/{column_id}')
     if article_id:
-        keys.append(f'frontend/article/{article_id}')
-    for k in keys:
+        legacy_keys.append(f'frontend/article/{article_id}')
+    for k in legacy_keys:
         try:
             cache.delete(k)
         except Exception as e:
             current_app.logger.warning('清除页面缓存 %s 失败：%s', k, e)
-    # 简单起见，直接清整站缓存（覆盖 sitemap 等关联）
-    try:
-        cache.clear()
-    except Exception as e:
-        current_app.logger.warning('清空页面缓存失败：%s', e)
+    if not cleared:
+        # 简单起见，直接清整站缓存（覆盖 sitemap 等关联）
+        try:
+            cache.clear()
+        except Exception as e:
+            current_app.logger.warning('清空页面缓存失败：%s', e)
 
 
 # ============================================================

@@ -36,6 +36,10 @@ class User(UserMixin, db.Model):
     column_permissions = db.relationship(
         'UserColumnPermission', backref='user', cascade='all, delete-orphan', lazy='dynamic'
     )
+    # 关联：站点专属权限（v3.2.0 站群模式）
+    site_permissions = db.relationship(
+        'UserSitePermission', backref='user', cascade='all, delete-orphan', lazy='dynamic'
+    )
 
     def set_password(self, raw):
         self.password_hash = generate_password_hash(raw)
@@ -83,16 +87,35 @@ class User(UserMixin, db.Model):
         """判断用户是否具备任一权限点（菜单/入口可见性判断用；超级管理员永远为真）。"""
         return any(self.has_permission(c) for c in perm_codes)
 
-    def has_permission(self, perm_code):
-        """判断用户是否具备指定权限（超级管理员 is_super=True 永远全放行）。"""
-        from ..models.rbac import Role, RolePermission, Permission
+    def site_role_ids(self, site_id):
+        """返回在指定站点内生效的角色 id 集合（含全局角色）。"""
+        return {r.role_id for r in self.role_assignments
+                if r.site_id is None or r.site_id == site_id}
+
+    def has_site_role(self, site_id):
+        """是否存在绑定到该站点的站点级角色（不含全局角色）。"""
+        return any(r.site_id == site_id for r in self.role_assignments)
+
+    def site_scoped_role_sites(self):
+        """返回该用户被站点级角色绑定的站点 id 集合。"""
+        return {r.site_id for r in self.role_assignments if r.site_id is not None}
+
+    def has_permission(self, perm_code, site_id=None):
+        """判断用户是否具备指定权限（超级管理员 is_super=True 永远全放行）。
+
+        site_id 为 None 时按全部角色判断（菜单/入口可见性）；
+        指定 site_id 时仅全局角色 + 该站点内的角色生效（v3.2.3 站点级授权）。
+        """
+        from ..models.rbac import RolePermission, Permission
         if self.is_super:
             return True
-        if not self.role_ids:
+        role_ids = (self.role_ids if site_id is None
+                    else self.site_role_ids(site_id))
+        if not role_ids:
             # 未绑定任何角色的普通用户 = 无任何权限（只读查看员也必须显式绑定角色）
             return False
         codes = {p.code for p in Permission.query.join(RolePermission).filter(
-            RolePermission.role_id.in_(list(self.role_ids))
+            RolePermission.role_id.in_(list(role_ids))
         ).all()}
         return perm_code in codes
 

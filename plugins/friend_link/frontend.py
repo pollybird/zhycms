@@ -14,9 +14,12 @@ def friend_links(limit=None):
     返回 FriendLink 对象列表（v2.5.0 起返回对象以支持 t() 多语言翻译）；
     插件未启用 / 无有效链接 → []。
     """
+    from app.sites import current_site_id
     from .models import FriendLink
 
-    q = FriendLink.query.filter_by(is_enabled=True, is_deleted=False).order_by(
+    q = FriendLink.query.filter_by(
+        is_enabled=True, is_deleted=False, site_id=current_site_id()
+    ).order_by(
         FriendLink.sort_order.desc(), FriendLink.created_at.desc()
     )
     if limit:
