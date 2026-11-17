@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.2.4 使用手册</title>
+<title>ZhyCMS v3.2.5 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -162,7 +162,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.2.4</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.2.5</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -188,7 +188,7 @@
   <tr><td>Docker 部署</td><td>官方镜像 pollybird/zhycms 已发布，MySQL/PostgreSQL 一键启动，支持本地构建</td><td>v2.4</td></tr>
   <tr><td>RBAC 权限</td><td>角色/权限点两级模型，菜单与按钮级授权，栏目级内容粒度</td><td>v2.0</td></tr>
   <tr><td>内容工作流</td><td>草稿 → 待审核 → 已发布/已驳回，版本快照与对比还原</td><td>v2.0</td></tr>
-  <tr><td>后台编辑器双模式</td><td>富文本（CKEditor）/ Markdown 一键切换，实时预览，系统设置可改默认模式</td><td>v3.1.5</td></tr>
+  <tr><td>后台编辑器双模式</td><td>富文本（CKEditor）/ Markdown 一键切换，实时预览，全局设置可改默认模式</td><td>v3.1.5</td></tr>
   <tr><td>审计日志</td><td>登录、配置变更、内容 CRUD 全量留痕，多维度检索</td><td>v2.0</td></tr>
   <tr><td>SEO 优化</td><td>伪静态、sitemap、robots.txt、页面缓存、图片默认 ALT</td><td>v2.0</td></tr>
   <tr><td>表单收集</td><td>可视化表单设计，提交后邮件/企微实时通知</td><td>v2.0</td></tr>
@@ -350,7 +350,7 @@ docker compose -f docker-compose.postgresql.yml up -d
 
 <section id="sitegroup">
 <h2>站群模式（多站点）<span class="tag tag-new">v3.2.0</span></h2>
-<p>后台菜单：<b>系统 → 站点管理</b>。一个实例 + 一个数据库按「站点」维度切分内容，同一套 CMS 同时服务多个独立前台站点。</p>
+<p>后台菜单：<b>全局设置 → 站点管理</b>。一个实例 + 一个数据库按「站点」维度切分内容，同一套 CMS 同时服务多个独立前台站点。</p>
 <table>
   <tr><th>能力</th><th>说明</th></tr>
   <tr><td>站点寻址</td><td>独立域名（<code>sites.domain</code> 精确匹配）或泛解析子域（<code>sites.subdomain</code> 标签，配合 <code>*.main.com</code>）；未命中回退默认站点 0</td></tr>
@@ -364,6 +364,13 @@ docker compose -f docker-compose.postgresql.yml up -d
 </section>
 
 <section id="rbac">
+<h2>后台菜单结构 <span class="tag tag-new">v3.2.5</span></h2>
+<p>侧边栏按作用域组织，原「系统设置」拆分为两组：</p>
+<ul>
+  <li><b>站点设置（当前站点）</b>：网站设置、SEO 默认配置、SEO 高级、主题管理；切换当前站点后，修改作用于该站点。</li>
+  <li><b>全局设置（全站共用）</b>：站点管理、插件管理、上传配置、上传安全、消息通知、后台安全、登录日志、内容 API、国际化、搜索设置、编辑设置、Redis 缓存；其中「站点管理」「插件管理」仅超级管理员或具备 <code>site:manage</code> 的账号可见。</li>
+</ul>
+
 <h2>用户、角色与权限（RBAC）</h2>
 <p>后台菜单：<b>用户权限 → 用户列表 / 角色与权限</b></p>
 <ul>
@@ -398,7 +405,7 @@ docker compose -f docker-compose.postgresql.yml up -d
 <p>后台所有富文本输入框（文章正文、单页栏目内容、富文本碎片，含各自多语言译文字段）均支持 <b>富文本（CKEditor）/ Markdown</b> 双模式编辑，编辑器顶部「富文本 | Markdown」分段控件一键切换。</p>
 <h3>使用要点</h3>
 <ul>
-  <li><b>默认仍为富文本</b>：升级后老内容以 CKEditor 打开，操作习惯零变化；新建内容默认模式可在 <b>系统设置 → 编辑设置</b> 中改为 Markdown（仅影响新建内容）。</li>
+  <li><b>默认仍为富文本</b>：升级后老内容以 CKEditor 打开，操作习惯零变化；新建内容默认模式可在 <b>全局设置 → 编辑设置</b> 中改为 Markdown（仅影响新建内容）。</li>
   <li><b>Markdown 模式</b>：等宽编辑区 + 实时预览（输入停顿约 300ms 后渲染），支持插入图片（复用后台上传接口）与全屏编辑。</li>
   <li><b>切换即转换</b>：富文本 → Markdown 由 turndown.js 转换，反向由 marked.js 转换；<b>切向 Markdown 时会弹二次确认</b>——表格样式、字体字号、颜色、对齐等 Markdown 无法表达的排版会丢失，未保存前刷新即可放弃。</li>
   <li><b>存储约定</b>：无论哪种模式，<code>content</code> 列始终保存 HTML（Markdown 保存时服务端用 python-markdown 渲染），前台主题、搜索、内容 API 全部零改动；Markdown 原文另存 <code>*_md</code> 列，供再次编辑时原样回填。</li>
@@ -421,7 +428,7 @@ docker compose -f docker-compose.postgresql.yml up -d
 
 <section id="notify">
 <h2>表单消息通知</h2>
-<p>后台菜单：<b>系统设置 → 消息通知</b></p>
+<p>后台菜单：<b>全局设置 → 消息通知</b></p>
 <p>配置后，前台表单每收到一条提交都会实时推送。v2.3 起自定义表单已转为官方内置插件，配置页与设置键保持不变。</p>
 
 <h3>邮件通知</h3>
@@ -447,7 +454,7 @@ docker compose -f docker-compose.postgresql.yml up -d
 
 <section id="seo">
 <h2>SEO 与站点性能</h2>
-<p>后台菜单：<b>系统设置 → SEO 高级</b></p>
+<p>后台菜单：<b>站点设置 → SEO 高级</b></p>
 
 <h3 id="seo-rewrite">伪静态 URL</h3>
 <table>
@@ -549,10 +556,10 @@ class MyPlugin(PluginBase):
 </ul>
 
 <h3>后台路由前缀</h3>
-<p><b>系统设置 → 后台安全</b> 中修改前缀（如 <code>admin</code> → <code>manage-x8y2</code>）后<b>即时生效</b>，无需重启。旧前缀立即 404，页内跳转自动使用新前缀。忘记路由可删除 <code>instance/admin_config.json</code> 恢复默认。</p>
+<p><b>全局设置 → 后台安全</b> 中修改前缀（如 <code>admin</code> → <code>manage-x8y2</code>）后<b>即时生效</b>，无需重启。旧前缀立即 404，页内跳转自动使用新前缀。忘记路由可删除 <code>instance/admin_config.json</code> 恢复默认。</p>
 
 <h3 id="sec-password-policy">管理员密码复杂度（v3.2.4）</h3>
-<p><b>系统设置 → 后台安全 → 管理员密码复杂度</b>（仅超级管理员可见）：</p>
+<p><b>全局设置 → 后台安全 → 管理员密码复杂度</b>（仅超级管理员可见）：</p>
 <ul>
   <li>最低位数可在 <b>6-64</b> 位之间调整；</li>
   <li>大写字母、小写字母、数字、特殊字符四项可分别勾选是否必须包含；</li>
@@ -562,7 +569,7 @@ class MyPlugin(PluginBase):
 </ul>
 
 <h3 id="sec-upload">上传安全与图片优化</h3>
-<p>后台菜单：<b>系统设置 → 上传安全</b>，默认全部开启：</p>
+<p>后台菜单：<b>全局设置 → 上传安全</b>，默认全部开启：</p>
 <ul>
   <li><b>后缀 + MIME 双重校验</b>：检查文件真实内容（magic bytes），伪装成图片的脚本直接拒绝。</li>
   <li><b>SHA-256 内容去重</b>：相同内容只存一份，多处引用自动计数。</li>
@@ -585,7 +592,7 @@ class MyPlugin(PluginBase):
 插件自带  plugins/&lt;slug&gt;/templates/&lt;name&gt;.html（如 banner/hero_carousel.html）
    ↓ 不存在
 default 主题兜底  themes/default/&lt;name&gt;.html</code></pre>
-<p>创建新主题：<code>cp -r themes/default themes/green</code> → 修改 <code>css/style.css</code> 与 <code>manifest.json</code>（slug 需与目录名一致）→ 后台 <b>系统设置 → 主题管理</b> 启用。主题自动发现，无需代码注册。</p>
+<p>创建新主题：<code>cp -r themes/default themes/green</code> → 修改 <code>css/style.css</code> 与 <code>manifest.json</code>（slug 需与目录名一致）→ 后台 <b>站点设置 → 主题管理</b> 启用。主题自动发现，无需代码注册。</p>
 
 <h3 id="tpl-dir">主题目录结构与 manifest</h3>
 <pre><code>themes/&lt;slug&gt;/
@@ -725,7 +732,7 @@ default 主题兜底  themes/default/&lt;name&gt;.html</code></pre>
 
 <section id="theme-mgr">
 <h2>主题管理 <span class="tag tag-new">v2.2</span></h2>
-<p>入口：<b>系统设置 → 主题管理</b>（权限 <code>system:settings</code>）。</p>
+<p>入口：<b>站点设置 → 主题管理</b>（权限 <code>system:settings</code>）。</p>
 
 <h3>主题列表</h3>
 <ul>
@@ -843,7 +850,7 @@ default 主题兜底  themes/default/&lt;name&gt;.html</code></pre>
 <p>基于 Flask-Babel，前台+后台全站生效。<b>默认关闭</b>（<code>i18n_enable=0</code>），不影响现有站点；仅界面文案翻译，内容数据不翻译。</p>
 
 <h3 id="i18n-config">后台配置</h3>
-<p>入口：<b>系统设置 → 国际化</b>（权限 <code>system:settings</code>）。</p>
+<p>入口：<b>全局设置 → 国际化</b>（权限 <code>system:settings</code>）。</p>
 <table>
   <tr><th>设置项</th><th>默认值</th><th>说明</th></tr>
   <tr><td><code>i18n_enable</code></td><td>关闭</td><td>总开关</td></tr>
@@ -1360,7 +1367,7 @@ flask db migrate -m "xxx" # 新建迁移脚本（开发用）</code></pre>
   <li>该语言索引尚未建立时自动回退默认语言索引；i18n 关闭时仅维护默认语言单一索引，行为不变</li>
   <li><b>插件内容同样本地化检索（v2.5.2）</b>：产品的规格参数、岗位的部门/工作地点/薪资待遇均按语言索引与兜底匹配（如英文搜 <code>Model</code>、<code>Shanghai</code> 可命中）</li>
 </ul>
-<div class="tip">升级到 v2.5.1 后，到后台「系统设置 → 搜索设置」点击一次<b>「重建索引」</b>即可生成各语言索引；内容保存/删除会自动同步全部语言索引，无需手动维护。</div>
+<div class="tip">升级到 v2.5.1 后，到后台「全局设置 → 搜索设置」点击一次<b>「重建索引」</b>即可生成各语言索引；内容保存/删除会自动同步全部语言索引，无需手动维护。</div>
 
 <h3>插件内容接入搜索（SearchProvider） <span class="tag tag-new">v2.5.2</span></h3>
 <p>插件通过 <code>get_search_provider()</code> 钩子返回一个 <code>SearchProvider</code> 实例，自有内容即可进入全站搜索（官方「产品展示」「招聘管理」已接入）。协议四方法：</p>
@@ -1488,7 +1495,7 @@ bash docker/install.sh
 docker compose --profile mysql --profile redis up -d</code></pre>
 
 <h3>后台状态页</h3>
-<p>后台「系统设置 → Redis 缓存」提供<b>只读</b>状态展示：</p>
+<p>后台「全局设置 → Redis 缓存」提供<b>只读</b>状态展示：</p>
 <ul>
   <li><b>已启用</b>（绿色）：显示连接地址，说明 RedisCache + 服务端 Session 已生效</li>
   <li><b>未启用</b>（黄色）：提示安装 Redis 并设置环境变量的步骤</li>
