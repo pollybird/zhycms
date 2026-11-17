@@ -4,12 +4,15 @@
 {% set active_menu = 'setting_notify' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">{{ _('全局设置') }}</li>
+<li class="breadcrumb-item">{{ _('站点设置') }}</li>
 <li class="breadcrumb-item active">{{ _('消息通知') }}</li>
 {% endblock %}
 
 {% block content %}
 <form method="post">
+<div class="alert alert-light border">
+  <i class="fas fa-info-circle mr-1"></i>{{ _('该配置仅对当前站点生效。不同站点可分别设置收件人与推送渠道，前台表单通知会发送到所属站点的配置。') }}
+</div>
 <div class="row">
   <div class="col-md-5">
     <div class="card card-outline card-primary">

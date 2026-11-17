@@ -30,7 +30,9 @@ def _pending_form_submissions():
         return 0
     try:
         from plugins.form.models import FormSubmission
-        return FormSubmission.query.filter_by(is_deleted=False, is_read=False).count()
+        from ..sites import current_site_id
+        return FormSubmission.query.filter_by(
+            is_deleted=False, is_read=False, site_id=current_site_id()).count()
     except Exception as e:
         # 插件隔离：表单插件数据结构异常时仪表盘显示 0
         current_app.logger.warning('读取未读表单提交数失败：%s', e)
@@ -49,6 +51,7 @@ def dashboard():
         flash(_gettext('检测到本次登录可能为异地登录（城市：{0}，IP：{1}，时间：{2}）。若不是本人操作请立即修改密码并联系超级管理员。').format(city, ip, tm), 'warning')
 
     from ..sites import current_site_id as _sid
+    from ..services.user_service import log_visible_site_ids
     stats = {
         'users': User.query.filter_by(is_deleted=False).count(),
         'columns': Column.query.filter_by(is_deleted=False, site_id=_sid()).count(),
@@ -57,9 +60,21 @@ def dashboard():
             is_deleted=False, status=STATUS_REVIEW, site_id=_sid()
         ).count(),
         'pending_submissions': _pending_form_submissions(),
-        'recent_logs': LoginLog.query.order_by(LoginLog.created_at.desc()).limit(8).all(),
-        'recent_audits': AuditLog.query.order_by(AuditLog.created_at.desc()).limit(10).all(),
+        'recent_logs': [],
+        'recent_audits': [],
     }
+    # v3.2.6：审计/登录日志仅超管与站点管理员可见，且站点管理员仅限授权站点
+    if current_user.has_permission('system:audit_log'):
+        scope = log_visible_site_ids()
+        log_query = LoginLog.query
+        audit_query = AuditLog.query
+        if scope is not None:
+            log_query = log_query.filter(LoginLog.site_id.in_(list(scope)))
+            audit_query = audit_query.filter(AuditLog.site_id.in_(list(scope)))
+        stats['recent_logs'] = log_query.order_by(
+            LoginLog.created_at.desc()).limit(8).all()
+        stats['recent_audits'] = audit_query.order_by(
+            AuditLog.created_at.desc()).limit(10).all()
     # 仪表盘审计详情中文化的 ID→名称映射（与审计列表页同款）
     from ..models.rbac import Role
     dashboard_audit_maps = {

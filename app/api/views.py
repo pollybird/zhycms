@@ -14,8 +14,8 @@
 import hmac
 from functools import wraps
 
+import jwt as pyjwt
 from flask import request, jsonify, current_app
-from flask_jwt_extended import verify_jwt_in_request, JWTManager
 
 from ..extensions import db, limiter
 from ..models.column import Column, ColumnField
@@ -150,11 +150,15 @@ def _check_api_token():
 
 
 def _check_jwt():
-    """JWT 校验：Authorization: Bearer <token>。"""
+    """JWT 校验：Authorization: Bearer <token>（按当前站点密钥）。"""
+    from ..utils.api_jwt import decode_token
+    header = request.headers.get('Authorization', '') or ''
+    if not header.lower().startswith('bearer '):
+        return api_err(401, 'JWT 无效或已过期')
     try:
-        verify_jwt_in_request()
+        decode_token(header[7:].strip(), expected_type='access')
         return None
-    except Exception:
+    except pyjwt.PyJWTError:
         return api_err(401, 'JWT 无效或已过期')
 
 

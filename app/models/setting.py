@@ -39,7 +39,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.2.5'
+    CMS_VERSION = '3.2.6'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -199,12 +199,13 @@ class Setting(db.Model):
     # 站点键缺失时回退 (key, 0)（默认站点/迁移前存量值），保证单站点零变化。
     GLOBAL_KEYS_EXPLICIT = frozenset({
         'member_scope',
-        'editor_default_mode',
     })
+    # v3.2.6：notify_ / api_ / jwt_ / editor_default_mode 改为站点级，
+    # 不同站点可分别配置通知收件人、内容 API 开关/鉴权/密钥与默认编辑器。
     GLOBAL_KEY_PREFIXES = (
-        'upload_', 'login_', 'password_', 'api_', 'jwt_', 'i18n_', 'search_',
+        'upload_', 'login_', 'password_', 'i18n_', 'search_',
         'storage_', 'oss_', 'audit_', 'backup_', 'security_', 'redis_',
-        'notify_', 'plugin_', 'smtp_', 'mail_',
+        'plugin_', 'smtp_', 'mail_',
         'member_sms_', 'member_wechat_', 'member_oauth', 'member_captcha',
     )
 

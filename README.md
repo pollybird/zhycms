@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.2.5-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.6-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-562%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-569%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.5**（后台菜单分类版：侧边栏将原「系统设置」拆分为「站点设置（当前站点）」与「全局设置（全站共用）」，站点级与平台级配置不再混排；无数据库迁移、无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.6**（站点级配置与日志可见性版：消息通知、编辑设置、内容 API 改为按站点配置；审计/登录日志仅超级管理员与站点管理员可见且站点管理员仅限授权站点；Redis 缓存仅超管可见；含迁移 `0016`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -112,6 +112,10 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.2.6（2026-11-17）
+
+站点级配置与日志可见性。消息通知、编辑设置、内容 API 从全局配置改为按站点配置：不同站点可分别设置表单通知收件人、默认编辑器，以及内容 API 的开关、鉴权方式与密钥（新增 `app/utils/api_jwt.py` 按站点密钥签发/校验 JWT）。审计日志与登录日志仅超级管理员、站点管理员可见，站点管理员仅能看到自己授权站点的日志（列表、筛选、导出、清理与仪表盘同步过滤），内容审核员与只读查看员不再可见；`LoginLog` 新增 `site_id`（迁移 `0016`）。Redis 缓存页仅超级管理员可见。站点级设置未配置时回退默认站点 0 的存量值，单站点部署行为不变。无新增依赖。
 
 ### v3.2.5（2026-11-17）
 

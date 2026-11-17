@@ -22,6 +22,7 @@ from ...models.audit import (
 )
 from ...models.setting import Setting
 from ...models.site import Site
+from ...services.user_service import log_visible_site_ids
 from ...sites import DEFAULT_SITE_ID
 from ...utils.helpers import permission_required, audit_log
 from ...utils.db_utils import escape_like, LIKE_ESCAPE
@@ -63,6 +64,9 @@ def audit_index():
     site_id = (request.args.get('site_id') or '').strip()
 
     query = AuditLog.query
+    scope_site_ids = log_visible_site_ids()
+    if scope_site_ids is not None:
+        query = query.filter(AuditLog.site_id.in_(list(scope_site_ids)))
     if site_id.isdigit():
         query = query.filter_by(site_id=int(site_id))
     if keyword:
@@ -120,7 +124,9 @@ def audit_index():
         date_from=date_from, date_to=date_to, username=username,
         module_choices=module_choices, op_type_choices=OP_TYPE_CHOICES,
         total_count=total_count, audit_maps=audit_maps,
-        sites=Site.active_sites(), site_id=site_id,
+        sites=(Site.active_sites() if scope_site_ids is None else
+               Site.query.filter(Site.id.in_(list(scope_site_ids))).all()),
+        site_id=site_id,
         default_site_id=DEFAULT_SITE_ID,
         op_labels=OP_TYPE_LABELS, module_labels=MODULE_LABELS,
     )
@@ -140,6 +146,9 @@ def audit_export():
     fmt = (request.args.get('format') or 'csv').lower()
 
     query = AuditLog.query
+    scope_site_ids = log_visible_site_ids()
+    if scope_site_ids is not None:
+        query = query.filter(AuditLog.site_id.in_(list(scope_site_ids)))
     if site_id.isdigit():
         query = query.filter_by(site_id=int(site_id))
     if keyword:
@@ -232,7 +241,8 @@ def audit_clean():
         flash(_gettext('保留天数必须为非负整数'), 'danger')
         return redirect(url_for('admin.audit_index'))
     # keep_days=0 → cutoff 为当前时刻，等价于清空全部
-    count = AuditLog.clean_expired(keep_days=keep_days)
+    count = AuditLog.clean_expired(keep_days=keep_days,
+                                   site_ids=log_visible_site_ids())
     try:
         db.session.commit()
     except Exception as e:

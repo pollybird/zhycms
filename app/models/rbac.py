@@ -106,7 +106,7 @@ PRESET_ROLE_PERMISSIONS = {
         'form:view', 'form:manage',
     ],
     ROLE_CONTENT_AUDITOR: [
-        'system:audit_log',
+        # v3.2.6：审计/登录日志仅超管与站点管理员可见
         # v3.2.3：收回全局站点管理权限——审核员只能访问被分配的站点
         'column:manage',
         'content_manage:all_columns',
@@ -127,7 +127,7 @@ PRESET_ROLE_PERMISSIONS = {
     ],
     ROLE_READONLY_VIEWER: [
         'form:view',
-        'system:audit_log',  # 只读可看审计日志列表（但无清理/导出权限）
+        # v3.2.6：审计/登录日志仅超管与站点管理员可见，只读查看员不再授予
     ],
 }
 

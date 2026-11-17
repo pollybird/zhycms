@@ -4,12 +4,15 @@
 {% set active_menu = 'setting_api' %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item">{{ _('全局设置') }}</li>
+<li class="breadcrumb-item">{{ _('站点设置') }}</li>
 <li class="breadcrumb-item active">{{ _('内容 API') }}</li>
 {% endblock %}
 
 {% block content %}
 <form method="post">
+<div class="alert alert-light border">
+  <i class="fas fa-info-circle mr-1"></i>{{ _('该配置仅对当前站点生效：开关、鉴权方式、API Token 与 JWT 密钥均可按站点分别设置。') }}
+</div>
 <div class="row">
   <div class="col-md-6">
     <div class="card card-outline card-primary">
@@ -67,7 +70,7 @@
             </div>
           </div>
           <input type="hidden" name="jwt_regenerate" value="0">
-          <small class="form-text text-muted">{{ _('用于签发与校验 JWT。更换后所有已签发的 token 立即失效。留空时复用应用 SECRET_KEY。') }}</small>
+          <small class="form-text text-muted">{{ _('用于当前站点签发与校验 JWT。更换后该站点已签发的 token 立即失效；留空时依次回退到默认站点密钥与 SECRET_KEY。') }}</small>
         </div>
         <div class="row">
           <div class="col-6">

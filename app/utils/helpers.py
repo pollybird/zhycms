@@ -96,9 +96,11 @@ def log_login(username, result, message='', user_id=None, city=None):
     """记录登录日志（模块5：扩展 user_id 与 city 字段）。"""
     from ..extensions import db
     from ..models.user import LoginLog
+    from ..sites import current_site_id
     log = LoginLog(
         username=username,
         user_id=user_id,
+        site_id=current_site_id(),
         ip=request.remote_addr or '',
         city=city,
         user_agent=request.user_agent.string[:255] if request.user_agent else '',

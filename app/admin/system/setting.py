@@ -21,6 +21,8 @@ from flask_login import current_user
 from ...extensions import db
 from ...models.user import User, LoginLog
 from ...models.setting import Setting
+from ...models.site import Site
+from ...services.user_service import log_visible_site_ids
 from ...utils.helpers import admin_required, permission_required, audit_log, clear_content_cache
 from ...utils.uploads import save_upload_file
 from ...utils.themes import list_theme_templates
@@ -796,10 +798,13 @@ def setting_editor():
 def setting_redis():
     """Redis 缓存运行状态（v2.5.0，只读）。
 
+    v3.2.6：Redis 为平台级基础设施，仅超级管理员可查看。
     自动检测：环境变量 REDIS_URL 有值且 Redis 可达 → 已启用；
     否则未启用，提示用户安装 Redis 并设置环境变量。
     不提供手动开关——Redis 后端在应用启动时初始化，运行时不可切换。
     """
+    if not current_user.is_super:
+        abort(403)
     env_redis_url = os.environ.get('REDIS_URL', '').strip()
     # 当前运行时状态
     runtime_active = bool(current_app.config.get('SESSION_TYPE') == 'redis')
@@ -885,7 +890,19 @@ def password():
 @permission_required('system:audit_log')
 def logs():
     page = max(int(request.args.get('page', 1)), 1)
-    pagination = LoginLog.query.order_by(LoginLog.created_at.desc()).paginate(
+    site_id = (request.args.get('site_id') or '').strip()
+    scope_site_ids = log_visible_site_ids()
+
+    query = LoginLog.query
+    if scope_site_ids is not None:
+        query = query.filter(LoginLog.site_id.in_(list(scope_site_ids)))
+    if site_id.isdigit():
+        query = query.filter_by(site_id=int(site_id))
+    pagination = query.order_by(LoginLog.created_at.desc()).paginate(
         page=page, per_page=20, error_out=False
     )
-    return render_template('admin/setting/logs.html', logs=pagination.items, pagination=pagination)
+    sites = (Site.active_sites() if scope_site_ids is None else
+             Site.query.filter(Site.id.in_(list(scope_site_ids))).all())
+    return render_template(
+        'admin/setting/logs.html', logs=pagination.items, pagination=pagination,
+        sites=sites, site_id=site_id)

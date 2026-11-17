@@ -164,6 +164,8 @@ class LoginLog(db.Model):
     user_agent = db.Column(db.String(255))
     result = db.Column(db.String(16), nullable=False)  # success / failed / locked
     message = db.Column(db.String(255))
+    site_id = db.Column(db.Integer, db.ForeignKey('sites.id'), index=True)  # v3.2.6：登录所属站点
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False, index=True)
 
     user = db.relationship('User', backref=db.backref('login_logs', lazy='dynamic'))
+    site = db.relationship('Site')

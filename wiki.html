@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.2.5 使用手册</title>
+<title>ZhyCMS v3.2.6 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -162,7 +162,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.2.5</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.2.6</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -364,11 +364,12 @@ docker compose -f docker-compose.postgresql.yml up -d
 </section>
 
 <section id="rbac">
-<h2>后台菜单结构 <span class="tag tag-new">v3.2.5</span></h2>
-<p>侧边栏按作用域组织，原「系统设置」拆分为两组：</p>
+<h2>后台菜单结构 <span class="tag tag-new">v3.2.6</span></h2>
+<p>侧边栏按作用域组织，站点级配置与平台级配置分区展示：</p>
 <ul>
-  <li><b>站点设置（当前站点）</b>：网站设置、SEO 默认配置、SEO 高级、主题管理；切换当前站点后，修改作用于该站点。</li>
-  <li><b>全局设置（全站共用）</b>：站点管理、插件管理、上传配置、上传安全、消息通知、后台安全、登录日志、内容 API、国际化、搜索设置、编辑设置、Redis 缓存；其中「站点管理」「插件管理」仅超级管理员或具备 <code>site:manage</code> 的账号可见。</li>
+  <li><b>站点设置（当前站点）</b>：网站设置、SEO 默认配置、SEO 高级、主题管理、消息通知、编辑设置、内容 API；切换当前站点后，修改作用于该站点。</li>
+  <li><b>全局设置（全站共用）</b>：站点管理、插件管理、上传配置、上传安全、后台安全、国际化、搜索设置、Redis 缓存；其中「站点管理」「插件管理」仅超级管理员或具备 <code>site:manage</code> 的账号可见，「Redis 缓存」仅超级管理员可见。</li>
+  <li><b>日志审计</b>：操作审计、登录日志；仅超级管理员与站点管理员可见，站点管理员只看到自己授权站点的记录。</li>
 </ul>
 
 <h2>用户、角色与权限（RBAC）</h2>
@@ -405,7 +406,7 @@ docker compose -f docker-compose.postgresql.yml up -d
 <p>后台所有富文本输入框（文章正文、单页栏目内容、富文本碎片，含各自多语言译文字段）均支持 <b>富文本（CKEditor）/ Markdown</b> 双模式编辑，编辑器顶部「富文本 | Markdown」分段控件一键切换。</p>
 <h3>使用要点</h3>
 <ul>
-  <li><b>默认仍为富文本</b>：升级后老内容以 CKEditor 打开，操作习惯零变化；新建内容默认模式可在 <b>全局设置 → 编辑设置</b> 中改为 Markdown（仅影响新建内容）。</li>
+  <li><b>默认仍为富文本</b>：升级后老内容以 CKEditor 打开，操作习惯零变化；新建内容默认模式可在 <b>站点设置 → 编辑设置</b> 中改为 Markdown（仅影响新建内容，v3.2.6 起按站点独立配置）。</li>
   <li><b>Markdown 模式</b>：等宽编辑区 + 实时预览（输入停顿约 300ms 后渲染），支持插入图片（复用后台上传接口）与全屏编辑。</li>
   <li><b>切换即转换</b>：富文本 → Markdown 由 turndown.js 转换，反向由 marked.js 转换；<b>切向 Markdown 时会弹二次确认</b>——表格样式、字体字号、颜色、对齐等 Markdown 无法表达的排版会丢失，未保存前刷新即可放弃。</li>
   <li><b>存储约定</b>：无论哪种模式，<code>content</code> 列始终保存 HTML（Markdown 保存时服务端用 python-markdown 渲染），前台主题、搜索、内容 API 全部零改动；Markdown 原文另存 <code>*_md</code> 列，供再次编辑时原样回填。</li>
@@ -428,8 +429,8 @@ docker compose -f docker-compose.postgresql.yml up -d
 
 <section id="notify">
 <h2>表单消息通知</h2>
-<p>后台菜单：<b>全局设置 → 消息通知</b></p>
-<p>配置后，前台表单每收到一条提交都会实时推送。v2.3 起自定义表单已转为官方内置插件，配置页与设置键保持不变。</p>
+<p>后台菜单：<b>站点设置 → 消息通知</b>（仅对当前站点生效）</p>
+<p>配置后，前台表单每收到一条提交都会实时推送。v2.3 起自定义表单已转为官方内置插件，配置页与设置键保持不变。v3.2.6 起该配置按站点独立：不同站点可分别设置收件人与推送渠道，前台表单通知会发送到所属站点的配置。</p>
 
 <h3>邮件通知</h3>
 <table>
@@ -578,7 +579,7 @@ class MyPlugin(PluginBase):
 </ul>
 
 <h3 id="sec-audit">审计日志</h3>
-<p>后台菜单：<b>审计日志</b>。登录/登出、配置变更、内容增删改、备份恢复、权限调整等关键操作全量留痕，记录<b>操作人、IP、时间、类型与详情</b>；支持按模块、操作类型、操作人与时间范围检索。</p>
+<p>后台菜单：<b>日志审计 → 操作审计</b>。登录/登出、配置变更、内容增删改、备份恢复、权限调整等关键操作全量留痕，记录<b>操作人、IP、时间、类型与详情</b>；支持按模块、操作类型、操作人与时间范围检索。v3.2.6 起审计日志与登录日志仅超级管理员、站点管理员可见，站点管理员只看到自己授权站点的记录（筛选、导出与清理同步受限）。</p>
 </section>
 
 <!-- ==================== 第三篇：扩展开发 ==================== -->
@@ -816,6 +817,7 @@ default 主题兜底  themes/default/&lt;name&gt;.html</code></pre>
   <li><b>JWT 登录</b>（v2.6.3）：<code>POST /api/v1/auth/login</code> 用用户名密码换取 <code>access_token</code>（15min）+ <code>refresh_token</code>（7d），请求头 <code>Authorization: Bearer &lt;access_token&gt;</code>。</li>
   <li><b>JWT 刷新</b>：<code>POST /api/v1/auth/refresh</code>（Header 带 refresh_token）换新 access_token。</li>
   <li><b>速率限制</b>（v2.6.3，<code>api_rate_limit_enable</code>）：登录 5 次/分钟、只读 GET 120 次/分钟，超限返回 429。</li>
+  <li><b>按站点独立配置</b>（v3.2.6）：<code>api_enable</code> / <code>api_auth_mode</code> / <code>api_token</code> / <code>jwt_secret_key</code> / 缓存 TTL / CORS / 速率限制均为站点级，可在「站点设置 → 内容 API」为每个站点分别设置；JWT 按当前站点密钥签发与校验，跨站 token 不通用。</li>
   <li><b>CORS</b>（<code>api_cors_origins</code>）：<code>*</code> 或逗号分隔域名。</li>
   <li><b>缓存 TTL</b>（<code>api_cache_ttl</code>）：默认 300 秒。</li>
 </ul>
@@ -1495,7 +1497,7 @@ bash docker/install.sh
 docker compose --profile mysql --profile redis up -d</code></pre>
 
 <h3>后台状态页</h3>
-<p>后台「全局设置 → Redis 缓存」提供<b>只读</b>状态展示：</p>
+<p>后台「全局设置 → Redis 缓存」提供<b>只读</b>状态展示（v3.2.6 起仅超级管理员可见）：</p>
 <ul>
   <li><b>已启用</b>（绿色）：显示连接地址，说明 RedisCache + 服务端 Session 已生效</li>
   <li><b>未启用</b>（黄色）：提示安装 Redis 并设置环境变量的步骤</li>

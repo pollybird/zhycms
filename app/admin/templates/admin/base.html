@@ -185,10 +185,23 @@
           {% endif %}
 
           {% if current_user.is_super or current_user.has_permission('system:audit_log') %}
-          <li class="nav-item">
-            <a href="{{ url_for('admin.audit_index') }}" class="nav-link {{ 'active' if active_menu == 'audit' }}">
-              <i class="nav-icon fas fa-clipboard-list"></i><p>{{ _('审计日志') }}</p>
+          {% set log_active = active_menu in ['audit', 'logs'] %}
+          <li class="nav-item has-treeview {{ 'menu-open' if log_active }}">
+            <a href="#" class="nav-link {{ 'active' if log_active }}">
+              <i class="nav-icon fas fa-clipboard-list"></i><p>{{ _('日志审计') }}<i class="right fas fa-angle-left"></i></p>
             </a>
+            <ul class="nav nav-treeview">
+              <li class="nav-item">
+                <a href="{{ url_for('admin.audit_index') }}" class="nav-link {{ 'active' if active_menu == 'audit' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('操作审计') }}</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if active_menu == 'logs' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('登录日志') }}</p>
+                </a>
+              </li>
+            </ul>
           </li>
           {% endif %}
 
@@ -213,8 +226,8 @@
           {% endif %}
 
           {# v3.2.4：设置按「当前站点」与「全局」分区，避免站点设置与平台设置混排 #}
-          {% set site_setting_active = active_menu in ['setting_site', 'setting_seo', 'setting_seo_advanced', 'theme'] %}
-          {% set global_setting_active = active_menu in ['site', 'setting_upload', 'setting_upload_security', 'setting_notify', 'setting_security', 'logs', 'plugin', 'setting_api', 'setting_i18n', 'setting_search', 'setting_editor', 'setting_redis'] %}
+          {% set site_setting_active = active_menu in ['setting_site', 'setting_seo', 'setting_seo_advanced', 'theme', 'setting_notify', 'setting_editor', 'setting_api'] %}
+          {% set global_setting_active = active_menu in ['site', 'setting_upload', 'setting_upload_security', 'setting_security', 'plugin', 'setting_i18n', 'setting_search', 'setting_redis'] %}
 
           {% if current_user.has_permission('system:settings') %}
           <li class="nav-item has-treeview {{ 'menu-open' if site_setting_active }}">
@@ -242,11 +255,26 @@
                   <i class="far fa-circle nav-icon"></i><p>{{ _('主题管理') }}</p>
                 </a>
               </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_notify') }}" class="nav-link {{ 'active' if active_menu == 'setting_notify' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('消息通知') }}</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_editor') }}" class="nav-link {{ 'active' if active_menu == 'setting_editor' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('编辑设置') }}</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.setting_api') }}" class="nav-link {{ 'active' if active_menu == 'setting_api' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('内容 API') }}</p>
+                </a>
+              </li>
             </ul>
           </li>
           {% endif %}
 
-          {% if current_user.has_permission('system:settings') or current_user.has_permission('site:manage') or current_user.has_permission('system:audit_log') %}
+          {% if current_user.has_permission('system:settings') or current_user.has_permission('site:manage') %}
           <li class="nav-item has-treeview {{ 'menu-open' if global_setting_active }}">
             <a href="#" class="nav-link {{ 'active' if global_setting_active }}">
               <i class="nav-icon fas fa-cogs"></i><p>{{ _('全局设置') }}<i class="right fas fa-angle-left"></i></p>
@@ -278,29 +306,12 @@
                 </a>
               </li>
               <li class="nav-item">
-                <a href="{{ url_for('admin.setting_notify') }}" class="nav-link {{ 'active' if active_menu == 'setting_notify' }}">
-                  <i class="far fa-circle nav-icon"></i><p>{{ _('消息通知') }}</p>
-                </a>
-              </li>
-              <li class="nav-item">
                 <a href="{{ url_for('admin.setting_security') }}" class="nav-link {{ 'active' if active_menu == 'setting_security' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('后台安全') }}</p>
                 </a>
               </li>
               {% endif %}
-              {% if current_user.has_permission('system:audit_log') %}
-              <li class="nav-item">
-                <a href="{{ url_for('admin.logs') }}" class="nav-link {{ 'active' if active_menu == 'logs' }}">
-                  <i class="far fa-circle nav-icon"></i><p>{{ _('登录日志') }}</p>
-                </a>
-              </li>
-              {% endif %}
               {% if current_user.has_permission('system:settings') %}
-              <li class="nav-item">
-                <a href="{{ url_for('admin.setting_api') }}" class="nav-link {{ 'active' if active_menu == 'setting_api' }}">
-                  <i class="far fa-circle nav-icon"></i><p>{{ _('内容 API') }}</p>
-                </a>
-              </li>
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_i18n') }}" class="nav-link {{ 'active' if active_menu == 'setting_i18n' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('国际化') }}</p>
@@ -311,16 +322,13 @@
                   <i class="far fa-circle nav-icon"></i><p>{{ _('搜索设置') }}</p>
                 </a>
               </li>
-              <li class="nav-item">
-                <a href="{{ url_for('admin.setting_editor') }}" class="nav-link {{ 'active' if active_menu == 'setting_editor' }}">
-                  <i class="far fa-circle nav-icon"></i><p>{{ _('编辑设置') }}</p>
-                </a>
-              </li>
+              {% if current_user.is_super %}
               <li class="nav-item">
                 <a href="{{ url_for('admin.setting_redis') }}" class="nav-link {{ 'active' if active_menu == 'setting_redis' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('Redis 缓存') }}</p>
                 </a>
               </li>
+              {% endif %}
               {% endif %}
             </ul>
           </li>

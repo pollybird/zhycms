@@ -135,11 +135,17 @@ class AuditLog(db.Model):
             logger.exception('审计日志写入失败，已回滚')
 
     @classmethod
-    def clean_expired(cls, keep_days=90):
-        """清理过期日志，返回清理条数。"""
+    def clean_expired(cls, keep_days=90, site_ids=None):
+        """清理过期日志，返回清理条数。
+
+        site_ids 为 None 表示不限站点；传入集合时仅清理这些站点的日志
+        （站点管理员清理时避免影响其他站点）。
+        """
         from datetime import timedelta
         cutoff = datetime.now() - timedelta(days=keep_days)
         q = cls.query.filter(cls.created_at < cutoff)
+        if site_ids is not None:
+            q = q.filter(cls.site_id.in_(list(site_ids)))
         cnt = q.count()
         q.delete(synchronize_session=False)
         db.session.commit()
