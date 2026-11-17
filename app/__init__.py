@@ -787,6 +787,7 @@ def create_app(config_name=None):
         from .models.column import Column
         from .utils.themes import get_active_theme
         from .sites import current_site, current_site_id, accessible_sites
+        from .utils.password_policy import get_password_policy, password_policy_hint
 
         settings = Setting.get_dict()
         fragments = Fragment.get_dict()
@@ -800,6 +801,9 @@ def create_app(config_name=None):
             current_user=current_user,
             current_theme=theme,
             theme_base=f'themes/{theme}/base.html',
+            # v3.2.4：后台密码复杂度策略（表单 minlength/提示随配置变化）
+            password_policy=get_password_policy(),
+            password_policy_hint=password_policy_hint,
             # v3.2.0 站群：当前站点与后台可切换站点列表
             current_site=current_site(),
             current_site_id=current_site_id(),

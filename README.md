@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.2.3-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.4-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-553%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-560%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.3**（角色体系站点化版：新增「站点管理员」预设角色，账号角色按站点分配并支持一人多站多角色；站点管理员仅能在授权站点内管理账号，角色配置保留为平台级功能；新增迁移 `0015`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.4**（密码策略可配置版：后台管理员的密码最低位数与字符类型要求改为超管可在「后台安全」调整，默认沿用 12 位 + 大小写/数字/特殊字符的严格策略；低于 8 位保存前会提示安全风险；无数据库迁移、无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -112,6 +112,10 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.2.4（2026-11-17）
+
+密码策略可配置。后台管理员的密码复杂度不再写死：超级管理员可在「系统设置 → 后台安全」调整最低位数（6-64）以及大写字母/小写字母/数字/特殊字符四个必含项；默认仍为 12 位 + 四类字符的严格策略。最低位数低于 8 位时保存前弹出确认框提示安全风险，保存后返回 warning。初始化向导、个人改密、账号新建/重置密码的表单 `minlength` 与提示文案随策略动态渲染；`password_` 为全局设置前缀，站点切换不改变策略。无数据库迁移、无新增依赖。
 
 ### v3.2.3（2026-11-17）
 
