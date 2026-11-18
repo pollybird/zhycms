@@ -45,6 +45,7 @@ docker compose up -d redis
 2. **证书检查只读**：每天 08:00 检查 `/etc/letsencrypt/live/{域名}/cert.pem`（可用 `SSL_CERT_ROOT` 覆盖），剩余天数不超过 10 天时写审计并发送提醒；**不会自动申请或续签**。多进程部署可用 `python scripts/check_ssl_expiry.py --strict` 作为定时兜底。
 3. **站点克隆不复制上传资产**：克隆站内容中的 `/uploads/site{源站}/` 仍指向源站文件；站点级备份/导入会复制资产并重建索引。
 4. 新增全局设置：`ssl_expiry_warn_days`、`ssl_expiry_notify_enable`、`ssl_expiry_notify_channels`、`site_backup_keep_days`、`site_backup_max_unzip_mb`。
+5. **JWT 回退密钥按站点派生**：非默认站点未配置 `jwt_secret_key` 时，不再共用默认站点密钥，而是以应用级密钥 + 站点 id 派生；升级后这类站点此前签发的 token 会失效，需重新登录获取。默认站点与已显式配置密钥的站点不受影响。
 
 ---
 

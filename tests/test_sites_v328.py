@@ -909,7 +909,73 @@ def test_batch_delete_and_role(app, client):
 
 
 # ============================================================
-# 五、后台页面与权限
+# 五、安全加固回归
+# ============================================================
+
+def test_clone_site_rejects_non_dict_target(app):
+    from app.services.site_clone import clone_site
+
+    sid = _mk_site(app, slug=_uniq('v328-type'))
+    with app.app_context():
+        with pytest.raises(TypeError):
+            clone_site(sid, sid)
+
+
+def test_jwt_fallback_secret_is_isolated_per_site(app):
+    import jwt as pyjwt
+
+    from app.sites import set_current_site
+    from app.utils.api_jwt import create_token, decode_token, jwt_secret
+
+    sid_a = _mk_site(app, slug=_uniq('v328-jwt-a'))
+    sid_b = _mk_site(app, slug=_uniq('v328-jwt-b'))
+    with app.app_context():
+        set_current_site(sid_a)
+        token = create_token('api-user')
+        assert decode_token(token)['sub'] == 'api-user'
+        secret_a = jwt_secret()
+
+        set_current_site(sid_b)
+        assert jwt_secret() != secret_a
+        with pytest.raises(pyjwt.InvalidTokenError):
+            decode_token(token)
+
+
+def test_site_access_is_denied_when_permission_query_fails(app, monkeypatch):
+    import app.models.rbac as rbac
+    from app.models.user import User
+    from app.sites import accessible_sites, can_access_site
+
+    class _BrokenQuery:
+        def filter_by(self, *args, **kwargs):
+            raise RuntimeError('permission table unavailable')
+
+    class _BrokenPermission:
+        query = _BrokenQuery()
+
+    uid = _mk_user(app)
+    sid = _mk_site(app, slug=_uniq('v328-failclosed'))
+    monkeypatch.setattr(rbac, 'UserSitePermission', _BrokenPermission)
+    with app.app_context():
+        user = db.session.get(User, uid)
+        assert can_access_site(user, sid) is False
+        assert accessible_sites(user) == []
+
+
+def test_user_without_roles_has_no_site_access(app):
+    from app.models.user import User
+    from app.sites import accessible_sites, can_access_site
+
+    uid = _mk_user(app)
+    sid = _mk_site(app, slug=_uniq('v328-norole'))
+    with app.app_context():
+        user = db.session.get(User, uid)
+        assert can_access_site(user, sid) is False
+        assert accessible_sites(user) == []
+
+
+# ============================================================
+# 六、后台页面与权限
 # ============================================================
 
 def test_ssl_panel_and_backup_page(app, client):

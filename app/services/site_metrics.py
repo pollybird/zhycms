@@ -28,9 +28,6 @@ _PLUGIN_MODELS = (
     ('recruit', 'plugins.recruit.models', 'RecruitJob'),
 )
 
-# 单次遍历 SimpleCache 的上限，超过则视为不可统计
-_SIMPLE_CACHE_SCAN_LIMIT = 50000
-
 
 def _count_model(model, site_id):
     """按站点统计模型行数；模型没有 site_id 时返回 0。"""
@@ -72,9 +69,8 @@ def _cache_entry_count(site_id):
         store = getattr(backend, '_cache', None)
         if store is None:
             return None
-        if len(store) > _SIMPLE_CACHE_SCAN_LIMIT:
-            return None
         marker = f'site{site_id}'
+        # SimpleCache 仅用于开发环境，直接遍历统计，避免条目超限后指标恒为 None
         return sum(1 for key in list(store.keys()) if marker in str(key))
     except Exception as e:  # 缓存客户端可能抛出连接类异常，统一降级
         logger.warning('统计站点 %s 缓存条目失败：%s', site_id, e)

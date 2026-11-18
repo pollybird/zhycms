@@ -6,8 +6,7 @@ certbot、不修改服务器配置。证书根目录可通过 `SSL_CERT_ROOT` �
 """
 import logging
 import os
-import ssl
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 
 from flask import current_app
 
@@ -28,9 +27,27 @@ MAX_WARN_DAYS = 90
 AUDIT_EVENT = 'ssl_expiry'
 
 
-def _cert_root():
+def certificate_root():
+    """证书根目录（可通过 SSL_CERT_ROOT 覆盖，便于自定义部署与测试）。"""
     return current_app.config.get(
         'SSL_CERT_ROOT', '/etc/letsencrypt/live') or '/etc/letsencrypt/live'
+
+
+def read_certificate_expiry(cert_path):
+    """读取 PEM 证书到期时间，返回带 UTC 时区的 datetime。
+
+    使用 cryptography 公开接口解析，避免依赖 CPython 内部 API。
+    证书无法解析时抛出 ValueError/OSError，由调用方降级为状态值。
+    """
+    from cryptography import x509
+
+    with open(cert_path, 'rb') as fh:
+        cert = x509.load_pem_x509_certificate(fh.read())
+    expires = getattr(cert, 'not_valid_after_utc', None)
+    if expires is None:
+        # cryptography < 42 只提供 naive UTC 时间
+        expires = cert.not_valid_after.replace(tzinfo=timezone.utc)
+    return expires
 
 
 def get_warn_days():
@@ -69,22 +86,20 @@ def check_site_certificate(site, base_domain=None, warn_days=None):
     if not host:
         return result
 
-    cert_path = os.path.join(_cert_root(), host, 'cert.pem')
+    cert_path = os.path.join(certificate_root(), host, 'cert.pem')
     if not os.path.isfile(cert_path):
         return result
 
     result['configured'] = True
     try:
-        decoded = ssl._ssl._test_decode_cert(cert_path)
-        raw = decoded.get('notAfter')
-        expires = datetime.strptime(raw, '%b %d %H:%M:%S %Y %Z')
+        expires = read_certificate_expiry(cert_path)
     except (OSError, ValueError, AttributeError, TypeError) as e:
         result['status'] = STATUS_INVALID
         result['error'] = str(e)
         logger.warning('读取证书 %s 失败：%s', cert_path, e)
         return result
 
-    days_left = (expires - datetime.now()).days
+    days_left = (expires - datetime.now(timezone.utc)).days
     result['expires_at'] = expires.strftime('%Y-%m-%d %H:%M:%S')
     result['days_left'] = days_left
     limit = warn_days if warn_days is not None else get_warn_days()

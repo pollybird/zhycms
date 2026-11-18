@@ -6,7 +6,7 @@
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -239,18 +239,17 @@ def ssl_status(domain):
     if not host:
         return result
 
-    cert_path = f'/etc/letsencrypt/live/{host}/cert.pem'
+    from .site_ssl import certificate_root, read_certificate_expiry
+
+    cert_path = os.path.join(certificate_root(), host, 'cert.pem')
     if not os.path.isfile(cert_path):
         return result
 
     result['configured'] = True
     try:
-        import ssl
-        decoded = ssl._ssl._test_decode_cert(cert_path)
-        raw = decoded.get('notAfter')
-        expires = datetime.strptime(raw, '%b %d %H:%M:%S %Y %Z')
+        expires = read_certificate_expiry(cert_path)
         result['expires_at'] = expires.strftime('%Y-%m-%d %H:%M:%S')
-        result['days_left'] = (expires - datetime.now()).days
+        result['days_left'] = (expires - datetime.now(timezone.utc)).days
     except (OSError, ValueError, AttributeError, TypeError) as e:
         result['error'] = str(e)
         logger.warning('读取证书 %s 失败：%s', cert_path, e)

@@ -665,7 +665,8 @@ def import_site_backup(zip_path, target_site_id=None, mode='new',
         from .site_clone import delete_all_site_content
         # 覆盖前自动安全备份；失败则中止，避免不可恢复
         export_site(site.id, created_by=created_by)
-        delete_all_site_content(site.id)
+        # 与后续恢复共用事务：恢复失败时回滚，目标站点不会被清空
+        delete_all_site_content(site.id, commit=False)
     else:
         site = _create_site_from_manifest(summary['site'])
 

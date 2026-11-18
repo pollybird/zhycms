@@ -126,7 +126,13 @@ def _notify(progress, percent, message):
 
 
 def clone_site(source_site_id, target, options=None, progress=None, job_id=None):
-    """克隆站点，返回 {site_id, counts, elapsed_ms}；失败抛 CloneError。"""
+    """克隆站点，返回 {site_id, counts, elapsed_ms}；失败抛 CloneError。
+
+    target 必须是包含 name/slug/domain 等字段的字典；传入 site_id 等
+    其他类型时直接报错，避免误用。
+    """
+    if not isinstance(target, dict):
+        raise TypeError('target 必须为包含站点字段的字典')
     started = datetime.now()
     source = db.session.get(Site, source_site_id)
     if source is None or source.is_deleted:
@@ -723,10 +729,28 @@ def _delete_plugin_content(site_id):
         _exec('DELETE FROM tutorial_categories WHERE site_id = :sid')
 
 
-def delete_all_site_content(site_id):
-    """按「子表 → 父表」顺序删除站点内容，返回受影响表数。"""
+def delete_all_site_content(site_id, commit=True):
+    """删除站点全部内容，返回受影响表数。
+
+    commit=True 时立即提交；commit=False 时仅 flush，由调用方统一提交，
+    任一步骤抛出异常都会回滚本次删除，避免留下部分清空的数据。
+    """
     if site_id == DEFAULT_SITE_ID:
         raise ValueError('默认站点内容不可批量删除')
+    try:
+        tables = _delete_site_content(site_id)
+        if commit:
+            db.session.commit()
+        else:
+            db.session.flush()
+        return tables
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def _delete_site_content(site_id):
+    """按「子表 → 父表」顺序删除站点内容，不负责提交事务。"""
     tables = 0
 
     _delete_plugin_content(site_id)
@@ -791,7 +815,6 @@ def delete_all_site_content(site_id):
     Setting.query.filter(Setting.site_id == site_id).delete(
         synchronize_session=False)
     tables += 1
-    db.session.commit()
     return tables
 
 

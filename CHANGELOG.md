@@ -21,13 +21,23 @@
 ### Changed
 
 - **Redis 8**：Docker Compose 与安装脚本内置的 Redis 镜像升级为 `redis:8-alpine`。
+- **站点权限改为 fail-closed**：权限查询异常、账号无任何角色或站点绑定时不再默认全站可见，统一拒绝访问；禁用/已删除账号仍由登录装饰器登出。
+- **JWT 回退密钥按站点派生**：非默认站点未单独配置 `jwt_secret_key` 时，以应用级密钥 + 站点 id 派生独立密钥，不再与默认站点共用；默认站点与已显式配置密钥的站点不受影响。
+
+### Fixed
+
+- 站点备份覆盖导入时，内容清空与恢复共用事务，恢复失败可回滚，避免目标站点被部分清空。
+- 证书解析改用 `cryptography` 公开接口，移除对 CPython 内部 `ssl._ssl._test_decode_cert` 的依赖。
+- 站点克隆入口校验 `target` 必须为字典，传错类型时抛出明确的 `TypeError`。
+- 开发环境 SimpleCache 条目较多时，站点缓存指标不再固定返回空值。
 
 ### 升级注意
 
 - **有数据库迁移 `0018`**（`site_jobs`、`site_recycle_bin` 及索引，幂等、可降级），启动自动执行。
 - **删除站点行为变化**：删除改为移入回收站，内容保留 30 天；需要立即释放空间请使用回收站的彻底删除。
+- **JWT 令牌失效**：非默认站点未配置 `jwt_secret_key` 时，升级后此前签发的 token 会失效，用户需重新登录；已显式配置密钥的站点不受影响。
 - **Redis 升级**：使用内置 Redis 的部署重新拉取镜像即可，数据卷格式兼容；外部 Redis 需为 6.0 及以上版本。
-- **测试**：全量 627 项通过（新增 38 项站点平台化回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.8` 三门禁全绿。
+- **测试**：全量 631 项通过（新增 42 项站点平台化与安全回归）；`check_excepts.py` / `check_constants.py` / `check_release.py --version 3.2.8` 三门禁全绿。
 
 ## [3.2.7] - 2026-11-18
 

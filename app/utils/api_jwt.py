@@ -5,11 +5,15 @@ flask-jwt-extended 的签名密钥是应用级配置，无法按站点区分；�
 （由 Host/前台站点上下文解析）读取 ``jwt_secret_key`` 完成 HS256 签发与校验。
 
 兼容性：
-- 站点未单独配置密钥时回退到站点 0（全局）配置，再回退到 SECRET_KEY；
+- 站点未单独配置密钥时，默认站点沿用应用级密钥以兼容存量 token；
+  其他站点以应用级密钥 + 站点 id 派生独立密钥，避免跨站令牌混用；
 - 生成的 payload 与 flask-jwt-extended 兼容（sub/type/iat/nbf/exp/jti），
   存量 token 在密钥一致时仍可继续使用；
 - 沿用 Redis ``jti`` 黑名单实现登出即时失效。
 """
+import hashlib
+import hmac
+import logging
 import time
 import uuid
 
@@ -18,6 +22,8 @@ from flask import current_app, has_app_context
 
 from ..models.setting import Setting
 from . import jwt_blocklist
+
+logger = logging.getLogger(__name__)
 
 ALGORITHM = 'HS256'
 
@@ -32,14 +38,62 @@ def _int_setting(key, default):
         return default
 
 
-def jwt_secret():
-    """当前站点的 JWT 签名密钥；未配置时回退到应用级密钥。"""
-    value = ''
-    if has_app_context():
-        value = (Setting.get('jwt_secret_key') or '').strip()
-    return (value
-            or current_app.config.get('JWT_SECRET_KEY')
+def _current_site_id():
+    try:
+        from ..sites import current_site_id
+        return current_site_id()
+    except Exception as e:  # 无站点上下文时按默认站点处理
+        logger.debug('读取当前站点失败，使用默认站点：%s', e)
+        return 0
+
+
+def _site_secret(site_id):
+    """读取站点显式配置的 JWT 密钥，不回退到默认站点。
+
+    默认站点的密钥即全局配置；其他站点必须单独配置，未配置时由调用方派生。
+    """
+    if not site_id:
+        return (Setting.get('jwt_secret_key') or '').strip()
+    cache_map = Setting._request_cache_map()
+    if cache_map is not None:
+        site_map = cache_map.get(site_id) or {}
+        raw = site_map.get('jwt_secret_key')
+        if not raw:
+            return ''
+        if Setting._is_sensitive_key('jwt_secret_key'):
+            raw = Setting._resolve_sensitive(
+                'jwt_secret_key', raw, site_map, site_id=site_id)
+        return (raw or '').strip()
+    item = Setting.query.filter_by(key='jwt_secret_key', site_id=site_id).first()
+    if item is None or not (item.value or '').strip():
+        return ''
+    return (Setting.get_for_site('jwt_secret_key', site_id) or '').strip()
+
+
+def _fallback_secret(site_id):
+    """未配置站点密钥时的回退值。
+
+    默认站点继续使用应用级密钥，保证升级前签发的 token 仍有效；
+    其余站点基于应用级密钥与站点 id 派生，确保不同站点的 token 互不通用。
+    """
+    base = (current_app.config.get('JWT_SECRET_KEY')
             or current_app.config['SECRET_KEY'])
+    if not site_id:
+        return base
+    return hmac.new(
+        str(base).encode('utf-8'),
+        f'zhycms:jwt:site:{site_id}'.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def jwt_secret():
+    """当前站点的 JWT 签名密钥；站点未配置时按站点派生回退密钥。"""
+    if not has_app_context():
+        return (current_app.config.get('JWT_SECRET_KEY')
+                or current_app.config['SECRET_KEY'])
+    site_id = _current_site_id()
+    return _site_secret(site_id) or _fallback_secret(site_id)
 
 
 def access_expires_seconds():

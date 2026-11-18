@@ -75,7 +75,7 @@
 - **插件包上传 RCE 修复（VULN-002/009）**：插件包直传开关 `plugin_upload_enabled` **默认关闭**（插件管理页可显式开启）；上传包经 **AST 语法树源码审计**（`app/utils/plugin_safety.py`）：禁止导入 `subprocess`/`importlib`/`sys`/`builtins`/`operator` 等高危模块，禁止 `from os import system` 具名导入、`os.system` 限定名调用、`eval`/`exec`/`__import__`/`compile` 裸调用、危险 dunder 属性访问与动态属性名 `getattr`，杜绝字符串黑名单的拼接/变体绕过。官方插件为预装不经审计。
 - **敏感凭证加密入库（VULN-003）**：`oss_*_secret`、`*_password`、`api_token`、`jwt_secret_key`、`search_meili_key` 等敏感配置改为 Fernet（`cryptography`）加密入库，密文 `gAAAAA` 前缀可识别；历史明文首次读取时自动加密回写（惰性迁移，无需 Alembic 脚本）。加密密钥与 SECRET_KEY 独立：环境变量 `ZHYCMS_ENC_KEY` > `instance/enc_key` 持久化文件（0600）> 首次启动自动生成。密钥不可用时优雅降级并告警。
 - **SSRF 防护统一（VULN-004/005）**：公共工具 `app/utils/url_safety.py::assert_safe_external_url`（协议白名单 + hostname 精确白名单 + 内网/回环/链路本地/保留/多播/未指定 IP 拒绝），并覆盖非常规 IPv4 字面量（十进制 `2130706433`、十六进制 `0x7f000001`、八进制 `0177.0.0.1`、短格式 `127.1`，经 `socket.inet_aton` 归一化）、IPv4-mapped IPv6 递归判定与 `0.0.0.0/8`；非白名单域名经 `getaddrinfo` 解析后逐条记录判定（防 DNS 重绑定，解析失败 fail closed），白名单精确命中的可信域名跳过解析。企业微信 Webhook 强制 HTTPS + 域名精确等于 `qyapi.weixin.qq.com`（修复子串匹配绕过）；会员插件短信 Webhook 在保存时与发送前（占位符替换后的最终 URL）各校验一次。
-- **JWT 密钥隔离（VULN-006，v3.2.6 站点级）**：`jwt_secret_key` 为空时启动自动生成随机密钥并加密持久化，**不回落 SECRET_KEY**；v3.2.6 起该键按站点生效，各站点可配置独立密钥，未单独配置的站点回退默认站点（site 0）密钥。JWT 按当前站点密钥签发与校验，A 站点的 token 在 B 站点校验失败；更换某站点密钥后该站已签发 token 立即失效。v3.1.9 的 Redis `jti` 吊销机制保留。
+- **JWT 密钥隔离（VULN-006，v3.2.6 站点级）**：`jwt_secret_key` 为空时启动自动生成随机密钥并加密持久化，**不回落 SECRET_KEY**；v3.2.6 起该键按站点生效，各站点可配置独立密钥。v3.2.8 起非默认站点未单独配置密钥时，不再共用默认站点密钥，而是以应用级密钥 + 站点 id 派生独立密钥；默认站点沿用原密钥以兼容存量 token。JWT 按当前站点密钥签发与校验，A 站点的 token 在 B 站点校验失败；更换某站点密钥后该站已签发 token 立即失效。v3.1.9 的 Redis `jti` 吊销机制保留。
 - **CSP 第三方资源白名单（F-001）**：CSP 构建抽为 `_build_csp()`，基础策略与 v3.1.7 逐字节一致；后台「系统设置 → 后台安全」可为 `script-src`/`style-src`/`img-src`/`font-src`/`connect-src`/`media-src`/`frame-src` 配置换行分隔的来源白名单（`https://host[:port]` 精确源或 `*.example.com` 子域通配），保存时逐行校验（拒绝裸 `*`、非 http/https、userinfo、query/fragment、空格引号）。`frame-ancestors` 防点击劫持基线与 SVG 沙箱 CSP 永不读取白名单。
 
 ### v3.1.9 可被利用缺陷修复（GitCode issue #14 + SAST 续项）
@@ -112,6 +112,7 @@
 - **后台菜单按作用域拆分（v3.2.5）**：侧边栏区分「站点设置（当前站点）」与「全局设置（全站共用）」，站点管理员不可访问的平台级入口（站点管理、插件管理、Redis 等）按权限与超管身份隐藏，减少越权尝试面。
 - **密码复杂度可配置（v3.2.4）**：仅超级管理员可在「全局设置 → 后台安全」调整后台密码策略；默认仍为 12 位加强制四类字符，最低位数低于 8 位时需二次确认，防止误配弱策略。
 - **站点备份导入（v3.2.8）**：ZIP 导入前校验 manifest 与格式标识，拒绝路径穿越、符号链接、异常压缩比与超出解压上限的包；导入需 `site:manage` 权限并写审计日志。备份下载使用 30 分钟有效的签名 URL，上传的备份文件存放于非 Web 可访问目录。
+- **站点权限 fail-closed（v3.2.8）**：站点权限查询异常、无任何角色或站点绑定时一律拒绝访问，不再回退为全站可见；站点删除与批量操作仍排除默认站点。
 
 ## 安全配置基线（部署方自查）
 

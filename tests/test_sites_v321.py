@@ -114,15 +114,13 @@ def test_restricted_editor_content_route_blocked(app, client):
     assert resp.status_code == 403
 
 
-def test_unbound_user_keeps_full_access(app, client):
-    """未做任何站点绑定的老账号保持全站可见（升级零回归）。"""
+def test_unbound_user_has_no_site_access(app, client):
+    """无任何角色或站点绑定的账号不再默认全站可见（fail-closed）。"""
     sid = _mk_site(app, slug='site-b')
     uid = _mk_user(app, 'sg-legacy')
     _login(client, uid)
 
-    assert client.get(f'/admin/?site={sid}').status_code == 200
-    with client.session_transaction() as sess:
-        assert sess.get('admin_site_id') == sid
+    assert client.get(f'/admin/?site={sid}').status_code == 403
 
 
 # ============================================================
