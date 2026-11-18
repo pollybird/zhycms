@@ -52,7 +52,7 @@ ENV_FILE="$PROJECT_DIR/.env"
 
 # ---- 国内 Docker 镜像加速站 ----
 # 说明：以下均为「前缀替换式」镜像服务，拉取时把原镜像名改写为 <host>/<原路径>，
-#       例如 redis:7-alpine → docker.m.daocloud.io/library/redis:7-alpine。
+#       例如 redis:8-alpine → docker.m.daocloud.io/library/redis:8-alpine。
 #       配置到 daemon.json 的 registry-mirrors 后，dockerd 会自动按序尝试，
 #       原镜像名无需改动（compose / build 均透明生效）。
 CN_REGISTRY_MIRRORS=(
@@ -435,6 +435,26 @@ fi
 echo ""
 
 # ============================================================
+# 步骤 5.5：多站模式配置骨架（可选）
+# ============================================================
+if confirm "是否生成多站部署配置骨架？" "n"; then
+    MULTI_SITE="yes"
+    mkdir -p "$PROJECT_DIR/docker/env"
+    for tag in site-a site-b; do
+        src="$SCRIPT_DIR/env/${tag}.env.example"
+        dst="$PROJECT_DIR/docker/env/${tag}.env"
+        if [ -f "$src" ] && [ ! -f "$dst" ]; then
+            cp "$src" "$dst"
+            info "已生成多站环境骨架：$dst"
+        fi
+    done
+    warn "多站模式只生成 env 骨架，不会自动修改 nginx；部署步骤见 docs/DEPLOY_MULTI_SITE.md"
+else
+    MULTI_SITE="no"
+fi
+echo ""
+
+# ============================================================
 # 步骤 6：端口与 Worker
 # ============================================================
 echo -e "${GREEN}━━━ 步骤 6/6：运行参数 ━━━${NC}"
@@ -455,6 +475,7 @@ echo "  数据库密码：      ${DB_PASSWORD:0:4}****（已隐藏）"
 echo "  镜像加速：        ${USE_MIRROR}"
 echo "  Meilisearch：     ${USE_MEILI}"
 echo "  Redis：           ${USE_REDIS}"
+echo "  多站模式：        ${MULTI_SITE:-no}"
 echo "  Web 端口：        $WEB_PORT"
 echo "  Worker 数量：     $GUNICORN_WORKERS"
 echo ""
@@ -559,7 +580,7 @@ if [ "$USE_MIRROR" = "yes" ]; then
             postgres) REQUIRED_IMAGES+=("postgres:16-alpine") ;;
         esac
         [ "$USE_MEILI" = "yes" ] && OPTIONAL_IMAGES+=("getmeili/meilisearch:v1.8")
-        [ "$USE_REDIS" = "yes" ] && OPTIONAL_IMAGES+=("redis:7-alpine")
+        [ "$USE_REDIS" = "yes" ] && OPTIONAL_IMAGES+=("redis:8-alpine")
 
         PULL_FAILED=()
         info "拉取必需镜像（构建 / 数据库）..."

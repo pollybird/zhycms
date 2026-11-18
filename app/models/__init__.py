@@ -27,6 +27,14 @@ from .backup import BackupRecord, TRIGGER_MANUAL, TRIGGER_SCHEDULED
 from .upload import UploadedFile
 # v3.0.0 可视化页面构建器
 from .builder import BuilderPage, BuilderRevision
+# 站点资源指标每日快照
+from .site_metric import SiteMetricSnapshot
+# 站点异步任务与回收站
+from .site_job import (
+    SiteJob, JOB_PENDING, JOB_RUNNING, JOB_SUCCESS, JOB_FAILED,
+    JOB_STATUSES, JOB_CLONE, JOB_BACKUP_IMPORT, JOB_BACKUP_EXPORT,
+)
+from .site_recycle import SiteRecycleBin
 
 # v2.4.0: search_index 表由迁移 0002 创建；为避免 Alembic 下一次 autogenerate
 # 把它误报为 DROP，需要有一个对应的 ORM 模型声明在 db.metadata 中「锚定」。
@@ -76,4 +84,10 @@ __all__ = [
     'UploadedFile',
     # Builder (v3.0.0)
     'BuilderPage', 'BuilderRevision',
+    # 站点指标快照
+    'SiteMetricSnapshot',
+    # 站点异步任务与回收站
+    'SiteJob', 'JOB_PENDING', 'JOB_RUNNING', 'JOB_SUCCESS', 'JOB_FAILED',
+    'JOB_STATUSES', 'JOB_CLONE', 'JOB_BACKUP_IMPORT', 'JOB_BACKUP_EXPORT',
+    'SiteRecycleBin',
 ]

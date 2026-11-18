@@ -1,0 +1,81 @@
+# ============================================================
+# zhycms 多站部署模板
+#
+# 推荐形态：单实例多站
+#   - 只启动一个 zhycms 容器，站点在后台「站点管理」中创建；
+#   - 域名通过 nginx 反代到同一个 5000 端口，由应用按 Host 解析站点；
+#   - 不是「一站一容器」，新增站点不需要新增容器。
+#
+# 用法：
+#   cp .env.example .env
+#   docker compose -f docker/compose.multi.example.yml up -d
+#   python scripts/generate_nginx_sites.py --base-domain example.com
+#
+# 多实例形态（可选，为后续横向扩容预留）：
+#   - 复制 app 服务为 app-b，端口 5001/5002；
+#   - 两个实例共用同一数据库与 Redis；
+#   - 必须启用 Redis 会话（REDIS_URL），否则登录态不共享；
+#   - nginx upstream 同时指向 5001/5002。
+# ============================================================
+
+services:
+  app:
+    image: pollybird/zhycms:latest
+    build:
+      context: ..
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        APT_MIRROR: ${APT_MIRROR:-}
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      ZHYCMS_ENV: production
+      ZHYCMS_DB_URI: mysql+pymysql://zhycms:${MYSQL_PASSWORD:-zhycms}@db:3306/zhycms?charset=utf8mb4
+      REDIS_URL: ${REDIS_URL:-}
+    ports:
+      - "${WEB_PORT:-5000}:5000"
+    volumes:
+      - ../instance:/app/instance
+      - ../app/static/uploads:/app/app/static/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ---- 多实例形态示例（默认注释，按需取消注释）----
+  # app-b:
+  #   extends:
+  #     service: app
+  #   ports:
+  #     - "5001:5000"
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: zhycms
+      MYSQL_USER: zhycms
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-zhycms}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---- Redis（多实例必开：会话与缓存需共享）----
+  # redis:
+  #   image: redis:8-alpine
+  #   restart: unless-stopped
+  #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+  #   volumes:
+  #     - redis_data:/data
+
+volumes:
+  mysql_data:
+  # redis_data:

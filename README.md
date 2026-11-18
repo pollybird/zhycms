@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.2.6-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.8-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-569%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-631%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.6**（站点级配置与日志可见性版：消息通知、编辑设置、内容 API 改为按站点配置；审计/登录日志仅超级管理员与站点管理员可见且站点管理员仅限授权站点；Redis 缓存仅超管可见；含迁移 `0016`，无新增依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.8**（站点平台化运维版：新增站点克隆、站点级备份导出/导入、证书到期巡检、批量操作与站点回收站；Docker 内置 Redis 升级到 8；含迁移 `0018`，无新增 Python 依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -112,6 +112,14 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.2.8（2026-11-18）
+
+站点平台化运维。新增站点克隆：栏目、字段、文章、碎片、页面构建与插件内容可复制到新站点，目标站默认关闭，上传资产与日志不复制；内容量大时转异步任务并写入 `site_jobs`，重启后自动清理半成品站点。新增站点级备份：单站导出 ZIP（manifest + 各表 JSONL + 上传目录），导入支持新建/覆盖/改名，自动重映射主键、重写上传 URL 并重建文件索引，下载链接限时签名。新增证书到期巡检：每日 08:00 检查，默认提前 10 天告警，支持邮件与企业微信提醒，`scripts/check_ssl_expiry.py` 可接入外部监控。站点列表支持批量启用/禁用、批量删除与批量分配角色；删除改为移入回收站，到期先备份再彻底删除。Docker 内置 Redis 升级为 `redis:8-alpine`。含迁移 `0018`，无新增 Python 依赖。
+
+### v3.2.7（2026-11-18）
+
+站群部署与可观测。新增 `scripts/generate_nginx_sites.py`：读取站点表生成可 `nginx -t` 通过的 vhost，覆盖精确域名、泛解析子域、默认站点 `_` 兜底、SSL 跳转与非法域名跳过；后台站点列表新增「部署指南」，只读展示与脚本逐字一致的配置片段和 Let's Encrypt 证书剩余天数。新增 `/admin/sites/metrics` 资源面板与 4 个全局阈值（磁盘/文章/缓存/硬上限），每日 00:30 写入 `site_metric_snapshots`（迁移 `0017`）。新增插件站点作用域 AST 审计脚本与未适配标签，日志统一附加 `[site=N]` 标签；审计导出文件名带站点标识。单站点部署无需改动 nginx。无新增依赖。
 
 ### v3.2.6（2026-11-17）
 
@@ -256,7 +264,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.2.6**，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.2.8**，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -273,9 +281,9 @@ docker compose -f docker-compose.postgresql.yml up -d
 ```
 
 > 也可直接拉取镜像：
-> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.6`）
-> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.6`）
-> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.6`）
+> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.8`）
+> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.8`）
+> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.8`）
 >
 > 三个 tag（`mysql` / `postgresql` / `latest`）指向同一镜像，内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
 

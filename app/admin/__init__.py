@@ -49,7 +49,11 @@ def _enforce_admin_site_access():
         SESSION_KEY, accessible_sites, can_access_site, current_site_id,
     )
 
-    if not current_user.is_authenticated or getattr(current_user, 'is_super', False):
+    # 禁用/已删除账号交由登录装饰器登出，避免在此提前返回 403
+    if (not current_user.is_authenticated
+            or getattr(current_user, 'is_super', False)
+            or not getattr(current_user, 'is_active_flag', True)
+            or getattr(current_user, 'is_deleted', False)):
         return None
 
     if _is_platform_endpoint(request.endpoint):

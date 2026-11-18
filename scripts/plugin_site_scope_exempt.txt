@@ -1,0 +1,10 @@
+# 插件站群作用域审计豁免清单
+# 每行一个通配符（匹配类名或表名），# 之后为说明。
+# 仅用于「靠父表外键隔离」的子表，父表必须已有 site_id。
+
+*Translation       # 翻译表随父表级联，父表已按站点隔离
+FormField          # 表单字段随 Form 级联
+FormSubmission     # 表单提交随 Form 级联
+FormSubmissionValue # 提交值随 FormSubmission 级联
+MemberSmsCode      # 短信验证码随 Member 隔离
+RecruitApplication # 投递记录随 RecruitJob 隔离

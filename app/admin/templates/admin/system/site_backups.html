@@ -1,0 +1,116 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('站点备份') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('站点备份') }}{% endblock %}
+{% set active_menu = 'site' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.site_index') }}">{{ _('站点管理') }}</a></li>
+<li class="breadcrumb-item active">{{ _('备份') }} - {{ site.name }}</li>
+{% endblock %}
+
+{% block content %}
+{% if pending %}
+<div class="card card-warning">
+  <div class="card-header"><h3 class="card-title">{{ _('确认导入') }}</h3></div>
+  <div class="card-body">
+    <p>{{ _('备份来源站点：%(name)s（%(slug)s），创建时间 %(at)s，CMS 版本 %(ver)s。',
+         name=pending.summary.site.name, slug=pending.summary.site.slug,
+         at=pending.summary.created_at, ver=pending.summary.cms_version) }}</p>
+    <p>{{ _('内容行数：%(tables)s，上传文件 %(files)s 个（%(bytes)s 字节）。',
+         tables=pending.summary.tables, files=pending.summary.uploads,
+         bytes=pending.summary.upload_bytes) }}</p>
+    <form method="post" action="{{ url_for('admin.site_backup_import', sid=site.id) }}">
+      <input type="hidden" name="confirm" value="1">
+      <input type="hidden" name="incoming" value="{{ pending.incoming }}">
+      <input type="hidden" name="mode" value="{{ pending.mode }}">
+      <p class="mb-1">{{ _('导入模式：%(mode)s', mode={'new': _('新建站点'),
+                                'rename': _('新建站点（标识冲突时自动改名）'),
+                                'overwrite': _('覆盖当前站点（导入前自动备份）')}[pending.mode]) }}</p>
+      <button type="submit" class="btn btn-warning">{{ _('确认导入') }}</button>
+      <a href="{{ url_for('admin.site_backups', sid=site.id) }}" class="btn btn-default">{{ _('取消') }}</a>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="row">
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">{{ _('备份文件') }}</h3>
+        <div class="card-tools">
+          <form method="post" action="{{ url_for('admin.site_backup_export', sid=site.id) }}" class="d-inline">
+            <button class="btn btn-sm btn-primary"><i class="fas fa-download"></i> {{ _('立即备份') }}</button>
+          </form>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>{{ _('文件名') }}</th>
+              <th>{{ _('大小') }}</th>
+              <th>{{ _('创建时间') }}</th>
+              <th style="width:150px">{{ _('操作') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in backups %}
+            <tr>
+              <td><code>{{ b.filename }}</code></td>
+              <td>{{ '%.2f MB'|format(b.size / 1048576) }}</td>
+              <td>{{ b.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td>
+                <a class="btn btn-xs btn-info"
+                   href="{{ url_for('admin.site_backup_download', token=b.download_token) }}">
+                  <i class="fas fa-download"></i> {{ _('下载') }}
+                </a>
+                <form method="post" action="{{ url_for('admin.site_backup_delete', sid=site.id) }}"
+                      class="d-inline" onsubmit="return confirm('{{ _('确定删除该备份？') }}');">
+                  <input type="hidden" name="filename" value="{{ b.filename }}">
+                  <button class="btn btn-xs btn-danger"><i class="fas fa-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-4">{{ _('暂无备份') }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer text-muted small">
+        {{ _('备份包含站点内容与上传文件，可用于恢复或迁移；下载链接 30 分钟内有效。') }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header"><h3 class="card-title">{{ _('导入备份') }}</h3></div>
+      <form method="post" enctype="multipart/form-data"
+            action="{{ url_for('admin.site_backup_import', sid=site.id) }}">
+        <div class="card-body">
+          <div class="form-group">
+            <label>{{ _('ZIP 备份文件') }}</label>
+            <input type="file" name="file" accept=".zip" class="form-control-file" required>
+          </div>
+          <div class="form-group">
+            <label>{{ _('导入方式') }}</label>
+            <select name="mode" class="form-control">
+              <option value="new">{{ _('新建站点') }}</option>
+              <option value="rename">{{ _('新建站点（标识冲突时自动改名）') }}</option>
+              <option value="overwrite">{{ _('覆盖当前站点') }}</option>
+            </select>
+          </div>
+          <p class="text-muted small mb-0">
+            {{ _('覆盖导入会先自动备份当前站点；新建站点默认关闭。') }}
+          </p>
+        </div>
+        <div class="card-footer">
+          <button type="submit" class="btn btn-primary">{{ _('上传并检查') }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

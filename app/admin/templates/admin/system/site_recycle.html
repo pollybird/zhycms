@@ -1,0 +1,65 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('站点回收站') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('站点回收站') }}{% endblock %}
+{% set active_menu = 'site_recycle' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.site_index') }}">{{ _('站点管理') }}</a></li>
+<li class="breadcrumb-item active">{{ _('回收站') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{{ _('已删除站点') }}</h3>
+    <div class="card-tools">
+      <a href="{{ url_for('admin.site_index') }}" class="btn btn-sm btn-default">
+        <i class="fas fa-arrow-left"></i> {{ _('返回站点列表') }}
+      </a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>{{ _('ID') }}</th>
+          <th>{{ _('站点名称') }}</th>
+          <th>{{ _('标识') }}</th>
+          <th>{{ _('删除时间') }}</th>
+          <th>{{ _('彻底删除时间') }}</th>
+          <th>{{ _('剩余天数') }}</th>
+          <th style="width:180px">{{ _('操作') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td>{{ r.site_id }}</td>
+          <td>{{ r.name }}</td>
+          <td><code>{{ r.slug }}</code></td>
+          <td>{{ r.deleted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ r.purge_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ (r.purge_at - now).days }}</td>
+          <td>
+            <form method="post" action="{{ url_for('admin.site_recycle_restore', rid=r.id) }}" class="d-inline">
+              <button class="btn btn-xs btn-success"><i class="fas fa-undo"></i> {{ _('恢复') }}</button>
+            </form>
+            {% if current_user.is_super %}
+            <form method="post" action="{{ url_for('admin.site_recycle_purge', rid=r.id) }}"
+                  class="d-inline" onsubmit="return confirm('{{ _('彻底删除后不可恢复，且会先自动备份。确定继续？') }}');">
+              <button class="btn btn-xs btn-danger"><i class="fas fa-trash"></i> {{ _('彻底删除') }}</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">{{ _('回收站为空') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted small">
+    {{ _('站点删除后内容保留 30 天，期间可恢复；到期后系统先自动备份再彻底删除。') }}
+  </div>
+</div>
+{% endblock %}

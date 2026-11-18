@@ -68,15 +68,16 @@ def _match_site(rows, ident):
 
 
 def _user_can_access(site_id):
-    """当前登录用户是否可访问指定站点（未登录/校验异常按放行处理）。"""
+    """当前登录用户是否可访问指定站点（未登录访客放行，校验异常按拒绝处理）。"""
     try:
         from flask_login import current_user
         if not current_user.is_authenticated:
             return True
         return can_access_site(current_user, site_id)
     except Exception as e:
-        logger.debug('站点权限校验失败，按放行处理：%s', e)
-        return True
+        # 权限数据不可用时应拒绝而非放行，避免故障期间越权访问其他站点
+        logger.warning('站点权限校验失败，按拒绝处理：%s', e)
+        return False
 
 
 def _first_accessible_site(rows):
@@ -291,8 +292,9 @@ def can_access_site(user, site_id):
     try:
         rows = UserSitePermission.query.filter_by(user_id=user.id).all()
     except Exception as e:
-        logger.debug('站点权限表不可用，按全局权限判定：%s', e)
-        rows = []
+        # 绑定关系无法确认时拒绝访问，避免数据库故障导致越权放行
+        logger.warning('站点权限表不可用，按拒绝访问处理：%s', e)
+        return False
     if any(r.site_id == site_id for r in rows):
         return True
     # 全局角色（site_id 为空）：存量兼容——没有显式站点绑定时全站可见；
@@ -304,9 +306,7 @@ def can_access_site(user, site_id):
     # 只读查看员且未做站点级分配：保持全站可见（存量兼容）
     if ROLE_READONLY_VIEWER in role_codes and not scoped_sites:
         return True
-    # 未做任何站点绑定 → 保持 v3.2.0 前的全站可见语义
-    if not rows and not scoped_sites:
-        return True
+    # 无任何角色或站点绑定 → 不授予站点访问权限（fail-closed）
     return False
 
 
@@ -342,13 +342,15 @@ def accessible_sites(user):
         try:
             rows = UserSitePermission.query.filter_by(user_id=user.id).all()
         except Exception as e:
-            logger.debug('站点权限表不可用：%s', e)
-            rows = []
-        if rows:
-            allowed = {r.site_id for r in rows} | set(scoped_sites)
-            result = [s for s in sites if s.id in allowed]
+            # 绑定关系不可确认时只保留已明确的站点级角色范围
+            logger.warning('站点权限表不可用，按已知站点范围处理：%s', e)
+            result = [s for s in sites if s.id in set(scoped_sites)]
         else:
-            result = sites
+            if rows:
+                allowed = {r.site_id for r in rows} | set(scoped_sites)
+                result = [s for s in sites if s.id in allowed]
+            else:
+                result = sites
     elif scoped_sites:
         allowed = set(scoped_sites)
         try:
@@ -361,16 +363,20 @@ def accessible_sites(user):
         try:
             rows = UserSitePermission.query.filter_by(user_id=user.id).all()
         except Exception as e:
-            logger.debug('站点权限表不可用，按全站可见处理：%s', e)
-            return sites
+            # 权限数据不可用时返回空列表，避免故障期间暴露全部站点
+            logger.warning('站点权限表不可用，按无可见站点处理：%s', e)
+            return []
         role_codes = {getattr(r.role, 'code', '') for r in (user.role_assignments or [])
                       if getattr(r, 'role', None) is not None}
-        if not rows or ROLE_READONLY_VIEWER in role_codes:
-            # 未绑定任何站点（legacy）或只读查看员：全站可见
+        if ROLE_READONLY_VIEWER in role_codes:
+            # 只读查看员且未做站点级分配：保持全站可见（存量兼容）
             result = sites
-        else:
+        elif rows:
             allowed = {r.site_id for r in rows}
             result = [s for s in sites if s.id in allowed]
+        else:
+            # 无任何角色或站点绑定 → 不授予可见站点（fail-closed）
+            result = []
     if has_app_context():
         setattr(g, cache_key, result)
     return result
