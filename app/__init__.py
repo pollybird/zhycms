@@ -325,7 +325,7 @@ def _setup_scheduler(app):
             except Exception:
                 app.logger.exception('scheduled backup failed')
 
-    # 任务2：清理过期审计日志 + 过期备份
+    # 任务2：清理过期审计日志 + 过期备份 + 站点备份 + 到期回收站
     def cleanup_job():
         with app.app_context():
             from .models import AuditLog, BackupRecord, Setting
@@ -339,6 +339,21 @@ def _setup_scheduler(app):
                     BackupRecord.cleanup_expired()
             except Exception:
                 app.logger.exception('backup cleanup failed')
+            try:
+                from .services.site_backup import cleanup_expired_site_backups
+                cleanup_expired_site_backups()
+            except Exception:
+                app.logger.exception('site backup cleanup failed')
+            try:
+                from .services.site_clone import purge_expired_recycle_bin
+                purge_expired_recycle_bin()
+            except Exception:
+                app.logger.exception('site recycle bin cleanup failed')
+            try:
+                from .services.site_jobs import cleanup_old_jobs
+                cleanup_old_jobs()
+            except Exception:
+                app.logger.exception('site job cleanup failed')
 
     # 每天 02:30 清理过期数据
     sched.add_job(cleanup_job, CronTrigger(hour=2, minute=30), id='zhycms_cleanup', replace_existing=True)
@@ -354,6 +369,30 @@ def _setup_scheduler(app):
                 app.logger.exception('view count flush failed')
 
     sched.add_job(view_flush_job, IntervalTrigger(seconds=60), id='zhycms_view_flush', replace_existing=True)
+
+    # 任务4：每天 00:30 写入站点资源指标快照（磁盘/文章/浏览量/缓存）
+    def site_metrics_job():
+        with app.app_context():
+            try:
+                from .services.site_metrics import snapshot_daily
+                snapshot_daily()
+            except Exception:
+                app.logger.exception('site metrics snapshot failed')
+
+    sched.add_job(site_metrics_job, CronTrigger(hour=0, minute=30),
+                  id='zhycms_site_metrics', replace_existing=True)
+
+    # 任务5：每天 08:00 巡检站点证书，剩余 10 天内到期时告警
+    def ssl_expiry_job():
+        with app.app_context():
+            try:
+                from .services.site_ssl import run_daily_check
+                run_daily_check()
+            except Exception:
+                app.logger.exception('ssl expiry check failed')
+
+    sched.add_job(ssl_expiry_job, CronTrigger(hour=8, minute=0),
+                  id='zhycms_ssl_expiry', replace_existing=True)
 
     # 备份任务在应用启动 + 每次设置保存时按配置 reschedule
     try:
@@ -1064,10 +1103,34 @@ def create_app(config_name=None):
             _setup_scheduler(app)
         except Exception:
             app.logger.exception('scheduler init failed (non-fatal)')
+        # 进程重启后把长时间未更新的任务标记为失败，并清理半成品站点
+        try:
+            from .services.site_jobs import recover_stale_jobs
+            recover_stale_jobs()
+        except Exception as e:
+            app.logger.warning('站点异步任务恢复检查失败（非致命）：%s', e)
 
     # v3.1.4：Tantivy 索引缺失时后台自动重建（升级无感，期间 SQL 兜底）
     with app.app_context():
         _maybe_rebuild_search_index(app)
+
+    # 多站点部署时提示未适配站群作用域的插件（只告警，不阻止启动）
+    with app.app_context():
+        try:
+            from .models.site import Site
+            if len(Site.active_sites()) > 1:
+                from .utils.plugin_site_scope import unadapted_slugs
+                unadapted = unadapted_slugs()
+                if unadapted:
+                    app.logger.warning(
+                        '多站点部署下存在未适配站群作用域的插件：%s',
+                        '、'.join(sorted(unadapted)))
+        except Exception as e:
+            app.logger.warning('插件站群作用域检查失败（非致命）：%s', e)
+
+    # 日志附加当前站点标签，便于多站部署时定位请求来源
+    from .logging_ext import install_logging
+    install_logging(app)
 
     return app
 

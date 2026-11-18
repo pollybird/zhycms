@@ -50,7 +50,7 @@ services:
 
   # ---- Redis（可选，取消注释启用；启用后缓存与 Session 走 Redis）----
   # redis:
-  #   image: redis:7-alpine
+  #   image: redis:8-alpine
   #   restart: unless-stopped
   #   command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
   #   volumes:

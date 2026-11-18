@@ -418,6 +418,12 @@ def get_record(slug):
 def get_plugin_records():
     """插件管理页数据：[{slug,name,version,description,author,enabled,error,menu}]"""
     current = enabled_slugs()
+    try:
+        from .utils.plugin_site_scope import unadapted_slugs
+        unadapted = unadapted_slugs()
+    except Exception as e:
+        logger.warning('插件站群适配检查失败，适配标签按已适配展示：%s', e)
+        unadapted = set()
     result = []
     for rec in _registry:
         menu = []
@@ -443,6 +449,7 @@ def get_plugin_records():
             'min_core_version': rec.min_core_version,
             'requires': rec.requires,
             'extends': rec.extends,
+            'site_scope_adapted': rec.slug not in unadapted,
         })
     return result
 

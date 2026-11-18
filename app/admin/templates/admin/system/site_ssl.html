@@ -1,0 +1,63 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('证书状态') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('站点证书状态') }}{% endblock %}
+{% set active_menu = 'site_ssl' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.site_index') }}">{{ _('站点管理') }}</a></li>
+<li class="breadcrumb-item active">{{ _('证书状态') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">{{ _('Let\'s Encrypt 证书') }}</h3>
+    <div class="card-tools">
+      <span class="badge badge-warning">{{ _('预警阈值 %(n)s 天', n=summary.warn_days) }}</span>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>{{ _('站点') }}</th>
+          <th>{{ _('域名') }}</th>
+          <th>{{ _('状态') }}</th>
+          <th>{{ _('到期时间') }}</th>
+          <th>{{ _('剩余天数') }}</th>
+          <th>{{ _('说明') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in summary.results %}
+        <tr class="{{ 'table-warning' if r.status == 'expiring' else ('table-danger' if r.status in ('expired', 'invalid') else '') }}">
+          <td>{{ r.site_name }} <span class="text-muted small">#{{ r.site_id }}</span></td>
+          <td><code>{{ r.host or '-' }}</code></td>
+          <td>
+            {% if r.status == 'ok' %}
+            <span class="badge badge-success">{{ _('正常') }}</span>
+            {% elif r.status == 'expiring' %}
+            <span class="badge badge-warning">{{ _('即将到期') }}</span>
+            {% elif r.status == 'expired' %}
+            <span class="badge badge-danger">{{ _('已过期') }}</span>
+            {% elif r.status == 'invalid' %}
+            <span class="badge badge-danger">{{ _('解析失败') }}</span>
+            {% else %}
+            <span class="badge badge-secondary">{{ _('未配置') }}</span>
+            {% endif %}
+          </td>
+          <td>{{ r.expires_at or '-' }}</td>
+          <td>{{ r.days_left if r.days_left is not none else '-' }}</td>
+          <td class="text-muted small">{{ r.error or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">{{ _('暂无可检查的站点') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted small">
+    {{ _('本页只读取服务器上的证书文件，不会自动申请或续签。到期检查每天 08:00 执行一次，剩余天数不超过阈值时发送提醒。') }}
+  </div>
+</div>
+{% endblock %}

@@ -39,7 +39,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.2.6'
+    CMS_VERSION = '3.2.8'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -111,6 +111,21 @@ class Setting(db.Model):
         'cache_ttl_index': '3600',           # 首页缓存 TTL（秒）
         'cache_ttl_column': '1800',          # 栏目列表页 TTL
         'cache_ttl_article': '7200',         # 文章详情页 TTL
+
+        # ===== 站点资源指标告警阈值（全局） =====
+        'site_metric_disk_warn_mb': '2048',   # 单站磁盘告警阈值 MB（0=关闭）
+        'site_metric_article_warn': '5000',   # 单站文章数告警阈值（0=关闭）
+        'site_metric_cache_warn': '20000',    # 单站缓存条目告警阈值（0=关闭）
+        'site_metric_disk_limit_mb': '0',     # 单站磁盘硬上限 MB（0=不限制）
+
+        # ===== 站点证书到期巡检（全局，只读检查不调用 certbot） =====
+        'ssl_expiry_warn_days': '10',           # 剩余天数告警阈值（1-90）
+        'ssl_expiry_notify_enable': 'on',       # 是否发送邮件/企业微信提醒
+        'ssl_expiry_notify_channels': 'email,wework',  # 提醒渠道，逗号分隔
+
+        # ===== 站点级备份（全局，备份目录与保留策略） =====
+        'site_backup_keep_days': '30',          # 备份保留天数（0=不自动清理）
+        'site_backup_max_unzip_mb': '2048',     # 导入解压总量上限 MB
 
         # ===== 模块2/4：审计日志 与 备份 定期清理 =====
         'audit_log_keep_days': '90',
@@ -207,6 +222,11 @@ class Setting(db.Model):
         'storage_', 'oss_', 'audit_', 'backup_', 'security_', 'redis_',
         'plugin_', 'smtp_', 'mail_',
         'member_sms_', 'member_wechat_', 'member_oauth', 'member_captcha',
+        # 站点资源指标阈值属于全局配置；使用 site_metric_ 前缀，
+        # 避免误把 site_name/site_theme/site_logo 等站点键全局化。
+        'site_metric_',
+        # 证书巡检与站点级备份属于平台运维配置，所有站点共用一套。
+        'ssl_', 'site_backup_',
     )
 
     @classmethod

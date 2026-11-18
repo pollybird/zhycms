@@ -204,7 +204,8 @@ def audit_export():
                 (log.detail or '')[:5000],
             ])
         data = buf.getvalue().encode('utf-8')
-        filename = f'audit_logs_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        site_tag = f'site{site_id}' if site_id.isdigit() else 'all'
+        filename = f'audit-{site_tag}-{datetime.now().strftime("%Y%m%d")}.csv'
         audit_log(OP_EXPORT, MODULE_AUDIT, None, None,
                   {'rows': len(logs), 'filename': filename, 'filters': {
                       'keyword': keyword, 'module': module, 'op_type': op_type,

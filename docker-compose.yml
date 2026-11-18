@@ -125,7 +125,7 @@ services:
 
   # ---- Redis（可选，缓存与 Session 后端）----
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     restart: unless-stopped
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:

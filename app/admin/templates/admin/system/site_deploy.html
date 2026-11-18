@@ -1,0 +1,134 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('部署指南') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('站点部署指南') }}{% endblock %}
+{% set active_menu = 'site' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.site_index') }}">{{ _('站点管理') }}</a></li>
+<li class="breadcrumb-item active">{{ _('部署指南') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">{{ _('站点信息') }}</h3>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-4">{{ _('站点 ID') }}</dt>
+          <dd class="col-sm-8">{{ site.id }}</dd>
+          <dt class="col-sm-4">{{ _('站点名称') }}</dt>
+          <dd class="col-sm-8">{{ site.name }}</dd>
+          <dt class="col-sm-4">{{ _('站点标识') }}</dt>
+          <dd class="col-sm-8"><code>{{ site.slug }}</code></dd>
+          <dt class="col-sm-4">{{ _('精确域名') }}</dt>
+          <dd class="col-sm-8">{{ site.domain or '-' }}</dd>
+          <dt class="col-sm-4">{{ _('子域标签') }}</dt>
+          <dd class="col-sm-8">{{ site.subdomain or '-' }}</dd>
+          <dt class="col-sm-4">{{ _('状态') }}</dt>
+          <dd class="col-sm-8">
+            {% if site.status == 'open' %}
+            <span class="badge badge-success">{{ _('开放') }}</span>
+            {% else %}
+            <span class="badge badge-secondary">{{ _('维护中') }}</span>
+            {% endif %}
+          </dd>
+          <dt class="col-sm-4">{{ _('server_name') }}</dt>
+          <dd class="col-sm-8"><code>{{ server_names }}</code></dd>
+          <dt class="col-sm-4">{{ _('基础域名') }}</dt>
+          <dd class="col-sm-8">{{ base_domain or _('未设置（可在网站设置中填写站点网址）') }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">{{ _('HTTPS 证书') }}</h3>
+      </div>
+      <div class="card-body">
+        {% if certificate.configured %}
+        <p class="mb-1">
+          {% if certificate.status == 'expired' %}
+          <span class="badge badge-danger">{{ _('已过期') }}</span>
+          {% elif certificate.status == 'invalid' %}
+          <span class="badge badge-danger">{{ _('证书解析失败') }}</span>
+          {% elif certificate.status == 'expiring' %}
+          <span class="badge badge-warning">{{ _('即将到期') }}</span>
+          {% else %}
+          <span class="badge badge-success">{{ _('已配置') }}</span>
+          {% endif %}
+          {% if certificate.days_left is not none %}
+          <span class="ml-2">{{ _('剩余 %(days)s 天', days=certificate.days_left) }}</span>
+          {% endif %}
+        </p>
+        <p class="text-muted small mb-0">
+          {{ _('到期时间') }}：{{ certificate.expires_at or '-' }}
+        </p>
+        {% else %}
+        <p class="mb-0"><span class="badge badge-secondary">{{ _('未配置') }}</span></p>
+        <p class="text-muted small mb-0">{{ _('未找到该域名的 Let\'s Encrypt 证书，可先按 HTTP 部署。') }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">{{ _('nginx 配置片段') }}</h3>
+        <div class="card-tools">
+          <button type="button" class="btn btn-sm btn-outline-primary" id="copy-nginx">
+            <i class="fas fa-copy"></i> {{ _('复制') }}
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if config_error %}
+        <div class="alert alert-warning mb-0">{{ config_error }}</div>
+        {% else %}
+        <pre id="nginx-snippet" class="bg-light p-3 mb-0" style="max-height:520px;overflow:auto;">{{ config_text }}</pre>
+        {% endif %}
+      </div>
+      <div class="card-footer text-muted small">
+        {{ _('保存后需执行 nginx -t && nginx -s reload 才会生效；本页不会修改服务器配置。') }}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function () {
+  var btn = document.getElementById('copy-nginx');
+  var pre = document.getElementById('nginx-snippet');
+  if (!btn || !pre) { return; }
+  btn.addEventListener('click', function () {
+    var text = pre.textContent;
+    var done = function () {
+      btn.innerHTML = '<i class="fas fa-check"></i> {{ _('已复制') }}';
+      setTimeout(function () {
+        btn.innerHTML = '<i class="fas fa-copy"></i> {{ _('复制') }}';
+      }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {
+        var range = document.createRange();
+        range.selectNodeContents(pre);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    } else {
+      var range = document.createRange();
+      range.selectNodeContents(pre);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  });
+})();
+</script>
+{% endblock %}

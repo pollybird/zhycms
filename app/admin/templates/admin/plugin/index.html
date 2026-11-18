@@ -81,6 +81,11 @@
                   <i class="fas fa-sitemap"></i> {{ p.extends }}
                 </span>
               {% endif %}
+              {% if not p.site_scope_adapted %}
+                <span class="badge badge-warning mr-1" title="{{ _('该插件的数据模型未带站点维度，多站点部署下可能跨站读取') }}">
+                  <i class="fas fa-exclamation-triangle"></i> {{ _('未适配站群') }}
+                </span>
+              {% endif %}
             </div>
             {% endif %}
           </td>

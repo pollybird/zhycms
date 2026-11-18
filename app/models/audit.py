@@ -100,6 +100,9 @@ class AuditLog(db.Model):
         """
         from flask import has_request_context, request
         from flask_login import current_user as _cu
+        if isinstance(detail, (dict, list)):
+            import json
+            detail = json.dumps(detail, ensure_ascii=False, default=str)
         try:
             if user is not None:
                 u = user

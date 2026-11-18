@@ -330,8 +330,8 @@ def test_site_create_invalid_sort_order(app, admin_client):
         assert Site.query.filter_by(slug='site-x').first() is None
 
 
-def test_delete_site_with_content_rejected(app, admin_client):
-    """站点下仍有内容时禁止删除。"""
+def test_delete_site_with_content_moves_to_recycle(app, admin_client):
+    """站点下仍有内容时删除会移入回收站，内容保留以便恢复。"""
     sid = _mk_site(app, slug='site-b')
     with app.app_context():
         from app.models.column import Column
@@ -342,9 +342,14 @@ def test_delete_site_with_content_rejected(app, admin_client):
     resp = admin_client.post(f'/admin/sites/{sid}/delete')
     assert resp.status_code in (200, 302)
     with app.app_context():
+        from app.models.column import Column
+        from app.models.site_recycle import SiteRecycleBin
         site = db.session.get(Site, sid)
         assert site is not None
-        assert site.is_deleted is False
+        assert site.is_deleted is True
+        assert Column.query.filter_by(site_id=sid).count() == 1
+        assert SiteRecycleBin.query.filter_by(
+            site_id=sid, restored_at=None).count() == 1
 
 
 def test_site_url_supports_subdomain_only(app):

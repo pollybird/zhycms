@@ -6,10 +6,19 @@
 {% block breadcrumb %}<li class="breadcrumb-item active">{{ _('站点管理') }}</li>{% endblock %}
 
 {% block content %}
+<form id="batch-form" method="post" action="{{ url_for('admin.site_batch') }}"></form>
+<form id="role-form" method="post" action="{{ url_for('admin.site_batch_assign_role') }}"></form>
 <div class="card">
   <div class="card-header">
     <h3 class="card-title">{{ _('站点列表') }}</h3>
     <div class="card-tools">
+      <a href="{{ url_for('admin.site_ssl_status') }}" class="btn btn-sm btn-outline-warning">
+        <i class="fas fa-lock"></i> {{ _('证书状态') }}
+      </a>
+      <a href="{{ url_for('admin.site_recycle') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-recycle"></i> {{ _('回收站') }}
+        {% if recycle_count %}<span class="badge badge-danger">{{ recycle_count }}</span>{% endif %}
+      </a>
       <a href="{{ url_for('admin.site_create') }}" class="btn btn-primary btn-sm">
         <i class="fas fa-plus"></i> {{ _('新增站点') }}
       </a>
@@ -19,6 +28,7 @@
     <table class="table table-striped table-hover mb-0">
       <thead>
         <tr>
+          <th style="width:32px"><input type="checkbox" id="check-all"></th>
           <th style="width:70px">{{ _('ID') }}</th>
           <th>{{ _('站点名称') }}</th>
           <th>{{ _('标识') }}</th>
@@ -27,12 +37,18 @@
           <th>{{ _('主题') }}</th>
           <th>{{ _('状态') }}</th>
           <th>{{ _('栏目数') }}</th>
-          <th style="width:180px">{{ _('操作') }}</th>
+          <th style="width:250px">{{ _('操作') }}</th>
         </tr>
       </thead>
       <tbody>
         {% for s in sites %}
         <tr>
+          <td>
+            {% if not s.is_default %}
+            <input type="checkbox" class="site-check" form="batch-form"
+                   name="site_ids" value="{{ s.id }}">
+            {% endif %}
+          </td>
           <td>{{ s.id }}</td>
           <td>
             {{ s.name }}
@@ -55,22 +71,102 @@
             <a href="{{ url_for('admin.site_edit', sid=s.id) }}" class="btn btn-xs btn-primary">
               <i class="fas fa-edit"></i> {{ _('编辑') }}
             </a>
+            <a href="{{ url_for('admin.site_deploy', sid=s.id) }}" class="btn btn-xs btn-info">
+              <i class="fas fa-server"></i> {{ _('部署') }}
+            </a>
+            <a href="{{ url_for('admin.site_clone', sid=s.id) }}" class="btn btn-xs btn-warning">
+              <i class="fas fa-copy"></i> {{ _('克隆') }}
+            </a>
+            <a href="{{ url_for('admin.site_backups', sid=s.id) }}" class="btn btn-xs btn-secondary">
+              <i class="fas fa-archive"></i> {{ _('备份') }}
+            </a>
             {% if not s.is_default %}
             <form method="post" action="{{ url_for('admin.site_delete', sid=s.id) }}" class="d-inline"
-                  onsubmit="return confirm('{{ _('确定删除该站点？') }}');">
+                  onsubmit="return confirm('{{ _('删除后站点进入回收站，内容保留 30 天。确定继续？') }}');">
               <button class="btn btn-xs btn-danger"><i class="fas fa-trash"></i> {{ _('删除') }}</button>
             </form>
             {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="text-center text-muted py-4">{{ _('暂无站点') }}</td></tr>
+        <tr><td colspan="10" class="text-center text-muted py-4">{{ _('暂无站点') }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <div class="card-footer text-muted small">
-    {{ _('提示：站点通过「精确域名」或「子域标签」前缀匹配访问；均未命中时回退默认站点。默认站点（ID=0）不可删除。') }}
+  <div class="card-footer">
+    <div class="row">
+      <div class="col-md-6 mb-2">
+        <div class="input-group input-group-sm">
+          <div class="input-group-prepend">
+            <span class="input-group-text">{{ _('批量操作') }}</span>
+          </div>
+          <button type="submit" form="batch-form" name="action" value="enable"
+                  class="btn btn-outline-success">{{ _('启用') }}</button>
+          <button type="submit" form="batch-form" name="action" value="disable"
+                  class="btn btn-outline-secondary">{{ _('停用') }}</button>
+          <button type="submit" form="batch-form" name="action" value="delete"
+                  class="btn btn-outline-danger"
+                  onclick="return confirm('{{ _('选中站点将移入回收站，确定继续？') }}');">
+            {{ _('删除') }}
+          </button>
+        </div>
+      </div>
+      <div class="col-md-6 mb-2">
+        <div class="input-group input-group-sm">
+          <div class="input-group-prepend">
+            <span class="input-group-text">{{ _('批量授权') }}</span>
+          </div>
+          <select name="user_id" form="role-form" class="form-control" required>
+            <option value="">{{ _('选择用户') }}</option>
+            {% for u in assignable_users %}
+            <option value="{{ u.id }}">{{ u.username }}</option>
+            {% endfor %}
+          </select>
+          <select name="role_code" form="role-form" class="form-control" required>
+            <option value="">{{ _('选择站点角色') }}</option>
+            {% for role in assignable_roles %}
+            <option value="{{ role.code }}">{{ role.name }}</option>
+            {% endfor %}
+          </select>
+          <div class="input-group-append">
+            <button type="submit" form="role-form" class="btn btn-outline-primary">{{ _('分配') }}</button>
+          </div>
+        </div>
+        <small class="text-muted">{{ _('勾选的站点会同时获得该角色；默认站点不参与批量操作。') }}</small>
+      </div>
+    </div>
   </div>
 </div>
+{% endblock %}
+
+{% block js %}
+<script>
+(function () {
+  var all = document.getElementById('check-all');
+  var items = document.querySelectorAll('.site-check');
+  if (all) {
+    all.addEventListener('change', function () {
+      items.forEach(function (item) { item.checked = all.checked; });
+    });
+  }
+  // 复选框归属于批量操作表单；授权提交时复制一份到授权表单
+  var roleForm = document.getElementById('role-form');
+  if (roleForm) {
+    roleForm.addEventListener('submit', function () {
+      roleForm.querySelectorAll('input[data-role-sites]').forEach(function (n) {
+        n.remove();
+      });
+      document.querySelectorAll('.site-check:checked').forEach(function (cb) {
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'site_ids';
+        hidden.value = cb.value;
+        hidden.setAttribute('data-role-sites', '1');
+        roleForm.appendChild(hidden);
+      });
+    });
+  }
+})();
+</script>
 {% endblock %}

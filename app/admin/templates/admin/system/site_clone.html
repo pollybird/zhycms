@@ -1,0 +1,134 @@
+{% extends 'admin/base.html' %}
+{% block title %}{{ _('克隆站点') }} - {{ cms_name }}{% endblock %}
+{% block page_header %}{{ _('克隆站点') }}{% endblock %}
+{% set active_menu = 'site' %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('admin.site_index') }}">{{ _('站点管理') }}</a></li>
+<li class="breadcrumb-item active">{{ _('克隆站点') }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">{{ _('从「%(name)s」克隆', name=source.name) }}</h3>
+      </div>
+      <form method="post" action="{{ url_for('admin.site_clone', sid=source.id) }}">
+        <div class="card-body">
+          <div class="alert alert-info">
+            {{ _('克隆会复制栏目、文章、碎片、页面构建、插件内容与展示类设置；不复制会员、提交记录、日志、版本历史与上传文件。目标站点默认关闭，检查后再开放。') }}
+          </div>
+
+          <div class="form-group">
+            <label>{{ _('新站点名称') }} <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required maxlength="100"
+                   value="{{ form.get('name') or (source.name ~ ' 副本') }}">
+          </div>
+          <div class="form-group">
+            <label>{{ _('站点标识') }} <span class="text-danger">*</span></label>
+            <input type="text" name="slug" class="form-control" required maxlength="50"
+                   value="{{ form.get('slug') or (source.slug ~ '-copy') }}">
+            <small class="form-text text-muted">{{ _('小写字母/数字/连字符/下划线，长度 2-50 位，全局唯一') }}</small>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>{{ _('精确域名') }}</label>
+              <input type="text" name="domain" class="form-control" maxlength="255"
+                     value="{{ form.get('domain') or '' }}" placeholder="www.example.com">
+            </div>
+            <div class="form-group col-md-6">
+              <label>{{ _('子域标签') }}</label>
+              <input type="text" name="subdomain" class="form-control" maxlength="63"
+                     value="{{ form.get('subdomain') or '' }}" placeholder="news">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label>{{ _('主题') }}</label>
+              <select name="theme" class="form-control">
+                <option value="">{{ _('继承源站 / 全局默认') }}</option>
+                {% for t in themes %}
+                <option value="{{ t }}" {{ 'selected' if form.get('theme') == t }}>{{ t }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label>{{ _('排序') }}</label>
+              <input type="number" name="sort_order" class="form-control"
+                     value="{{ form.get('sort_order') or 0 }}">
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="custom-control custom-checkbox">
+              <input type="checkbox" class="custom-control-input" id="copy-plugins"
+                     name="copy_plugins" {{ 'checked' if not form or form.get('copy_plugins') }}>
+              <label class="custom-control-label" for="copy-plugins">{{ _('复制插件内容（表单、产品、招聘、链接、轮播、教程）') }}</label>
+            </div>
+            <div class="custom-control custom-checkbox">
+              <input type="checkbox" class="custom-control-input" id="copy-builder"
+                     name="copy_builder" {{ 'checked' if not form or form.get('copy_builder') }}>
+              <label class="custom-control-label" for="copy-builder">{{ _('复制页面构建布局（不含修订历史）') }}</label>
+            </div>
+          </div>
+
+          <p class="text-muted small mb-0">
+            {{ _('源站内容量：栏目 %(c)s / 文章 %(a)s / 碎片 %(f)s / 插件 %(p)s，合计约 %(t)s 行。超过 5000 行将自动转为后台任务。',
+                 c=estimate.columns, a=estimate.articles, f=estimate.fragments,
+                 p=estimate.plugin_rows, t=estimate.total) }}
+          </p>
+        </div>
+        <div class="card-footer">
+          <button type="submit" class="btn btn-primary">{{ _('开始克隆') }}</button>
+          <a href="{{ url_for('admin.site_index') }}" class="btn btn-default">{{ _('取消') }}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-md-5">
+    <div class="card" id="job-card"{% if not job %} style="display:none"{% endif %}>
+      <div class="card-header"><h3 class="card-title">{{ _('克隆进度') }}</h3></div>
+      <div class="card-body">
+        <div class="progress mb-2">
+          <div class="progress-bar" id="job-progress" role="progressbar"
+               style="width: {{ job.progress if job else 0 }}%"></div>
+        </div>
+        <p class="mb-1" id="job-message">{{ job.message if job else _('等待执行') }}</p>
+        <p class="text-muted small mb-0" id="job-error"></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block js %}
+{% if job %}
+<script>
+(function () {
+  var url = "{{ url_for('admin.site_clone_job', job_id=job.id) }}";
+  var bar = document.getElementById('job-progress');
+  var msg = document.getElementById('job-message');
+  var err = document.getElementById('job-error');
+  var timer = setInterval(function () {
+    fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        bar.style.width = (data.progress || 0) + '%';
+        bar.textContent = (data.progress || 0) + '%';
+        msg.textContent = data.message || '';
+        if (data.status === 'success') {
+          clearInterval(timer);
+          window.location.href = "{{ url_for('admin.site_index') }}";
+        } else if (data.status === 'failed') {
+          clearInterval(timer);
+          err.textContent = data.error || data.message || '{{ _('克隆失败') }}';
+        }
+      })
+      .catch(function () { /* 网络抖动时继续轮询 */ });
+  }, 2000);
+})();
+</script>
+{% endif %}
+{% endblock %}
