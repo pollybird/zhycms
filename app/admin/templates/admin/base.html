@@ -80,7 +80,10 @@
           <a href="{{ url_for('admin.profile') }}" class="dropdown-item"><i class="fas fa-id-card mr-2"></i>{{ _('个人资料') }}</a>
           <a href="{{ url_for('admin.password') }}" class="dropdown-item"><i class="fas fa-key mr-2"></i>{{ _('修改密码') }}</a>
           <div class="dropdown-divider"></div>
-          <a href="{{ url_for('admin_auth.logout') }}" class="dropdown-item"><i class="fas fa-sign-out-alt mr-2"></i>{{ _('退出登录') }}</a>
+          <form method="post" action="{{ url_for('admin_auth.logout') }}" class="d-inline">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="dropdown-item"><i class="fas fa-sign-out-alt mr-2"></i>{{ _('退出登录') }}</button>
+          </form>
         </div>
       </li>
     </ul>

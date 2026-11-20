@@ -13,6 +13,7 @@ import re
 import io
 import hashlib
 import uuid
+import xml.etree.ElementTree as ET
 from datetime import datetime
 
 from flask import current_app, url_for
@@ -37,6 +38,76 @@ ALLOWED_SUB_DIRS = frozenset({
 
 # 子目录段格式：1-32 个字母/数字/下划线/中横线（与 plugins/form slug 规则一致）
 _SAFE_SUB_SEGMENT_RE = re.compile(r'^[a-zA-Z0-9_-]{1,32}$')
+
+# SVG 采用元素与属性白名单净化，不依赖容易被变形绕过的危险片段匹配
+_SVG_ALLOWED_TAGS = frozenset({
+    'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline',
+    'polygon', 'text', 'tspan', 'title', 'desc', 'defs', 'symbol', 'use',
+    'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'pattern',
+    'marker',
+})
+_SVG_ALLOWED_ATTRS = frozenset({
+    'id', 'class', 'version', 'viewBox', 'preserveAspectRatio', 'role',
+    'aria-label', 'width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
+    'cx', 'cy', 'r', 'rx', 'ry', 'd', 'points', 'transform', 'fill',
+    'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-opacity',
+    'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit',
+    'stroke-dasharray', 'stroke-dashoffset', 'opacity', 'color',
+    'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor',
+    'dominant-baseline', 'alignment-baseline', 'offset', 'stop-color',
+    'stop-opacity', 'gradientUnits', 'gradientTransform', 'spreadMethod',
+    'clip-path', 'clip-rule', 'clipPathUnits', 'mask', 'maskUnits',
+    'patternUnits', 'patternTransform', 'markerWidth', 'markerHeight',
+    'markerUnits', 'orient', 'refX', 'refY',
+})
+_SVG_LOCAL_URL_RE = re.compile(r'^url\(\s*#[A-Za-z_][\w:.-]*\s*\)$')
+_SVG_LOCAL_HREF_RE = re.compile(r'^#[A-Za-z_][\w:.-]*$')
+
+
+def _xml_local_name(name):
+    return name.rsplit('}', 1)[-1] if isinstance(name, str) else ''
+
+
+def _sanitize_svg(data):
+    """解析并重建 SVG，仅保留静态绘图所需的元素和属性。"""
+    if re.search(br'<!\s*(?:DOCTYPE|ENTITY)', data, re.IGNORECASE):
+        raise ValueError('SVG 不允许包含 DTD 或实体声明')
+    root = ET.fromstring(data)
+    if _xml_local_name(root.tag) != 'svg':
+        raise ValueError('SVG 根元素无效')
+    ET.register_namespace('', 'http://www.w3.org/2000/svg')
+    ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
+
+    def clean(element):
+        tag = _xml_local_name(element.tag)
+        for attr_name in list(element.attrib):
+            local_attr = _xml_local_name(attr_name)
+            value = element.attrib[attr_name].strip()
+            if local_attr == 'href':
+                if tag != 'use' or not _SVG_LOCAL_HREF_RE.fullmatch(value):
+                    del element.attrib[attr_name]
+                continue
+            if local_attr not in _SVG_ALLOWED_ATTRS:
+                del element.attrib[attr_name]
+                continue
+            compact = re.sub(r'[\s\x00-\x20]+', '', value).lower()
+            if any(token in compact for token in (
+                    'javascript:', 'vbscript:', 'data:', 'file:', 'http:', 'https:')):
+                del element.attrib[attr_name]
+                continue
+            if 'url(' in compact and not _SVG_LOCAL_URL_RE.fullmatch(value):
+                del element.attrib[attr_name]
+
+        for child in list(element):
+            child_tag = _xml_local_name(child.tag)
+            if not isinstance(child.tag, str) or child_tag not in _SVG_ALLOWED_TAGS:
+                # script、foreignObject、style、a、image 等连同子树一起移除
+                element.remove(child)
+                continue
+            clean(child)
+
+    clean(root)
+    return ET.tostring(root, encoding='utf-8', xml_declaration=True)
 
 
 def _safe_sub_dir(sub_dir):
@@ -293,10 +364,7 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
     if allowed_exts is None:
         allowed_exts = Setting.get_allowed_exts()
 
-    # v3.1.2 M4：SVG 上传管控。SVG 不在默认 upload_allowed_exts 白名单内，
-    # 即便用户在后台把 svg 加入允许后缀也必须经 upload_allow_svg 开关二次
-    # 授权；开启后做内容嗅探（拒绝 <script>/onload=/onclick=/href="javascript:"
-    # /<foreignObject）+ 512KB 大小上限，阻断存储型 XSS 向量。
+    # SVG 上传需单独开启；开启后先净化为静态绘图片段，再进入后续保存流程
     if ext == 'svg':
         if Setting.get('upload_allow_svg') != 'on':
             return None, None, 'SVG 上传默认关闭，请到「上传安全」开启后再上传'
@@ -304,15 +372,13 @@ def save_upload_file(file_storage, sub_dir='', allowed_exts=None, max_size=None,
         if size > SVG_MAX_SIZE:
             return None, None, f'SVG 文件过大（最大 {SVG_MAX_SIZE // 1024} KB）'
         file_storage.stream.seek(0)
+        raw_svg = file_storage.stream.read(SVG_MAX_SIZE)
         try:
-            head = file_storage.stream.read(SVG_MAX_SIZE).decode('utf-8', errors='ignore').lower()
-        finally:
-            file_storage.stream.seek(0)
-        danger_tokens = ('<script', 'onload=', 'onclick=',
-                         'href="javascript:', 'href=\'javascript:',
-                         '<foreignobject', 'onerror=', 'onmouseover=')
-        if any(tok in head for tok in danger_tokens):
-            return None, None, 'SVG 含危险脚本片段，已拒绝上传'
+            sanitized_svg = _sanitize_svg(raw_svg)
+        except (ValueError, ET.ParseError):
+            return None, None, 'SVG 结构无效或含不安全内容，已拒绝上传'
+        file_storage.stream = io.BytesIO(sanitized_svg)
+        size = len(sanitized_svg)
         # 通过 SVG 专属校验，后续按图片处理
         allowed_exts = list(allowed_exts) + ['svg']
     elif not allowed_file(original_name, allowed_exts):

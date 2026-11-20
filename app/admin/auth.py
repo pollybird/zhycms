@@ -364,7 +364,7 @@ def divmax(a, b):
     return divmod(a, b) if b else (0, 0)
 
 
-@admin_auth_bp.route('/logout')
+@admin_auth_bp.route('/logout', methods=['POST'])
 @login_required
 def logout():
     uid = getattr(current_user, 'id', None)

@@ -21,6 +21,7 @@ from ..extensions import db, limiter
 from ..models.column import Column, ColumnField
 from ..models.article import Article
 from ..models.setting import Setting
+from ..models.user import User
 from ..models.workflow import STATUS_PUBLISHED
 from ..utils.db_utils import escape_like, LIKE_ESCAPE
 from . import api_bp
@@ -35,8 +36,8 @@ def api_ok(data=None, meta=None):
 
 
 def api_err(code, message, http=None):
-    return jsonify({'code': code, 'message': message, 'data': None, 'meta': None}), http or (
-        404 if code == 404 else (401 if code == 401 else 400))
+    status = {401: 401, 403: 403, 404: 404}.get(code, 400)
+    return jsonify({'code': code, 'message': message, 'data': None, 'meta': None}), http or status
 
 
 def api_cache(key_prefix):
@@ -149,6 +150,18 @@ def _check_api_token():
     return None
 
 
+def active_user_for_identity(identity):
+    """按令牌主体读取账号，并复核删除、禁用与锁定状态。"""
+    try:
+        uid = int(identity)
+    except (TypeError, ValueError):
+        return None
+    user = db.session.get(User, uid)
+    if user is None or user.is_deleted or not user.is_active_flag or user.is_locked:
+        return None
+    return user
+
+
 def _check_jwt():
     """JWT 校验：Authorization: Bearer <token>（按当前站点密钥）。"""
     from ..utils.api_jwt import decode_token
@@ -156,10 +169,12 @@ def _check_jwt():
     if not header.lower().startswith('bearer '):
         return api_err(401, 'JWT 无效或已过期')
     try:
-        decode_token(header[7:].strip(), expected_type='access')
-        return None
+        claims = decode_token(header[7:].strip(), expected_type='access')
     except pyjwt.PyJWTError:
         return api_err(401, 'JWT 无效或已过期')
+    if active_user_for_identity(claims.get('sub')) is None:
+        return api_err(401, '账号不可用或令牌已失效')
+    return None
 
 
 def _register_cors(app):
@@ -214,7 +229,8 @@ def _column_brief(col, with_children=False):
     if with_children:
         data['children'] = [
             _column_brief(c, with_children=True)
-            for c in col.children.filter_by(is_enabled=True, is_deleted=False)
+            for c in col.children.filter_by(is_enabled=True, is_deleted=False,
+                                            member_only=False)
             .order_by(Column.sort_order.desc())
         ]
     return data
@@ -300,7 +316,8 @@ def _get_enabled_column(slug):
     from ..sites import current_site_id
     col = Column.query.filter_by(
         slug=slug, is_deleted=False, site_id=current_site_id()).first()
-    if col is None or not col.is_enabled or col.type == 'link':
+    if col is None or not col.is_enabled or col.type == 'link' or col.member_only:
+        # 内容接口没有前台会员身份，会员专属栏目统一按不存在处理
         return None
     return col
 
@@ -317,7 +334,7 @@ def site_info():
     s = Setting.get_dict()
     site = current_site()
     root_columns = Column.query.filter_by(
-        parent_id=None, is_enabled=True, is_deleted=False,
+        parent_id=None, is_enabled=True, is_deleted=False, member_only=False,
         site_id=current_site_id()
     ).order_by(Column.sort_order.desc()).all()
     return api_ok({
@@ -349,12 +366,14 @@ def columns_index():
     sid = current_site_id()
     if request.args.get('tree') == '1':
         roots = Column.query.filter_by(
-            parent_id=None, is_enabled=True, is_deleted=False, site_id=sid
+            parent_id=None, is_enabled=True, is_deleted=False, member_only=False,
+            site_id=sid
         ).order_by(Column.sort_order.desc()).all()
         return api_ok([_column_brief(c, with_children=True) for c in roots])
 
     q = Column.query.filter(Column.is_enabled == True,  # noqa: E712
                             Column.is_deleted == False,  # noqa: E712
+                            Column.member_only == False,  # noqa: E712
                             Column.site_id == sid)
     parent_id = request.args.get('parent_id')
     if parent_id is not None and parent_id != '':
@@ -394,7 +413,8 @@ def column_articles(slug):
 
     # 含子栏目文章
     col_ids = [col.id]
-    for child in col.children.filter_by(is_enabled=True, is_deleted=False).all():
+    for child in col.children.filter_by(is_enabled=True, is_deleted=False,
+                                        member_only=False).all():
         col_ids.append(child.id)
 
     page = max(_to_int(request.args.get('page'), 1), 1)
@@ -428,7 +448,7 @@ def article_detail(aid):
     if int(a.site_id or 0) != int(current_site_id()):
         return api_err(404, '文章不存在')
     col = a.column
-    if col is None or col.is_deleted or not col.is_enabled:
+    if col is None or col.is_deleted or not col.is_enabled or col.member_only:
         return api_err(404, '文章不存在')
 
     data = _article_detail(a, col)

@@ -233,8 +233,8 @@ class TestMSvgUploadControl:
                 Setting.set('upload_allow_svg', 'off')
                 db.session.commit()
 
-    def test_svg_with_script_rejected_when_on(self, admin_client):
-        """开启后，含 <script> 片段的 SVG 仍被拒。"""
+    def test_svg_with_script_sanitized_when_on(self, admin_client):
+        """开启后，上传的 <script> 片段会被移除。"""
         with admin_client.application.app_context():
             Setting.set('upload_allow_svg', 'on')
             db.session.commit()
@@ -245,16 +245,20 @@ class TestMSvgUploadControl:
                 data={'file': (io.BytesIO(svg), 'evil.svg'),
                       'type': 'common'},
                 content_type='multipart/form-data')
-            assert resp.status_code == 400
-            err = resp.get_json().get('error', '')
-            assert '危险脚本' in err, f'未提示危险脚本: {err}'
+            assert resp.status_code == 200, resp.get_data(as_text=True)[:200]
+            saved = admin_client.get(resp.get_json()['url'])
+            assert saved.status_code == 200
+            content = saved.get_data(as_text=True).lower()
+            assert '<svg' in content
+            assert '<script' not in content
+            assert 'alert(' not in content
         finally:
             with admin_client.application.app_context():
                 Setting.set('upload_allow_svg', 'off')
                 db.session.commit()
 
-    def test_svg_with_onload_rejected_when_on(self, admin_client):
-        """开启后，onload= 事件处理器被拒。"""
+    def test_svg_with_onload_sanitized_when_on(self, admin_client):
+        """开启后，上传的 onload 事件处理器会被移除。"""
         with admin_client.application.app_context():
             Setting.set('upload_allow_svg', 'on')
             db.session.commit()
@@ -265,7 +269,13 @@ class TestMSvgUploadControl:
                 data={'file': (io.BytesIO(svg), 'onload.svg'),
                       'type': 'common'},
                 content_type='multipart/form-data')
-            assert resp.status_code == 400
+            assert resp.status_code == 200, resp.get_data(as_text=True)[:200]
+            saved = admin_client.get(resp.get_json()['url'])
+            assert saved.status_code == 200
+            content = saved.get_data(as_text=True).lower()
+            assert '<svg' in content
+            assert 'onload' not in content
+            assert 'alert(' not in content
         finally:
             with admin_client.application.app_context():
                 Setting.set('upload_allow_svg', 'off')
