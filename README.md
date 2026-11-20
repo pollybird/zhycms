@@ -7,11 +7,11 @@
   <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-643%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-644%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.9**（安全修复版：API 登录与令牌复核账号状态，内容 API 隔离会员专属栏目，短信验证码防爆破与限流，SVG 上传白名单净化，后台退出仅接受 POST；含迁移 `0019`，无新增 Python 依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.9**（安全修复版：API 登录与令牌复核账号状态，内容 API 隔离会员专属栏目，短信验证码防爆破与限流，SVG 上传白名单净化，找回密码与短信登录统一模糊提示，后台退出仅接受 POST；含迁移 `0019`，无新增 Python 依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -115,7 +115,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 
 ### v3.2.9（2026-11-20）
 
-安全修复版。API 登录排除已删除、禁用与锁定账号，密码错误接入失败计数和临时锁定；访问令牌与刷新令牌每次使用都会复核账号状态。内容 API 不再输出会员专属栏目及文章。短信验证码改用服务端密钥 HMAC，连续输错默认 5 次后作废，短信登录、找回密码和发送验证码接口按手机号与 IP 限流。SVG 上传改为元素/属性白名单净化，找回密码不再暴露手机号注册状态，后台退出登录仅接受带 CSRF 的 POST。含迁移 `0019`，无新增 Python 依赖。
+安全修复版。API 登录排除已删除、禁用与锁定账号，密码错误接入失败计数和临时锁定；访问令牌与刷新令牌每次使用都会复核账号状态。内容 API 不再输出会员专属栏目及文章。短信验证码改用服务端密钥 HMAC，连续输错默认 5 次后作废，短信登录、找回密码和发送验证码接口按手机号与 IP 限流。SVG 上传改为元素/属性白名单净化，找回密码与短信登录（关闭自动注册时）统一模糊提示、不再暴露手机号注册状态，后台退出登录仅接受带 CSRF 的 POST。含迁移 `0019`，无新增 Python 依赖。
 
 ### v3.2.8（2026-11-18）
 

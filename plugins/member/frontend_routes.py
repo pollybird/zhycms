@@ -193,7 +193,8 @@ def login():
                     site_id=_member_scope_site()).first()
                 if member is None:
                     if not cfg.is_on('member_auto_register_sms'):
-                        flash(_gettext('该手机号尚未注册'), 'danger')
+                        # 与找回密码统一提示，避免通过短信登录枚举注册手机号
+                        flash(_gettext('验证码错误或已失效'), 'danger')
                     else:
                         member = Member(
                             username='m' + phone, nickname=phone, phone=phone,
