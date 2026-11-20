@@ -85,7 +85,7 @@ def issue_code(phone, purpose='login', ip=''):
 
 
 def verify_code(phone, code, purpose='login', consume=True):
-    """校验验证码：必须为该手机号+用途下最近一条、未使用、未过期。"""
+    """校验验证码，并限制同一验证码的连续失败次数。"""
     if not phone or not code:
         return False
     row = MemberSmsCode.query.filter_by(
@@ -94,9 +94,16 @@ def verify_code(phone, code, purpose='login', consume=True):
     if row is None or row.is_expired:
         return False
     if not hmac.compare_digest(row.code_hash, MemberSmsCode.hash_code(phone, str(code).strip())):
+        row.fail_count = (row.fail_count or 0) + 1
+        if row.fail_count >= _int('member_sms_max_attempts', 5):
+            row.used = True
+        db.session.commit()
         return False
     if consume:
-        row.used = True
+        # 验证成功后，同手机号同用途的历史验证码一并失效
+        MemberSmsCode.query.filter_by(
+            phone=phone, purpose=purpose, used=False
+        ).update({'used': True}, synchronize_session=False)
         db.session.commit()
     return True
 

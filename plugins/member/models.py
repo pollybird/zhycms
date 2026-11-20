@@ -6,8 +6,10 @@
   member_sms_codes 短信验证码（哈希存储，含用途/频控/有效期）
 """
 import hashlib
+import hmac
 from datetime import datetime, timedelta
 
+from flask import current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from app.extensions import db
@@ -114,12 +116,17 @@ class MemberSmsCode(db.Model):
     purpose = db.Column(db.String(20), nullable=False, default='login')  # login / reset
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False, nullable=False)
+    fail_count = db.Column(db.Integer, default=0, nullable=False)  # 连续校验失败次数
     ip = db.Column(db.String(64))
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False, index=True)
 
     @staticmethod
     def hash_code(phone, code):
-        return hashlib.sha256(f'{phone}:{code}'.encode('utf-8')).hexdigest()
+        """使用服务端密钥计算 HMAC，避免数据库泄露后离线爆破验证码。"""
+        secret = (current_app.config.get('ZHYCMS_ENC_KEY')
+                  or current_app.config.get('SECRET_KEY') or '')
+        return hmac.new(str(secret).encode('utf-8'),
+                        f'{phone}:{code}'.encode('utf-8'), hashlib.sha256).hexdigest()
 
     @property
     def is_expired(self):

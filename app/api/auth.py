@@ -13,13 +13,27 @@ import time
 import jwt as pyjwt
 from flask import request
 
-from ..extensions import limiter
+from ..extensions import db, limiter
 from ..models.user import User
 from ..models.setting import Setting
 from ..utils import jwt_blocklist
 from ..utils.api_jwt import create_token, decode_token, access_expires_seconds
 from . import api_bp
-from .views import api_ok, api_err
+from .views import api_ok, api_err, active_user_for_identity
+
+
+def _login_max_fail():
+    try:
+        return max(1, min(20, int(Setting.get('login_max_fail', '5') or 5)))
+    except (TypeError, ValueError):
+        return 5
+
+
+def _login_lock_minutes():
+    try:
+        return max(1, min(1440, int(Setting.get('login_lock_minutes', '10') or 10)))
+    except (TypeError, ValueError):
+        return 10
 
 
 def _login_limit():
@@ -45,13 +59,21 @@ def api_login():
     if not username or not password:
         return api_err(400, '用户名和密码不能为空')
 
-    user = User.query.filter_by(username=username).first()
-    if user is None or not user.check_password(password):
+    user = User.query.filter_by(username=username, is_deleted=False).first()
+    if user is not None and user.is_locked:
+        return api_err(403, '账号已被锁定，请稍后再试')
+
+    if user is None or not user.is_active_flag or not user.check_password(password):
+        # 与后台登录保持一致的失败计数和临时锁定策略
+        if user is not None:
+            user.record_login_fail(_login_max_fail(), _login_lock_minutes())
+            db.session.commit()
+            if user.is_locked:
+                return api_err(403, '连续密码错误次数过多，账号已临时锁定')
         return api_err(401, '用户名或密码错误')
 
-    # 仅允许启用的用户通过 API 登录
-    if not getattr(user, 'is_active', True):
-        return api_err(403, '账号已被禁用')
+    user.reset_login_fail()
+    db.session.commit()
 
     identity = str(user.id)
     additional_claims = {'username': user.username, 'uid': user.id}
@@ -78,10 +100,10 @@ def api_refresh():
         return api_err(401, '令牌无效或已过期')
 
     identity = claims.get('sub')
-    additional_claims = {
-        'username': claims.get('username', ''),
-        'uid': claims.get('uid'),
-    }
+    user = active_user_for_identity(identity)
+    if user is None:
+        return api_err(401, '账号不可用或令牌已失效')
+    additional_claims = {'username': user.username, 'uid': user.id}
     access_token = create_token(identity, 'access', additional_claims)
     return api_ok({
         'access_token': access_token,

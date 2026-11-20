@@ -12,7 +12,7 @@ class TestAuthRBAC:
 
     def test_logout(self, admin_client):
         """登出后跳转登录页。"""
-        resp = admin_client.get('/admin/logout', follow_redirects=False)
+        resp = admin_client.post('/admin/logout', follow_redirects=False)
         assert resp.status_code == 302
 
     def test_unauthenticated_admin_redirects(self, client):

@@ -26,7 +26,7 @@ from flask import (
 )
 from flask_babel import gettext as _gettext
 
-from app.extensions import db
+from app.extensions import db, limiter
 from app.plugin_system import plugin_enabled
 from app.constants import Upload as _Upload
 from app.utils.uploads import save_upload_file
@@ -44,6 +44,17 @@ member_frontend = Blueprint('member_frontend', __name__,
 
 USERNAME_RE = re.compile(r'^[A-Za-z0-9_\-]{3,32}$')
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def _phone_ip_key():
+    """短信相关端点按手机号与来源 IP 组合限流。"""
+    data = request.get_json(silent=True) or {}
+    phone = request.form.get('phone') or data.get('phone') or ''
+    return f"{request.remote_addr or 'unknown'}:{phone}"
+
+
+def _sms_request_limit():
+    return f"{cfg.cfg('member_sms_rate_limit') or '10'} per minute"
 
 
 def _gate(view):
@@ -157,6 +168,7 @@ def register():
 
 @member_frontend.route('/login', methods=['GET', 'POST'])
 @_gate
+@limiter.limit(_sms_request_limit, key_func=_phone_ip_key, methods=['POST'])
 def login():
     if current_member() is not None:
         return redirect(url_for('member_frontend.center'))
@@ -244,6 +256,7 @@ def logout():
 
 @member_frontend.route('/sms/send', methods=['POST'])
 @_gate
+@limiter.limit(_sms_request_limit, key_func=_phone_ip_key)
 def sms_send():
     if request.is_json:
         phone = (request.json.get('phone') or '').strip()
@@ -265,6 +278,7 @@ def sms_send():
 
 @member_frontend.route('/forgot-password', methods=['GET', 'POST'])
 @_gate
+@limiter.limit(_sms_request_limit, key_func=_phone_ip_key, methods=['POST'])
 def forgot_password():
     if current_member() is not None:
         return redirect(url_for('member_frontend.change_password'))
@@ -279,7 +293,8 @@ def forgot_password():
         if not sms_svc.valid_phone(phone):
             flash(_gettext('手机号格式不正确'), 'danger')
         elif member is None:
-            flash(_gettext('该手机号尚未注册'), 'danger')
+            # 与验证码错误保持相同提示，避免通过找回密码枚举注册手机号
+            flash(_gettext('验证码错误或已失效'), 'danger')
         elif not sms_svc.verify_code(phone, code, purpose='reset'):
             flash(_gettext('验证码错误或已失效'), 'danger')
         elif len(password) < 6:
