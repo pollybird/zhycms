@@ -122,9 +122,10 @@ def main():
         if migrated:
             print('  [skip] articles.status 已回填过（schema_migrations 有 v2.0 记录），不覆盖运行期数据')
         else:
+            # 布尔值以参数绑定写入，避免 PostgreSQL 报 boolean = integer
             db.session.execute(text(
-                "UPDATE articles SET status = CASE WHEN is_enabled = 1 "
-                "THEN 'published' ELSE 'draft' END"))
+                "UPDATE articles SET status = CASE WHEN is_enabled = :enabled "
+                "THEN 'published' ELSE 'draft' END").bindparams(enabled=True))
             db.session.execute(text(
                 "INSERT INTO schema_migrations (version, applied_at) "
                 "VALUES ('v2.0_articles_status', CURRENT_TIMESTAMP)"))
