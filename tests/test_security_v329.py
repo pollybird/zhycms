@@ -21,7 +21,8 @@ def _uniq(prefix):
 def _clean_security_data(app):
     keys = (
         'api_rate_limit_login', 'enabled_plugins', 'member_sms_rate_limit',
-        'member_sms_max_attempts',
+        'member_sms_max_attempts', 'member_login_sms_enable',
+        'member_auto_register_sms',
     )
     with app.app_context():
         cache.clear()
@@ -201,6 +202,29 @@ def test_forgot_password_does_not_reveal_unregistered_phone(app, client):
         'phone': '13932900002', 'code': '123456',
         'password': 'new-password', 'password_confirm': 'new-password',
     }, environ_base={'REMOTE_ADDR': '10.32.9.10'})
+    text = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert '验证码错误或已失效' in text
+    assert '该手机号尚未注册' not in text
+
+
+def test_sms_login_does_not_reveal_unregistered_phone(app, client):
+    from plugins.member.models import MemberSmsCode
+
+    phone = '13932900004'
+    with app.app_context():
+        Setting.set('enabled_plugins', 'member')
+        Setting.set('member_login_sms_enable', 'on')
+        Setting.set('member_auto_register_sms', 'off')
+        db.session.add(MemberSmsCode(
+            phone=phone, purpose='login',
+            code_hash=MemberSmsCode.hash_code(phone, '123456'),
+            expires_at=datetime.now() + timedelta(minutes=5), used=False))
+        db.session.commit()
+
+    resp = client.post('/login', data={
+        'login_type': 'sms', 'phone': phone, 'code': '123456',
+    }, environ_base={'REMOTE_ADDR': '10.32.9.12'})
     text = resp.get_data(as_text=True)
     assert resp.status_code == 200
     assert '验证码错误或已失效' in text
