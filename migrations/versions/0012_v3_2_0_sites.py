@@ -64,20 +64,36 @@ def _find_downgrade_conflicts(conn):
     之前先做本检查。
     """
     insp = sa.inspect(conn)
+    prep = conn.dialect.identifier_preparer
     conflicts = []
     for table, column in _DOWNGRADE_UNIQUE:
         if not insp.has_table(table):
             continue
+        # 标识符按方言引用（settings.key 在 MySQL 中为保留字）
+        tbl = prep.quote(table)
+        col = prep.quote(column)
         try:
             rows = conn.execute(sa.text(
-                f'SELECT {column}, COUNT(*) AS c FROM {table} '
-                f'GROUP BY {column} HAVING COUNT(*) > 1')).fetchall()
+                f'SELECT {col}, COUNT(*) AS c FROM {tbl} '
+                f'GROUP BY {col} HAVING COUNT(*) > 1')).fetchall()
         except SQLAlchemyError:
             # 列不存在（旧版插件表结构）时跳过，不影响其余表预检
             continue
         for row in rows:
             conflicts.append(f'{table}.{column}={row[0]}（{row[1]} 条）')
     return conflicts
+
+
+def _settings_table():
+    """轻量表构造：由 SQLAlchemy 按方言引用标识符，避免 key 保留字问题。"""
+    return sa.table(
+        'settings',
+        sa.column('key', sa.String(100)),
+        sa.column('site_id', sa.Integer()),
+        sa.column('value', sa.Text()),
+        sa.column('description', sa.Text()),
+        sa.column('updated_at', sa.DateTime()),
+    )
 
 
 def _dialect():
@@ -207,15 +223,17 @@ def upgrade():
 
     # ---------- 5. 全局设置 member_scope ----------
     if _has_table('settings'):
-        exists = bind.execute(sa.text(
-            "SELECT COUNT(*) FROM settings WHERE key = 'member_scope' AND site_id = 0"
-        )).scalar()
+        settings = _settings_table()
+        exists = bind.execute(
+            sa.select(sa.func.count()).select_from(settings)
+            .where(sa.and_(settings.c.key == 'member_scope',
+                           settings.c.site_id == 0))
+        ).scalar()
         if not exists:
-            op.execute(
-                "INSERT INTO settings (key, site_id, value, description, updated_at) "
-                "VALUES ('member_scope', 0, 'shared', "
-                "'站群会员归属：shared 共享（默认）/ isolated 站点独立', CURRENT_TIMESTAMP)"
-            )
+            bind.execute(settings.insert().values(
+                key='member_scope', site_id=0, value='shared',
+                description='站群会员归属：shared 共享（默认）/ isolated 站点独立',
+                updated_at=sa.func.now()))
 
 
 def downgrade():
@@ -252,7 +270,8 @@ def downgrade():
             bind.execute(sa.text(f'SELECT 1'))
 
     if _has_table('settings'):
-        bind.execute(sa.text("DELETE FROM settings WHERE key = 'member_scope'"))
+        settings = _settings_table()
+        bind.execute(settings.delete().where(settings.c.key == 'member_scope'))
 
     # 站点权限表（新装由 db.create_all 创建）
     if _has_table('user_site_permissions'):

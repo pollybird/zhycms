@@ -35,6 +35,17 @@ def _column_exists(conn, table, column):
         return False
 
 
+def _settings_table():
+    """轻量表构造：由 SQLAlchemy 按方言引用标识符，避免 key 保留字问题。"""
+    return sa.table(
+        'settings',
+        sa.column('key', sa.String(100)),
+        sa.column('value', sa.Text()),
+        sa.column('description', sa.Text()),
+        sa.column('updated_at', sa.DateTime()),
+    )
+
+
 def upgrade():
     conn = op.get_bind()
 
@@ -45,19 +56,17 @@ def upgrade():
                 'storage', sa.String(length=16), nullable=False,
                 server_default='local'))
 
-    # 2. 幂等插入 storage_driver 设置
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # 2. 幂等插入 storage_driver 设置（标识符引用交由 SQLAlchemy 按方言处理）
+    settings = _settings_table()
     exists = conn.execute(
-        sa.text('SELECT COUNT(*) FROM settings WHERE `key` = :key'),
-        {'key': 'storage_driver'}
+        sa.select(sa.func.count()).select_from(settings)
+        .where(settings.c.key == 'storage_driver')
     ).scalar()
     if exists == 0:
-        conn.execute(sa.text(
-            'INSERT INTO settings (`key`, value, description, updated_at) '
-            'VALUES (:key, :value, :desc, :now)'
-        ), {'key': 'storage_driver', 'value': 'local',
-            'desc': '文件存储驱动（local 本地 / aliyun 阿里云OSS / tencent 腾讯云COS / qiniu 七牛云）',
-            'now': now})
+        conn.execute(settings.insert().values(
+            key='storage_driver', value='local',
+            description='文件存储驱动（local 本地 / aliyun 阿里云OSS / tencent 腾讯云COS / qiniu 七牛云）',
+            updated_at=datetime.now()))
 
 
 def downgrade():
@@ -65,7 +74,5 @@ def downgrade():
     if _column_exists(conn, 'uploaded_files', 'storage'):
         with op.batch_alter_table('uploaded_files') as batch_op:
             batch_op.drop_column('storage')
-    conn.execute(
-        sa.text('DELETE FROM settings WHERE `key` = :key'),
-        {'key': 'storage_driver'}
-    )
+    settings = _settings_table()
+    conn.execute(settings.delete().where(settings.c.key == 'storage_driver'))

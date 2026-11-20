@@ -84,12 +84,15 @@ class Article(db.Model):
         try:
             # 注意 OR/AND 优先级：必须用括号把 (status IS NULL OR status = '') 包起来，
             # 否则 is_enabled=0 且 status 为空的旧文章会被第一句误置为 published。
+            # 布尔值以参数绑定写入，避免 PostgreSQL 报 boolean = integer
             db.session.execute(text(
-                "UPDATE articles SET status = :pub WHERE (status IS NULL OR status = '') AND is_enabled = 1"
-            ).bindparams(pub=STATUS_PUBLISHED))
+                "UPDATE articles SET status = :pub "
+                "WHERE (status IS NULL OR status = '') AND is_enabled = :enabled"
+            ).bindparams(pub=STATUS_PUBLISHED, enabled=True))
             db.session.execute(text(
-                "UPDATE articles SET status = :draft WHERE (status IS NULL OR status = '') AND is_enabled = 0"
-            ).bindparams(draft=STATUS_DRAFT))
+                "UPDATE articles SET status = :draft "
+                "WHERE (status IS NULL OR status = '') AND is_enabled = :enabled"
+            ).bindparams(draft=STATUS_DRAFT, enabled=False))
             db.session.commit()
         except Exception as e:
             db.session.rollback()

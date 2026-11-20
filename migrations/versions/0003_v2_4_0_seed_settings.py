@@ -28,26 +28,34 @@ SEARCH_SETTINGS = [
 ]
 
 
+def _settings_table():
+    """轻量表构造：由 SQLAlchemy 按方言引用标识符，避免 key 保留字问题。"""
+    return sa.table(
+        'settings',
+        sa.column('key', sa.String(100)),
+        sa.column('value', sa.Text()),
+        sa.column('description', sa.Text()),
+        sa.column('updated_at', sa.DateTime()),
+    )
+
+
 def upgrade():
     conn = op.get_bind()
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    settings = _settings_table()
+    now = datetime.now()
     for key, value, desc in SEARCH_SETTINGS:
         # 幂等：仅当键不存在时插入（兼容所有数据库）
         exists = conn.execute(
-            sa.text('SELECT COUNT(*) FROM settings WHERE `key` = :key'),
-            {'key': key}
+            sa.select(sa.func.count()).select_from(settings)
+            .where(settings.c.key == key)
         ).scalar()
         if exists == 0:
-            conn.execute(sa.text(
-                'INSERT INTO settings (`key`, value, description, updated_at) '
-                'VALUES (:key, :value, :desc, :now)'
-            ), {'key': key, 'value': value, 'desc': desc, 'now': now})
+            conn.execute(settings.insert().values(
+                key=key, value=value, description=desc, updated_at=now))
 
 
 def downgrade():
     conn = op.get_bind()
+    settings = _settings_table()
     for key, _, _ in SEARCH_SETTINGS:
-        conn.execute(
-            sa.text('DELETE FROM settings WHERE `key` = :key'),
-            {'key': key}
-        )
+        conn.execute(settings.delete().where(settings.c.key == key))

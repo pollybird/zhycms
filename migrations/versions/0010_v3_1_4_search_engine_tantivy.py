@@ -23,17 +23,27 @@ branch_labels = None
 depends_on = None
 
 
+def _settings_table():
+    """轻量表构造：由 SQLAlchemy 按方言引用标识符，避免 key 保留字问题。"""
+    return sa.table(
+        'settings',
+        sa.column('key', sa.String(100)),
+        sa.column('value', sa.Text()),
+    )
+
+
+def _switch(conn, old_value, new_value):
+    settings = _settings_table()
+    conn.execute(
+        settings.update()
+        .where(sa.and_(settings.c.key == 'search_engine',
+                       settings.c.value == old_value))
+        .values(value=new_value))
+
+
 def upgrade():
-    conn = op.get_bind()
-    conn.execute(sa.text(
-        "UPDATE settings SET value = 'tantivy' "
-        "WHERE `key` = 'search_engine' AND value = 'whoosh'"
-    ))
+    _switch(op.get_bind(), 'whoosh', 'tantivy')
 
 
 def downgrade():
-    conn = op.get_bind()
-    conn.execute(sa.text(
-        "UPDATE settings SET value = 'whoosh' "
-        "WHERE `key` = 'search_engine' AND value = 'tantivy'"
-    ))
+    _switch(op.get_bind(), 'tantivy', 'whoosh')

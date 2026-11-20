@@ -53,6 +53,17 @@ def _column_exists(table_name, column_name):
     return column_name in [c['name'] for c in insp.get_columns(table_name)]
 
 
+def _settings_table():
+    """轻量表构造：由 SQLAlchemy 按方言引用标识符，避免 key 保留字问题。"""
+    return sa.table(
+        'settings',
+        sa.column('key', sa.String(100)),
+        sa.column('value', sa.Text()),
+        sa.column('description', sa.Text()),
+        sa.column('updated_at', sa.DateTime()),
+    )
+
+
 def upgrade():
     for table, md_col, fmt_col in _TARGETS:
         if not _table_exists(table):
@@ -67,22 +78,23 @@ def upgrade():
     # 幂等插入设置键：默认编辑模式（ckeditor / markdown），已有值不覆盖
     conn = op.get_bind()
     if _table_exists('settings'):
+        settings = _settings_table()
         exists = conn.execute(
-            sa.text("SELECT COUNT(*) FROM settings WHERE `key` = 'editor_default_mode'")
+            sa.select(sa.func.count()).select_from(settings)
+            .where(settings.c.key == 'editor_default_mode')
         ).scalar()
         if exists == 0:
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            conn.execute(sa.text(
-                'INSERT INTO settings (`key`, value, description, updated_at) '
-                "VALUES ('editor_default_mode', 'ckeditor', "
-                "'后台默认编辑模式（ckeditor / markdown，仅影响新建内容）', :now)"
-            ), {'now': now})
+            conn.execute(settings.insert().values(
+                key='editor_default_mode', value='ckeditor',
+                description='后台默认编辑模式（ckeditor / markdown，仅影响新建内容）',
+                updated_at=datetime.now()))
 
 
 def downgrade():
     # 注意：删列会丢失 Markdown 原文，但 content（HTML）不受影响
     conn = op.get_bind()
-    conn.execute(sa.text("DELETE FROM settings WHERE `key` = 'editor_default_mode'"))
+    settings = _settings_table()
+    conn.execute(settings.delete().where(settings.c.key == 'editor_default_mode'))
     for table, md_col, fmt_col in _TARGETS:
         if _column_exists(table, fmt_col):
             op.drop_column(table, fmt_col)

@@ -12,13 +12,16 @@
 - 逐级 -1 降级
 - 版本图：单 head、0001→0008 线性链
 """
+import importlib.util
 import os
 
 import pytest
+import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.dialects import mysql, postgresql
 
 migration = pytest.mark.migration
 
@@ -164,3 +167,57 @@ class TestRevisionGraph:
         for i, rev in enumerate(ordered):
             assert (rev.down_revision is None) if i == 0 \
                 else (rev.down_revision == ordered[i - 1].revision)
+
+
+def _load_migration(filename):
+    path = os.path.join(MIGRATIONS_DIR, 'versions', filename)
+    spec = importlib.util.spec_from_file_location(f'mig_{filename[:-3]}', path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _settings_migration_files():
+    """收集所有声明了 _settings_table() 的迁移（settings.key 为 MySQL 保留字）。"""
+    versions = os.path.join(MIGRATIONS_DIR, 'versions')
+    names = []
+    for name in sorted(os.listdir(versions)):
+        if not name.endswith('.py'):
+            continue
+        with open(os.path.join(versions, name), encoding='utf-8') as f:
+            if 'def _settings_table(' in f.read():
+                names.append(name)
+    return names
+
+
+@migration
+class TestDialectPortableSql:
+    """迁移中的原生 SQL 必须按方言引用标识符，不能在 MySQL/PG 上报语法错误。"""
+
+    def test_mysql_quotes_reserved_key(self):
+        files = _settings_migration_files()
+        assert files, '未找到 settings 相关迁移'
+        for name in files:
+            table = _load_migration(name)._settings_table()
+            statements = [
+                sa.select(sa.func.count()).select_from(table)
+                .where(table.c.key == 'probe'),
+                table.insert().values(key='probe', value='v'),
+                table.delete().where(table.c.key == 'probe'),
+            ]
+            for stmt in statements:
+                sql = str(stmt.compile(dialect=mysql.dialect()))
+                assert '`key`' in sql, f'{name} 未按 MySQL 方言引用保留字 key: {sql}'
+
+    def test_postgresql_compiles(self):
+        for name in _settings_migration_files():
+            table = _load_migration(name)._settings_table()
+            statements = [
+                sa.select(sa.func.count()).select_from(table)
+                .where(table.c.key == 'probe'),
+                table.insert().values(key='probe', value='v'),
+                table.delete().where(table.c.key == 'probe'),
+            ]
+            for stmt in statements:
+                sql = str(stmt.compile(dialect=postgresql.dialect()))
+                assert 'key' in sql

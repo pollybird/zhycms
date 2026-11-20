@@ -853,6 +853,8 @@ def create_app(config_name=None):
             cms_version=Setting.CMS_VERSION,
             # v3.1.10 VULN-025：加密不可用标记（后台 base.html 渲染红色横幅）
             zhycms_enc_unavailable=bool(app.config.get('ZHYCMS_ENC_UNAVAILABLE')),
+            # 迁移未完成标记（后台 base.html 渲染红色横幅，提示手动 flask db upgrade）
+            zhycms_migration_failed=bool(app.config.get('ZHYCMS_MIGRATION_FAILED')),
         )
 
     # v2.2.0 插件菜单（启用 + 有权限才显示；后台模板使用）
@@ -935,7 +937,12 @@ def create_app(config_name=None):
         try:
             _alembic_bootstrap(app)
         except Exception as e:
-            app.logger.warning('Alembic bootstrap 跳过（非致命）: %s', e)
+            # 迁移未完成会导致后续版本的结构/数据变更（含安全修复）全部缺失，
+            # 不能按「非致命」静默跳过：记录 error 并在后台所有页面常驻告警。
+            app.config['ZHYCMS_MIGRATION_FAILED'] = str(e) or 'unknown'
+            app.logger.error(
+                'Alembic 迁移未完成：%s。数据库结构可能落后于当前版本，'
+                '请手动执行 `flask db upgrade` 后重启服务', e)
 
         # ===== v3.2.1：JWT 配置（迁移完成后读取，避免首启临时密钥告警）=====
         _init_jwt_config(app)
