@@ -97,4 +97,6 @@ python run.py
 
 ## 许可
 
-提交即表示你同意代码以项目现有许可证发布。
+- 当前 `main` 分支及自 v3.2.7 起的版本以木兰宽松许可证第2版（Mulan PSL v2）发布，全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍以 Apache License 2.0 发布，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
+- 提交 PR 或其他贡献即表示你同意你的贡献按上述 Mulan PSL v2 许可证发布，并保证你有权作出该授权。
+- 新增或升级第三方组件（前端库、字体、图标等）时，必须保留其原始许可证与版权声明，并同步更新 [THIRD_PARTY_NOTICES](./THIRD_PARTY_NOTICES)；引入 copyleft 组件前请先开 Issue 讨论对整体分发许可的影响。
