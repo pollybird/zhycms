@@ -4,7 +4,7 @@
 
 <p>
   <img alt="Version" src="https://img.shields.io/badge/version-3.2.11-2e6df6?style=flat-square">
-  <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/license-MulanPSL--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
   <img alt="Tests" src="https://img.shields.io/badge/tests-679%20passed-brightgreen?style=flat-square">
@@ -556,7 +556,7 @@ zhycms/
 
 ## 许可证
 
-本项目基于 [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0) 开源。
+本项目自 **v3.2.7** 起基于 [木兰宽松许可证第2版（Mulan PSL v2）](http://license.coscl.org.cn/MulanPSL2) 开源，许可证全文见 [LICENSE](./LICENSE)；**v3.2.6 及之前版本**仍基于 Apache License 2.0 发布，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
 随项目分发的前端第三方组件（CKEditor 5、Bootstrap、Font Awesome 等）仍受各自许可证约束，版权声明、许可证全文与署名要求见 [THIRD_PARTY_NOTICES](./THIRD_PARTY_NOTICES)。
 

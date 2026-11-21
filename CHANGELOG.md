@@ -5,6 +5,8 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+> **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
+
 ## [3.2.11] - 2026-11-21
 
 **OpenAPI 公开版**：为内容 API 建立可机器读取的 OpenAPI 3.0 契约，并新增默认关闭的内容写端点与官方 Python SDK。无数据库迁移、无新增 Python 依赖。

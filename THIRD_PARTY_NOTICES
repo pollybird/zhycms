@@ -5,11 +5,12 @@ ZhyCMS 第三方开源许可声明
 --------------------------
 
 本文件列出随 ZhyCMS 分发（bundled）的前端第三方组件，包括 JavaScript 库、
-CSS 样式表、字体与图标资源。ZhyCMS 自身以 Apache License 2.0 发布，全文见仓库
-根目录的 LICENSE 文件。
+CSS 样式表、字体与图标资源。ZhyCMS 自 v3.2.7 起以木兰宽松许可证第2版
+（Mulan PSL v2）发布，全文见仓库根目录的 LICENSE 文件；v3.2.6 及之前版本以
+Apache License 2.0 发布，全文见 LICENSE-APACHE-2.0。
 
 上述第三方组件仍受其各自许可证约束，不因被本项目集成、修改或再分发而转为
-Apache-2.0。若本文件或仓库根目录 LICENSE 中的表述与某个第三方组件的许可证发生
+Mulan PSL v2。若本文件或仓库根目录 LICENSE 中的表述与某个第三方组件的许可证发生
 冲突，就该组件而言以该第三方许可证为准。
 
 本文件仅为合规披露与索引用，不构成法律意见。若需就具体分发场景作出判断，请咨询
@@ -64,19 +65,19 @@ Apache-2.0。若本文件或仓库根目录 LICENSE 中的表述与某个第三�
     https://ckeditor.com/pricing/
 
 说明
-    CKEditor 5 不受本项目 Apache-2.0 许可证约束，其分发条件由 GPL-2.0-or-later
+    CKEditor 5 不受本项目 Mulan PSL v2 许可证约束，其分发条件由 GPL-2.0-or-later
     或 CKSource 商业许可决定。若以 GPL-2.0-or-later 方式再分发，须遵守 GPL 对
     源码提供与许可证文本随附的要求，即：向接收者提供对应源码（或符合 GPL 要求的
     书面要约），并随附 GPL 许可证全文（见附录 D）。若已购买 CKSource 商业许可，
     则按商业许可条款执行，可替代 GPL 义务，但商业许可不覆盖本项目自身的
-    Apache-2.0 代码。
+    Mulan PSL v2 代码。
 
 风险提示
-    GPL-2.0-only 与 Apache-2.0 不兼容。本项目之所以能够以 Apache-2.0 发布并同时
-    包含 CKEditor 5，依赖的是 CKEditor 采用了 “or later”（即 GPL-2.0-or-later）
-    选项。若上游移除了 “or later”，或本项目改用/新增仅以 GPL-2.0-only 授权的
-    组件，则需重新评估本项目的整体分发许可证，必要时应取得商业许可或调整授权
-    方案。
+    Mulan PSL v2 属于宽松许可证，但并不免除 CKEditor 5 的 GPL copyleft 义务：
+    将 CKEditor 5 与本项目一起分发时，需按 GPL-2.0-or-later 评估整体作品的许可
+    与源码提供义务。若上游移除 “or later” 改为 GPL-2.0-only，或本项目改用/新增
+    仅以 GPL-2.0-only 授权的组件，则需重新评估整体分发许可证，必要时应取得
+    商业许可或调整授权方案。
 
 
 2. Bootstrap 4.6.2
