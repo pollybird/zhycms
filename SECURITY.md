@@ -117,6 +117,7 @@
 - **短信与上传防护（v3.2.9）**：短信验证码使用服务端密钥 HMAC，连续失败自动作废并对相关接口限流；SVG 上传经白名单净化，后台退出登录仅接受带 CSRF 的 POST。
 - **多进程部署一致性（v3.2.10）**：多 worker / 多实例必须配置 `REDIS_URL`，限流、缓存、会话与调度器领导者锁共享后端，避免防爆破计数与定时任务在进程间失效或重复执行；未配置 Redis 时记录 ERROR 并在后台显示告警，可设置 `ZHYCMS_REQUIRE_REDIS=1` 拒绝降级启动。`ZHYCMS_SCHEDULER_ENABLED` 可关闭内置调度，交由受控的外部 cron。
 - **API 写端点默认关闭且仅接受 JWT（v3.2.11）**：`api_write_enable` 默认 `off`，写接口对外表现为 404；开启后静态 `X-API-Token` 不能调用写接口，必须是有效 Bearer JWT，并按账号 + IP 限流。写入复用后台服务层，按 RBAC 权限与栏目授权校验，发布操作额外校验栏目发布标志，全部写操作写审计日志。OpenAPI 契约与 `openapi.json` 仅暴露公开 API，不包含后台管理路由。
+- **Webhook 外送防护（v3.2.12）**：订阅仅限 `site:manage` 管理且按站点隔离；接收地址在保存与每次发送前都做 SSRF 校验，默认仅 HTTPS 公网（`webhook_allow_http` / `webhook_allow_private` 默认 `off`），投递不跟随重定向。签名密钥 Fernet 加密入库、仅创建/轮换时完整显示一次，列表只显示掩码；事件载荷不含密码、密钥、完整手机号/邮箱与表单提交值。每订阅每秒 5 次限速，失败重试 2 次后终态并写审计，错误响应体仅保留前 2KB；消费方应校验 `X-ZhyCMS-Signature` 并按 `X-ZhyCMS-Delivery` 幂等（见 `docs/WEBHOOK.md`）。
 
 ## 安全配置基线（部署方自查）
 

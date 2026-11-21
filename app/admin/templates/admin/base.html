@@ -246,7 +246,7 @@
 
           {# v3.2.4：设置按「当前站点」与「全局」分区，避免站点设置与平台设置混排 #}
           {% set site_setting_active = active_menu in ['setting_site', 'setting_seo', 'setting_seo_advanced', 'theme', 'setting_notify', 'setting_editor', 'setting_api'] %}
-          {% set global_setting_active = active_menu in ['site', 'site_metrics', 'setting_upload', 'setting_upload_security', 'setting_security', 'plugin', 'setting_i18n', 'setting_search', 'setting_redis'] %}
+          {% set global_setting_active = active_menu in ['site', 'site_metrics', 'site_webhooks', 'setting_upload', 'setting_upload_security', 'setting_security', 'plugin', 'setting_i18n', 'setting_search', 'setting_redis'] %}
 
           {% if current_user.has_permission('system:settings') %}
           <li class="nav-item has-treeview {{ 'menu-open' if site_setting_active }}">
@@ -315,6 +315,11 @@
               <li class="nav-item">
                 <a href="{{ url_for('admin.site_ssl_status') }}" class="nav-link {{ 'active' if active_menu == 'site_ssl' }}">
                   <i class="far fa-circle nav-icon"></i><p>{{ _('证书状态') }}</p>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ url_for('admin.site_webhooks') }}" class="nav-link {{ 'active' if active_menu == 'site_webhooks' }}">
+                  <i class="far fa-circle nav-icon"></i><p>{{ _('Webhook 集成') }}</p>
                 </a>
               </li>
               <li class="nav-item">

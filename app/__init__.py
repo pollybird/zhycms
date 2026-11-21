@@ -453,6 +453,18 @@ def _setup_scheduler(app):
     sched.add_job(ssl_expiry_job, CronTrigger(hour=8, minute=0),
                   id='zhycms_ssl_expiry', replace_existing=True)
 
+    # 任务6（v3.2.12）：Webhook 到期事件投递（10s），多 worker 下仅领导者执行
+    def webhook_delivery_job():
+        with app.app_context():
+            try:
+                from .services.webhook import deliver_due_events
+                deliver_due_events()
+            except Exception:
+                app.logger.exception('webhook delivery failed')
+
+    sched.add_job(webhook_delivery_job, IntervalTrigger(seconds=10),
+                  id='zhycms_webhook_delivery', replace_existing=True)
+
     # 备份任务在应用启动 + 每次设置保存时按配置 reschedule
     try:
         from .models import Setting

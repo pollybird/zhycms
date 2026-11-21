@@ -124,6 +124,16 @@ def _validate(data, site=None):
     return errors, cleaned
 
 
+def _emit_site_status(site, old_status):
+    """v3.2.12：站点启停状态变化后发射 Webhook 事件。"""
+    try:
+        from ...services.webhook import emit as webhook_emit
+        webhook_emit('site.status_changed', site.id, {
+            'site_id': site.id, 'from': old_status, 'to': site.status})
+    except Exception as e:
+        current_app.logger.warning('Webhook 事件发射失败：%s', e)
+
+
 def _invalidate_all():
     """站点变更后：失效请求级站点缓存 + 清前台整页缓存。"""
     invalidate_site_cache()
@@ -362,6 +372,7 @@ def site_create():
 def site_edit(sid):
     site = Site.query.filter_by(id=sid, is_deleted=False).first_or_404()
     if request.method == 'POST':
+        old_status = site.status
         errors, data = _validate(request.form, site=site)
         if errors:
             for e in errors:
@@ -383,6 +394,8 @@ def site_edit(sid):
                           'subdomain': site.subdomain, 'status': site.status,
                           'theme': site.theme})
         flash(_gettext('站点「{}」已保存').format(site.name), 'success')
+        if old_status != site.status:
+            _emit_site_status(site, old_status)
         return redirect(url_for('admin.site_index'))
 
     return render_template('admin/system/site_form.html', site=site,
@@ -727,8 +740,12 @@ def site_batch():
                     continue
                 move_site_to_recycle(site, deleted_by=_current_user_id())
             else:
-                site.status = 'open' if action == 'enable' else 'closed'
+                new_status = 'open' if action == 'enable' else 'closed'
+                old_status = site.status
+                site.status = new_status
                 db.session.commit()
+                if old_status != new_status:
+                    _emit_site_status(site, old_status)
             done.append(site.id)
         except (SQLAlchemyError, ValueError) as e:
             db.session.rollback()
@@ -843,3 +860,182 @@ def site_recycle_purge(rid):
     _invalidate_all()
     flash(_gettext('站点已彻底删除，删除前备份已保留'), 'success')
     return redirect(url_for('admin.site_recycle'))
+
+
+# ============================================================
+# Webhook 事件订阅（v3.2.12，站点设置 → 集成）
+# ============================================================
+
+from ...models.webhook import WebhookSubscription, WebhookEvent  # noqa: E402
+
+
+def _webhook_sub_or_404(sid):
+    return WebhookSubscription.query.filter_by(
+        id=sid, site_id=current_site_id()).first_or_404()
+
+
+def _webhook_validate_form():
+    """校验订阅表单，返回 (url, events_csv, enabled, error)。"""
+    from ...services.webhook import EVENT_TYPES, validate_target_url
+    url = (request.form.get('url') or '').strip()
+    events = [e for e in request.form.getlist('events') if e in EVENT_TYPES]
+    enabled = request.form.get('enabled') == 'on'
+    if not url:
+        return None, None, None, _gettext('接收地址必填')
+    if not events:
+        return None, None, None, _gettext('请至少选择一个事件类型')
+    try:
+        validate_target_url(url)
+    except ValueError as e:
+        return None, None, None, _gettext('接收地址未通过安全校验：{}').format(e)
+    return url, ','.join(events), enabled, None
+
+
+@admin_bp.route('/sites/webhooks')
+@permission_required('site:manage')
+def site_webhooks():
+    subs = WebhookSubscription.query.filter_by(
+        site_id=current_site_id()).order_by(WebhookSubscription.id.desc()).all()
+    last_events = {s.id: s.deliveries.order_by(
+        WebhookEvent.id.desc()).first() for s in subs}
+    return render_template('admin/system/site_webhooks.html',
+                           subs=subs, last_events=last_events)
+
+
+@admin_bp.route('/sites/webhooks/create', methods=['GET', 'POST'])
+@permission_required('site:manage')
+def site_webhook_create():
+    from ...services.webhook import EVENT_TYPES
+    if request.method == 'POST':
+        url, events, enabled, error = _webhook_validate_form()
+        if error:
+            flash(error, 'danger')
+        elif WebhookSubscription.query.filter_by(
+                site_id=current_site_id(), url=url).first():
+            flash(_gettext('该接收地址已存在订阅'), 'danger')
+        else:
+            sub = WebhookSubscription(site_id=current_site_id(), url=url,
+                                      events=events, enabled=enabled)
+            secret = WebhookSubscription.generate_secret()
+            sub.set_secret(secret)
+            db.session.add(sub)
+            db.session.commit()
+            audit_log(OP_CREATE, MODULE_SITE, target_id=sub.id, target_name=url,
+                      detail={'action': 'webhook_create', 'events': events})
+            flash(_gettext('Webhook 订阅已创建'), 'success')
+            flash(_gettext('签名密钥（仅显示一次，请立即保存）：{}').format(secret),
+                  'warning')
+            return redirect(url_for('admin.site_webhooks'))
+    return render_template('admin/system/site_webhook_form.html', sub=None,
+                           event_types=EVENT_TYPES, form=request.form)
+
+
+@admin_bp.route('/sites/webhooks/<int:sid>/edit', methods=['GET', 'POST'])
+@permission_required('site:manage')
+def site_webhook_edit(sid):
+    from ...services.webhook import EVENT_TYPES
+    sub = _webhook_sub_or_404(sid)
+    if request.method == 'POST':
+        url, events, enabled, error = _webhook_validate_form()
+        if error:
+            flash(error, 'danger')
+        else:
+            duplicate = WebhookSubscription.query.filter(
+                WebhookSubscription.site_id == current_site_id(),
+                WebhookSubscription.url == url,
+                WebhookSubscription.id != sub.id).first()
+            if duplicate:
+                flash(_gettext('该接收地址已存在订阅'), 'danger')
+            else:
+                sub.url, sub.events, sub.enabled = url, events, enabled
+                db.session.commit()
+                audit_log(OP_UPDATE, MODULE_SITE, target_id=sub.id,
+                          target_name=url,
+                          detail={'action': 'webhook_update', 'events': events,
+                                  'enabled': enabled})
+                flash(_gettext('Webhook 订阅已保存'), 'success')
+                return redirect(url_for('admin.site_webhooks'))
+    return render_template('admin/system/site_webhook_form.html', sub=sub,
+                           event_types=EVENT_TYPES, form=request.form)
+
+
+@admin_bp.route('/sites/webhooks/<int:sid>/rotate', methods=['POST'])
+@permission_required('site:manage')
+def site_webhook_rotate(sid):
+    sub = _webhook_sub_or_404(sid)
+    secret = WebhookSubscription.generate_secret()
+    sub.set_secret(secret)
+    db.session.commit()
+    audit_log(OP_UPDATE, MODULE_SITE, target_id=sub.id, target_name=sub.url,
+              detail={'action': 'webhook_rotate_secret'})
+    flash(_gettext('密钥已轮换，旧密钥立即失效'), 'success')
+    flash(_gettext('新签名密钥（仅显示一次，请立即保存）：{}').format(secret),
+          'warning')
+    return redirect(url_for('admin.site_webhooks'))
+
+
+@admin_bp.route('/sites/webhooks/<int:sid>/delete', methods=['POST'])
+@permission_required('site:manage')
+def site_webhook_delete(sid):
+    sub = _webhook_sub_or_404(sid)
+    url = sub.url
+    db.session.delete(sub)
+    db.session.commit()
+    audit_log(OP_DELETE, MODULE_SITE, target_id=sid, target_name=url,
+              detail={'action': 'webhook_delete'})
+    flash(_gettext('Webhook 订阅已删除'), 'success')
+    return redirect(url_for('admin.site_webhooks'))
+
+
+@admin_bp.route('/sites/webhooks/<int:sid>/test', methods=['POST'])
+@permission_required('site:manage')
+def site_webhook_test(sid):
+    from ...services.webhook import create_test_event
+    sub = _webhook_sub_or_404(sid)
+    event = create_test_event(sub)
+    audit_log(OP_OTHER, MODULE_SITE, target_id=sub.id, target_name=sub.url,
+              detail={'action': 'webhook_test', 'event_id': event.id})
+    flash(_gettext('测试事件已生成，将由投递器在约 10 秒内发送'), 'success')
+    return redirect(url_for('admin.site_webhook_events', subscription_id=sub.id))
+
+
+@admin_bp.route('/sites/webhooks/events')
+@permission_required('site:manage')
+def site_webhook_events():
+    from ...services.webhook import EVENT_TYPES
+    query = WebhookEvent.query.filter_by(site_id=current_site_id())
+    status = request.args.get('status') or ''
+    event_type = request.args.get('event_type') or ''
+    subscription_id = request.args.get('subscription_id', type=int)
+    if status in (WebhookEvent.STATUS_PENDING, WebhookEvent.STATUS_DELIVERING,
+                  WebhookEvent.STATUS_SUCCESS, WebhookEvent.STATUS_FAILED):
+        query = query.filter_by(status=status)
+    else:
+        status = ''
+    if event_type in EVENT_TYPES:
+        query = query.filter_by(event_type=event_type)
+    else:
+        event_type = ''
+    if subscription_id:
+        query = query.filter_by(subscription_id=subscription_id)
+    events = query.order_by(WebhookEvent.id.desc()).limit(100).all()
+    return render_template('admin/system/site_webhook_events.html',
+                           events=events, event_types=EVENT_TYPES,
+                           status=status, event_type=event_type,
+                           subscription_id=subscription_id)
+
+
+@admin_bp.route('/sites/webhooks/events/<int:eid>/retry', methods=['POST'])
+@permission_required('site:manage')
+def site_webhook_event_retry(eid):
+    from ...services.webhook import retry_event
+    event = retry_event(eid, site_id=current_site_id())
+    if event is None:
+        flash(_gettext('投递记录不存在'), 'danger')
+    else:
+        audit_log(OP_OTHER, MODULE_SITE, target_id=event.id,
+                  target_name=event.event_type,
+                  detail={'action': 'webhook_retry',
+                          'replay_id': event.replay_id})
+        flash(_gettext('已重新加入投递队列'), 'success')
+    return redirect(request.referrer or url_for('admin.site_webhook_events'))

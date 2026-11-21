@@ -192,4 +192,43 @@ def transition_article(article, action, *, user, reject_reason=None):
     if reason is not None:
         detail['reason'] = reason
     audit_log(spec['audit_op'], MODULE_ARTICLE, article.id, article.title, detail)
+    _emit_workflow_webhook(article)
     return TransitionResult(True, [('success', success)])
+
+
+def _article_url(article):
+    """文章前台 URL（Webhook 载荷用），异常时回退相对路径。"""
+    try:
+        from flask import url_for
+        return url_for('frontend.article_detail', slug=article.column.slug,
+                       aid=article.id, _external=True)
+    except Exception as e:
+        current_app.logger.warning('生成文章 URL 失败：%s', e)
+        slug = article.column.slug if article.column else ''
+        return f'/column/{slug}/article/{article.id}'
+
+
+def _emit_workflow_webhook(article):
+    """v3.2.12：发布/归档成功后发射 Webhook 事件（失败不影响主流程）。"""
+    if article.status not in (STATUS_PUBLISHED, STATUS_ARCHIVED):
+        return
+    try:
+        from .webhook import emit as webhook_emit
+        if article.status == STATUS_PUBLISHED:
+            webhook_emit('article.published', article.site_id, {
+                'article_id': article.id,
+                'column_id': article.column_id,
+                'title': article.title,
+                'url': _article_url(article),
+                'published_at': article.published_at.strftime('%Y-%m-%d %H:%M:%S')
+                if article.published_at else '',
+            })
+        else:
+            webhook_emit('article.archived', article.site_id, {
+                'article_id': article.id,
+                'column_id': article.column_id,
+                'title': article.title,
+                'archived_at': datetime.now().isoformat(),
+            })
+    except Exception as e:
+        current_app.logger.warning('Webhook 事件发射失败：%s', e)

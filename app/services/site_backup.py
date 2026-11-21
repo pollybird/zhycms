@@ -363,10 +363,19 @@ def export_site(site_id, created_by=None, filename=None):
                     detail={'action': 'site_export', 'filename': name,
                             'size': size, 'tables': manifest['tables']},
                     site_id=site_id)
+    # v3.2.12：备份导出成功后发射 Webhook 事件（失败不影响导出结果）
+    try:
+        from .webhook import emit as webhook_emit
+        webhook_emit('backup.completed', site_id, {
+            'filename': name, 'size': size,
+            'created_at': manifest['created_at'],
+            'tables': manifest['tables'],
+        })
+    except Exception as e:
+        logger.warning('Webhook 事件发射失败（backup.completed）：%s', e)
     return {'filename': name, 'path': final_path, 'size': size,
             'tables': manifest['tables'], 'uploads': manifest['uploads'],
             'manifest': manifest}
-
 
 # ============================================================
 # 导入

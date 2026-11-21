@@ -133,6 +133,20 @@ def form_submit(slug):
         if form.submit_interval > 0:
             session[cache_key] = int(time.time())
 
+        # v3.2.12：Webhook 事件（仅字段名摘要，不含提交值等隐私内容）
+        try:
+            from app.services.webhook import emit as webhook_emit
+            webhook_emit('form.submitted', form.site_id, {
+                'form_id': form.id,
+                'form_slug': form.slug,
+                'submission_id': sub.id,
+                'fields': [label for label, _ in fields_list],
+                'submitted_at': sub.created_at.isoformat()
+                if getattr(sub, 'created_at', None) else '',
+            })
+        except Exception:
+            current_app.logger.exception('webhook emit failed')
+
         # 消息通知推送（异常不影响用户提交成功提示）
         if Setting.get('form_notify_enable') == 'on':
             try:

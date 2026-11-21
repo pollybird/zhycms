@@ -27,6 +27,8 @@ from .backup import BackupRecord, TRIGGER_MANUAL, TRIGGER_SCHEDULED
 from .upload import UploadedFile
 # v3.0.0 可视化页面构建器
 from .builder import BuilderPage, BuilderRevision
+# v3.2.12 Webhook 事件订阅
+from .webhook import WebhookSubscription, WebhookEvent
 # 站点资源指标每日快照
 from .site_metric import SiteMetricSnapshot
 # 站点异步任务与回收站
@@ -90,4 +92,6 @@ __all__ = [
     'SiteJob', 'JOB_PENDING', 'JOB_RUNNING', 'JOB_SUCCESS', 'JOB_FAILED',
     'JOB_STATUSES', 'JOB_CLONE', 'JOB_BACKUP_IMPORT', 'JOB_BACKUP_EXPORT',
     'SiteRecycleBin',
+    # Webhook 事件订阅（v3.2.12）
+    'WebhookSubscription', 'WebhookEvent',
 ]

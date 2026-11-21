@@ -7,6 +7,27 @@
 
 > **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
+## [3.2.12] - 2026-11-21
+
+**Webhook 事件订阅版**：业务事件可按站点订阅并异步外送到用户自定义接收地址，带签名、重试与安全防护。新增数据库迁移 `0020`，无新增 Python 依赖。
+
+### Added
+
+- **七类事件**：`article.published` / `article.archived`（工作流流转成功后）、`form.submitted`（仅字段名摘要，不含提交值）、`backup.completed`、`site.status_changed`（编辑与批量启停）、`ssl.expiring`（每日巡检随提醒去重）、`webhook.test`（后台测试）。
+- **投递器**：`app/services/webhook.py`，10 秒 APScheduler 任务（受 v3.2.10 领导者锁约束）或 `python -m app.services.webhook --once` 外部 cron；`UPDATE ... WHERE status='pending'` 抢占避免多 worker 重复投递。
+- **签名与幂等**：`X-ZhyCMS-Event`、`X-ZhyCMS-Delivery: <replay_id>`、`X-ZhyCMS-Signature: t=<unix>,v1=<hex>`（`hex(hmac_sha256(secret, "{t}." + body))`）；重试保持同一 replay_id，消费方可幂等去重。
+- **重试与审计**：非 2xx / 超时 / 连接错误按 1s、10s 退避重试，第 3 次失败后终态 `failed` 并写审计日志；后台支持手动重试（重置 attempts）。
+- **安全防护**：密钥 Fernet 加密存储、仅在创建/轮换时完整显示一次；投递不跟随重定向；发送前二次 SSRF 校验，默认仅 HTTPS 公网地址（`webhook_allow_http`、`webhook_allow_private` 默认 `off`）；每订阅每秒 5 次限速（Redis 计数，退化进程内滑窗）；错误响应体仅保留前 2KB。
+- **后台管理**：「全局设置 → Webhook 集成」（`site:manage`），订阅增删改、启用开关、密钥轮换、测试发送、投递记录按状态/事件筛选与失败重试，所有变更写审计。
+- **数据模型**：迁移 `0020` 新增 `webhook_subscriptions`（`site_id+url` 唯一）与 `webhook_events`（`(status,next_retry_at)`、`(site_id,created_at)` 索引，`replay_id` 唯一）；一行 = 一次事件对一个订阅的投递。
+- **文档与测试**：新增 `docs/WEBHOOK.md`（含签名校验示例），15 项回归测试。
+
+### 升级注意
+
+- 启动自动执行迁移 `0020`（可降级）；不配置订阅时不产生任何外发请求，存量行为不变。
+- 事件在业务事务提交后发射，发射/投递失败仅记录日志，不影响主业务。
+- 回滚：停用全部订阅即可停止外送；回退代码后可执行降级删除两张 webhook 表，不影响既有内容。
+
 ## [3.2.11] - 2026-11-21
 
 **OpenAPI 公开版**：为内容 API 建立可机器读取的 OpenAPI 3.0 契约，并新增默认关闭的内容写端点与官方 Python SDK。无数据库迁移、无新增 Python 依赖。

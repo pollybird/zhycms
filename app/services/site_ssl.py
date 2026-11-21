@@ -261,5 +261,19 @@ def run_daily_check(sites=None, notify=True, warn_days=None):
 
     if notify and notified:
         _send_notifications(notified)
+
+    # v3.2.12：证书临期/过期事件（同站同日随提醒去重）
+    for item in notified:
+        try:
+            from .webhook import emit as webhook_emit
+            webhook_emit('ssl.expiring', item['site_id'], {
+                'domain': item['host'],
+                'days_left': item['days_left'],
+                'status': item['status'],
+                'expires_at': item['expires_at'],
+            })
+        except Exception as e:
+            logger.warning('Webhook 事件发射失败（ssl.expiring）：%s', e)
+
     summary['notified'] = notified
     return summary

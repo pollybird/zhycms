@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.2.11-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.2.12-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MulanPSL--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-679%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-695%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.11**（OpenAPI 公开版：内容 API 提供 OpenAPI 3.0 契约与 `openapi.json`，新增默认关闭的文章/栏目/碎片写端点、表单提交与站点计量只读端点、官方 Python SDK；无数据库迁移、无新增 Python 依赖，详见 [CHANGELOG](CHANGELOG.md) 与 [UPGRADE](UPGRADE.md)）
+**当前版本：v3.2.12**（Webhook 事件订阅版：文章/表单/备份/站点/证书事件经订阅外送，HMAC-SHA256 签名、自动重试、SSRF 防护与后台管理；新增迁移 `0020`，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md) 与 [Webhook 文档](docs/WEBHOOK.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -112,6 +112,13 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.2.12（2026-11-21）
+
+- **Webhook 事件订阅**：`article.published` / `article.archived` / `form.submitted` / `backup.completed` / `site.status_changed` / `ssl.expiring` / `webhook.test` 七类事件，业务事务提交后落库、10 秒调度异步外送。
+- **安全投递**：HMAC-SHA256 签名（`X-ZhyCMS-Signature: t=...,v1=...`）、`X-ZhyCMS-Delivery` 幂等标识、1s/10s 重试后终态失败并写审计、每订阅每秒 5 次限速、禁跟随重定向、SSRF 防护（默认仅 HTTPS 公网，`webhook_allow_http` / `webhook_allow_private` 默认关闭）。
+- **后台管理**：全局设置 → Webhook 集成（`site:manage`），订阅增删改、密钥仅显示一次与轮换、测试发送、投递记录筛选与失败重试，全程审计。
+- **数据与运维**：迁移 `0020` 新增 `webhook_subscriptions` / `webhook_events` 两表；密钥 Fernet 加密存储；支持 `python -m app.services.webhook --once` 外部 cron；新增 [Webhook 文档](docs/WEBHOOK.md)，15 项回归测试。
 
 ### v3.2.11（2026-11-21）
 
@@ -276,7 +283,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.2.11**，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.2.12**，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -293,9 +300,9 @@ docker compose -f docker-compose.postgresql.yml up -d
 ```
 
 > 也可直接拉取镜像：
-> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.11`）
-> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.11`）
-> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.11`）
+> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.12`）
+> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.12`）
+> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.12`）
 >
 > 三个 tag（`mysql` / `postgresql` / `latest`）指向同一镜像，内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
 
