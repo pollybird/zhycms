@@ -6,3 +6,4 @@ api_bp = Blueprint('api', __name__)
 
 from . import views  # noqa: E402,F401
 from . import auth   # noqa: E402,F401  v2.6.3 JWT 鉴权端点
+from . import write  # noqa: E402,F401  v3.2.11 写端点与扩展只读端点

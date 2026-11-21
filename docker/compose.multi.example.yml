@@ -11,11 +11,12 @@
 #   docker compose -f docker/compose.multi.example.yml up -d
 #   python scripts/generate_nginx_sites.py --base-domain example.com
 #
-# 多实例形态（可选，为后续横向扩容预留）：
-#   - 复制 app 服务为 app-b，端口 5001/5002；
+# 多实例形态（可选，v3.2.10 起支持）：
+#   - 复制 app 服务为 app-b，端口 5001；
 #   - 两个实例共用同一数据库与 Redis；
-#   - 必须启用 Redis 会话（REDIS_URL），否则登录态不共享；
-#   - nginx upstream 同时指向 5001/5002。
+#   - 必须启用 Redis（REDIS_URL），否则会话、限流与调度锁不共享；
+#   - 使用 generate_nginx_sites.py --upstreams 127.0.0.1:5000,127.0.0.1:5001
+#     生成 upstream 配置；定时任务由 Redis 领导者锁保证只执行一次。
 # ============================================================
 
 services:

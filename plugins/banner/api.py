@@ -4,12 +4,18 @@
 额外受插件启用门控：未启用 → 404（不暴露存在性）。
 """
 from app.api.views import api_ok, api_err, api_cache
+from app.api.openapi import openapi_doc
 from app.plugin_system import plugin_enabled
 
 
 def register(api_bp):
     @api_bp.route('/banners/<slug>')
     @api_cache('banner')
+    @openapi_doc(
+        '轮播图分组', tags=['plugins'], auth='both',
+        params=[{'name': 'slug', 'in': 'path', 'required': True,
+                 'schema': {'type': 'string'}}],
+    )
     def banner_api_detail(slug):
         if not plugin_enabled('banner'):
             return api_err(404, '资源不存在')

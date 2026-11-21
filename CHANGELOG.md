@@ -5,6 +5,54 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 2.0.0](https://semver.org/lang/zh-CN/)。
 
+## [3.2.11] - 2026-11-21
+
+**OpenAPI 公开版**：为内容 API 建立可机器读取的 OpenAPI 3.0 契约，并新增默认关闭的内容写端点与官方 Python SDK。无数据库迁移、无新增 Python 依赖。
+
+### Added
+
+- **OpenAPI 3.0 契约**：新增 `app/api/openapi.py` 注册表与 `GET /api/v1/openapi.json`，覆盖站点、栏目、文章、鉴权、表单与插件贡献端点；`scripts/generate_openapi.py` 生成 `docs/openapi.yaml`，`scripts/check_openapi.py` 在 CI 中反向校验路由覆盖率与文件一致性。
+- **内容写端点（默认关闭）**：`POST /api/v1/articles`、`PUT/DELETE /api/v1/articles/<id>`、栏目与碎片的创建/更新/删除。写入复用后台服务层（版本快照、审计日志、自定义字段），开启后仅接受 Bearer JWT，并按角色与栏目授权校验；发布操作额外校验栏目发布标志。
+- **扩展只读端点**：`GET /api/v1/forms/<slug>/submissions`（JWT + `form:view`）、`GET /api/v1/sites` 与 `GET /api/v1/sites/<id>/metrics`（仅超级管理员）。
+- **官方 Python SDK**：新增 `sdk/zhycms_sdk`（`Client`、`Page`、内容/表单/站点客户端），支持登录、401 自动刷新重放、GET 网络错误重试与统一异常。
+- **后台开关**：内容 API 设置页新增「写端点开关」与写端点限流（`api_write_enable` 默认 `off`，`api_rate_limit_write` 默认 30 次/分钟）。
+
+### Changed
+
+- 全局 API 门控新增写端点分支：写开关关闭时返回 404；静态 `X-API-Token` 不能调用写接口。
+- `api_err` 支持 409，用于栏目存在子栏目或文章时的删除冲突。
+
+### 升级注意
+
+- 无数据库迁移，覆盖代码 + 重启即可。
+- 写端点默认关闭，存量只读 API 行为不变；需要写入时在「全局设置 → 内容 API」开启，并使用 JWT 登录后的 Bearer Token。
+- SDK 位于仓库 `sdk/` 目录，可按需 `pip install ./sdk`，不影响主程序依赖。
+
+## [3.2.10] - 2026-11-21
+
+**多进程 / 多实例版**：支持同一实例安全运行多个 worker、多个容器共享数据库与 Redis。无数据库迁移、无新增 Python 依赖。
+
+### Added
+
+- **限流共享存储**：配置 `REDIS_URL` 时，API 与会员接口限流改用 Redis 存储，多 worker / 多实例计数一致；未配置时维持内存存储。
+- **调度器单实例**：多 worker + Redis 时通过 Redis 领导者锁保证同一时刻只有一个进程执行备份、清理、指标快照、证书巡检与浏览量合并；锁丢失时自动停止本进程调度器。
+- **调度外置**：`ZHYCMS_SCHEDULER_ENABLED=0` 可关闭内置调度，交由外部 cron；`=1` 可强制启动（专用调度进程）。
+- **多实例 nginx 配置**：`generate_nginx_sites.py` 新增 `--upstreams`，生成独立 `00-zhycms-upstream.conf`（`upstream` 组 + keepalive），站点配置统一反代。
+- **健康检查详情**：`GET /healthz?detail=1` 返回数据库、Redis、缓存、限流、调度器角色、worker 数与站点解析结果；默认 `/healthz` 保持轻量探测。
+- **压测脚本**：新增 `scripts/bench_http.py`，输出 QPS、p50 / p95 / p99 与错误率，作为多实例发布验收依据。
+- **运行形态自检**：多 worker 未启用 Redis 时记录 ERROR 并在后台显示红色横幅；`ZHYCMS_REQUIRE_REDIS=1` 时 Redis 不可用直接拒绝启动。
+
+### Changed
+
+- 浏览量周期合并增加缓存锁，避免多 worker 重复回写。
+- 多实例部署文档补充 Redis 必需项、环境变量与健康检查说明。
+
+### 升级注意
+
+- 无数据库迁移，覆盖代码 + 重启即可。
+- 单进程部署无需 Redis，行为与 v3.2.9 一致；多 worker / 多实例必须配置 `REDIS_URL`。
+- 使用自定义进程管理器自行运行定时任务时，可设置 `ZHYCMS_SCHEDULER_ENABLED=0` 避免与内置调度重复。
+
 ## [3.2.9] - 2026-11-20
 
 **安全修复版**：收紧内容 API 的账号状态与会员内容边界，增强短信验证码、SVG 上传和后台退出登录防护。新增数据库迁移 `0019`（会员短信验证码失败计数），无新增 Python 依赖。

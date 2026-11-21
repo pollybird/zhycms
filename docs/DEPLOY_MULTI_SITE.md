@@ -109,12 +109,41 @@ cp docker/.env.example .env
 docker compose -f docker/compose.multi.example.yml up -d
 ```
 
-多实例（可选）：
+多实例（可选，v3.2.10 起受支持）：
 
-1. 取消 `docker/compose.multi.example.yml` 中 `app-b` 的注释；
-2. 两个实例共用同一 `ZHYCMS_DB_URI` 与 `REDIS_URL`；
-3. nginx upstream 同时指向 `127.0.0.1:5001` 与 `127.0.0.1:5002`；
-4. 未启用 Redis 会话时不要使用多实例，否则登录态不共享。
+1. 取消 `docker/compose.multi.example.yml` 中 `app-b` 的注释，两个实例共用同一 `ZHYCMS_DB_URI` 与 `REDIS_URL`；
+2. 启动 Redis（模板中已提供，需取消 `redis` 服务与 `redis_data` 卷的注释）；
+3. 生成多实例 nginx 配置：
+
+```bash
+python scripts/generate_nginx_sites.py \
+  --base-domain example.com \
+  --upstreams 127.0.0.1:5000,127.0.0.1:5001 \
+  --output-dir build/nginx
+```
+
+脚本会额外生成 `00-zhycms-upstream.conf`（定义 `zhycms_backend` 并启用 keepalive），站点配置统一反代到该 upstream。
+
+4. **必须启用 Redis**：会话、缓存、限流、调度器领导者锁都依赖 `REDIS_URL`。未启用时应用仍可启动，但后台会显示红色告警，且定时任务可能重复执行。
+
+多实例相关环境变量：
+
+| 变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `REDIS_URL` | 空 | 多实例必填，如 `redis://redis:6379/0` |
+| `GUNICORN_WORKERS` | 4 | 每个实例的 worker 数；用于运行形态自检 |
+| `ZHYCMS_REQUIRE_REDIS` | 空 | 设为 `1` 时 Redis 不可用即拒绝启动 |
+| `ZHYCMS_SCHEDULER_ENABLED` | 空（自动） | `0` 关闭内置调度交由外部 cron；`1` 强制启动（专用调度进程） |
+
+> 多 worker + Redis 时，应用通过 Redis 领导者锁保证同一时刻只有一个进程执行定时任务；无需额外配置。单进程部署无需 Redis，行为与旧版本一致。
+
+验证运行形态：
+
+```bash
+curl -s http://127.0.0.1:5000/healthz?detail=1
+```
+
+返回中 `redis`、`cache`、`limiter`、`scheduler`（`leader` / `follower` / `disabled`）可确认多实例是否按预期工作。
 
 ## 八、验证清单
 

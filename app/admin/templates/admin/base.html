@@ -31,6 +31,14 @@
   </div>
   {% endif %}
 
+  {# v3.2.10：多 worker 未启用 Redis，限流/调度/计数降级为进程内语义 #}
+  {% if zhycms_runtime_warning %}
+  <div class="alert alert-danger mb-0 rounded-0 text-center" role="alert" style="position:relative;z-index:1050;">
+    <i class="fas fa-exclamation-triangle"></i>
+    <strong>{{ _('运行形态告警') }}：</strong>{{ zhycms_runtime_warning }}{{ _('。请配置 REDIS_URL 后重启服务。') }}
+  </div>
+  {% endif %}
+
   {# 数据库迁移未完成时顶部常驻红色横幅，避免结构落后被静默忽略 #}
   {% if zhycms_migration_failed %}
   <div class="alert alert-danger mb-0 rounded-0 text-center" role="alert" style="position:relative;z-index:1050;">

@@ -590,6 +590,16 @@ def setting_api():
             Setting.set('api_rate_limit_read', val)
             changed['api_rate_limit_read'] = val
 
+        # v3.2.11：内容写端点（默认关闭，开启后仅 Bearer JWT）
+        val = _onoff('api_write_enable')
+        if Setting.get('api_write_enable') != val:
+            Setting.set('api_write_enable', val)
+            changed['api_write_enable'] = val
+        val = str(max(1, min(10000, _int_safe('api_rate_limit_write', default=30))))
+        if Setting.get('api_rate_limit_write') != val:
+            Setting.set('api_rate_limit_write', val)
+            changed['api_rate_limit_write'] = val
+
         db.session.commit()
         flash(_gettext('内容 API 配置已保存'), 'success')
         if changed:
@@ -603,7 +613,8 @@ def setting_api():
     except (TypeError, ValueError):
         settings['api_cache_ttl'] = 60
     for k in ('jwt_access_expires_minutes', 'jwt_refresh_expires_days',
-              'api_rate_limit_login', 'api_rate_limit_read'):
+              'api_rate_limit_login', 'api_rate_limit_read',
+              'api_rate_limit_write'):
         try:
             settings[k] = int(settings.get(k, Setting.DEFAULTS.get(k, '0')))
         except (TypeError, ValueError):

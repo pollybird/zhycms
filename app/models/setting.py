@@ -39,7 +39,7 @@ class Setting(db.Model):
     CMS_NAME = '钟毓企业网站CMS'
     CMS_COPYRIGHT = '版权所有：泰州姜堰钟毓信息技术有限公司'
     # 全站显示的版本号（后台页脚等），改版本只动这里
-    CMS_VERSION = '3.2.9'
+    CMS_VERSION = '3.2.11'
 
     DEFAULTS = {
         # site_name 为“网站名称”，前台展示企业名称，可在网站设置中修改，演示数据会写入企业名
@@ -149,6 +149,9 @@ class Setting(db.Model):
         'api_rate_limit_enable': 'on',       # on=开启速率限制
         'api_rate_limit_login': '5',         # 登录端点每 IP 每分钟次数
         'api_rate_limit_read': '120',        # 只读端点每 IP 每分钟次数
+        # ===== v3.2.11：内容写端点（默认关闭，开启后仅 Bearer JWT）=====
+        'api_write_enable': 'off',           # on=开启写端点 / off=写端点 404
+        'api_rate_limit_write': '30',        # 写端点每身份每分钟次数
 
         # ===== v2.3.0：第三方统计代码（plugins/analytics，键值存储零迁移）=====
         'analytics_enable': '0',             # 1=启用前台注入 / 0=关闭

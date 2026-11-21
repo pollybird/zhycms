@@ -12,6 +12,7 @@ from app.api.views import (
     api_ok, api_err, api_cache, _abs_url, _get_enabled_column,
     _pagination_meta, _to_int,
 )
+from app.api.openapi import openapi_doc
 from app.plugin_system import plugin_enabled
 from app.utils.db_utils import escape_like, LIKE_ESCAPE
 from app.models.setting import Setting
@@ -58,6 +59,15 @@ def register(api_bp):
 
     @api_bp.route('/columns/<slug>/products')
     @api_cache('products')
+    @openapi_doc(
+        '栏目产品列表', tags=['plugins'], auth='both',
+        params=[
+            {'name': 'slug', 'in': 'path', 'required': True,
+             'schema': {'type': 'string'}},
+            {'name': 'page', 'in': 'query', 'schema': {'type': 'integer'}},
+            {'name': 'per_page', 'in': 'query', 'schema': {'type': 'integer'}},
+        ],
+    )
     def product_api_list(slug):
         if not plugin_enabled('product'):
             return api_err(404, '资源不存在')
@@ -83,6 +93,11 @@ def register(api_bp):
 
     @api_bp.route('/products/<int:pid>')
     @api_cache('product')
+    @openapi_doc(
+        '产品详情', tags=['plugins'], auth='both',
+        params=[{'name': 'pid', 'in': 'path', 'required': True,
+                 'schema': {'type': 'integer'}}],
+    )
     def product_api_detail(pid):
         if not plugin_enabled('product'):
             return api_err(404, '资源不存在')

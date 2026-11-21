@@ -247,15 +247,33 @@ def _flush_view_counts():
     先取后删之间存在微小竞态窗口：窗口内到达的增量可能随删除丢失，
     对浏览量这类近似统计可接受（与 issue 方案 A「临时键+过期合并」一致）；
     合并失败时增量放回缓存，避免丢数。
+
+    v3.2.10：多 worker 下用缓存锁保证同一轮只由一方合并，避免重复回写。
     """
+    from ..extensions import cache
     from ..models.site import Site
+
+    lock_key = 'zhycms:lock:view_flush'
     try:
-        site_ids = [s.id for s in Site.active_sites()]
+        acquired = cache.add(lock_key, '1', timeout=55)
     except Exception as e:
-        current_app.logger.warning('读取站点列表失败，仅合并默认站点：%s', e)
-        site_ids = [0]
-    for sid in site_ids or [0]:
-        _flush_site_views(sid)
+        current_app.logger.warning('浏览量合并锁获取失败，按无锁模式继续：%s', e)
+        acquired = True
+    if not acquired:
+        return
+    try:
+        try:
+            site_ids = [s.id for s in Site.active_sites()]
+        except Exception as e:
+            current_app.logger.warning('读取站点列表失败，仅合并默认站点：%s', e)
+            site_ids = [0]
+        for sid in site_ids or [0]:
+            _flush_site_views(sid)
+    finally:
+        try:
+            cache.delete(lock_key)
+        except Exception as e:
+            current_app.logger.warning('浏览量合并锁释放失败：%s', e)
 
 
 def _inject_default_alt(html):
@@ -969,9 +987,59 @@ def sitemap():
 @frontend_bp.route('/healthz')
 def healthz():
     from sqlalchemy import text
+
+    detail = str(request.args.get('detail') or '').lower() in ('1', 'true', 'yes')
+    db_ok = True
     try:
         db.session.execute(text('SELECT 1'))
-        return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
     except Exception as e:
+        db_ok = False
         current_app.logger.warning('健康检查数据库探测失败：%s', e)
+
+    if not detail:
+        # 保持轻量：默认只探测数据库，语义与旧版本一致
+        if db_ok:
+            return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
         return '{"status":"error"}', 503, {'Content-Type': 'application/json'}
+
+    from ..services.runtime_guard import check_runtime
+    from ..sites import current_site, current_site_id, SESSION_KEY
+
+    runtime = current_app.config.get('ZHYCMS_RUNTIME_INFO') or check_runtime(current_app)
+    redis_state = 'disabled'
+    redis_conn = current_app.config.get('JWT_BLOCKLIST_REDIS')
+    if redis_conn is not None:
+        try:
+            redis_conn.ping()
+            redis_state = 'ok'
+        except Exception as e:
+            redis_state = 'error'
+            current_app.logger.warning('健康检查 Redis 探测失败：%s', e)
+
+    sid = current_site_id()
+    site = current_site()
+    if sid == 0:
+        resolved_by = 'default'
+    elif session.get(SESSION_KEY) == sid:
+        resolved_by = 'session'
+    else:
+        resolved_by = 'domain'
+
+    payload = {
+        'status': 'ok' if db_ok else 'error',
+        'cms_version': Setting.CMS_VERSION,
+        'database': 'ok' if db_ok else 'error',
+        'redis': redis_state,
+        'cache': runtime.get('cache_backend', 'unknown'),
+        'limiter': runtime.get('limiter_backend', 'unknown'),
+        'scheduler': runtime.get('scheduler', 'unknown'),
+        'workers': runtime.get('workers', 1),
+        'site': {
+            'id': sid,
+            'status': getattr(site, 'status', None),
+            'resolved_by': resolved_by,
+        },
+    }
+    import json
+    return json.dumps(payload, ensure_ascii=False), (200 if db_ok else 503), {
+        'Content-Type': 'application/json'}

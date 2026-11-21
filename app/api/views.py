@@ -15,7 +15,7 @@ import hmac
 from functools import wraps
 
 import jwt as pyjwt
-from flask import request, jsonify, current_app
+from flask import g, request, jsonify, current_app
 
 from ..extensions import db, limiter
 from ..models.column import Column, ColumnField
@@ -25,6 +25,7 @@ from ..models.user import User
 from ..models.workflow import STATUS_PUBLISHED
 from ..utils.db_utils import escape_like, LIKE_ESCAPE
 from . import api_bp
+from .openapi import openapi_doc
 
 
 # ============================================================
@@ -36,7 +37,7 @@ def api_ok(data=None, meta=None):
 
 
 def api_err(code, message, http=None):
-    status = {401: 401, 403: 403, 404: 404}.get(code, 400)
+    status = {401: 401, 403: 403, 404: 404, 409: 409}.get(code, 400)
     return jsonify({'code': code, 'message': message, 'data': None, 'meta': None}), http or status
 
 
@@ -102,7 +103,9 @@ api_read_limit = limiter.limit(_read_limit)
 # ============================================================
 
 # 免鉴权端点（登录/登出；refresh 由 jwt_required 装饰器自处理）
-_AUTH_PUBLIC_ENDPOINTS = frozenset({'api.api_login', 'api.api_logout'})
+_AUTH_PUBLIC_ENDPOINTS = frozenset({
+    'api.api_login', 'api.api_logout', 'api.api_openapi',
+})
 
 
 @api_bp.before_request
@@ -114,6 +117,14 @@ def _api_gate():
     # 登录/登出端点免鉴权；refresh 端点由 @jwt_required(refresh=True) 自处理
     if endpoint in _AUTH_PUBLIC_ENDPOINTS or endpoint == 'api.api_refresh':
         return None
+
+    # v3.2.11：写端点默认关闭，开启后仅接受 Bearer JWT
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        if Setting.get('api_write_enable') != 'on':
+            return api_err(404, '资源不存在')
+        if not request.headers.get('Authorization', '').lower().startswith('bearer '):
+            return api_err(403, '写接口仅支持 Bearer JWT')
+        return _check_jwt()
 
     auth_mode = (Setting.get('api_auth_mode') or 'both').lower()
 
@@ -174,6 +185,8 @@ def _check_jwt():
         return api_err(401, 'JWT 无效或已过期')
     if active_user_for_identity(claims.get('sub')) is None:
         return api_err(401, '账号不可用或令牌已失效')
+    g.api_identity = claims.get('sub')
+    g.api_claims = claims
     return None
 
 
@@ -329,6 +342,7 @@ def _get_enabled_column(slug):
 @api_bp.route('/site')
 @api_read_limit
 @api_cache('site')
+@openapi_doc('站点信息', tags=['site'], auth='both')
 def site_info():
     from ..sites import current_site, current_site_id
     s = Setting.get_dict()
@@ -361,6 +375,11 @@ def site_info():
 
 @api_bp.route('/columns')
 @api_cache('columns')
+@openapi_doc(
+    '栏目列表', tags=['content'], auth='both',
+    params=[{'name': 'tree', 'in': 'query', 'schema': {'type': 'string',
+                                                       'enum': ['0', '1']}}],
+)
 def columns_index():
     from ..sites import current_site_id
     sid = current_site_id()
@@ -388,6 +407,11 @@ def columns_index():
 @api_bp.route('/columns/<slug>')
 @api_read_limit
 @api_cache('column')
+@openapi_doc(
+    '栏目详情', tags=['content'], auth='both',
+    params=[{'name': 'slug', 'in': 'path', 'required': True,
+             'schema': {'type': 'string'}}],
+)
 def column_detail(slug):
     col = _get_enabled_column(slug)
     if col is None:
@@ -406,6 +430,14 @@ def column_detail(slug):
 
 @api_bp.route('/columns/<slug>/articles')
 @api_cache('column_articles')
+@openapi_doc(
+    '栏目文章列表', tags=['content'], auth='both',
+    params=[
+        {'name': 'slug', 'in': 'path', 'required': True, 'schema': {'type': 'string'}},
+        {'name': 'page', 'in': 'query', 'schema': {'type': 'integer'}},
+        {'name': 'limit', 'in': 'query', 'schema': {'type': 'integer'}},
+    ],
+)
 def column_articles(slug):
     col = _get_enabled_column(slug)
     if col is None:
@@ -440,6 +472,11 @@ def column_articles(slug):
 
 @api_bp.route('/articles/<int:aid>')
 @api_cache('article')
+@openapi_doc(
+    '文章详情', tags=['content'], auth='both',
+    params=[{'name': 'aid', 'in': 'path', 'required': True,
+             'schema': {'type': 'integer'}}],
+)
 def article_detail(aid):
     from ..sites import current_site_id
     a = db.session.get(Article, aid)
@@ -466,3 +503,16 @@ def _to_int(val, default):
         return int(val)
     except (TypeError, ValueError):
         return default
+
+
+# ============================================================
+# OpenAPI 契约（v3.2.11）
+# ============================================================
+
+@api_bp.route('/openapi.json')
+@api_read_limit
+@api_cache('openapi')
+def api_openapi():
+    """输出 OpenAPI 3.0 契约（随 api_enable 开关生效，免鉴权）。"""
+    from .openapi import build_spec
+    return jsonify(build_spec(current_app))

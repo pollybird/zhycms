@@ -1,6 +1,9 @@
 import os
 import re
 import logging
+import threading
+import time
+import uuid
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -305,14 +308,70 @@ def _register_dynamic_admin_rules(app, target_prefix=None):
 # 定时任务（模块4：自动备份 + 模块2：审计日志清理）
 # ============================================================
 
+def _acquire_scheduler_leadership(app):
+    """多 worker 下通过 Redis 竞争调度器领导者，避免定时任务重复执行。"""
+    token = f'{os.getpid()}:{uuid.uuid4().hex}'
+    try:
+        if cache.add('zhycms:sched:leader', token, timeout=90):
+            return token
+    except Exception as e:
+        # 返回空字符串表示未取得锁但仍按无锁模式启动（Redis 异常时避免全部停摆）
+        app.logger.warning('调度器领导者锁获取失败，按无锁模式运行：%s', e)
+        return ''
+    return None
+
+
+def _start_leader_renewal(app, sched, token):
+    """后台线程续期领导者锁；锁丢失时停止当前进程的调度器。"""
+    def _loop():
+        with app.app_context():
+            while True:
+                time.sleep(30)
+                try:
+                    if cache.get('zhycms:sched:leader') != token:
+                        app.logger.warning('调度器领导者锁已丢失，停止本进程调度器')
+                        sched.shutdown(wait=False)
+                        from .services.runtime_guard import set_scheduler_role
+                        set_scheduler_role('follower', app)
+                        break
+                    cache.set('zhycms:sched:leader', token, timeout=90)
+                except Exception as e:
+                    app.logger.warning('调度器领导者锁续期失败：%s', e)
+
+    threading.Thread(target=_loop, daemon=True, name='zhycms-sched-leader').start()
+
+
 def _setup_scheduler(app):
-    """在单进程环境下启动 APScheduler（多进程请用外部 cron）。"""
+    """启动 APScheduler。
+
+    多 worker + Redis 时仅领导者进程执行定时任务；可通过
+    ``ZHYCMS_SCHEDULER_ENABLED=0`` 关闭内置调度，交由外部 cron。
+    """
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
         from apscheduler.triggers.interval import IntervalTrigger
     except ImportError:
         return None
+
+    from .services.runtime_guard import (
+        worker_count, redis_active, set_scheduler_role,
+    )
+
+    mode = (os.environ.get('ZHYCMS_SCHEDULER_ENABLED') or '').strip().lower()
+    if mode in ('0', 'false', 'off', 'no'):
+        set_scheduler_role('disabled', app)
+        app.logger.info('内置调度器已通过 ZHYCMS_SCHEDULER_ENABLED 关闭')
+        return None
+    forced = mode in ('1', 'true', 'on', 'yes')
+
+    leader_token = None
+    if not forced and worker_count() > 1 and redis_active(app):
+        leader_token = _acquire_scheduler_leadership(app)
+        if leader_token is None:
+            set_scheduler_role('follower', app)
+            app.logger.info('当前 worker 未获得调度器领导者锁，跳过定时任务')
+            return None
 
     sched = BackgroundScheduler(daemon=True, timezone='Asia/Shanghai')
 
@@ -419,6 +478,12 @@ def _setup_scheduler(app):
         except Exception as e:
             app.logger.warning('调度器启动失败（非致命，定时任务不可用）：%s', e)
             return None
+        set_scheduler_role('leader', app)
+        if leader_token:
+            _start_leader_renewal(app, sched, leader_token)
+    else:
+        # reloader 父进程不启动调度器，也不参与领导者竞争
+        set_scheduler_role('disabled', app)
     set_scheduler(sched)
     return sched
 
@@ -743,6 +808,9 @@ def create_app(config_name=None):
     # v2.5.0：Redis 缓存 + 服务端 Session
     # 自动检测：环境变量 REDIS_URL 有值且 Redis 可达 → 启用；否则 SimpleCache + Cookie
     redis_url = _resolve_redis_url(app)
+    # v3.2.10：限流与缓存/会话共用同一 Redis，多 worker 下计数才能共享
+    from .services.runtime_guard import configure_redis_backends
+    configure_redis_backends(app, redis_url)
 
     if redis_url:
         # Redis 缓存
@@ -794,8 +862,13 @@ def create_app(config_name=None):
     def _jwt_blocklist_check(_jwt_header, jwt_payload):
         return _jwt_is_revoked(jwt_payload.get('jti'))
 
-    # v2.6.3：API 速率限制初始化（未配置 Redis 时用内存存储，多实例下不精确但可用）
+    # v2.6.3：API 速率限制初始化
+    # v3.2.10：配置 Redis 时使用共享存储，多 worker / 多实例计数一致
     limiter.init_app(app)
+
+    # v3.2.10：运行形态自检（多 worker 无 Redis → ERROR + 后台横幅）
+    from .services.runtime_guard import check_runtime
+    check_runtime(app)
 
     # 兜底编译核心翻译（.mo 不入库；开发环境未 pybabel compile 时自动生成，
     # 避免英文等语种下全站 _() 文案回退中文）
@@ -855,6 +928,8 @@ def create_app(config_name=None):
             zhycms_enc_unavailable=bool(app.config.get('ZHYCMS_ENC_UNAVAILABLE')),
             # 迁移未完成标记（后台 base.html 渲染红色横幅，提示手动 flask db upgrade）
             zhycms_migration_failed=bool(app.config.get('ZHYCMS_MIGRATION_FAILED')),
+            # v3.2.10：多 worker 未启用 Redis 时的运行形态告警
+            zhycms_runtime_warning=app.config.get('ZHYCMS_RUNTIME_WARNING', ''),
         )
 
     # v2.2.0 插件菜单（启用 + 有权限才显示；后台模板使用）

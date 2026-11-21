@@ -1,0 +1,574 @@
+# 由 scripts/generate_openapi.py 自动生成，请勿手工修改
+"openapi": "3.0.3"
+"info":
+  "title": "ZhyCMS Content API"
+  "version": "3.2.11"
+  "description": "ZhyCMS 对外内容 API。只读端点支持 Bearer JWT 或 X-API-Token；写端点默认关闭，开启后仅接受 Bearer JWT。"
+"servers":
+  - "url": "/"
+"tags":
+  - "name": "site"
+    "description": "站点信息"
+  - "name": "content"
+    "description": "栏目与文章"
+  - "name": "auth"
+    "description": "JWT 鉴权"
+  - "name": "forms"
+    "description": "表单提交"
+  - "name": "sites"
+    "description": "站点与资源计量（超管）"
+  - "name": "plugins"
+    "description": "插件内容"
+"paths":
+  "/api/v1/site":
+    "get":
+      "summary": "站点信息"
+      "tags":
+        - "site"
+      "responses":
+        "200":
+          "description": "成功"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+  "/api/v1/columns":
+    "get":
+      "summary": "栏目列表"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "tree"
+          "in": "query"
+          "schema":
+            "type": "string"
+            "enum":
+              - "0"
+              - "1"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+    "post":
+      "summary": "创建栏目"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "required":
+                - "name"
+                - "slug"
+              "properties":
+                "name":
+                  "type": "string"
+                "slug":
+                  "type": "string"
+                "type":
+                  "type": "string"
+                  "enum":
+                    - "list"
+                    - "page"
+                    - "link"
+                "parent_id":
+                  "type": "integer"
+                  "nullable": true
+                "summary":
+                  "type": "string"
+                "sort_order":
+                  "type": "integer"
+                "is_enabled":
+                  "type": "boolean"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/columns/{slug}":
+    "get":
+      "summary": "栏目详情"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "slug"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+  "/api/v1/columns/{slug}/articles":
+    "get":
+      "summary": "栏目文章列表"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "slug"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+        - "name": "page"
+          "in": "query"
+          "schema":
+            "type": "integer"
+        - "name": "limit"
+          "in": "query"
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+  "/api/v1/articles/{aid}":
+    "get":
+      "summary": "文章详情"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "aid"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+  "/api/v1/auth/login":
+    "post":
+      "summary": "JWT 登录"
+      "tags":
+        - "auth"
+      "responses":
+        "200":
+          "description": "成功"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "required":
+                - "username"
+                - "password"
+              "properties":
+                "username":
+                  "type": "string"
+                "password":
+                  "type": "string"
+                  "format": "password"
+      "security": []
+  "/api/v1/auth/refresh":
+    "post":
+      "summary": "刷新 access token"
+      "tags":
+        - "auth"
+      "responses":
+        "200":
+          "description": "成功"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/auth/logout":
+    "post":
+      "summary": "登出"
+      "tags":
+        - "auth"
+      "responses":
+        "200":
+          "description": "成功"
+      "security": []
+  "/api/v1/articles":
+    "post":
+      "summary": "创建文章（默认草稿）"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "required":
+                - "column_id"
+                - "title"
+              "properties":
+                "column_id":
+                  "type": "integer"
+                "title":
+                  "type": "string"
+                "summary":
+                  "type": "string"
+                "content":
+                  "type": "string"
+                "status":
+                  "type": "string"
+                  "enum":
+                    - "draft"
+                    - "review"
+                    - "published"
+                    - "archived"
+                "author":
+                  "type": "string"
+                "source":
+                  "type": "string"
+                "cover":
+                  "type": "string"
+                "seo_title":
+                  "type": "string"
+                "seo_keywords":
+                  "type": "string"
+                "seo_description":
+                  "type": "string"
+                "fields":
+                  "type": "object"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/articles/{article_id}":
+    "put":
+      "summary": "更新文章"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "article_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "required":
+                - "title"
+              "properties":
+                "column_id":
+                  "type": "integer"
+                "title":
+                  "type": "string"
+                "summary":
+                  "type": "string"
+                "content":
+                  "type": "string"
+                "status":
+                  "type": "string"
+                  "enum":
+                    - "draft"
+                    - "review"
+                    - "published"
+                    - "archived"
+                "author":
+                  "type": "string"
+                "source":
+                  "type": "string"
+                "cover":
+                  "type": "string"
+                "seo_title":
+                  "type": "string"
+                "seo_keywords":
+                  "type": "string"
+                "seo_description":
+                  "type": "string"
+                "fields":
+                  "type": "object"
+      "security":
+        - "bearerAuth": []
+    "delete":
+      "summary": "删除文章（软删除）"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "article_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/columns/{column_id}":
+    "put":
+      "summary": "更新栏目"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "column_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "required":
+                - "name"
+                - "slug"
+              "properties":
+                "name":
+                  "type": "string"
+                "slug":
+                  "type": "string"
+                "type":
+                  "type": "string"
+                  "enum":
+                    - "list"
+                    - "page"
+                    - "link"
+                "parent_id":
+                  "type": "integer"
+                  "nullable": true
+                "summary":
+                  "type": "string"
+                "sort_order":
+                  "type": "integer"
+                "is_enabled":
+                  "type": "boolean"
+                "seo_title":
+                  "type": "string"
+                "seo_keywords":
+                  "type": "string"
+                "seo_description":
+                  "type": "string"
+      "security":
+        - "bearerAuth": []
+    "delete":
+      "summary": "删除栏目"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "column_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/fragments":
+    "post":
+      "summary": "创建碎片"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "requestBody":
+        "required": true
+        "content":
+          "application/json":
+            "schema":
+              "type": "object"
+              "required":
+                - "name"
+                - "slug"
+              "properties":
+                "name":
+                  "type": "string"
+                "slug":
+                  "type": "string"
+                "field_type":
+                  "type": "string"
+                  "enum":
+                    - "text"
+                    - "textarea"
+                    - "richtext"
+                    - "image"
+                    - "url"
+                    - "number"
+                    - "file"
+                "value":
+                  "type": "string"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/fragments/{fragment_id}":
+    "put":
+      "summary": "更新碎片"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "fragment_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+    "delete":
+      "summary": "删除碎片"
+      "tags":
+        - "content"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "fragment_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/forms/{slug}/submissions":
+    "get":
+      "summary": "表单提交列表"
+      "tags":
+        - "forms"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "slug"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+        - "name": "page"
+          "in": "query"
+          "schema":
+            "type": "integer"
+        - "name": "per_page"
+          "in": "query"
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/sites":
+    "get":
+      "summary": "站点列表（超管）"
+      "tags":
+        - "sites"
+      "responses":
+        "200":
+          "description": "成功"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/sites/{site_id}/metrics":
+    "get":
+      "summary": "站点资源计量（超管）"
+      "tags":
+        - "sites"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "site_id"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+  "/api/v1/banners/{slug}":
+    "get":
+      "summary": "轮播图分组"
+      "tags":
+        - "plugins"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "slug"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+  "/api/v1/columns/{slug}/products":
+    "get":
+      "summary": "栏目产品列表"
+      "tags":
+        - "plugins"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "slug"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "string"
+        - "name": "page"
+          "in": "query"
+          "schema":
+            "type": "integer"
+        - "name": "per_page"
+          "in": "query"
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+  "/api/v1/products/{pid}":
+    "get":
+      "summary": "产品详情"
+      "tags":
+        - "plugins"
+      "responses":
+        "200":
+          "description": "成功"
+      "parameters":
+        - "name": "pid"
+          "in": "path"
+          "required": true
+          "schema":
+            "type": "integer"
+      "security":
+        - "bearerAuth": []
+        - "apiToken": []
+"components":
+  "securitySchemes":
+    "bearerAuth":
+      "type": "http"
+      "scheme": "bearer"
+      "bearerFormat": "JWT"
+    "apiToken":
+      "type": "apiKey"
+      "in": "header"
+      "name": "X-API-Token"
+  "schemas":
+    "Envelope":
+      "type": "object"
+      "properties":
+        "code":
+          "type": "integer"
+        "message":
+          "type": "string"
+        "data": {}
+        "meta":
+          "type": "object"
+          "nullable": true

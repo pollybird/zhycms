@@ -25,8 +25,11 @@ def parse_args(argv=None):
                         help='项目根目录（默认脚本上级目录）')
     parser.add_argument('--base-domain', default=None,
                         help='子域站点使用的基础域名，缺省读取站点设置 site_url')
-    parser.add_argument('--upstream', default=None,
-                        help='后端地址，默认 127.0.0.1:5000')
+    backend = parser.add_mutually_exclusive_group()
+    backend.add_argument('--upstream', default=None,
+                         help='单个后端地址，默认 127.0.0.1:5000')
+    backend.add_argument('--upstreams', default=None,
+                         help='多实例后端地址，逗号分隔，如 127.0.0.1:5000,127.0.0.1:5001')
     parser.add_argument('--output-dir', default='build/nginx',
                         help='输出目录，默认 build/nginx')
     parser.add_argument('--stdout', action='store_true',
@@ -84,12 +87,13 @@ def main(argv=None):
         sys.path.insert(0, app_root)
 
     from app import create_app
-    from app.services.site_deploy import generate_for_app
+    from app.services.site_deploy import generate_for_app, render_upstream_block
 
+    upstreams = [u for u in (args.upstreams or '').split(',') if u.strip()]
     app = create_app()
     text, entries, skipped = generate_for_app(
         app, base_domain=args.base_domain, upstream=args.upstream,
-        ssl=args.ssl, site_id=args.site_id)
+        ssl=args.ssl, site_id=args.site_id, upstreams=upstreams)
 
     for item in skipped:
         print(f'跳过站点 {item["site_id"]}（{item["name"]}）：{item["reason"]}',
@@ -105,6 +109,13 @@ def main(argv=None):
 
     output_dir = os.path.abspath(args.output_dir)
     os.makedirs(output_dir, exist_ok=True)
+    # 多实例 upstream 独立成文件，避免多个站点配置重复定义 upstream
+    block = render_upstream_block(upstreams)
+    if block:
+        upstream_path = os.path.join(output_dir, '00-zhycms-upstream.conf')
+        with open(upstream_path, 'w', encoding='utf-8') as fh:
+            fh.write(block + '\n')
+        print(f'已生成 {upstream_path}')
     for entry in entries:
         path = os.path.join(output_dir, entry['filename'])
         with open(path, 'w', encoding='utf-8') as fh:

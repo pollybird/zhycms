@@ -19,6 +19,7 @@ from ..models.setting import Setting
 from ..utils import jwt_blocklist
 from ..utils.api_jwt import create_token, decode_token, access_expires_seconds
 from . import api_bp
+from .openapi import openapi_doc
 from .views import api_ok, api_err, active_user_for_identity
 
 
@@ -50,6 +51,13 @@ def _bearer_token():
 
 @api_bp.route('/auth/login', methods=['POST'])
 @limiter.limit(_login_limit)
+@openapi_doc(
+    'JWT 登录', tags=['auth'], auth='none',
+    body={'type': 'object', 'required': ['username', 'password'], 'properties': {
+        'username': {'type': 'string'},
+        'password': {'type': 'string', 'format': 'password'},
+    }},
+)
 def api_login():
     """用户名密码登录，签发 JWT。"""
     data = request.get_json(silent=True) or {}
@@ -89,6 +97,7 @@ def api_login():
 
 
 @api_bp.route('/auth/refresh', methods=['POST'])
+@openapi_doc('刷新 access token', tags=['auth'], auth='jwt')
 def api_refresh():
     """用 refresh_token 换取新的 access_token。"""
     token = _bearer_token()
@@ -113,6 +122,7 @@ def api_refresh():
 
 
 @api_bp.route('/auth/logout', methods=['POST'])
+@openapi_doc('登出', tags=['auth'], auth='none')
 def api_logout():
     """登出。
 

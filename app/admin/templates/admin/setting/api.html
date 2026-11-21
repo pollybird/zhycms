@@ -131,6 +131,27 @@
       </div>
     </div>
 
+    <div class="card card-outline card-warning">
+      <div class="card-header"><h3 class="card-title">{{ _('内容写端点（v3.2.11）') }}</h3></div>
+      <div class="card-body">
+        <div class="form-group">
+          <div class="icheck-primary">
+            <input type="checkbox" name="api_write_enable" value="on" id="api_write_enable" {{ 'checked' if settings.api_write_enable == 'on' }}>
+            <label for="api_write_enable">{{ _('启用写端点（文章 / 栏目 / 碎片）') }}</label>
+          </div>
+          <small class="form-text text-muted">{{ _('默认关闭。开启后写端点仅接受 Bearer JWT，仍按角色与栏目授权校验。') }}</small>
+        </div>
+        <div class="form-group">
+          <label>{{ _('写端点限流（次/分钟）') }}</label>
+          <input type="number" name="api_rate_limit_write" class="form-control" min="1" max="10000" value="{{ settings.api_rate_limit_write }}">
+          <small class="form-text text-muted">{{ _('按账号 + IP 限流，作用于 POST/PUT/DELETE 写请求') }}</small>
+        </div>
+        <div class="alert alert-warning mb-0" style="font-size:13px;">
+          {{ _('启用前请确认已通过 JWT 登录并具备对应权限（content:create/edit/delete、column:manage、system:settings）。') }}
+        </div>
+      </div>
+    </div>
+
     <div class="card card-outline card-secondary">
       <div class="card-header"><h3 class="card-title">{{ _('端点一览') }}</h3></div>
       <div class="card-body p-0">

@@ -68,6 +68,44 @@ def _log_paths(site_id):
     )
 
 
+_UPSTREAM_RE = re.compile(r'^[A-Za-z0-9.\-\[\]:]+$')
+
+
+def normalize_upstreams(upstreams):
+    """清洗多实例后端地址；非法片段直接丢弃。"""
+    cleaned = []
+    for raw in upstreams or []:
+        item = str(raw or '').strip()
+        if item and _UPSTREAM_RE.match(item) and item not in cleaned:
+            cleaned.append(item)
+    return cleaned
+
+
+def render_upstream_block(upstreams):
+    """生成多实例 upstream 块；少于两个地址时返回空字符串。"""
+    cleaned = normalize_upstreams(upstreams)
+    if len(cleaned) < 2:
+        return ''
+    servers = '\n'.join(f'    server {item};' for item in cleaned)
+    return (
+        '# zhycms 多实例后端（由站点部署脚本生成）\n'
+        'upstream zhycms_backend {\n'
+        f'{servers}\n'
+        '    keepalive 32;\n'
+        '}'
+    )
+
+
+def resolve_upstream(upstream=None, upstreams=None):
+    """多实例时返回 upstream 组名，否则返回单个后端地址。"""
+    cleaned = normalize_upstreams(upstreams)
+    if len(cleaned) > 1:
+        return 'zhycms_backend'
+    if cleaned:
+        return cleaned[0]
+    return upstream or DEFAULT_UPSTREAM
+
+
 def _proxy_location(upstream):
     return f"""    location / {{
         proxy_pass http://{upstream};
@@ -148,7 +186,7 @@ def render_site_block(site, base_domain=None, upstream=None, ssl=False,
 
 
 def render_site_entries(sites, base_domain=None, upstream=None, ssl=False,
-                        upload_max_mb=None):
+                        upload_max_mb=None, upstreams=None):
     """渲染全部站点，返回 (entries, skipped)。
 
     entries: [{'site_id', 'name', 'filename', 'content'}]
@@ -157,6 +195,7 @@ def render_site_entries(sites, base_domain=None, upstream=None, ssl=False,
     """
     ordered = [s for s in sites if not is_default_site(s)]
     ordered += [s for s in sites if is_default_site(s)]
+    upstream = resolve_upstream(upstream, upstreams)
 
     entries, skipped = [], []
     for site in ordered:
@@ -181,19 +220,22 @@ def render_site_entries(sites, base_domain=None, upstream=None, ssl=False,
 
 
 def render_nginx_config(sites, base_domain=None, upstream=None, ssl=False,
-                        upload_max_mb=None):
+                        upload_max_mb=None, upstreams=None):
     """渲染全部站点为单个配置文本，返回 (text, skipped)。"""
     entries, skipped = render_site_entries(
         sites, base_domain=base_domain, upstream=upstream, ssl=ssl,
-        upload_max_mb=upload_max_mb)
+        upload_max_mb=upload_max_mb, upstreams=upstreams)
     text = '\n\n'.join(e['content'] for e in entries)
+    block = render_upstream_block(upstreams)
+    if block:
+        text = f'{block}\n\n{text}' if text else block
     if text:
         text += '\n'
     return text, skipped
 
 
 def generate_for_app(app, base_domain=None, upstream=None, ssl=False,
-                     site_id=None):
+                     site_id=None, upstreams=None):
     """在应用上下文中读取站点并渲染，返回 (text, entries, skipped)。"""
     from ..models.setting import Setting
     from ..models.site import Site
@@ -215,8 +257,11 @@ def generate_for_app(app, base_domain=None, upstream=None, ssl=False,
             max_mb = DEFAULT_UPLOAD_MAX_MB
         entries, skipped = render_site_entries(
             sites, base_domain=base, upstream=upstream, ssl=ssl,
-            upload_max_mb=max_mb)
+            upload_max_mb=max_mb, upstreams=upstreams)
     text = '\n\n'.join(e['content'] for e in entries)
+    block = render_upstream_block(upstreams)
+    if block:
+        text = f'{block}\n\n{text}' if text else block
     if text:
         text += '\n'
     return text, entries, skipped
