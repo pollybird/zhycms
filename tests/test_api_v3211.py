@@ -99,7 +99,9 @@ def _isolate(app):
     from app.models.article import (
         Article, ArticleFieldValue, ArticleTranslation,
     )
-    from app.models.column import Column
+    from app.models.column import (
+        Column, ColumnField, ColumnFieldValue, ColumnTranslation,
+    )
     from app.models.fragment import Fragment
     from app.models.rbac import Role, RolePermission, UserRole
     from app.models.site import Site
@@ -126,6 +128,15 @@ def _isolate(app):
                     ArticleVersion.article_id.in_(aids)).delete(
                         synchronize_session=False)
                 Article.query.filter(Article.id.in_(aids)).delete(
+                    synchronize_session=False)
+            ColumnFieldValue.query.filter(
+                ColumnFieldValue.column_id.in_(col_ids)).delete(
+                    synchronize_session=False)
+            ColumnTranslation.query.filter(
+                ColumnTranslation.column_id.in_(col_ids)).delete(
+                    synchronize_session=False)
+            ColumnField.query.filter(
+                ColumnField.column_id.in_(col_ids)).delete(
                     synchronize_session=False)
         Column.query.filter(Column.slug.like(f'{COL_SLUG_PREFIX}%')).delete(
             synchronize_session=False)
@@ -306,6 +317,42 @@ def test_delete_article_updates_search_index(app, client, monkeypatch):
     from app.models.article import Article
     with app.app_context():
         assert db.session.get(Article, article_id).is_deleted is True
+
+
+def test_create_column_with_json_body(app, client):
+    """JSON 请求体可创建栏目（save_column 需要 MultiDict 的 getlist）。"""
+    _set(app, 'api_write_enable', 'on')
+    resp = client.post('/api/v1/columns', headers=_bearer(_jwt(app, _admin_id(app))),
+                       json={'name': 'API 栏目', 'slug': 'v3211-api',
+                             'type': 'list', 'summary': '摘要'})
+    assert resp.status_code == 200
+    data = resp.get_json()['data']
+    from app.models.column import Column
+    with app.app_context():
+        col = db.session.get(Column, data['id'])
+        assert col.slug == 'v3211-api'
+        assert col.is_enabled is True
+
+
+def test_update_column_preserves_custom_fields(app, client):
+    """更新栏目不会清空 API 未暴露的自定义字段。"""
+    from app.models.column import Column, ColumnField
+    _set(app, 'api_write_enable', 'on')
+    col_id = _mk_column(app, slug='v3211-upd', name='旧名称')
+    with app.app_context():
+        db.session.add(ColumnField(column_id=col_id, field_key='author',
+                                   label='作者', field_type='text',
+                                   is_deleted=False))
+        db.session.commit()
+    resp = client.put(f'/api/v1/columns/{col_id}',
+                      headers=_bearer(_jwt(app, _admin_id(app))),
+                      json={'name': '新名称', 'slug': 'v3211-upd', 'type': 'list'})
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Column, col_id).name == '新名称'
+        kept = ColumnField.query.filter_by(column_id=col_id,
+                                           field_key='author').first()
+        assert kept is not None and kept.is_deleted is False
 
 
 def test_delete_column_with_children_conflict(app, client):

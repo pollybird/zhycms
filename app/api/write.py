@@ -7,11 +7,12 @@
 from datetime import date
 
 from flask import g, request
+from werkzeug.datastructures import MultiDict
 
 from ..constants import Workflow as _W
 from ..extensions import db, limiter
 from ..models.article import Article
-from ..models.column import Column
+from ..models.column import Column, ColumnField
 from ..models.fragment import Fragment
 from ..models.setting import Setting
 from ..services.article_service import save_article
@@ -47,7 +48,7 @@ def _form_data(payload, fields=()):
     自定义字段按 ``fields`` 的 field_key（或直接写字段 id）映射为
     ``field_<id>``，与后台表单命名保持一致。
     """
-    form = {}
+    form = MultiDict()
     for key, value in payload.items():
         if isinstance(value, bool):
             form[key] = 'on' if value else ''
@@ -63,6 +64,75 @@ def _form_data(payload, fields=()):
             if fid is None:
                 continue
             form[f'field_{fid}'] = '' if value is None else str(value)
+    return form
+
+
+def _column_form(payload, column=None):
+    """构造 save_column 需要的表单映射。
+
+    ``save_column`` 面向后台表单，用 ``getlist`` 读取自定义字段数组；
+    因此这里必须返回 MultiDict。更新时额外回填 API 未暴露的子资源
+    （字段配置、单页字段值、翻译、模板等），避免 PUT 把它们清空。
+    """
+    form = _form_data(payload)
+    if column is not None:
+        fields = column.fields.filter_by(is_deleted=False).order_by(
+            ColumnField.sort_order.asc()).all()
+        for i, f in enumerate(fields):
+            form.add('field_id[]', str(f.id))
+            form.add('field_key[]', f.field_key)
+            form.add('field_label[]', f.label)
+            form.add('field_type[]', f.field_type)
+            form.add('field_required[]', str(i) if f.is_required else '')
+            form.add('field_visible[]', str(i) if f.is_frontend_visible else '')
+            form.add('field_exts[]', f.allowed_exts or '')
+            form.add('field_maxsize[]',
+                     str(f.max_size // 1024) if f.max_size else '')
+            value = column.get_field_value(f.id) or ''
+            if f.field_type in ('image', 'file'):
+                form[f'field_{f.id}_existing'] = value
+            else:
+                form[f'field_{f.id}'] = value
+
+        if column.type == 'page':
+            for key, val in (
+                ('page_content', column.page_content or ''),
+                ('page_content_format', column.page_content_format or 'html'),
+                ('page_content_md', column.page_content_md or ''),
+            ):
+                if key not in form:
+                    form[key] = val
+        for tr in column.translations:
+            for key, val in (
+                ('name', tr.name or ''),
+                ('summary', tr.summary or ''),
+                ('page_content', tr.page_content or ''),
+                ('page_content_format', tr.page_content_format or 'html'),
+                ('page_content_md', tr.page_content_md or ''),
+                ('seo_title', tr.seo_title or ''),
+                ('seo_keywords', tr.seo_keywords or ''),
+                ('seo_description', tr.seo_description or ''),
+            ):
+                name = f'{key}_{tr.locale}'
+                if name not in form:
+                    form[name] = val
+
+        for key, val in (
+            ('parent_mode', column.parent_mode),
+            ('list_template', column.list_template or ''),
+            ('detail_template', column.detail_template or ''),
+            ('page_template', column.page_template or ''),
+            ('page_size', column.page_size),
+            ('link_url', column.link_url or ''),
+            ('link_target', column.link_target or '_self'),
+            ('member_only', 'on' if column.member_only else ''),
+        ):
+            if key not in form and val is not None:
+                form[key] = str(val)
+
+    if 'is_enabled' not in form:
+        # 后台表单未勾选即关闭；API 新建默认启用，更新则沿用原状态
+        form['is_enabled'] = 'on' if column is None or column.is_enabled else ''
     return form
 
 
@@ -285,9 +355,7 @@ def create_column():
     if _deny(user, 'column:manage'):
         return api_err(403, '无栏目管理权限')
 
-    form = _form_data(_json_body())
-    # 后台表单未勾选即关闭；API 新建默认启用，避免创建后前台不可见
-    form.setdefault('is_enabled', 'on')
+    form = _column_form(_json_body())
     column, messages = save_column(None, form_data=form, files_data={})
     if column is None:
         return api_err(400, '；'.join(m for _c, m in messages) or '创建失败')
@@ -324,9 +392,7 @@ def update_column(column_id):
     if column is None:
         return api_err(404, '栏目不存在')
 
-    form = _form_data(_json_body())
-    if 'is_enabled' not in form:
-        form['is_enabled'] = 'on' if column.is_enabled else ''
+    form = _column_form(_json_body(), column)
     updated, messages = save_column(
         column, form_data=form, files_data={})
     if updated is None:
