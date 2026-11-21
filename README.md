@@ -558,4 +558,6 @@ zhycms/
 
 本项目基于 [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0) 开源。
 
+随项目分发的前端第三方组件（CKEditor 5、Bootstrap、Font Awesome 等）仍受各自许可证约束，版权声明、许可证全文与署名要求见 [THIRD_PARTY_NOTICES](./THIRD_PARTY_NOTICES)。
+
 Copyright 2026 泰州姜堰钟毓信息技术有限公司
