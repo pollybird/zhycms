@@ -2,7 +2,7 @@
 
 本文说明 ZhyCMS 的信创数据库适配现状、后续适配思路与贡献方式。
 
-> **结论先行**：官方目前**仅实现并验证了 openGauss**（v3.3.0，x86_64）。
+> **结论先行**：官方目前**仅实现并验证了 openGauss**（v3.3.0，x86_64 + aarch64/鲲鹏）。
 > 达梦、人大金仓、南大通用、PolarDB 等数据库**尚未实现、尚未验证**，本文给出的是
 > 适配思路与工作量评估，不构成支持承诺。欢迎社区按本文路径提交贡献。
 
@@ -10,7 +10,7 @@
 
 | 数据库 | 兼容基础 | 官方状态 | 验证范围 |
 | --- | --- | --- | --- |
-| openGauss 7.0 | PostgreSQL 协议 + 自有方言差异 | **已实现**（v3.3.0） | x86_64；迁移 `0020`、向导、业务读写、备份恢复 |
+| openGauss 7.0 | PostgreSQL 协议 + 自有方言差异 | **已实现**（v3.3.0） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复 |
 | 人大金仓 KingbaseES V8/V9 | PostgreSQL 协议（`sys_` 系工具与系统表） | 未实现 | 无 |
 | PolarDB（PostgreSQL 版 / PolarDB-X） | PostgreSQL / MySQL 协议 | 未实现 | 无 |
 | 达梦 DM8 | Oracle 风格自有协议 | 未实现 | 无 |
@@ -159,6 +159,55 @@ DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
 
 ## 六、验证状态声明
 
-除 openGauss 7.0（x86_64）外，本文提及的达梦、人大金仓、南大通用、PolarDB 等
+除 openGauss 7.0（x86_64 + aarch64/鲲鹏）外，本文提及的达梦、人大金仓、南大通用、PolarDB 等
 数据库均**未实现、未验证**。文中驱动名、工具名与差异点为适配方向，可能随产品
 版本变化，落地前请以目标环境的官方文档和实测结果为准。
+
+## 七、openGauss ARM 架构（aarch64/鲲鹏）实测记录
+
+v3.3.0 发布后，在华为云鲲鹏 ARM 环境（Huawei Cloud EulerOS 3.0，aarch64）上对
+openGauss 7.0 Lite 进行了端到端实测，验证结果如下：
+
+### 环境信息
+
+| 项目 | 值 |
+| --- | --- |
+| CPU 架构 | aarch64（鲲鹏） |
+| 操作系统 | Huawei Cloud EulerOS 3.0 |
+| openGauss 版本 | openGauss-Lite 7.0.0 build 2397a86f, aarch64-unknown-linux-gnu |
+| Python 驱动 | openGauss-Python 7.0.0（aarch64），psycopg2 |
+| 驱动安装路径 | `/tmp/opengauss/python-driver/`（需设置 `LD_LIBRARY_PATH` 与 `PYTHONPATH`） |
+
+### ARM 架构依赖注意事项
+
+openGauss Lite 在 aarch64 上运行需要以下系统库，部分发行版默认未安装：
+
+- **`libopenblas.so.0`**：提供 `cblas_sgemv`、`LAPACKE_sgeqrf`、`LAPACKE_sorgqr` 等符号。
+  若系统已有 scipy 内嵌的 openblas（如 `/usr/lib64/python3.x/site-packages/scipy.libs/libopenblas*.so`），
+  可创建 wrapper `.so` 桥接符号；否则需安装 `openblas` 包。
+- **`libatomic.so.1`**：提供 `__atomic_load_16`、`__atomic_store_16` 等 128 位原子操作。
+  需安装 `libatomic`（GCC 运行时库），或编译带 `LIBATOMIC_1.0` 版本符号的 stub。
+
+Docker 镜像 `pollybird/opengauss:7.0.0` 已包含上述依赖，容器部署无需额外处理。
+
+### 实测结果（26 项全部通过）
+
+| 类别 | 验证项 | 结果 |
+| --- | --- | --- |
+| 方言注册 | `opengauss+psycopg2://` URI 解析、方言版本返回 (9,2,4) | 通过 |
+| Alembic DDL | `0020` 迁移建表（52 张表） | 通过 |
+| 初始化向导 | openGauss 选项可选、建号成功 | 通过 |
+| 业务读写 | 用户/角色/站点/栏目/文章/设置 CRUD | 通过 |
+| Webhook | 订阅 CRUD、事件投递 | 通过 |
+| 备份恢复 | `gs_dump` 导出、`gsql` 导入 | 通过 |
+| 健康检查 | `/healthz?detail=1` 输出 `db_dialect=openGauss` | 通过 |
+| 集成测试 | `test_compat_integration.py`（openGauss 2 项） | 通过 |
+
+### CI 矩阵
+
+`.github/workflows/compat.yml` 已扩展为 x86_64 + aarch64 双架构矩阵：
+
+- x86_64：`ubuntu-latest` runner，x86 驱动 URL
+- aarch64：`ubuntu-24.04-arm` runner，ARM 驱动 URL
+
+`docker-compose.opengauss.yml` 也已添加 ARM 版本 `OPENGAUSS_PY_URL` 注释说明。
