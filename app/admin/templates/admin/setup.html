@@ -116,8 +116,15 @@
         <div class="form-group">
           <label><strong>{{ _('数据库类型') }}</strong></label>
           <small class="text-muted d-block mb-2">
-            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
+            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+ / openGauss 7.0+（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
           </small>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="db_opengauss" name="db_type" value="opengauss" {{ 'checked' if db_type == 'opengauss' else '' }}>
+            <label for="db_opengauss">
+              <strong>openGauss</strong> <span class="badge badge-success">{{ _('信创推荐') }}</span>
+              <small class="text-muted d-block">{{ _('国产数据库（7.0+），需已创建目标数据库并安装 openGauss 官方 psycopg2 驱动') }}</small>
+            </label>
+          </div>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_mysql" name="db_type" value="mysql" {{ 'checked' if db_type == 'mysql' else '' }}>
             <label for="db_mysql">
@@ -300,7 +307,8 @@
 <script src="{{ url_for('static', filename='vendor/jquery/3.6.4/jquery.min.js') }}"></script>
 <script>
 (function () {
-  var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432 };
+  var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432, opengauss: 5432 };
+  var CONN_TYPES = ['mysql', 'postgresql', 'opengauss'];
   var fields = document.getElementById('db-conn-fields');
   // 环境变量托管数据库时（Docker 部署）页面无数据库配置区，直接跳过
   if (!fields) { return; }
@@ -312,35 +320,30 @@
     return checked ? checked.value : 'sqlite';
   }
 
+  function isDefaultPort(value) {
+    return CONN_TYPES.some(function (t) {
+      return String(value) === String(DEFAULT_PORTS[t]);
+    });
+  }
+
   function apply() {
     var type = currentType();
-    var needConn = (type === 'mysql' || type === 'postgresql');
+    var needConn = CONN_TYPES.indexOf(type) !== -1;
     fields.style.display = needConn ? 'block' : 'none';
     required.forEach(function (name) {
       var el = document.querySelector('input[name="' + name + '"]');
       if (el) { if (needConn) { el.setAttribute('required', 'required'); } else { el.removeAttribute('required'); } }
     });
-    if (needConn && portInput && !portInput.value) {
+    if (needConn && portInput && (!portInput.value || isDefaultPort(portInput.value))) {
       portInput.value = DEFAULT_PORTS[type];
     }
-    if (!needConn && portInput) {
-      var isDefault = String(portInput.value) === String(DEFAULT_PORTS.mysql)
-        || String(portInput.value) === String(DEFAULT_PORTS.postgresql);
-      if (isDefault) { portInput.value = ''; }
+    if (!needConn && portInput && isDefaultPort(portInput.value)) {
+      portInput.value = '';
     }
   }
 
   document.querySelectorAll('input[name="db_type"]').forEach(function (radio) {
-    radio.addEventListener('change', function () {
-      var type = currentType();
-      if (portInput && (type === 'mysql' || type === 'postgresql')) {
-        var other = type === 'mysql' ? DEFAULT_PORTS.postgresql : DEFAULT_PORTS.mysql;
-        if (!portInput.value || String(portInput.value) === String(other)) {
-          portInput.value = DEFAULT_PORTS[type];
-        }
-      }
-      apply();
-    });
+    radio.addEventListener('change', apply);
   });
 
   apply();

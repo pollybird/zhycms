@@ -26,13 +26,23 @@ import time
 
 from sqlalchemy import create_engine, text
 
+# openGauss 方言在 create_app() 内注册；此处等待数据库时需提前注册，
+# 否则 opengauss+psycopg2 会因方言未注册而一直重试。
+try:
+    from app.utils.dialects import register_opengauss_dialect
+    register_opengauss_dialect()
+except Exception as _dialect_exc:
+    print('[entrypoint] dialect registration skipped: {}'.format(_dialect_exc))
+
 uri = os.environ['ZHYCMS_DB_URI']
 deadline = time.time() + 60
 attempt = 0
 while True:
     attempt += 1
     try:
-        engine = create_engine(uri, pool_pre_ping=True, connect_args={'connect_timeout': 5})
+        # SQLite 驱动不接受 connect_timeout；网络数据库才注入连接超时
+        connect_args = {} if uri.startswith('sqlite') else {'connect_timeout': 5}
+        engine = create_engine(uri, pool_pre_ping=True, connect_args=connect_args)
         with engine.connect() as conn:
             conn.execute(text('SELECT 1'))
         print('[entrypoint] Database ready (attempt {})'.format(attempt))

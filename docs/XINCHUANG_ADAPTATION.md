@@ -1,0 +1,164 @@
+# 信创数据库适配专题
+
+本文说明 ZhyCMS 的信创数据库适配现状、后续适配思路与贡献方式。
+
+> **结论先行**：官方目前**仅实现并验证了 openGauss**（v3.3.0，x86_64）。
+> 达梦、人大金仓、南大通用、PolarDB 等数据库**尚未实现、尚未验证**，本文给出的是
+> 适配思路与工作量评估，不构成支持承诺。欢迎社区按本文路径提交贡献。
+
+## 一、适配现状
+
+| 数据库 | 兼容基础 | 官方状态 | 验证范围 |
+| --- | --- | --- | --- |
+| openGauss 7.0 | PostgreSQL 协议 + 自有方言差异 | **已实现**（v3.3.0） | x86_64；迁移 `0020`、向导、业务读写、备份恢复 |
+| 人大金仓 KingbaseES V8/V9 | PostgreSQL 协议（`sys_` 系工具与系统表） | 未实现 | 无 |
+| PolarDB（PostgreSQL 版 / PolarDB-X） | PostgreSQL / MySQL 协议 | 未实现 | 无 |
+| 达梦 DM8 | Oracle 风格自有协议 | 未实现 | 无 |
+| 南大通用 GBase 8a | MySQL 协议（分析型 MPP） | 未实现 | 无 |
+| 南大通用 GBase 8c | PostgreSQL / openGauss 系（分布式） | 未实现 | 无 |
+| 南大通用 GBase 8s | Informix 系自有协议 | 未实现 | 无 |
+
+说明：GBase 三条产品线差异很大，适配前必须先确认具体产品线与版本，不能一概而论。
+
+## 二、通用适配架构
+
+openGauss 的适配已经形成一套可复用的接入框架。新增数据库时，原则上只改「连接层 +
+方言层 + 运维工具映射」，不引入 ORM 之外的数据库抽象层，也不在业务代码中写厂商分支。
+
+| 层 | 位置 | 需要做的事 |
+| --- | --- | --- |
+| 方言注册 | `app/utils/dialects/`、`app/__init__.py` | 新增方言模块；在 `db.init_app()` 之前注册；必要时注册 Alembic DDL 实现 |
+| URI 与驱动 | `app/utils/dbconfig.py` | 增加 scheme、默认端口、驱动探测与中文错误提示；支持 TCP / Unix socket |
+| 引擎参数 | `app/config.py::build_engine_options()` | 连接池、`connect_timeout`、`application_name` 等按方言设置 |
+| 初始化向导 | `app/admin/auth.py`、`app/admin/templates/admin/setup.html` | 新增单选与端口联动；后台显示数据库名称 |
+| 备份恢复 | `app/utils/backup_utils.py` | 按方言选择导出/导入工具与参数风格；支持工具目录环境变量 |
+| 健康检查 | `app/frontend/views.py` | `/healthz?detail=1` 输出正确的 `db_dialect` |
+| 测试 | `tests/`、`.github/workflows/compat.yml` | 方言单测 + 集成冒烟（默认 skip，由环境变量启用）；CI 增加服务容器 |
+
+实现顺序建议：先跑通「连接 → 迁移 → 向导 → 业务读写」，再补备份恢复与健康检查，
+最后补测试与文档。任何一步未实测，都必须在文档中标注「未验证」。
+
+## 三、分库适配思路
+
+### 3.1 人大金仓 KingbaseES V8 / V9（预计工作量最低）
+
+KingbaseES 以 PostgreSQL 为兼容基础，是最接近 openGauss 的路径。
+
+- **驱动与 URI**：优先使用金仓官方 `ksycopg2`，或复用 `psycopg2`（需实测协议兼容性）。
+  URI 可先尝试 `kingbase+psycopg2://`，方言内部复用 PostgreSQL 方言。
+- **方言与迁移**：参照 `app/utils/dialects/opengauss.py` 增加 `kingbase` 方言，
+  仅覆盖版本串解析与必要的 DDL 注册；先验证 Alembic 全量迁移与 `render_as_batch`。
+- **备份恢复**：金仓工具名为 `sys_dump` / `sys_restore` / `ksql`，不是 `pg_dump`。
+  需在 `backup_utils.py` 增加映射，并支持 `KINGBASE_BIN` 一类的工具目录变量。
+- **主要差异与风险**：默认端口 54321；`sys_` 前缀系统表；大小写折叠与
+  Oracle 兼容模式（`database_mode`）可能影响标识符与空串语义；`ON UPDATE`、
+  自增列等 DDL 细节需逐条核对迁移脚本。
+- **验证要点**：52 张表迁移、向导建号、中文/布尔/时间回读、序列不回退、
+  `sys_dump` 导出与恢复。
+
+### 3.2 PolarDB（PostgreSQL 版 / PolarDB-X，预计工作量低到中）
+
+- **PolarDB for PostgreSQL**：协议与 PostgreSQL 基本一致，可复用
+  `postgresql+psycopg2`；主要工作是版本识别、云上连接参数与备份策略。
+- **PolarDB-X（MySQL 版）**：可复用 `mysql+pymysql`；需关注分布式拆分规则、
+  全局二级索引、跨分片事务限制，以及 DDL 中是否必须携带分区键。
+- **方言与迁移**：优先复用现有 PostgreSQL / MySQL 方言，仅补充版本正则；
+  若云版对 `information_schema` 或 DDL 有差异，再新增最小方言覆盖。
+- **备份恢复**：云上优先使用平台快照 / 备份服务；`pg_dump` / `mysqldump`
+  的兼容性需在目标实例实测，不建议直接假定可用。
+- **主要差异与风险**：连接串参数（SSL、集群地址）、只读节点路由、分布式
+  表的 DDL 限制；这些通常属于部署侧配置，不应写死到业务代码。
+
+### 3.3 达梦 DM8（预计工作量中到高）
+
+DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
+
+- **驱动与 URI**：使用官方 `dmPython` 驱动；SQLAlchemy 方言可采用厂商/社区提供
+  的实现，或基于 `Dialect` 自建最小方言（需固定驱动与 SQLAlchemy 版本后实测）。
+  URI 形如 `dm+dmPython://user:password@host:5236/DB`。
+- **方言与迁移**：重点处理标识符大小写（默认大写）、`VARCHAR(n)` 的字节/字符语义、
+  `IDENTITY` 自增、布尔类型（`BIT`）、`CLOB/TEXT`、时间类型、分页语法、
+  `COMMENT ON` 与 `ON UPDATE` 支持情况；Alembic 批量模式与约束命名需逐项验证。
+- **备份恢复**：逻辑导出/导入使用 `dexp` / `dimp`（参数风格与 `pg_dump` 不同），
+  物理备份使用 `dmrman`；应用侧需新增一套参数拼装与错误解析。
+- **主要差异与风险**：SQLAlchemy 生态成熟度、驱动与 Python 版本匹配、字符集、
+  大小写敏感、DDL 事务行为、序列/自增回读。建议先做「空库迁移 + 只读业务」
+  的可行性验证，再评估写入与备份。
+- **验证要点**：全量迁移、向导、CRUD、中文与时间、分页、备份恢复、异常提示。
+
+### 3.4 南大通用 GBase（按产品线分别评估）
+
+- **GBase 8a（MySQL 协议，分析型 MPP）**：可尝试复用 `mysql+pymysql`。需重点验证
+  外键、事务、`AUTO_INCREMENT`、字符集与分布式表 DDL 限制；部分引擎对事务和
+  外键支持有限，可能影响现有模型与迁移脚本。备份工具为集群侧 `gcdump` 等，
+  需按版本核验。
+- **GBase 8c（PostgreSQL / openGauss 系，分布式）**：可复用 openGauss / PostgreSQL
+  方言作为起点；重点是分布式建表所需的分布键、节点拓扑与 DDL 限制，以及
+  `gs_dump` 类工具的可用性。
+- **GBase 8s（Informix 系）**：协议与 SQL 方言均不同，预计工作量最高；需要专用
+  驱动与独立方言，备份工具为 Informix 系（`dbexport` / `dbimport` 等），
+  不建议与 8a/8c 共用适配方案。
+
+## 四、工作量与风险矩阵
+
+| 数据库 | 方言改造 | 驱动接入 | 备份工具 | 迁移风险 | 综合评估 |
+| --- | --- | --- | --- | --- | --- |
+| KingbaseES | 小（复用 PG） | 小 | 小（`sys_dump`） | 低-中 | 优先适配 |
+| PolarDB PG | 极小 | 极小 | 云平台为主 | 低 | 优先适配 |
+| PolarDB-X | 小 | 极小 | 云平台为主 | 中（分布式 DDL） | 可并行 |
+| 达梦 DM8 | 大 | 中 | 中（`dexp`/`dimp`） | 高 | 单独立项 |
+| GBase 8a | 中 | 小 | 中 | 中-高（事务/外键） | 先做可行性验证 |
+| GBase 8c | 中 | 小 | 中 | 中（分布键） | 可复用 openGauss |
+| GBase 8s | 大 | 大 | 大 | 高 | 最后评估 |
+
+以上为经验判断，实际以目标版本、部署形态与业务 SQL 复杂度为准。
+
+## 五、贡献指南
+
+欢迎所有人提交信创数据库适配贡献，包括但不限于代码、测试、部署文档、实测报告与
+问题反馈。提交前建议先开 Issue 对齐范围，避免重复投入。
+
+### 1. Issue 需提供的信息
+
+- 数据库产品、版本、CPU 架构与部署形态（单机 / 主备 / 分布式 / 云托管）；
+- 驱动名称与版本、Python 版本、SQLAlchemy 版本；
+- 迁移结果（`alembic_version`、表数量、失败脚本与报错）；
+- 已验证项与未验证项清单；
+- 与 MySQL / PostgreSQL / openGauss 的 SQL 或 DDL 差异。
+
+### 2. 代码贡献范围
+
+- 方言与注册：`app/utils/dialects/`、`app/__init__.py`；
+- URI、端口、驱动探测与错误提示：`app/utils/dbconfig.py`；
+- 引擎参数：`app/config.py`；
+- 初始化向导与显示：`app/admin/auth.py`、`setup.html`；
+- 备份恢复映射：`app/utils/backup_utils.py`；
+- 健康检查：`app/frontend/views.py`；
+- 测试：`tests/` 下的方言单测与集成用例；CI：`.github/workflows/compat.yml`；
+- 文档：部署指南、故障速查、支持矩阵与验证状态。
+
+### 3. 提交要求
+
+1. 不引入 ORM 之外的数据库抽象层，不在业务代码中写厂商分支；差异收敛在方言与
+   工具映射层。
+2. 默认部署行为不变：未选择新数据库时，MySQL / PostgreSQL / SQLite 行为不得变化。
+3. 必须附带可复现的验证证据（迁移日志、关键表行数、CRUD 回读、备份恢复结果）。
+4. 未实测的能力必须显式标注「未验证」，不得在文档中声称已支持。
+5. 新增依赖放入可选 requirements 文件，不修改 `requirements.txt` 的默认安装集。
+6. 通过现有门禁：`check_constants.py`、`check_excepts.py`、`check_openapi.py`、
+   `check_release.py`、`git diff --check`，以及全量 pytest。
+
+### 4. 参考实现
+
+- 方言与注册：[app/utils/dialects/opengauss.py](../app/utils/dialects/opengauss.py)
+- 连接与驱动探测：[app/utils/dbconfig.py](../app/utils/dbconfig.py)
+- 备份恢复映射：[app/utils/backup_utils.py](../app/utils/backup_utils.py)
+- 单元测试：[tests/test_opengauss_v330.py](../tests/test_opengauss_v330.py)
+- 集成测试：[tests/test_compat_integration.py](../tests/test_compat_integration.py)
+- 部署样例：[docs/DEPLOY_OPENGAUSS.md](DEPLOY_OPENGAUSS.md)
+
+## 六、验证状态声明
+
+除 openGauss 7.0（x86_64）外，本文提及的达梦、人大金仓、南大通用、PolarDB 等
+数据库均**未实现、未验证**。文中驱动名、工具名与差异点为适配方向，可能随产品
+版本变化，落地前请以目标环境的官方文档和实测结果为准。

@@ -1,0 +1,167 @@
+name: Compatibility
+
+# v3.3.0 信创适配：openGauss + openAMDC 兼容性验证。
+# 与 ci.yml 的 Python 矩阵解耦，只在相关路径变化时运行，控制耗时。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/config.py'
+      - 'app/utils/dbconfig.py'
+      - 'app/utils/backup_utils.py'
+      - 'app/utils/dialects/**'
+      - 'app/services/redis_backend.py'
+      - 'app/services/runtime_guard.py'
+      - 'app/frontend/views.py'
+      - 'app/admin/system/setting.py'
+      - 'docker/**'
+      - 'docker-compose*.yml'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - 'requirements-dev.txt'
+      - 'pytest.ini'
+      - 'tests/test_opengauss_v330.py'
+      - 'tests/test_redis_backend_v330.py'
+      - 'tests/test_openamdc_v330.py'
+      - 'tests/test_compat_integration.py'
+      - '.github/workflows/compat.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  openamdc:
+    name: openAMDC full test suite
+    runs-on: ubuntu-latest
+    services:
+      openamdc:
+        image: pollybird/openamdc:1.0.0
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "openamdc-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 6
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Verify delivered image is the pinned build
+        run: |
+          CONTAINER_ID="$(docker ps -q --filter ancestor=pollybird/openamdc:1.0.0)"
+          test -n "$CONTAINER_ID"
+          docker exec "$CONTAINER_ID" openamdc-cli INFO server \
+            | tee /tmp/openamdc-info.txt
+          grep -q '^openamdc_git_sha1:6758505d' /tmp/openamdc-info.txt
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run full suite against openAMDC
+        env:
+          REDIS_URL: redis://127.0.0.1:6379/0
+          ZHYCMS_TEST_OPENAMDC_URL: redis://127.0.0.1:6379/0
+        run: pytest tests -q --timeout=120
+
+  opengauss:
+    name: openGauss migration smoke
+    runs-on: ubuntu-latest
+
+    env:
+      OPENGAUSS_PASSWORD: Zhycms-2026og
+      OPENGAUSS_URL: opengauss+psycopg2://gaussdb:Zhycms-2026og@127.0.0.1:5432/zhycms
+      OPENGAUSS_PY_URL: https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/x86/openGauss-Python-7.0.0-openEuler22.03-x86_64.tar.gz
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Start openGauss
+        run: |
+          docker run -d --name opengauss --privileged \
+            -p 5432:5432 \
+            -e GS_PASSWORD="$OPENGAUSS_PASSWORD" \
+            -e GS_DB=zhycms \
+            pollybird/opengauss:7.0.0
+
+      - name: Wait for openGauss ready
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec opengauss bash -lc \
+              'LD_LIBRARY_PATH=/usr/local/opengauss/lib /usr/local/opengauss/bin/gsql -d postgres -U gaussdb -W "$GS_PASSWORD" -tAc "select 1"' >/dev/null 2>&1; then
+              echo "openGauss ready (attempt ${attempt})"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs opengauss
+          exit 1
+
+      - name: Install dependencies and openGauss driver
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          python - "$OPENGAUSS_PY_URL" <<'PY'
+          import sys
+          import tarfile
+          import urllib.request
+          from pathlib import Path
+
+          url = sys.argv[1]
+          target = Path('/tmp/ogpy.tar.gz')
+          urllib.request.urlretrieve(url, target)
+          Path('/tmp/ogpython').mkdir(exist_ok=True)
+          tarfile.open(target).extractall('/tmp/ogpython')
+          PY
+          SITE="$(python -c 'import site; print(site.getsitepackages()[0])')"
+          pip uninstall -y psycopg2 psycopg2-binary || true
+          rm -rf "$SITE/psycopg2" "$SITE/psycopg2_binary.libs"
+          cp -r /tmp/ogpython/psycopg2 "$SITE/psycopg2"
+          rm -f /tmp/ogpython/lib/libstdc++.so.6 \
+                /tmp/ogpython/lib/libssl.so.3 \
+                /tmp/ogpython/lib/libcrypto.so.3
+          echo "LD_LIBRARY_PATH=/tmp/ogpython/lib" >> "$GITHUB_ENV"
+
+      - name: Run migration smoke
+        env:
+          ZHYCMS_ENV: production
+          ZHYCMS_SECRET_KEY: ci-only-secret-key
+          ZHYCMS_DB_URI: opengauss+psycopg2://gaussdb:Zhycms-2026og@127.0.0.1:5432/zhycms
+        run: |
+          python -c "from app import create_app; create_app(); print('migration ok')"
+          python - "$OPENGAUSS_URL" <<'PY'
+          import sys
+
+          from sqlalchemy import create_engine, text
+
+          from app.utils.dialects import register_opengauss_dialect
+
+          register_opengauss_dialect()
+          engine = create_engine(sys.argv[1], pool_pre_ping=True)
+          with engine.connect() as conn:
+              revision = conn.execute(text('select version_num from alembic_version')).scalar()
+              tables = conn.execute(text(
+                  "select count(*) from information_schema.tables "
+                  "where table_schema = 'public'")).scalar()
+          print(f'alembic={revision} tables={tables}')
+          assert revision == '0020', revision
+          assert tables >= 40, tables
+          PY
+
+      - name: Run compatibility tests
+        env:
+          ZHYCMS_TEST_OPENGAUSS_URL: opengauss+psycopg2://gaussdb:Zhycms-2026og@127.0.0.1:5432/zhycms
+        run: pytest tests/test_compat_integration.py tests/test_opengauss_v330.py -q --timeout=120

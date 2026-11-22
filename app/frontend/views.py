@@ -1008,13 +1008,19 @@ def healthz():
     runtime = current_app.config.get('ZHYCMS_RUNTIME_INFO') or check_runtime(current_app)
     redis_state = 'disabled'
     redis_conn = current_app.config.get('JWT_BLOCKLIST_REDIS')
+    redis_flavor = current_app.config.get('ZHYCMS_REDIS_FLAVOR')
     if redis_conn is not None:
         try:
             redis_conn.ping()
             redis_state = 'ok'
+            # v3.3.0：启动时未识别到后端类型时，此处按需补识别
+            if not redis_flavor:
+                from ..services.redis_backend import describe as _describe_redis
+                redis_flavor = _describe_redis(redis_conn)['flavor']
         except Exception as e:
             redis_state = 'error'
             current_app.logger.warning('健康检查 Redis 探测失败：%s', e)
+    redis_flavor = redis_flavor or 'disabled'
 
     sid = current_site_id()
     site = current_site()
@@ -1029,7 +1035,10 @@ def healthz():
         'status': 'ok' if db_ok else 'error',
         'cms_version': Setting.CMS_VERSION,
         'database': 'ok' if db_ok else 'error',
+        'db_dialect': (current_app.config.get('ZHYCMS_DB_DIALECT')
+                       or db.engine.dialect.name),
         'redis': redis_state,
+        'redis_flavor': redis_flavor,
         'cache': runtime.get('cache_backend', 'unknown'),
         'limiter': runtime.get('limiter_backend', 'unknown'),
         'scheduler': runtime.get('scheduler', 'unknown'),

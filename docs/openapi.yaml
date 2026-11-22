@@ -2,7 +2,7 @@
 "openapi": "3.0.3"
 "info":
   "title": "ZhyCMS Content API"
-  "version": "3.2.12"
+  "version": "3.3.0"
   "description": "ZhyCMS 对外内容 API。只读端点支持 Bearer JWT 或 X-API-Token；写端点默认关闭，开启后仅接受 Bearer JWT。"
 "servers":
   - "url": "/"

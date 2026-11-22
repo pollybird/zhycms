@@ -1,6 +1,6 @@
 # 运维故障排查 FAQ
 
-> 适用版本：ZhyCMS ≥ 2.6.4　|　覆盖：启动、数据库迁移、缓存、主题插件、伪静态、上传、搜索、Docker、备份
+> 适用版本：ZhyCMS ≥ 2.6.4　|　覆盖：启动、数据库迁移、缓存、主题插件、伪静态、上传、搜索、Docker、备份、openGauss / openAMDC
 
 通用排查三板斧：
 
@@ -202,7 +202,41 @@ install.sh 内置多源回退（daocloud → 1ms.run → xuanyuan.me → hub.rat
 
 ---
 
-## 10. 快速诊断命令速查
+## 11. openGauss 与 openAMDC（v3.3.0）
+
+### Q：连接 openGauss 报 `No module named 'psycopg2'` 或驱动不兼容
+openGauss 必须使用官方 psycopg2 fork，PyPI 的 `psycopg2-binary` 不能连接。按 [DEPLOY_OPENGAUSS.md](DEPLOY_OPENGAUSS.md) 第四节安装预编译包并配置 `LD_LIBRARY_PATH`，或直接使用 `pollybird/zhycms:opengauss` 镜像。
+
+### Q：驱动装好后 Python 报 `OPENSSL_3.3.0 not found`
+驱动包自带旧 `libssl.so.3` / `libcrypto.so.3`，加入 `LD_LIBRARY_PATH` 后覆盖了系统 OpenSSL。删除驱动目录下的这两个库（保留 `libpq` 等），重启应用。
+
+### Q：openGauss 连接被拒绝 / `no pg_hba.conf entry`
+检查 `listen_addresses`、`pg_hba.conf` 是否放行客户端网段（`host all all <网段> sha256`）、`password_encryption_type=2`，以及 5432 端口防火墙；密码需含大小写、数字与特殊字符。
+
+### Q：openGauss 备份失败 `option -d not recognized` / 缺共享库
+`gs_dump` 不接受 `-d`，数据库名须作为位置参数；运行前需 `LD_LIBRARY_PATH=/usr/local/opengauss/lib`。应用已自动处理，手工执行时请遵循 [DEPLOY_OPENGAUSS.md](DEPLOY_OPENGAUSS.md) 第六节，或用 `OPENGAUSS_BIN` / `ZHYCMS_DB_DUMP_BIN_DIR` 指定工具目录。
+
+### Q：如何确认当前数据库是 openGauss
+`curl 'http://127.0.0.1:5000/healthz?detail=1'` 查看 `db_dialect`；后台页脚与初始化向导也会显示数据库类型。迁移版本应为 `0020`、约 52 张表。
+
+### Q：openAMDC 连接失败，日志回退 SimpleCache
+检查 `openamdc` 容器是否启动（`docker compose --profile openamdc ps`）、`REDIS_URL` 是否为 `redis://openamdc:6379/0`，并用 `docker compose exec openamdc openamdc-cli ping` 验证。openAMDC 与 Redis 二选一，不要同时启动后指向错误端口。
+
+### Q：healthz 的 `redis_flavor` 为什么是 `unknown`
+后端启动时无法从 `INFO server` 读到 `openamdc_version` 或 `redis_version`。确认连接的是 openAMDC/Redis 而非代理或错误服务；查看启动日志 `backend=openamdc version=1.0.0`。
+
+### Q：日志出现 `ERR Unknown subcommand`（CLIENT SETINFO）
+openAMDC 基于 Redis 6.2，不支持 Redis 7 的 `CLIENT SETINFO`；redis-py 会自动忽略，不影响功能，可忽略该日志。
+
+### Q：openAMDC 重启后用户全部掉线
+镜像默认 `save ""` / `appendonly no`，仅作缓存，服务端 Session 不持久化。需要保留登录态时自行开启 RDB/AOF，或接受重新登录。
+
+### Q：能否直接用 Redis Sentinel 连接 openAMDC
+本项目只接受单个 `REDIS_URL`，不内置哨兵自动切换。openAMDC 哨兵需手工 `ln -s openamdc-server openamdc-sentinel`，再由部署侧（VIP / HAProxy / 服务发现）提供稳定入口；Sentinel 自动切换、Cluster 与 TLS 均未验证，详见 [DEPLOY_OPENAMDC.md](DEPLOY_OPENAMDC.md)。
+
+---
+
+## 12. 快速诊断命令速查
 
 ```bash
 # 应用存活

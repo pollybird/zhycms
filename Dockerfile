@@ -36,6 +36,28 @@ COPY requirements.txt requirements-prod.txt ./
 # 核心依赖 + 生产依赖（gunicorn / gevent，Docker 运行时需要）
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-prod.txt
 
+# openGauss 官方 psycopg2 驱动（v3.3.0，可选；默认不安装）
+# 仅 :opengauss 镜像通过 --build-arg INSTALL_OPENGAUSS_DRIVER=1 打入。
+# 预编译包内含 openGauss 版 libpq；删除其自带 libstdc++ / libssl / libcrypto，
+# 改用系统库：否则 LD_LIBRARY_PATH 会让 Python _ssl 加载旧 OpenSSL 而启动失败。
+ARG INSTALL_OPENGAUSS_DRIVER=0
+ARG OPENGAUSS_PY_URL=https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/x86/openGauss-Python-7.0.0-openEuler22.03-x86_64.tar.gz
+RUN mkdir -p /opt/ogpython \
+    && if [ "$INSTALL_OPENGAUSS_DRIVER" = "1" ]; then \
+         python -c "import os, tarfile, urllib.request; \
+           url=os.environ['OPENGAUSS_PY_URL']; \
+           print('Downloading openGauss driver:', url); \
+           urllib.request.urlretrieve(url, '/tmp/ogpy.tar.gz'); \
+           tarfile.open('/tmp/ogpy.tar.gz').extractall('/opt/ogpython')" ; \
+         SITE="$(python -c 'import site; print(site.getsitepackages()[0])')" ; \
+         pip uninstall -y psycopg2 psycopg2-binary || true ; \
+         rm -rf "$SITE/psycopg2" "$SITE/psycopg2_binary.libs" ; \
+         cp -r /opt/ogpython/psycopg2 "$SITE/psycopg2" ; \
+         rm -f /opt/ogpython/lib/libstdc++.so.6 \
+               /opt/ogpython/lib/libssl.so.3 \
+               /opt/ogpython/lib/libcrypto.so.3 ; \
+       fi
+
 # pkuseg 中文分词模型预热（v3.1.4）：构建期下载并解压，运行期完全离线。
 # 默认 GitHub Releases；国内构建可覆盖为镜像前缀地址，例：
 #   --build-arg PKUSEG_MODEL_URL=https://ghfast.top/https://github.com/explosion/spacy-pkuseg/releases/download/v0.0.26/spacy_ontonotes.zip
@@ -69,6 +91,10 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV ZHYCMS_ENV=production
+
+# openGauss 驱动运行库（未启用驱动时 /opt/ogpython/lib 不存在，配置无副作用）
+COPY --from=builder /opt/ogpython /opt/ogpython
+ENV LD_LIBRARY_PATH=/opt/ogpython/lib
 
 # 复制 pkuseg 分词模型（v3.1.4 预热，运行期离线可用；root 所有、应用只读）
 COPY --from=builder /opt/pkuseg /opt/pkuseg

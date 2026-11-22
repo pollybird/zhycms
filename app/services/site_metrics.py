@@ -66,6 +66,21 @@ def _cache_entry_count(site_id):
                 total += 1
             return total
 
+        # cachelib RedisCache（含 Flask-Caching）没有 scan_iter/_cache，
+        # 通过底层客户端 SCAN 统计（v3.3.0 修复 Redis 模式下指标恒为 None）
+        client = getattr(backend, '_read_client', None)
+        if client is not None and hasattr(client, 'scan_iter'):
+            prefix = ''
+            if hasattr(backend, '_get_prefix'):
+                prefix = backend._get_prefix() or ''
+            else:
+                prefix = getattr(backend, 'key_prefix', '') or ''
+            total = 0
+            for _ in client.scan_iter(
+                    match=f'{prefix}*site{site_id}*', count=1000):
+                total += 1
+            return total
+
         store = getattr(backend, '_cache', None)
         if store is None:
             return None

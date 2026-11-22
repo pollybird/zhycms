@@ -4,8 +4,10 @@
 #   MySQL:      docker compose --profile mysql up -d
 #   MariaDB:    docker compose --profile mariadb up -d
 #   PostgreSQL: docker compose --profile postgres up -d
+#   SQLite:     docker compose --profile sqlite up -d（无外部数据库）
 #   + 搜索:     追加 --profile search
 #   + Redis:    追加 --profile redis（缓存与 Session 走 Redis，支持多实例）
+#   + openAMDC: 追加 --profile openamdc（需设 REDIS_URL=redis://openamdc:6379/0）
 # ============================================================
 
 # ---- 公共配置锚点（YAML 锚点，不依赖 compose extends） ----
@@ -111,6 +113,14 @@ services:
       retries: 5
     profiles: ["postgres"]
 
+  # ---- SQLite 方案（无外部数据库，数据落在 instance 卷）----
+  app-sqlite:
+    <<: *app-base
+    environment:
+      <<: *app-env
+      ZHYCMS_DB_URI: sqlite:////app/instance/zhycms.db
+    profiles: ["sqlite"]
+
   # ---- Meilisearch（可选）----
   meilisearch:
     image: getmeili/meilisearch:v1.8
@@ -137,9 +147,26 @@ services:
       retries: 3
     profiles: ["redis"]
 
+  # ---- openAMDC（可选，信创缓存后端；与 redis 二选一）----
+  # 启用后需将应用的 REDIS_URL 指向 redis://openamdc:6379/0。
+  # 镜像未发布时可本地构建：docker build -t pollybird/openamdc:1.0.0 docker/openamdc
+  openamdc:
+    image: ${OPENAMDC_IMAGE:-pollybird/openamdc:1.0.0}
+    restart: unless-stopped
+    command: ["/etc/openamdc/openamdc.conf", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - openamdc_data:/data
+    healthcheck:
+      test: ["CMD", "openamdc-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles: ["openamdc"]
+
 volumes:
   mysql_data:
   mariadb_data:
   pg_data:
   meili_data:
   redis_data:
+  openamdc_data:

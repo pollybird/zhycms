@@ -19,7 +19,8 @@
           <h5><i class="fas fa-check-circle"></i> {{ _('Redis 已启用') }}</h5>
           <p>{{ _('当前使用 Redis 作为缓存后端与服务端 Session 存储，支撑多实例负载均衡。') }}</p>
           <p class="mb-0 text-muted small">
-            {{ _('连接地址') }}：<code>{{ env_redis_url }}</code>
+            {{ _('连接地址') }}：<code>{{ env_redis_url }}</code><br>
+            {{ _('后端类型') }}：<strong>{{ redis_flavor_label }}</strong>{% if redis_version %} · {{ _('版本') }} <code>{{ redis_version }}</code>{% endif %}
           </p>
         </div>
         {% elif env_redis_url and redis_reachable %}
@@ -27,7 +28,8 @@
           <h5><i class="fas fa-info-circle"></i> {{ _('Redis 可达但未启用') }}</h5>
           <p>{{ _('检测到环境变量 REDIS_URL 且 Redis 可连接，但当前应用未使用 Redis（可能是本次启动前刚设置，需重启应用生效）。') }}</p>
           <p class="mb-0 text-muted small">
-            {{ _('连接地址') }}：<code>{{ env_redis_url }}</code>
+            {{ _('连接地址') }}：<code>{{ env_redis_url }}</code><br>
+            {{ _('后端类型') }}：<strong>{{ redis_flavor_label }}</strong>{% if redis_version %} · {{ _('版本') }} <code>{{ redis_version }}</code>{% endif %}
           </p>
         </div>
         {% elif env_redis_url and not redis_reachable %}

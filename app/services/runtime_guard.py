@@ -72,9 +72,14 @@ def check_runtime(app):
         raise RuntimeError(
             'ZHYCMS_REQUIRE_REDIS=1 但 Redis 不可用，拒绝以不可靠后端启动')
 
+    redis_flavor = app.config.get('ZHYCMS_REDIS_FLAVOR')
+    if not redis_flavor:
+        redis_flavor = 'unknown' if redis_ok else 'disabled'
+
     info = {
         'workers': workers,
         'redis': redis_ok,
+        'redis_flavor': redis_flavor,
         'cache_backend': cache_backend,
         'limiter_backend': limiter_backend,
         'scheduler': 'unknown',

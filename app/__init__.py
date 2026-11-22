@@ -15,7 +15,7 @@ from flask.templating import (
 )
 from jinja2.sandbox import SandboxedEnvironment
 
-from .config import config
+from .config import config, build_engine_options
 from .extensions import db, login_manager, cache, set_scheduler, babel, migrate, server_session, jwt, limiter
 from .i18n import select_locale, available_locales, current_locale, _p
 
@@ -651,6 +651,8 @@ def _resolve_redis_url(app):
     后台设置页仅展示此结果，不提供手动开关。
     """
     env_url = os.environ.get('REDIS_URL', '').strip()
+    app.config['ZHYCMS_REDIS_FLAVOR'] = None
+    app.config['ZHYCMS_REDIS_VERSION'] = None
     if not env_url:
         return None
     # 检测 Redis 是否可达
@@ -658,10 +660,19 @@ def _resolve_redis_url(app):
         import redis as _redis
         conn = _redis.from_url(env_url, decode_responses=False)
         conn.ping()
-        app.logger.info(f'[Redis] 环境变量 REDIS_URL 已配置且 Redis 可达，启用 Redis 缓存')
+        # v3.3.0：识别 openAMDC / Redis；识别失败不影响启用与启动
+        from .services.redis_backend import describe as _describe_redis
+        meta = _describe_redis(conn)
+        app.config['ZHYCMS_REDIS_FLAVOR'] = meta['flavor']
+        app.config['ZHYCMS_REDIS_VERSION'] = meta['version']
+        app.logger.info(
+            '[Redis] 环境变量 REDIS_URL 已配置且 Redis 可达，启用 Redis 缓存'
+            '（backend=%s version=%s）', meta['flavor'], meta['version'])
         return env_url
     except Exception as e:
         app.logger.warning(f'[Redis] REDIS_URL={env_url} 但连接失败（{e}），回退 SimpleCache')
+        app.config['ZHYCMS_REDIS_FLAVOR'] = None
+        app.config['ZHYCMS_REDIS_VERSION'] = None
         return None
 
 
@@ -802,8 +813,8 @@ def create_app(config_name=None):
 
     # v3.1.10 VULN-018：非 testing 环境误用 TestingConfig 固定密钥时拒绝启动，
     # 防止仓库内公开的测试密钥被带入生产（ZHYCMS_SECRET_KEY 环境变量优先）。
-    from .config import TestingConfig
-    if config_name != 'testing' and app.config.get('SECRET_KEY') == TestingConfig.SECRET_KEY:
+    from .config import TESTING_SECRET_KEY_FALLBACK
+    if config_name != 'testing' and app.config.get('SECRET_KEY') == TESTING_SECRET_KEY_FALLBACK:
         app.logger.error(
             '检测到非测试环境使用 TestingConfig 的固定 SECRET_KEY，'
             '请配置环境变量 ZHYCMS_SECRET_KEY，应用拒绝启动')
@@ -811,6 +822,19 @@ def create_app(config_name=None):
             'TestingConfig SECRET_KEY must not be used outside testing')
 
     config[config_name].init_app(app)
+
+    # v3.3.0 信创适配：方言注册与引擎参数必须早于 db.init_app（引擎创建）
+    _final_db_uri = app.config.get('SQLALCHEMY_DATABASE_URI') or ''
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = build_engine_options(_final_db_uri)
+    try:
+        from sqlalchemy.engine import make_url
+        _db_backend = make_url(_final_db_uri).get_backend_name()
+    except Exception:
+        _db_backend = ''
+    app.config['ZHYCMS_DB_DIALECT'] = _db_backend
+    if _db_backend == 'opengauss':
+        from .utils.dialects import register_opengauss_dialect
+        register_opengauss_dialect()
 
     # 初始化扩展
     db.init_app(app)
@@ -830,7 +854,10 @@ def create_app(config_name=None):
             'CACHE_TYPE': 'RedisCache',
             'CACHE_DEFAULT_TIMEOUT': app.config.get('CACHE_DEFAULT_TIMEOUT', 3600),
             'CACHE_REDIS_URL': redis_url,
-            'CACHE_KEY_PREFIX': app.config.get('CACHE_KEY_PREFIX', 'zhycms:'),
+            # v3.3.0：缓存键前缀必须与 Session 前缀（zhycms:sess:）不重叠。
+            # cachelib 的 clear() 按前缀批量删除，旧前缀 `zhycms:` 会连带清空
+            # Session，导致 Redis 模式下清缓存后用户被登出。
+            'CACHE_KEY_PREFIX': app.config.get('CACHE_KEY_PREFIX', 'zhycms:cache:'),
         })
         # 服务端 Session
         import redis as _redis

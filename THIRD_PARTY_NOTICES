@@ -36,6 +36,8 @@ Mulan PSL v2。若本文件或仓库根目录 LICENSE 中的表述与某个第�
   icheck-bootstrap      3.0.1     MIT                                 复选框/单选框样式；app/static/vendor/icheck-bootstrap/3.0.1/
   marked                12.0.2    MIT                                 Markdown 渲染；app/static/vendor/marked/marked.min.js
   Turndown              （未标注） MIT                                  HTML 转 Markdown；app/static/vendor/turndown/turndown.min.js
+  openAMDC              1.0.0     Mulan PSL v2                        可选缓存后端；仅自建镜像 pollybird/openamdc 捆绑，许可证随镜像分发
+  openGauss Python 驱动 7.0.0     LGPL-2.1（以官方包为准）             可选数据库驱动；仅 :opengauss 镜像捆绑，源码来自 openGauss 官方发布
 
 
 1. CKEditor 5
@@ -299,6 +301,32 @@ pytest 等）。
 
 各依赖的许可证随其发行包提供（通常位于包内 dist-info 的 LICENSE/METADATA 或
 源码包中），并受各自许可证约束。具体版本与清单以对应 requirements*.txt 为准。
+
+
+信创组件（可选部署）
+--------------------
+
+以下组件不属于默认安装，仅在启用信创部署时随自建镜像分发。
+
+1. openAMDC 1.0.0
+    许可证：木兰宽松许可证第2版（Mulan PSL v2）。
+    来源：https://atomgit.com/openeuler/openAMDC
+    固定版本：commit 6758505d722a7efa0fd64dec5164e19885942f87。
+    分发方式：由本仓库 docker/openamdc/Dockerfile 构建为 pollybird/openamdc:1.0.0
+    镜像，许可证全文随镜像位于 /usr/share/licenses/openamdc/LICENSE；仓库源码树
+    不包含 openAMDC 源码。仅将其作为独立进程使用，未修改其源代码。
+
+2. openGauss Python 驱动 7.0.0（官方 psycopg2 fork）
+    许可证：GNU Lesser General Public License v2.1（以官方发行包内 LICENSE 为准）。
+    来源：https://opengauss.org/（预编译包下载地址见 docs/DEPLOY_OPENGAUSS.md）
+    分发方式：仅在以 INSTALL_OPENGAUSS_DRIVER=1 构建的 pollybird/zhycms:opengauss
+    镜像中捆绑；默认镜像不包含该驱动，requirements.txt 也不依赖它。
+    源码获取：openGauss 官方仓库与发行包内附带源码/许可证信息；如需重新分发，
+    请遵循 LGPL-2.1 关于源码提供的条款。
+    说明：该驱动包自带旧版 OpenSSL 库，镜像构建时删除其中的 libssl.so.3 与
+    libcrypto.so.3，仅保留 libpq 等运行期依赖。
+
+上述组件均由使用者可选部署，不改变本项目的许可证。
 
 
 附录 A：MIT 许可证全文

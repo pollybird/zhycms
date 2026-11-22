@@ -822,21 +822,35 @@ def setting_redis():
     # 检测 Redis 可达性（用于未启用时给出原因）
     redis_reachable = False
     redis_error = ''
+    redis_flavor = 'unknown'
+    redis_version = None
     if env_redis_url:
         try:
             import redis as _redis
             conn = _redis.from_url(env_redis_url, decode_responses=False)
             conn.ping()
             redis_reachable = True
+            # v3.3.0：展示实际后端类型（openAMDC / Redis）与版本
+            from ...services.redis_backend import describe as _describe_redis
+            meta = _describe_redis(conn)
+            redis_flavor = meta['flavor']
+            redis_version = meta['version']
         except Exception as e:
             # 探测失败仅影响页面提示，不阻断设置页
             current_app.logger.warning('Redis 连通性探测失败：%s', e)
             redis_error = str(e)
+    redis_flavor_label = {
+        'openamdc': 'openAMDC',
+        'redis': 'Redis',
+    }.get(redis_flavor, _gettext('未知'))
     return render_template('admin/setting/redis.html',
                            env_redis_url=env_redis_url,
                            runtime_active=runtime_active,
                            redis_reachable=redis_reachable,
-                           redis_error=redis_error)
+                           redis_error=redis_error,
+                           redis_flavor=redis_flavor,
+                           redis_flavor_label=redis_flavor_label,
+                           redis_version=redis_version)
 
 
 # ============ 个人资料 / 密码 ============

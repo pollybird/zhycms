@@ -61,6 +61,8 @@ def _db_managed_by_env():
 def _current_db_label():
     """当前生效引擎的数据库类型显示名。"""
     uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
+    if uri.startswith('opengauss'):
+        return 'openGauss'
     if uri.startswith('mysql'):
         return 'MySQL'
     if uri.startswith('postgresql'):
@@ -130,7 +132,7 @@ def setup():
             # 直接使用启动时已连通的引擎，表结构由启动迁移保证，
             # 向导不接收任何连接参数（忽略表单中的 db_type/主机等字段）
             pass
-        elif db_type in ('mysql', 'postgresql'):
+        elif db_type in ('mysql', 'postgresql', 'opengauss'):
             host = ctx['db_host']
             port = ctx['db_port'] or str(DEFAULT_PORTS[db_type])
             name = ctx['db_name']

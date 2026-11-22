@@ -1,0 +1,109 @@
+# ============================================================
+# zhycms Docker Compose — openGauss 7.0 版（独立编排文件）
+# 用法：
+#   cp docker/.env.example .env   # 按需修改 SECRET_KEY / OPENGAUSS_PASSWORD
+#   docker compose -f docker-compose.opengauss.yml up -d --build
+#   # 可选：追加 --profile redis / --profile openamdc / --profile search
+#
+# 镜像：
+#   pollybird/zhycms:opengauss（内置 openGauss 官方 psycopg2 驱动）
+#   pollybird/opengauss:7.0.0（官方镜像 + openblas 运行时依赖）
+#
+# 注意：
+# - openGauss 密码必须同时包含大写、小写、数字与特殊字符；本文件默认用 `-`
+#   作为特殊字符，避免 `@` / `#` / `%` 破坏数据库 URI。安装器按同一规则生成。
+# - openGauss 官方镜像缺少 libopenblas.so.0，db-opengauss 通过
+#   docker/opengauss/Dockerfile 派生修复。
+# ============================================================
+
+services:
+  app:
+    image: pollybird/zhycms:opengauss
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        APT_MIRROR: ${APT_MIRROR:-}
+        INSTALL_OPENGAUSS_DRIVER: "1"
+        OPENGAUSS_PY_URL: ${OPENGAUSS_PY_URL:-https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/x86/openGauss-Python-7.0.0-openEuler22.03-x86_64.tar.gz}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5000}:5000"
+    environment:
+      ZHYCMS_ENV: production
+      ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      REDIS_URL: ${REDIS_URL:-}
+      ZHYCMS_DB_URI: opengauss+psycopg2://gaussdb:${OPENGAUSS_PASSWORD:-Zhycms-2026og}@db-opengauss:5432/zhycms
+    volumes:
+      - ./instance:/app/instance
+      - ./app/static/uploads:/app/app/static/uploads
+    depends_on:
+      db-opengauss:
+        condition: service_healthy
+
+  db-opengauss:
+    image: ${OPENGAUSS_IMAGE:-pollybird/opengauss:7.0.0}
+    build:
+      context: docker/opengauss
+      args:
+        BASE_IMAGE: ${OPENGAUSS_BASE_IMAGE:-opengauss/opengauss:7.0.0-RC3.B025-openEuler22.03}
+    restart: unless-stopped
+    privileged: true
+    environment:
+      GS_PASSWORD: ${OPENGAUSS_PASSWORD:-Zhycms-2026og}
+      GS_DB: zhycms
+    volumes:
+      - opengauss_data:/var/lib/opengauss/data
+    healthcheck:
+      test: ["CMD-SHELL", "LD_LIBRARY_PATH=/usr/local/opengauss/lib /usr/local/opengauss/bin/gsql -d postgres -U gaussdb -W \"$$GS_PASSWORD\" -tAc 'select 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  # ---- Meilisearch（可选）----
+  meilisearch:
+    image: getmeili/meilisearch:v1.8
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
+    volumes:
+      - meili_data:/meili_data
+    ports:
+      - "7700:7700"
+    profiles: ["search"]
+
+  # ---- Redis（可选，缓存与 Session 后端）----
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles: ["redis"]
+
+  # ---- openAMDC（可选，信创缓存后端；与 redis 二选一）----
+  openamdc:
+    image: ${OPENAMDC_IMAGE:-pollybird/openamdc:1.0.0}
+    restart: unless-stopped
+    command: ["/etc/openamdc/openamdc.conf", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - openamdc_data:/data
+    healthcheck:
+      test: ["CMD", "openamdc-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles: ["openamdc"]
+
+volumes:
+  opengauss_data:
+  meili_data:
+  redis_data:
+  openamdc_data:

@@ -106,10 +106,39 @@ def _resolve_database_uri():
     return 'sqlite:///' + os.path.join(BASE_DIR, 'instance', 'zhycms.db')
 
 
+def build_engine_options(uri):
+    """按数据库 URI 返回 SQLAlchemy 引擎参数。
+
+    openGauss 多部署在独立数据库主机上，显式约束连接池与超时，避免网络
+    异常时请求长时间阻塞；其它后端保持既有的 ``pool_pre_ping`` 行为。
+    """
+    options = {'pool_pre_ping': True}
+    try:
+        from sqlalchemy.engine import make_url
+        backend = make_url(uri or '').get_backend_name()
+    except Exception:
+        return options
+    if backend == 'opengauss':
+        options.update({
+            'pool_size': 10,
+            'max_overflow': 20,
+            'pool_recycle': 1800,
+            'pool_timeout': 30,
+            'connect_args': {
+                'connect_timeout': 5,
+                'application_name': 'zhycms',
+            },
+        })
+    return options
+
+
+# 仓库内公开的测试固定密钥；生产环境误用时由 create_app 拦截。
+TESTING_SECRET_KEY_FALLBACK = 'test-secret-key-for-pytest-only'
+
+
 class Config:
     # 基础配置（SECRET_KEY：环境变量 > instance/secret_key 持久化 > 首次启动生成）
     SECRET_KEY = _resolve_secret_key()
-
     # v3.1.8 VULN-003：敏感配置加密密钥（环境变量 > instance/enc_key > 首次启动生成）
     ZHYCMS_ENC_KEY = _resolve_enc_key()
 
@@ -130,6 +159,9 @@ class Config:
     # 文件上传
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'app', 'static', 'uploads')
     BACKUP_FOLDER = os.path.join(BASE_DIR, 'instance', 'backups')
+    # v3.3.0：外部数据库备份工具目录（openGauss 的 gs_dump/gsql 与 PostgreSQL
+    # 官方工具不通用）。未配置时按 PATH 查找。
+    DB_DUMP_BIN_DIR = os.environ.get('ZHYCMS_DB_DUMP_BIN', '')
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 默认 50MB，单字段可在数据库配置中再约束
 
     # 会话
@@ -197,7 +229,7 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         'ZHYCMS_DB_URI', 'sqlite:///:memory:')
     WTF_CSRF_ENABLED = False
-    SECRET_KEY = os.environ.get('ZHYCMS_SECRET_KEY', 'test-secret-key-for-pytest-only')
+    SECRET_KEY = os.environ.get('ZHYCMS_SECRET_KEY', TESTING_SECRET_KEY_FALLBACK)
     # v3.1.8：测试固定加密密钥（仅 pytest 使用，保证加解密用例可重复）
     ZHYCMS_ENC_KEY = os.environ.get(
         'ZHYCMS_ENC_KEY', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')

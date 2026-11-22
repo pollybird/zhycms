@@ -4,8 +4,9 @@
 
 | 版本 | 支持状态 | 说明 |
 | --- | --- | --- |
-| 3.2.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.2.11**（OpenAPI 3.0 契约与默认关闭的 JWT 写端点、表单/站点计量只读端点、官方 Python SDK；v3.2.10 多进程 / 多实例：Redis 共享限流、调度器领导者锁、多实例 upstream 与健康检查详情；v3.2.9 API 账号状态复核、会员内容隔离、短信验证码防爆破、SVG 白名单净化与后台 POST 退出） |
-| 3.1.x | ✅ 完整支持 | 上一发布线（安全加固至 v3.1.10）；低于 v3.1.10 的版本缺少部分安全修复，建议升级至 3.2.x |
+| 3.3.x | ✅ 完整支持 | 当前发布线，**最新版本 v3.3.0**（信创适配：openGauss 7.0 内置方言与官方驱动、openAMDC 1.0.0 缓存后端、`/healthz?detail=1` 输出 `db_dialect` / `redis_flavor`；无数据库迁移） |
+| 3.2.x | ✅ 安全修复 | 上一发布线；3.2.12 之前缺少 v3.3.0 的缓存前缀修复（清缓存可误删会话），建议升级至 3.3.x |
+| 3.1.x | ⚠️ 仅严重漏洞 | 历史发布线（安全加固至 v3.1.10）；缺少 v3.2.x 起的修复，建议升级至 3.3.x |
 | 3.0.x | ⚠️ 仅严重漏洞 | 缺少 v3.1.8–v3.1.10 的安全专项修复，建议升级至 3.2.x |
 | 2.6.x | ⚠️ 仅严重漏洞 | 缺少 v3.1.x 系列安全修复，建议升级至 3.2.x |
 | 2.5.x | ⚠️ 仅严重漏洞 | 缺少 v3.1.x 系列安全修复，建议升级至 3.2.x |
@@ -118,6 +119,8 @@
 - **多进程部署一致性（v3.2.10）**：多 worker / 多实例必须配置 `REDIS_URL`，限流、缓存、会话与调度器领导者锁共享后端，避免防爆破计数与定时任务在进程间失效或重复执行；未配置 Redis 时记录 ERROR 并在后台显示告警，可设置 `ZHYCMS_REQUIRE_REDIS=1` 拒绝降级启动。`ZHYCMS_SCHEDULER_ENABLED` 可关闭内置调度，交由受控的外部 cron。
 - **API 写端点默认关闭且仅接受 JWT（v3.2.11）**：`api_write_enable` 默认 `off`，写接口对外表现为 404；开启后静态 `X-API-Token` 不能调用写接口，必须是有效 Bearer JWT，并按账号 + IP 限流。写入复用后台服务层，按 RBAC 权限与栏目授权校验，发布操作额外校验栏目发布标志，全部写操作写审计日志。OpenAPI 契约与 `openapi.json` 仅暴露公开 API，不包含后台管理路由。
 - **Webhook 外送防护（v3.2.12）**：订阅仅限 `site:manage` 管理且按站点隔离；接收地址在保存与每次发送前都做 SSRF 校验，默认仅 HTTPS 公网（`webhook_allow_http` / `webhook_allow_private` 默认 `off`），投递不跟随重定向。签名密钥 Fernet 加密入库、仅创建/轮换时完整显示一次，列表只显示掩码；事件载荷不含密码、密钥、完整手机号/邮箱与表单提交值。每订阅每秒 5 次限速，失败重试 2 次后终态并写审计，错误响应体仅保留前 2KB；消费方应校验 `X-ZhyCMS-Signature` 并按 `X-ZhyCMS-Delivery` 幂等（见 `docs/WEBHOOK.md`）。
+- **openGauss 驱动来源与校验（v3.3.0）**：应用只从 openGauss 官方发布地址下载驱动（`opengauss.obs.cn-south-1.myhuaweicloud.com`，7.0.0 / openEuler22.03 / x86_64），构建 `:opengauss` 镜像时可覆盖 `OPENGAUSS_PY_URL`；生产环境建议固定 URL 并自行校验下载包的 sha256 后再构建。驱动包内的 `libssl.so.3` / `libcrypto.so.3` 会覆盖系统 OpenSSL 并导致 Python `_ssl` 失效，镜像构建与文档均要求删除该两个库，仅保留 `libpq` 等依赖。项目不捆绑该驱动，默认镜像不安装。
+- **openAMDC 镜像构建来源（v3.3.0）**：`pollybird/openamdc` 由仓库 `docker/openamdc/Dockerfile` 从 AtomGit 官方仓库构建，`OPENAMDC_REF` 固定 commit `6758505d722a7efa0fd64dec5164e19885942f87`；镜像以非 root（uid 999）运行、关闭持久化、默认 `protected-mode no`，仅应在内网或受控容器网络中使用，不应直接暴露到公网；许可证（Mulan PSL v2）随镜像位于 `/usr/share/licenses/openamdc/LICENSE`。
 
 ## 安全配置基线（部署方自查）
 
@@ -128,7 +131,7 @@
 5. **备份**：定期在后台「备份运维」导出备份，验证 `instance/backups/` 的磁盘余量；恢复上传的备份文件不会残留 Web 目录。
 6. **密钥轮换**：升级 v2.4.1 后若此前使用过默认硬编码密钥，请立即轮换 `ZHYCMS_SECRET_KEY`（或删除 `instance/secret_key` 让系统重新生成），旧会话会失效需重新登录。
 7. **反向代理 / CSRF 同源校验（v2.4.2）**：CSRF 防护基于 `Origin/Referer` 与请求 `Host` 头比对，Nginx 反代需确保 `proxy_set_header Host $host;`（标准配置即满足）；若站点同时绑定多个域名访问，跨域名提交表单会被 403 拦截，属预期行为（同一域名访问正常）。REST API 调用（X-API-Token 鉴权）不受影响。
-8. **Redis 安全（v2.5.0）**：启用 Redis 后，建议配置密码（`requirepass` 或 ACL），Redis 仅监听内网地址（`bind 127.0.0.1` 或内网 IP），生产环境通过防火墙限制 6379 端口访问。`REDIS_URL` 中的密码与数据库 URI 中的密码一样属于敏感信息，不应入版本库（`.env` 已在 `.gitignore` 中）。
+8. **Redis / openAMDC 安全（v2.5.0 / v3.3.0）**：启用缓存后端后，建议配置密码（Redis `requirepass` 或 ACL；openAMDC 镜像默认未设密码），仅监听内网地址，生产环境通过防火墙限制 6379 端口访问；openAMDC 镜像默认 `protected-mode no`，不得直接暴露公网。`REDIS_URL` 中的密码与数据库 URI 中的密码一样属于敏感信息，不应入版本库（`.env` 已在 `.gitignore` 中）。
 9. **加密密钥（v3.1.8）**：敏感配置加密密钥优先取环境变量 `ZHYCMS_ENC_KEY`（可用 `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成）；未设置时首次启动自动生成并写入 `instance/enc_key`（权限 600），**务必随 `instance/` 目录一并备份**（丢失后已加密的敏感配置无法解密，需在后台重新录入）。多实例/容器部署必须各实例配置相同的 `ZHYCMS_ENC_KEY`；轮换密钥前请先在后台记录并重新保存各敏感配置。
 10. **插件包直传（v3.1.8）**：`plugin_upload_enabled` 默认关闭，仅在确需后台上传第三方插件 zip 时临时开启，用完建议关闭；上传包需通过静态源码审计，请仍只安装来源可信的插件。
 11. **SSRF 与 DNS 重绑定残余风险（v3.1.8）**：`url_safety.py` 已在校验时对外部域名做 DNS 解析并逐条记录判定（解析失败 fail closed），可拦截绝大多数重绑定攻击。但 DNS 校验与实际 HTTP 请求之间存在 TOCTOU 时间窗——攻击者理论上可在校验通过后翻转 DNS 记录指向内网（典型 TTL=0 双重应答）。**彻底防御需在网络层兜底**：生产环境应配置出口防火墙（egress firewall）或出口代理，禁止应用服务器主动访问内网网段（`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`、`169.254.0.0/16`、`127.0.0.0/8`、云元数据地址 `169.254.169.254` 等），仅放行确需访问的外部服务端口。iptables 示例：`iptables -A OUTPUT -d 169.254.169.254 -j DROP`。使用云主机时建议同时开启云厂商的元数据服务加固（如 IMDSv2 强制 token 模式）。

@@ -1,0 +1,12 @@
+# ZhyCMS v3.3.0 可选依赖：openGauss（信创数据库）
+#
+# 默认镜像不安装本文件：应用内置轻量方言（app/utils/dialects/opengauss.py）
+# 可直接以 opengauss+psycopg2:// 连接。安装官方包后自动优先使用官方方言。
+#
+# 用法：
+#   pip install -r requirements-opengauss.txt
+#
+# 注意：连接 openGauss 还需 openGauss 官方 psycopg2 驱动（不是 PyPI 上的
+# psycopg2-binary），请从 openGauss 发行版获取预编译包，并按部署文档配置
+# LD_LIBRARY_PATH。仅安装本文件不足以连接 openGauss。
+opengauss-sqlalchemy==2.4.0

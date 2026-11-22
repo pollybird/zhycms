@@ -15,6 +15,7 @@
 #   - 复制 app 服务为 app-b，端口 5001；
 #   - 两个实例共用同一数据库与 Redis；
 #   - 必须启用 Redis（REDIS_URL），否则会话、限流与调度锁不共享；
+#   - 信创环境可用 openAMDC 替代 Redis（协议兼容，REDIS_URL=redis://openamdc:6379/0）；
 #   - 使用 generate_nginx_sites.py --upstreams 127.0.0.1:5000,127.0.0.1:5001
 #     生成 upstream 配置；定时任务由 Redis 领导者锁保证只执行一次。
 # ============================================================
@@ -77,6 +78,16 @@ services:
   #   volumes:
   #     - redis_data:/data
 
+  # ---- openAMDC（信创替代 Redis；与 redis 二选一）----
+  # 启用后把 app 的 REDIS_URL 设为 redis://openamdc:6379/0。
+  # openamdc:
+  #   image: ${OPENAMDC_IMAGE:-pollybird/openamdc:1.0.0}
+  #   restart: unless-stopped
+  #   command: ["/etc/openamdc/openamdc.conf", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+  #   volumes:
+  #     - openamdc_data:/data
+
 volumes:
   mysql_data:
   # redis_data:
+  # openamdc_data:

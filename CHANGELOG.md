@@ -7,6 +7,34 @@
 
 > **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
+## [3.3.0] - 2026-11-22
+
+**信创适配版**：新增 openGauss 7.0 数据库与 openAMDC 1.0.0 缓存后端支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖。
+
+### Added
+
+- **openGauss 数据库支持**：新增内置轻量方言 `app/utils/dialects/opengauss.py`（兼容 `openGauss-lite` 版本串、注册 Alembic DDL 实现），`opengauss+psycopg2://` 可直接连接；官方 `opengauss-sqlalchemy` 已安装时优先使用（可选，`requirements-opengauss.txt`）。
+- **连接与引擎参数**：`app/config.py::build_engine_options()` 为 openGauss 设置连接池、`connect_timeout` 与 `application_name`；`app/utils/dbconfig.py` 支持 openGauss 的 TCP 与 Unix socket URI，驱动缺失、sha256 认证失败、连接拒绝分别给出可操作中文提示。
+- **初始化向导与显示**：向导新增「openGauss（信创推荐）」选项与 5432 端口联动；`_current_db_label()` 与后台页脚显示 openGauss。
+- **备份与恢复**：`backup_utils` 按方言适配 openGauss——`gs_dump` 使用位置参数库名与 `-W` 密码、`gsql` 恢复、自动注入 `LD_LIBRARY_PATH`；工具路径支持 `ZHYCMS_DB_DUMP_BIN_DIR` / `OPENGAUSS_BIN` / `ZHYCMS_DB_DUMP_BIN`。
+- **openAMDC 缓存后端**：新增 `app/services/redis_backend.py`，按 `INFO server` 的 `openamdc_version` / `redis_version` 识别后端；启动日志、后台 Redis 页与 `/healthz?detail=1` 展示 `redis_flavor` 与版本。
+- **健康检查**：`/healthz?detail=1` 新增 `db_dialect` 与 `redis_flavor`；默认 `/healthz` 保持轻量。
+- **镜像与编排**：新增 `pollybird/zhycms:opengauss`、`pollybird/openamdc:1.0.0`、`pollybird/opengauss:7.0.0`；新增 `docker-compose.opengauss.yml`，`docker-compose.yml` 增加 `openamdc` profile 与 `app-sqlite` profile；根 `Dockerfile` 新增可选构建参数 `INSTALL_OPENGAUSS_DRIVER` / `OPENGAUSS_PY_URL`；安装器支持数据库四选一、缓存三选一。
+- **文档**：新增 `docs/DEPLOY_OPENGAUSS.md`、`docs/DEPLOY_OPENAMDC.md` 与 `docs/XINCHUANG_ADAPTATION.md`（信创数据库适配专题：官方仅实现 openGauss，附达梦 / 金仓 / GBase / PolarDB 适配思路、工作量评估与贡献指南）。
+- **测试与 CI**：新增 `tests/test_opengauss_v330.py`、`tests/test_openamdc_v330.py`、`tests/test_redis_backend_v330.py`、`tests/test_compat_integration.py`（默认 skip），以及 `.github/workflows/compat.yml`（openAMDC 全量 + openGauss 冒烟）。
+
+### Fixed
+
+- **清缓存导致全员登出**：缓存键前缀 `zhycms:` 与会话前缀 `zhycms:sess:` 重叠，`clear()` 会连带删除会话；缓存前缀改为 `zhycms:cache:`。
+- **站点缓存条目恒为 `--`**：cachelib `RedisCache` 无 `scan_iter` 也无 `_cache`，新增 `scan_iter(match=...)` 统计分支。
+
+### 升级注意
+
+- 无数据库迁移，覆盖代码 + 重启即可；MySQL / PostgreSQL / Redis 部署行为不变。
+- 切换 openGauss 需额外安装 openGauss 官方 psycopg2 驱动并配置 `LD_LIBRARY_PATH`，或用 `:opengauss` 镜像；aarch64 驱动未验证。
+- openAMDC 可直接作为 `REDIS_URL` 使用，应用自动识别；镜像默认关闭持久化，重启后会话失效属预期。
+- 回退：改回原 `ZHYCMS_DB_URI` / `REDIS_URL` 后重启即可，无结构变更。
+
 ## [3.2.12] - 2026-11-21
 
 **Webhook 事件订阅版**：业务事件可按站点订阅并异步外送到用户自定义接收地址，带签名、重试与安全防护。新增数据库迁移 `0020`，无新增 Python 依赖。

@@ -21,42 +21,74 @@ from ..models.setting import Setting
 
 
 def _db_type_and_path():
-    """返回 (db_type, db_name_or_path, host, port, user, password)。"""
-    uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '')
-    if uri.startswith('sqlite:///'):
-        path = uri[len('sqlite:///'):]
-        return 'sqlite', path, None, None, None, None
-    if uri.startswith('mysql+pymysql://') or uri.startswith('mysql://'):
-        # mysql+pymysql://user:pwd@host:port/dbname
-        prefix = 'mysql+pymysql://' if 'mysql+pymysql' in uri else 'mysql://'
-        rest = uri[len(prefix):]
-        return ('mysql',) + _parse_db_url(rest)
-    if uri.startswith('postgresql'):
-        prefix = 'postgresql+psycopg2://' if 'psycopg2' in uri else 'postgresql://'
-        rest = uri[len(prefix):]
-        return ('postgresql',) + _parse_db_url(rest)
-    return 'unknown', uri, None, None, None, None
+    """返回 (db_type, db_name_or_path, host, port, user, password)。
 
-
-def _parse_db_url(rest):
-    """解析 user:pwd@host:port/dbname → (dbname, host, port, user, pwd)。"""
+    统一用 ``make_url`` 解析，兼容用户名/密码中的特殊字符，并识别
+    openGauss 以及 host 位于 query 的 Unix socket 形态。
+    """
+    uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
     try:
-        auth, hostpart = rest.split('@', 1) if '@' in rest else (None, rest)
-        user, pwd = (auth.split(':', 1) if auth and ':' in auth else (auth, '')) if auth else ('', '')
-        host_port, dbname = hostpart.split('/', 1) if '/' in hostpart else (hostpart, '')
-        if ':' in host_port:
-            host, port = host_port.split(':', 1)
-        else:
-            host, port = host_port, None
-        port = int(port) if port and port.isdigit() else None
-        # 剥离 SQLAlchemy URL 查询参数（如 ?charset=utf8mb4），否则 mysqldump 会
-        # 把 "zhycms?charset=utf8mb4" 当成库名报 1049 Unknown database
-        if '?' in dbname:
-            dbname = dbname.split('?', 1)[0]
-        return dbname, host, port, user or '', pwd or ''
+        from sqlalchemy.engine import make_url
+        url = make_url(uri)
+        backend = url.get_backend_name()
     except Exception as e:
         current_app.logger.warning('数据库连接串解析失败，按空配置处理：%s', e)
-        return '', None, None, '', ''
+        return 'unknown', uri, None, None, None, None
+
+    if backend == 'sqlite':
+        return 'sqlite', url.database or '', None, None, None, None
+    if backend not in ('mysql', 'postgresql', 'opengauss'):
+        return 'unknown', uri, None, None, None, None
+
+    # v3.3.0：build_uri() 对 socket 连接把路径放在 query（MySQL: unix_socket，
+    # PostgreSQL/openGauss: host），此时 url.host 为空，需要回退到 query 取。
+    socket_key = 'unix_socket' if backend == 'mysql' else 'host'
+    host = url.query.get(socket_key) or url.host
+    return backend, url.database or '', host, url.port, url.username or '', url.password or ''
+
+
+def _bin_tool(name, db_type=None):
+    """定位外部数据库工具路径（v3.3.0）。
+
+    优先级：``DB_DUMP_BIN_DIR`` 配置/环境变量 > openGauss ``OPENGAUSS_BIN`` >
+    ``ZHYCMS_DB_DUMP_BIN`` 显式文件（仅备份工具） > PATH。
+    """
+    from flask import has_app_context
+    dump_tools = ('mysqldump', 'pg_dump', 'gs_dump')
+    bin_dir = ''
+    if has_app_context():
+        bin_dir = current_app.config.get('DB_DUMP_BIN_DIR') or ''
+    bin_dir = (bin_dir or os.environ.get('ZHYCMS_DB_DUMP_BIN_DIR')
+               or os.environ.get('DB_DUMP_BIN_DIR') or '')
+    if bin_dir:
+        candidate = os.path.join(bin_dir, name)
+        if os.path.exists(candidate):
+            return candidate
+    if db_type == 'opengauss':
+        og_bin = os.environ.get('OPENGAUSS_BIN', '')
+        if og_bin:
+            candidate = os.path.join(og_bin, name) if os.path.isdir(og_bin) else og_bin
+            if os.path.exists(candidate):
+                return candidate
+    if name in dump_tools:
+        explicit = os.environ.get('ZHYCMS_DB_DUMP_BIN', '')
+        if explicit and os.path.isfile(explicit):
+            return explicit
+    return shutil.which(name) or name
+
+
+def _tool_env(db_type, password=None):
+    """构造外部工具运行环境：密码 + openGauss 动态库搜索路径。"""
+    env = os.environ.copy()
+    if password:
+        env['PGPASSWORD'] = password
+    if db_type == 'opengauss':
+        libdir = (os.environ.get('ZHYCMS_OPENGAUSS_LIB')
+                  or os.environ.get('OPENGAUSS_LIB') or '/usr/local/opengauss/lib')
+        if os.path.isdir(libdir):
+            old = env.get('LD_LIBRARY_PATH', '')
+            env['LD_LIBRARY_PATH'] = libdir + (':' + old if old else '')
+    return env
 
 
 def _backup_dir():
@@ -101,6 +133,9 @@ def create_backup(trigger=TRIGGER_MANUAL, remark='', created_by=None):
             ok = _backup_mysql(dest_path, db_name_or_path, host, port or 3306, user, pwd)
         elif db_type == 'postgresql':
             ok = _backup_pg(dest_path, db_name_or_path, host, port or 5432, user, pwd)
+        elif db_type == 'opengauss':
+            ok = _backup_pg(dest_path, db_name_or_path, host, port or 5432, user, pwd,
+                            db_type='opengauss')
         else:
             ok = _backup_json(dest_path)  # 兜底：JSON 导出
     except Exception as e:
@@ -166,21 +201,62 @@ def _backup_sqlite(src_path, dest_path):
 
 def _backup_mysql(dest_path, dbname, host, port, user, pwd):
     """调用 mysqldump；失败回退 JSON。"""
-    cmd = ['mysqldump', '--default-character-set=utf8mb4',
-           f'-h{host or "localhost"}', f'-P{port}', f'-u{user or ""}']
+    cmd = [_bin_tool('mysqldump', 'mysql'), '--default-character-set=utf8mb4']
+    if host and host.startswith('/'):
+        cmd.append(f'--socket={host}')
+    else:
+        cmd.extend([f'-h{host or "localhost"}', f'-P{port}'])
+    cmd.append(f'-u{user or ""}')
     if pwd:
         cmd.append(f'-p{pwd}')
     cmd.append(dbname or '')
     return _run_dump_with_gzip(cmd, dest_path, fallback_json=True)
 
 
-def _backup_pg(dest_path, dbname, host, port, user, pwd):
-    env = os.environ.copy()
-    if pwd:
-        env['PGPASSWORD'] = pwd
-    cmd = ['pg_dump', f'--host={host or "localhost"}', f'--port={port}',
-           f'--username={user or ""}', dbname or '']
+def _backup_pg(dest_path, dbname, host, port, user, pwd, db_type='postgresql'):
+    """调用 pg_dump（PostgreSQL）或 gs_dump（openGauss）导出纯 SQL。"""
+    is_og = db_type == 'opengauss'
+    tool = _bin_tool('gs_dump' if is_og else 'pg_dump', db_type)
+    env = _tool_env(db_type, pwd)
+    cmd = [tool, f'--host={host or "localhost"}', f'--port={port}',
+           f'--username={user or ""}', '--no-password']
+    if is_og and pwd:
+        # openGauss 的 gs_dump 不读取 PGPASSWORD，需显式 -W（M0 实测）。
+        cmd.extend(['-W', pwd])
+    # M0 实测：gs_dump 不支持 -d，数据库名必须作为位置参数；pg_dump 同样接受
+    # 位置参数库名，因此两种后端保持一致的命令结构。
+    if is_og:
+        # gs_dump 会把进度日志写到 stdout，直接管道压缩会污染 SQL 流；
+        # 改用 -f 输出到临时文件后再压缩。
+        return _run_og_dump_with_gzip(cmd, dest_path, dbname, env)
+    cmd.append(dbname or '')
     return _run_dump_with_gzip(cmd, dest_path, env=env, fallback_json=True)
+
+
+def _run_og_dump_with_gzip(cmd, dest_path, dbname, env):
+    """gs_dump 输出到临时文件，成功后 gzip 压缩并清理。"""
+    tmp_sql = dest_path + '.tmp.sql'
+    try:
+        proc = subprocess.Popen(
+            cmd + ['-f', tmp_sql, dbname or ''],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env)
+        _, err = proc.communicate(timeout=600)
+        if proc.returncode != 0:
+            current_app.logger.warning(
+                'gs_dump 失败：%s', (err or b'').decode('utf-8', errors='ignore')[:500])
+        elif os.path.exists(tmp_sql) and os.path.getsize(tmp_sql) > 0:
+            with open(tmp_sql, 'rb') as f_in, gzip.open(dest_path, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+            return True
+    except Exception as e:
+        current_app.logger.warning('gs_dump 执行失败，尝试 JSON 兜底：%s', e)
+    finally:
+        try:
+            if os.path.exists(tmp_sql):
+                os.remove(tmp_sql)
+        except OSError:
+            pass
+    return _backup_json(dest_path)
 
 
 def _run_dump_with_gzip(cmd, dest_path, env=None, fallback_json=False):
@@ -250,6 +326,8 @@ def restore_backup(record_or_filename):
         if db_type == 'mysql':
             return _restore_mysql(path)
         if db_type == 'postgresql':
+            return _restore_pg(path)
+        if db_type == 'opengauss':
             return _restore_pg(path)
         # JSON 格式
         return _restore_json(path)
@@ -337,8 +415,13 @@ def _restore_mysql(gz_path):
         db.engine.dispose()
         # --init-command 设置锁等待超时：并发连接持锁时 15 秒快速失败，
         # 避免恢复请求永久挂起（错误信息可通过返回值提示用户稍后重试）
-        cmd = ['mysql', '--init-command=SET SESSION lock_wait_timeout=15',
-               f'-h{host or "localhost"}', f'-P{port or 3306}', f'-u{user or ""}']
+        cmd = [_bin_tool('mysql', 'mysql'),
+               '--init-command=SET SESSION lock_wait_timeout=15']
+        if host and host.startswith('/'):
+            cmd.append(f'--socket={host}')
+        else:
+            cmd.extend([f'-h{host or "localhost"}', f'-P{port or 3306}'])
+        cmd.append(f'-u{user or ""}')
         if pwd:
             cmd.append(f'-p{pwd}')
         cmd.append(dbname or '')
@@ -357,10 +440,9 @@ def _restore_mysql(gz_path):
 
 def _restore_pg(gz_path):
     db_type, dbname, host, port, user, pwd = _db_type_and_path()
+    is_og = db_type == 'opengauss'
     sql_path = gz_path + '.sql'
-    env = os.environ.copy()
-    if pwd:
-        env['PGPASSWORD'] = pwd
+    env = _tool_env(db_type, pwd)
     try:
         with gzip.open(gz_path, 'rb') as f_in, open(sql_path, 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
@@ -376,13 +458,25 @@ def _restore_pg(gz_path):
             head = f.read(2048)
         if head.lstrip().startswith('{'):
             return _restore_json(gz_path)
-        cmd = ['psql', f'--host={host or "localhost"}', f'--port={port or 5432}',
-               f'--username={user or ""}', '-f', sql_path, dbname or '']
+        if is_og:
+            # openGauss 备份由 gs_dump 生成纯 SQL，用 gsql 导入；库名走 -d
+            cmd = [_bin_tool('gsql', 'opengauss'),
+                   f'--host={host or "localhost"}', f'--port={port or 5432}',
+                   f'--username={user or ""}',
+                   '-d', dbname or '', '-f', sql_path]
+            if pwd:
+                cmd.extend(['-W', pwd])
+        else:
+            cmd = [_bin_tool('psql', 'postgresql'),
+                   f'--host={host or "localhost"}', f'--port={port or 5432}',
+                   f'--username={user or ""}', '-w',
+                   '-f', sql_path, dbname or '']
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
         _, err = proc.communicate(timeout=600)
         if proc.returncode != 0:
-            return False, f'psql 导入失败: {(err or b"").decode("utf-8", errors="ignore")[:500]}'
-        return True, 'PostgreSQL 恢复成功'
+            tool = 'gsql' if is_og else 'psql'
+            return False, f'{tool} 导入失败: {(err or b"").decode("utf-8", errors="ignore")[:500]}'
+        return True, ('openGauss 恢复成功' if is_og else 'PostgreSQL 恢复成功')
     finally:
         try:
             os.remove(sql_path)
@@ -483,7 +577,7 @@ def system_monitor_stats():
                 alt = os.path.join(_BD, db_name_or_path)
                 if os.path.exists(alt):
                     res['db_size_mb'] = round(os.path.getsize(alt) / (1024 * 1024), 2)
-        elif db_type in ('mysql', 'postgresql'):
+        elif db_type in ('mysql', 'postgresql', 'opengauss'):
             try:
                 if db_type == 'mysql':
                     r = db.session.execute(db.text(

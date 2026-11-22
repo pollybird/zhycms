@@ -45,6 +45,23 @@ gen_random() {
     head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32
 }
 
+# openGauss 密码：必须含大写、小写、数字与特殊字符；用 - 作为特殊字符，
+# 保证可直接拼入 URI（@ / # / % 会破坏连接串）。
+gen_opengauss_password() {
+    local lower upper digit
+    lower=$(head -c 64 /dev/urandom | tr -dc 'a-z' | head -c 8)
+    upper=$(head -c 64 /dev/urandom | tr -dc 'A-Z' | head -c 6)
+    digit=$(head -c 64 /dev/urandom | tr -dc '0-9' | head -c 6)
+    printf '%s%s%s-\n' "$upper" "$lower" "$digit"
+}
+
+valid_opengauss_password() {
+    local p="$1"
+    [[ "$p" =~ ^[A-Za-z0-9-]+$ ]] && [ ${#p} -ge 8 ] \
+        && [[ "$p" =~ [A-Z] ]] && [[ "$p" =~ [a-z] ]] \
+        && [[ "$p" =~ [0-9] ]] && [[ "$p" == *-* ]]
+}
+
 # ---- 路径 ----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -254,17 +271,29 @@ echo ""
 echo -e "${GREEN}━━━ 步骤 1/6：选择数据库 ━━━${NC}"
 echo "  1) MySQL 8.4（推荐，功能最全）"
 echo "  2) PostgreSQL 16（高并发性能更强）"
-echo "  3) MariaDB 11.4（MySQL 协议兼容，开源社区维护）"
+echo "  3) openGauss 7.0（信创数据库，独立编排文件）"
+echo "  4) SQLite（无外部数据库，适合单机/演示）"
 echo ""
-prompt "请选择 [1-3]" DB_CHOICE
+prompt "请选择 [1-4]" DB_CHOICE
 DB_CHOICE="${DB_CHOICE:-1}"
+
+OPENGAUSS_IMAGE="pollybird/opengauss:7.0.0"
+OPENGAUSS_BASE_IMAGE="opengauss/opengauss:7.0.0-RC3.B025-openEuler22.03"
 
 case "$DB_CHOICE" in
     1) DB_PROFILE="mysql";    DB_NAME="MySQL 8.4" ;;
     2) DB_PROFILE="postgres"; DB_NAME="PostgreSQL 16" ;;
-    3) DB_PROFILE="mariadb";  DB_NAME="MariaDB 11.4" ;;
+    3) DB_PROFILE="opengauss"; DB_NAME="openGauss 7.0" ;;
+    4) DB_PROFILE="sqlite";   DB_NAME="SQLite" ;;
     *) error "无效选择"; exit 1 ;;
 esac
+
+# openGauss 使用独立编排文件，无 profile 参数
+if [ "$DB_PROFILE" = "opengauss" ]; then
+    COMPOSE_FILES=(-f docker-compose.opengauss.yml)
+else
+    COMPOSE_FILES=()
+fi
 info "已选择：${DB_NAME}"
 echo ""
 
@@ -285,20 +314,21 @@ else
 fi
 echo ""
 
-# 已有数据卷检测：MySQL/PostgreSQL 仅在首次初始化空数据卷时应用密码，
-# 若数据卷已存在（此前部署过），新密码不会同步到数据库，会导致 Access denied
+# 已有数据卷检测：MySQL/PostgreSQL/openGauss 仅在首次初始化空数据卷时应用密码，
+# 若数据卷已存在（此前部署过），新密码不会同步到数据库，会导致认证失败。
+# SQLite 无独立数据卷，跳过。
 EXISTING_VOL=""
 case "$DB_PROFILE" in
-    mysql)    EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_mysql_data$' | head -1 || true) ;;
-    mariadb)  EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_mariadb_data$' | head -1 || true) ;;
-    postgres) EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_pg_data$' | head -1 || true) ;;
+    mysql)     EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_mysql_data$' | head -1 || true) ;;
+    postgres)  EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_pg_data$' | head -1 || true) ;;
+    opengauss) EXISTING_VOL=$(docker volume ls --format '{{.Name}}' 2>/dev/null | grep -E '_opengauss_data$' | head -1 || true) ;;
 esac
 
 REUSE_DB=false
 if [ -n "$EXISTING_VOL" ]; then
     warn "检测到已有数据库数据卷：$EXISTING_VOL"
     echo "  数据库仅在首次初始化空数据卷时应用密码，"
-    echo "  若该数据卷由其它密码初始化，输入新密码将无法登录（Access denied）。"
+    echo "  若该数据卷由其它密码初始化，输入新密码将无法登录。"
     echo ""
     echo "  1) 沿用已有数据（输入此前初始化时的密码）"
     echo "  2) 删除数据卷重新初始化（数据库数据将全部清空！）"
@@ -306,7 +336,11 @@ if [ -n "$EXISTING_VOL" ]; then
     VOL_CHOICE="${VOL_CHOICE:-1}"
     if [ "$VOL_CHOICE" = "2" ] && confirm "确认删除数据卷 $EXISTING_VOL？数据不可恢复！" "n"; then
         info "停止容器并删除数据卷..."
-        "${COMPOSE_CMD[@]}" --profile "$DB_PROFILE" down -v 2>/dev/null || true
+        if [ "$DB_PROFILE" = "opengauss" ]; then
+            "${COMPOSE_CMD[@]}" "${COMPOSE_FILES[@]}" down -v 2>/dev/null || true
+        else
+            "${COMPOSE_CMD[@]}" --profile "$DB_PROFILE" down -v 2>/dev/null || true
+        fi
         info "数据卷已删除，将使用新密码全新初始化"
     else
         REUSE_DB=true
@@ -316,7 +350,38 @@ fi
 echo ""
 
 # 数据库密码
-if [ "$REUSE_DB" = "true" ]; then
+DB_PASSWORD=""
+OPENGAUSS_PASSWORD=""
+if [ "$DB_PROFILE" = "sqlite" ]; then
+    info "SQLite 无需数据库密码"
+elif [ "$DB_PROFILE" = "opengauss" ]; then
+    # openGauss 要求大写、小写、数字与特殊字符；统一用 - 保证 URI 安全
+    if [ "$REUSE_DB" = "true" ]; then
+        while true; do
+            prompt "  请输入该数据库当前生效的密码（字母/数字/连字符 -）" DB_PASSWORD
+            if valid_opengauss_password "$DB_PASSWORD"; then
+                break
+            fi
+            warn "密码需包含大写、小写、数字和 -，长度至少 8 位"
+        done
+    else
+        DEFAULT_DB_PASS=$(gen_opengauss_password)
+        echo "  数据库密码自动生成："
+        echo "  ${DEFAULT_DB_PASS:0:8}...${DEFAULT_DB_PASS: -8}"
+        if confirm "使用此自动生成的密码？" "y"; then
+            DB_PASSWORD="$DEFAULT_DB_PASS"
+        else
+            while true; do
+                prompt "  请输入自定义密码（字母/数字/连字符 -）" DB_PASSWORD
+                if valid_opengauss_password "$DB_PASSWORD"; then
+                    break
+                fi
+                warn "密码需包含大写、小写、数字和 -，长度至少 8 位"
+            done
+        fi
+    fi
+    OPENGAUSS_PASSWORD="$DB_PASSWORD"
+elif [ "$REUSE_DB" = "true" ]; then
     # 沿用已有数据卷：必须输入库内当前生效的密码，否则应用连接失败
     while true; do
         prompt "  请输入该数据库当前生效的密码（仅字母数字）" DB_PASSWORD
@@ -343,12 +408,19 @@ else
     fi
 fi
 
-MYSQL_ROOT_PASSWORD=$(gen_random)
-MYSQL_PASSWORD="$DB_PASSWORD"
-# MariaDB 复用同一组生成的密码（compose 中按 profile 各取所需）
-MARIADB_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD"
-MARIADB_PASSWORD="$DB_PASSWORD"
-POSTGRES_PASSWORD="$DB_PASSWORD"
+MYSQL_ROOT_PASSWORD=""
+MYSQL_PASSWORD=""
+MARIADB_ROOT_PASSWORD=""
+MARIADB_PASSWORD=""
+POSTGRES_PASSWORD=""
+if [ "$DB_PROFILE" != "sqlite" ]; then
+    MYSQL_ROOT_PASSWORD=$(gen_random)
+    MYSQL_PASSWORD="$DB_PASSWORD"
+    # MariaDB 仍保留在 compose profile 中，复用同一组密码占位
+    MARIADB_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD"
+    MARIADB_PASSWORD="$DB_PASSWORD"
+    POSTGRES_PASSWORD="$DB_PASSWORD"
+fi
 info "安全配置完成"
 echo ""
 
@@ -417,21 +489,44 @@ fi
 echo ""
 
 # ============================================================
-# 步骤 5：Redis 缓存与 Session（可选）
+# 步骤 5：缓存与 Session（可选：Redis / openAMDC）
 # ============================================================
-echo -e "${GREEN}━━━ 步骤 5/6：Redis 缓存与 Session（可选）━━━${NC}"
-echo "  启用 Redis 后，页面缓存与登录 Session 存入 Redis，支持多实例负载均衡。"
-echo "  不启用则使用内置 SimpleCache + Cookie Session（单机部署零依赖）。"
+echo -e "${GREEN}━━━ 步骤 5/6：缓存与 Session（可选）━━━${NC}"
+echo "  启用后页面缓存与登录 Session 存入缓存服务，支持多实例负载均衡。"
+echo "  openAMDC 为信创缓存后端，协议与 Redis 兼容。"
 echo ""
-if confirm "是否启用 Redis？" "n"; then
-    USE_REDIS="yes"
-    REDIS_URL="redis://redis:6379/0"
-    info "Redis 已配置（将自动启动 redis 容器）"
-else
-    USE_REDIS="no"
-    REDIS_URL=""
-    info "使用内置 SimpleCache + Cookie Session"
-fi
+echo "  1) 不启用（内置 SimpleCache + Cookie Session）"
+echo "  2) Redis 8（通用）"
+echo "  3) openAMDC 1.0（信创）"
+echo ""
+prompt "请选择 [1-3]" CACHE_CHOICE
+CACHE_CHOICE="${CACHE_CHOICE:-1}"
+USE_REDIS="no"
+USE_OPENAMDC="no"
+REDIS_URL=""
+OPENAMDC_IMAGE="${OPENAMDC_IMAGE:-pollybird/openamdc:1.0.0}"
+case "$CACHE_CHOICE" in
+    1)
+        CACHE_BACKEND="不启用"
+        info "使用内置 SimpleCache + Cookie Session"
+        ;;
+    2)
+        USE_REDIS="yes"
+        CACHE_BACKEND="Redis 8"
+        REDIS_URL="redis://redis:6379/0"
+        info "Redis 已配置（将自动启动 redis 容器）"
+        ;;
+    3)
+        USE_OPENAMDC="yes"
+        CACHE_BACKEND="openAMDC 1.0"
+        REDIS_URL="redis://openamdc:6379/0"
+        info "openAMDC 已配置（将自动启动 openamdc 容器）"
+        ;;
+    *)
+        error "无效选择"
+        exit 1
+        ;;
+esac
 echo ""
 
 # ============================================================
@@ -471,10 +566,12 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 echo "  数据库：          $DB_NAME"
 echo "  应用密钥：        ${SECRET_KEY:0:8}...（已隐藏）"
-echo "  数据库密码：      ${DB_PASSWORD:0:4}****（已隐藏）"
+if [ "$DB_PROFILE" != "sqlite" ]; then
+    echo "  数据库密码：      ${DB_PASSWORD:0:4}****（已隐藏）"
+fi
 echo "  镜像加速：        ${USE_MIRROR}"
 echo "  Meilisearch：     ${USE_MEILI}"
-echo "  Redis：           ${USE_REDIS}"
+echo "  缓存后端：        ${CACHE_BACKEND}"
 echo "  多站模式：        ${MULTI_SITE:-no}"
 echo "  Web 端口：        $WEB_PORT"
 echo "  Worker 数量：     $GUNICORN_WORKERS"
@@ -505,6 +602,11 @@ MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
 MARIADB_PASSWORD=${MARIADB_PASSWORD}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 
+# openGauss（docker-compose.opengauss.yml）
+OPENGAUSS_PASSWORD=${OPENGAUSS_PASSWORD}
+OPENGAUSS_BASE_IMAGE=${OPENGAUSS_BASE_IMAGE}
+OPENGAUSS_IMAGE=${OPENGAUSS_IMAGE}
+
 # Web 端口
 WEB_PORT=${WEB_PORT}
 
@@ -514,8 +616,9 @@ GUNICORN_WORKERS=${GUNICORN_WORKERS}
 # Meilisearch
 MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
 
-# Redis（可选，启用后缓存与 Session 走 Redis）
+# 缓存与 Session（Redis / openAMDC；留空则使用 SimpleCache）
 REDIS_URL=${REDIS_URL}
+OPENAMDC_IMAGE=${OPENAMDC_IMAGE}
 
 # 镜像源加速
 APT_MIRROR=${APT_MIRROR}
@@ -571,16 +674,19 @@ if [ "$USE_MIRROR" = "yes" ]; then
         echo "  将依次尝试：${CN_MIRROR_HOSTS[*]}"
         echo ""
 
-        # 组装本次部署需要的全部镜像（必须与 docker-compose.yml / Dockerfile 一致）
+        # 组装本次部署需要的全部镜像（必须与 compose / Dockerfile 一致）
         REQUIRED_IMAGES=("python:3.12-slim")   # 多阶段构建的基础镜像
         OPTIONAL_IMAGES=()
         case "$DB_PROFILE" in
-            mysql)    REQUIRED_IMAGES+=("mysql:8.4") ;;
-            mariadb)  REQUIRED_IMAGES+=("mariadb:11.4") ;;
-            postgres) REQUIRED_IMAGES+=("postgres:16-alpine") ;;
+            mysql)     REQUIRED_IMAGES+=("mysql:8.4") ;;
+            postgres)  REQUIRED_IMAGES+=("postgres:16-alpine") ;;
+            opengauss) REQUIRED_IMAGES+=("$OPENGAUSS_BASE_IMAGE") ;;
+            sqlite)    ;;
         esac
         [ "$USE_MEILI" = "yes" ] && OPTIONAL_IMAGES+=("getmeili/meilisearch:v1.8")
         [ "$USE_REDIS" = "yes" ] && OPTIONAL_IMAGES+=("redis:8-alpine")
+        # openAMDC 镜像本地构建，需要 openEuler 基座
+        [ "$USE_OPENAMDC" = "yes" ] && OPTIONAL_IMAGES+=("openeuler/openeuler:24.03-lts-sp1")
 
         PULL_FAILED=()
         info "拉取必需镜像（构建 / 数据库）..."
@@ -623,12 +729,27 @@ echo ""
 
 cd "$PROJECT_DIR"
 
-COMPOSE_PROFILES="--profile ${DB_PROFILE}"
+# openGauss 使用独立编排文件且无 profile；其余数据库走 profiles
+COMPOSE_PROFILES=""
+if [ "$DB_PROFILE" != "opengauss" ]; then
+    COMPOSE_PROFILES="--profile ${DB_PROFILE}"
+fi
 [ "$USE_MEILI" = "yes" ] && COMPOSE_PROFILES="$COMPOSE_PROFILES --profile search"
 [ "$USE_REDIS" = "yes" ] && COMPOSE_PROFILES="$COMPOSE_PROFILES --profile redis"
+[ "$USE_OPENAMDC" = "yes" ] && COMPOSE_PROFILES="$COMPOSE_PROFILES --profile openamdc"
+
+# openAMDC 镜像不在官方仓库，本地缺失时从源码构建
+if [ "$USE_OPENAMDC" = "yes" ] && ! docker image inspect "$OPENAMDC_IMAGE" >/dev/null 2>&1; then
+    info "本地未找到 $OPENAMDC_IMAGE，开始从源码构建（首次构建较慢）..."
+    if ! docker build -t "$OPENAMDC_IMAGE" docker/openamdc 2>&1 | tee /tmp/zhycms_openamdc_build.log; then
+        error "openAMDC 镜像构建失败，请检查 /tmp/zhycms_openamdc_build.log"
+        exit 1
+    fi
+    info "openAMDC 镜像构建完成 ✓"
+fi
 
 # 构建时覆盖端口（通过 --build-arg 不需要改端口，端口在 compose 层）
-if ! "${COMPOSE_CMD[@]}" $COMPOSE_PROFILES build --build-arg APT_MIRROR="${APT_MIRROR}" --build-arg PIP_INDEX_URL="${PIP_INDEX_URL}" 2>&1 | tee /tmp/zhycms_build.log; then
+if ! "${COMPOSE_CMD[@]}" "${COMPOSE_FILES[@]}" $COMPOSE_PROFILES build --build-arg APT_MIRROR="${APT_MIRROR}" --build-arg PIP_INDEX_URL="${PIP_INDEX_URL}" 2>&1 | tee /tmp/zhycms_build.log; then
     error "镜像构建失败，请检查上方日志"
     exit 1
 fi
@@ -640,40 +761,50 @@ echo ""
 # 启动服务
 # ============================================================
 info "启动服务..."
-"${COMPOSE_CMD[@]}" $COMPOSE_PROFILES up -d 2>&1 | tail -10
+"${COMPOSE_CMD[@]}" "${COMPOSE_FILES[@]}" $COMPOSE_PROFILES up -d 2>&1 | tail -10
 echo ""
 
 # 数据库凭据校验（数据卷由旧密码初始化时快速给出明确指引，而非等应用超时）
 info "校验数据库连接..."
 CREDS_OK=false
-for _ in $(seq 1 30); do
-    if [ "$DB_PROFILE" = "mysql" ]; then
-        if "${COMPOSE_CMD[@]}" --profile mysql exec -T db-mysql mysql -uzhycms "-p${MYSQL_PASSWORD}" -e "SELECT 1" &>/dev/null; then
-            CREDS_OK=true
-            break
+if [ "$DB_PROFILE" = "sqlite" ]; then
+    # SQLite 无独立数据库服务，由应用首次启动自动建库
+    CREDS_OK=true
+else
+    for _ in $(seq 1 30); do
+        if [ "$DB_PROFILE" = "mysql" ]; then
+            if "${COMPOSE_CMD[@]}" "${COMPOSE_FILES[@]}" --profile mysql exec -T db-mysql mysql -uzhycms "-p${MYSQL_PASSWORD}" -e "SELECT 1" &>/dev/null; then
+                CREDS_OK=true
+                break
+            fi
+        elif [ "$DB_PROFILE" = "opengauss" ]; then
+            if "${COMPOSE_CMD[@]}" "${COMPOSE_FILES[@]}" exec -T db-opengauss bash -lc 'LD_LIBRARY_PATH=/usr/local/opengauss/lib /usr/local/opengauss/bin/gsql -d postgres -U gaussdb -W "$GS_PASSWORD" -tAc "select 1"' &>/dev/null; then
+                CREDS_OK=true
+                break
+            fi
+        else
+            if "${COMPOSE_CMD[@]}" "${COMPOSE_FILES[@]}" --profile postgres exec -T db-pg env PGPASSWORD="${POSTGRES_PASSWORD}" psql -U zhycms -d zhycms -tAc "SELECT 1" &>/dev/null; then
+                CREDS_OK=true
+                break
+            fi
         fi
-    elif [ "$DB_PROFILE" = "mariadb" ]; then
-        if "${COMPOSE_CMD[@]}" --profile mariadb exec -T db-mariadb mariadb -uzhycms "-p${MARIADB_PASSWORD}" -e "SELECT 1" &>/dev/null; then
-            CREDS_OK=true
-            break
-        fi
-    else
-        if "${COMPOSE_CMD[@]}" --profile postgres exec -T db-pg env PGPASSWORD="${POSTGRES_PASSWORD}" psql -U zhycms -d zhycms -tAc "SELECT 1" &>/dev/null; then
-            CREDS_OK=true
-            break
-        fi
-    fi
-    sleep 2
-done
+        sleep 2
+    done
+fi
 
 if [ "$CREDS_OK" = "true" ]; then
     info "数据库连接验证通过 ✓"
 else
+    if [ "$DB_PROFILE" = "opengauss" ]; then
+        RESET_HINT="${COMPOSE_CMD[*]} -f docker-compose.opengauss.yml down -v"
+    else
+        RESET_HINT="${COMPOSE_CMD[*]} --profile $DB_PROFILE down -v"
+    fi
     error "数据库密码验证失败（Access denied）"
     echo "  原因：数据卷由旧密码初始化，当前 .env 中的密码无法登录。"
     echo "  处理方式二选一："
     echo "    A. 保留数据：重跑安装脚本，选择「沿用已有数据」并输入旧密码"
-    echo "    B. 清空重建（数据丢失）：${COMPOSE_CMD[*]} --profile $DB_PROFILE down -v"
+    echo "    B. 清空重建（数据丢失）：${RESET_HINT}"
     exit 1
 fi
 echo ""
@@ -695,7 +826,7 @@ echo ""
 
 if [ $WAITED -ge $MAX_WAIT ]; then
     warn "服务未在 ${MAX_WAIT}s 内就绪，可能仍在启动中"
-    echo "  查看日志：${COMPOSE_CMD[*]} $COMPOSE_PROFILES logs -f"
+    echo "  查看日志：${COMPOSE_CMD[*]} ${COMPOSE_FILES[*]} $COMPOSE_PROFILES logs -f"
 else
     echo ""
     echo -e "${GREEN}╔══════════════════════════════════════════════════╗${NC}"
@@ -706,9 +837,9 @@ else
     echo "  健康检查：    http://localhost:${WEB_PORT}/healthz"
     echo ""
     echo "  常用命令："
-    echo "    查看日志：  ${COMPOSE_CMD[*]} $COMPOSE_PROFILES logs -f"
-    echo "    停止服务：  ${COMPOSE_CMD[*]} $COMPOSE_PROFILES down"
-    echo "    重启服务：  ${COMPOSE_CMD[*]} $COMPOSE_PROFILES restart"
+    echo "    查看日志：  ${COMPOSE_CMD[*]} ${COMPOSE_FILES[*]} $COMPOSE_PROFILES logs -f"
+    echo "    停止服务：  ${COMPOSE_CMD[*]} ${COMPOSE_FILES[*]} $COMPOSE_PROFILES down"
+    echo "    重启服务：  ${COMPOSE_CMD[*]} ${COMPOSE_FILES[*]} $COMPOSE_PROFILES restart"
     echo "    卸载：      bash docker/uninstall.sh"
     echo ""
     echo -e "  ${YELLOW}首次访问需通过初始化向导创建管理员账号。${NC}"

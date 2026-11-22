@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.2.12-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.3.0-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MulanPSL--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-695%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-749%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.2.12**（Webhook 事件订阅版：文章/表单/备份/站点/证书事件经订阅外送，HMAC-SHA256 签名、自动重试、SSRF 防护与后台管理；新增迁移 `0020`，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md) 与 [Webhook 文档](docs/WEBHOOK.md)）
+**当前版本：v3.3.0**（信创适配版：新增 openGauss 数据库与 openAMDC 缓存后端支持，内置方言零依赖、运行态自动识别后端类型；无数据库迁移，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[openGauss 部署](docs/DEPLOY_OPENGAUSS.md) 与 [openAMDC 部署](docs/DEPLOY_OPENAMDC.md)）
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
 
@@ -108,10 +108,18 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **可视化页面构建器** | 自研轻量拖拽构建器：24 个 Bootstrap4 组件、四页面类型（首页/单页/列表/文章详情）、草稿/发布/修订回滚、中英双语与会员可见性、iframe 内服务端真实渲染；插件可注册自有组件并贡献默认布局片段（启用即开箱即用） | v3.0.0 |
 | **站群模式（多站点）** | 一个后端实例 + 一个库按站点切分内容：独立域名 / 泛解析子域解析、后台站点 CRUD 与切换、站点级配置/主题/SEO、搜索与缓存按站隔离、会员共享或独立、插件站群 SDK；默认站点 0 单站点部署零感知 | v3.2.0 |
 | **数据库迁移插件** | 内置插件 `db_migrator`（默认不启用）：后台一键把 SQLite 开发库迁移到 MySQL/PostgreSQL，建表+数据复制+序列重置，目标库非空保护，支持迁移后免重启热切换 | v3.1.0 |
+| **信创适配** | 数据库新增 **openGauss 7.0**（内置方言、向导可选、备份恢复适配），缓存新增 **openAMDC 1.0.0**（协议零改动、运行态自动识别），提供信创镜像与 Compose 编排 | v3.3.0 |
 
 ---
 
 ## 版本速览
+
+### v3.3.0（2026-11-22）
+
+- **openGauss 支持**：`opengauss+psycopg2://` 连接 openGauss 7.0，内置轻量方言（版本解析 + Alembic DDL 注册，零新增依赖），初始化向导新增 openGauss 选项，健康检查输出 `db_dialect`，备份/恢复适配 `gs_dump` / `gsql`。无数据库迁移（仍为 `0020`）。
+- **openAMDC 支持**：Redis 兼容缓存后端，缓存 / 会话 / 限流 / JWT 吊销零代码改动；启动时按 `INFO server` 自动识别后端类型并在后台与 `/healthz?detail=1` 展示 `redis_flavor`。
+- **镜像与编排**：新增 `pollybird/zhycms:opengauss`、`pollybird/openamdc:1.0.0`、`pollybird/opengauss:7.0.0`；新增 `docker-compose.opengauss.yml`，通用编排增加 `openamdc` profile。
+- **文档与测试**：新增 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md) 与 [信创数据库适配专题](docs/XINCHUANG_ADAPTATION.md)（达梦/金仓/GBase/PolarDB 适配思路与贡献指南）；新增 54 项测试与兼容性 CI 工作流。
 
 ### v3.2.12（2026-11-21）
 
@@ -256,8 +264,29 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 ### 环境要求
 
 - Python 3.10+（CI 覆盖 3.10 / 3.11 / 3.12 / 3.13，3.14 实验性）
-- 数据库：**MySQL 5.7+** 或 **PostgreSQL 12+**（生产推荐）
+- 数据库：**MySQL 5.7+** / **PostgreSQL 12+** / **openGauss 7.0**（v3.3.0 起；生产推荐其一）
+- 缓存（可选）：**Redis 6.2+** 或 **openAMDC 1.0.0**（v3.3.0 起，Redis 协议兼容）
 - SQLite 仅用于开发/测试（不支持并发写入）
+
+| 后端 | 版本 | 状态 | 说明 |
+| --- | --- | --- | --- |
+| MySQL / MariaDB | 5.7+ / 11.4 | 完整支持 | 默认生产方案 |
+| PostgreSQL | 12+ | 完整支持 | 默认生产方案 |
+| openGauss | 7.0.0（实测 7.0.0-RC3） | 已验证（x86_64） | 需 openGauss 官方 psycopg2 驱动，见 [部署文档](docs/DEPLOY_OPENGAUSS.md) |
+| SQLite | 3.x | 仅开发/测试 | 不支持并发写入 |
+| Redis | 6.2+ | 完整支持 | 配置 `REDIS_URL` 启用 |
+| openAMDC | 1.0.0 | 已验证 | 协议兼容，见 [部署文档](docs/DEPLOY_OPENAMDC.md) |
+| 达梦 / 金仓 / GBase / PolarDB | 以目标版本为准 | 规划中（未实现、未验证） | 仅提供适配思路，欢迎贡献，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
+
+### 信创适配专题
+
+官方在信创数据库方面**目前仅实现并验证了 openGauss 7.0**。达梦 DM8、人大金仓
+KingbaseES、南大通用 GBase（8a / 8c / 8s）与 PolarDB（PostgreSQL 版 / PolarDB-X）
+尚未适配；[信创适配专题](docs/XINCHUANG_ADAPTATION.md) 给出了按「方言 / 驱动 / URI /
+备份工具」分层的适配思路、工作量与风险评估，以及贡献指南。
+
+欢迎所有人提交适配代码、测试、部署文档或实测报告：可先开 Issue 说明数据库产品、
+版本、架构与已验证项，再按专题中的接入点提交 PR。未经实测的能力不会被声明为支持。
 
 ### 本地开发
 
@@ -283,7 +312,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.2.12**，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.3.0**，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -300,11 +329,30 @@ docker compose -f docker-compose.postgresql.yml up -d
 ```
 
 > 也可直接拉取镜像：
-> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.12`）
-> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.12`）
-> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.2.12`）
+> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
+> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
+> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
 >
 > 三个 tag（`mysql` / `postgresql` / `latest`）指向同一镜像，内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
+
+#### 信创部署（openGauss + openAMDC）
+
+```bash
+# 1. 配置环境变量（OPENGAUSS_PASSWORD 需含大小写、数字与特殊字符）
+cp docker/.env.example .env
+
+# 2. 启动 openGauss 编排（镜像 pollybird/zhycms:opengauss）
+docker compose -f docker-compose.opengauss.yml up -d
+
+# 3. 可选：启用 openAMDC 作为缓存后端
+docker compose -f docker-compose.opengauss.yml --profile openamdc up -d
+# 并在 .env 设置 REDIS_URL=redis://openamdc:6379/0
+```
+
+> - openGauss 镜像：`pollybird/opengauss:7.0.0`（官方 7.0.0 镜像 + openblas 运行时依赖）
+> - openAMDC 镜像：`pollybird/openamdc:1.0.0`（源码固定 commit 构建，可用 `--profile openamdc` 启动）
+> - 详细步骤与故障速查见 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md)
+> - 验证范围：openGauss 7.0 x86_64；aarch64 驱动、openAMDC Sentinel 自动切换与 TLS 未经验证
 
 如需本地构建或使用 MariaDB 方案，仍可用通用编排文件：
 
@@ -364,14 +412,16 @@ zhycms/
 │   ├── db_migrator/        # 数据库迁移插件（默认不启用）
 │   └── member/             # 前台用户中心插件（社区插件）
 ├── migrations/             # Alembic 数据库迁移脚本
-├── docker/                 # Docker 部署辅助文件
+├── docker/                 # Docker 部署辅助文件（含 openamdc/、opengauss/ 镜像构建）
 ├── instance/               # 实例数据（数据库、配置、备份、索引等）
 ├── requirements.txt        # 核心依赖
 ├── requirements-prod.txt   # 生产依赖（gunicorn + gevent）
-├── Dockerfile              # 多阶段构建镜像
-├── docker-compose.yml      # 通用编排文件（--profile mysql/mariadb/postgres，本地构建）
+├── requirements-opengauss.txt  # 可选：openGauss 官方 SQLAlchemy 方言
+├── Dockerfile              # 多阶段构建镜像（可选打入 openGauss 驱动）
+├── docker-compose.yml      # 通用编排文件（--profile mysql/mariadb/postgres/openamdc，本地构建）
 ├── docker-compose.mysql.yml      # MySQL 独立编排（拉取 pollybird/zhycms:mysql）
 ├── docker-compose.postgresql.yml # PostgreSQL 独立编排（拉取 pollybird/zhycms:postgresql）
+├── docker-compose.opengauss.yml  # openGauss 独立编排（拉取 pollybird/zhycms:opengauss）
 ├── wsgi.py                 # 生产 WSGI 入口
 ├── run.py                  # 开发启动入口
 └── babel.cfg               # pybabel 提取配置
@@ -488,6 +538,9 @@ zhycms/
 | [docs/PLUGIN_DEV.md](docs/PLUGIN_DEV.md) | 插件开发手册：目录结构、manifest.json 字段、PluginBase API、钩子与数据模型规范，含可直接复制的最小示例插件 |
 | [docs/THEME_TEMPLATE_API.md](docs/THEME_TEMPLATE_API.md) | 主题模板开发 API：模板继承链、全局变量、Jinja 过滤器与函数、页面上下文 |
 | [docs/OPERATIONS_FAQ.md](docs/OPERATIONS_FAQ.md) | 运维故障排查 FAQ：常见报错、数据库迁移失败处理、缓存/主题/插件/伪静态/Docker 排障速查 |
+| [docs/DEPLOY_OPENGAUSS.md](docs/DEPLOY_OPENGAUSS.md) | openGauss 部署：两种拓扑、建库建号、pg_hba、驱动安装、备份工具与故障速查 |
+| [docs/DEPLOY_OPENAMDC.md](docs/DEPLOY_OPENAMDC.md) | openAMDC 部署：镜像构建、Compose 用法、配置项、与 Redis 差异、哨兵与 TLS 说明 |
+| [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md) | 信创数据库适配专题：openGauss 现状、达梦/金仓/GBase/PolarDB 适配思路、工作量评估与贡献指南 |
 | [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) | 插件依赖 / 继承 / 最低核心版本校验详解 |
 
 单页版文档见 [wiki.html](wiki.html)，在线 Wiki 见 Gitee / GitCode / GitHub 仓库 Wiki 页（三平台镜像同步）。
@@ -495,6 +548,15 @@ zhycms/
 ---
 
 ## 升级指南
+
+### v3.2.12 → v3.3.0
+
+覆盖代码 + 重启应用即可，**无数据库迁移、无新增必需依赖**（迁移仍为 `0020`）。MySQL/PostgreSQL/Redis 部署行为不变。
+
+- 切换 openGauss：安装 openGauss 官方 psycopg2 驱动，将 `ZHYCMS_DB_URI` 改为 `opengauss+psycopg2://...`，或使用 `docker compose -f docker-compose.opengauss.yml up -d`
+- 切换 openAMDC：启动 openAMDC 并把 `REDIS_URL` 指向它，应用自动识别后端类型
+- 回退：改回原数据库 URI / `REDIS_URL` 后重启即可，无结构变更
+- 详见 [UPGRADE.md](./UPGRADE.md)、[openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md)
 
 ### v2.6.x → v3.0.0
 
