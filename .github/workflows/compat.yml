@@ -101,13 +101,31 @@ jobs:
           python-version: '3.12'
           cache: pip
 
+      - name: Prepare openGauss image
+        run: |
+          IMG="${{ matrix.og_image }}"
+          docker pull "$IMG"
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            # ARM 版二进制依赖 libopenblas（及 libatomic），官方镜像未内置。
+            docker run -d --name og-prep --entrypoint sleep "$IMG" infinity
+            docker exec og-prep bash -lc \
+              'yum install -y --nogpgcheck openblas libatomic || (yum clean all && yum makecache && yum install -y --nogpgcheck openblas libatomic)'
+            docker commit \
+              --change 'ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]' \
+              --change 'CMD ["gaussdb"]' \
+              og-prep og-run:local
+            docker rm -f og-prep
+          else
+            docker tag "$IMG" og-run:local
+          fi
+
       - name: Start openGauss
         run: |
           docker run -d --name opengauss --privileged \
             -p 5432:5432 \
             -e GS_PASSWORD="$OPENGAUSS_PASSWORD" \
             -e GS_DB=zhycms \
-            "${{ matrix.og_image }}"
+            og-run:local
 
       - name: Wait for openGauss ready
         run: |

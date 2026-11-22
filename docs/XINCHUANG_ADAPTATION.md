@@ -219,7 +219,8 @@ docker build -t pollybird/zhycms:opengauss-arm \
 - aarch64：`ubuntu-24.04-arm` runner，数据库镜像 `opengauss/opengauss:7.0.0-RC3.B025-arm64-openEuler22.03`，ARM 驱动 URL
 
 `pollybird/opengauss:7.0.0` 仅提供 x86_64，ARM job 因此改用 openGauss 官方 ARM 镜像；
-两个 job 使用相同的 `GS_PASSWORD` / `GS_DB` 初始化参数与 ARM/x86 驱动。
+由于官方 ARM 镜像未内置 `libopenblas` 与 `libatomic`，CI 在启动前会先在容器内安装这两个依赖，
+再提交为本地镜像运行。两个 job 使用相同的 `GS_PASSWORD` / `GS_DB` 初始化参数与 ARM/x86 驱动。
 
 `docker-compose.opengauss.yml` 也已添加 ARM 版本 `OPENGAUSS_PY_URL` 注释说明。
 
