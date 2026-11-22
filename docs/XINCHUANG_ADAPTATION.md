@@ -224,5 +224,6 @@ docker build -t pollybird/zhycms:opengauss-arm \
 
 `docker-compose.opengauss.yml` 也已添加 ARM 版本 `OPENGAUSS_PY_URL` 注释说明。
 
-> 说明：上述 26 项结果为贡献者在鲲鹏 ARM 环境的实测记录；双架构 CI 工作流已配置，
-> 运行结果以 GitHub Actions 页面为准，本文不将「CI 已通过」作为已完成的验证结论。
+> 说明：上述 26 项结果为贡献者在鲲鹏 ARM 环境的实测记录。双架构 CI 已于 2026-11-22 在
+> GitHub Actions 跑通：`openGauss migration smoke (x86_64)`、`openGauss migration smoke (aarch64)`
+> 与 `openAMDC full test suite` 均通过（run 45018096964）。
