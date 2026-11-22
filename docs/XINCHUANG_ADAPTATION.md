@@ -215,10 +215,13 @@ docker build -t pollybird/zhycms:opengauss-arm \
 
 `.github/workflows/compat.yml` 已扩展为 x86_64 + aarch64 双架构矩阵：
 
-- x86_64：`ubuntu-latest` runner，x86 驱动 URL
-- aarch64：`ubuntu-24.04-arm` runner，ARM 驱动 URL
+- x86_64：`ubuntu-latest` runner，数据库镜像 `pollybird/opengauss:7.0.0`，x86 驱动 URL
+- aarch64：`ubuntu-24.04-arm` runner，数据库镜像 `opengauss/opengauss:7.0.0-RC3.B025-arm64-openEuler22.03`，ARM 驱动 URL
+
+`pollybird/opengauss:7.0.0` 仅提供 x86_64，ARM job 因此改用 openGauss 官方 ARM 镜像；
+两个 job 使用相同的 `GS_PASSWORD` / `GS_DB` 初始化参数与 ARM/x86 驱动。
 
 `docker-compose.opengauss.yml` 也已添加 ARM 版本 `OPENGAUSS_PY_URL` 注释说明。
 
 > 说明：上述 26 项结果为贡献者在鲲鹏 ARM 环境的实测记录；双架构 CI 工作流已配置，
-> 首次运行结果以 GitHub Actions 页面为准，本文不将「CI 已通过」作为已完成的验证结论。
+> 运行结果以 GitHub Actions 页面为准，本文不将「CI 已通过」作为已完成的验证结论。
