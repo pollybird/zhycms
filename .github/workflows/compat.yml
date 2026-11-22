@@ -73,13 +73,23 @@ jobs:
         run: pytest tests -q --timeout=120
 
   opengauss:
-    name: openGauss migration smoke
-    runs-on: ubuntu-latest
+    name: openGauss migration smoke (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+            og_py_url: https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/x86/openGauss-Python-7.0.0-openEuler22.03-x86_64.tar.gz
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            og_py_url: https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/arm/openGauss-Python-7.0.0-openEuler22.03-aarch64.tar.gz
 
     env:
       OPENGAUSS_PASSWORD: Zhycms-2026og
       OPENGAUSS_URL: opengauss+psycopg2://gaussdb:Zhycms-2026og@127.0.0.1:5432/zhycms
-      OPENGAUSS_PY_URL: https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/x86/openGauss-Python-7.0.0-openEuler22.03-x86_64.tar.gz
+      OPENGAUSS_PY_URL: ${{ matrix.og_py_url }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
