@@ -7,13 +7,13 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| openGauss 7.0.0（x86_64） | 已验证 | 实测镜像 `opengauss/opengauss:7.0.0-RC3.B025-openEuler22.03`，`version()` 返回 `openGauss-lite 7.0.0-RC3` |
+| openGauss 7.0.0（x86_64 / aarch64） | 已验证 | x86_64 实测镜像 `opengauss/opengauss:7.0.0-RC3.B025-openEuler22.03`；aarch64 由贡献者在鲲鹏环境实测，详见 [信创适配专题](XINCHUANG_ADAPTATION.md) |
 | 迁移至 `0020` | 已验证 | 52 张表，`MIGRATION_FAILED=None` |
 | 初始化向导 / 业务读写 | 已验证 | 创建管理员、文章中文/布尔/时间回读、序列不回退 |
 | 备份与恢复 | 已验证 | `gs_dump` 导出，`gsql` 恢复到新库，核心表行数一致 |
 | Docker Compose 编排 | 已验证 | `docker-compose.opengauss.yml` 完成迁移与向导 |
 | openGauss 官方 SQLAlchemy 方言 | 未验证 | `requirements-opengauss.txt` 为可选增强，默认走内置方言 |
-| aarch64 驱动 | 未验证 | 本文驱动地址仅适用于 x86_64；ARM 需自行获取对应预编译包 |
+| aarch64 驱动 | 已验证（贡献者实测） | 预编译包地址见下文；本项目已发布镜像仍为 x86_64，ARM 需本地构建 |
 | 哨兵 / 集群 | 不适用 | 本项目只使用单个数据库连接串，HA 属部署侧能力 |
 
 ## 二、拓扑 A：Docker Compose（推荐）
@@ -104,12 +104,25 @@ opengauss+psycopg2://zhycms:password@/var/lib/opengauss/run?host=/var/lib/openga
 应用默认使用内置轻量方言（`app/utils/dialects/opengauss.py`），但仍需要
 **openGauss 官方 psycopg2 驱动**——PyPI 上的 `psycopg2-binary` 不能连接 openGauss。
 
-### 1. 预编译包（x86_64，已验证）
+### 1. 预编译包（x86_64 / aarch64，已验证）
+
+x86_64：
 
 ```bash
 curl -fL -o /tmp/openGauss-Python.tar.gz \
   https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/x86/openGauss-Python-7.0.0-openEuler22.03-x86_64.tar.gz
+```
 
+aarch64（鲲鹏）：
+
+```bash
+curl -fL -o /tmp/openGauss-Python.tar.gz \
+  https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/arm/openGauss-Python-7.0.0-openEuler22.03-aarch64.tar.gz
+```
+
+解压与安装步骤两架构相同：
+
+```bash
 mkdir -p /tmp/ogpy && tar -xzf /tmp/openGauss-Python.tar.gz -C /tmp/ogpy
 cp -r /tmp/ogpy/psycopg2* /usr/local/lib/python3.12/site-packages/
 # 运行期库路径（psycopg2 与 libpq 依赖）
@@ -201,6 +214,6 @@ export ZHYCMS_DB_DUMP_BIN_DIR=/usr/local/opengauss/bin
 ## 八、限制说明
 
 - **版本**：目标为 openGauss 7.0.0 LTS；本次实测为 7.0.0-RC3（lite）镜像。
-- **架构**：仅验证 x86_64；aarch64 需自行准备驱动，未做验证。
+- **架构**：x86_64 由官方验证；aarch64 为贡献者实测记录。已发布镜像仅提供 x86_64，ARM 环境需使用 ARM 版数据库镜像，并在 ARM 主机本地构建应用镜像（见 [信创适配专题](XINCHUANG_ADAPTATION.md)）。
 - **方言**：内置方言覆盖版本解析与 Alembic DDL 注册，未实现 openGauss 特有语法扩展。
 - **高可用**：应用只接受单个 `ZHYCMS_DB_URI`，主备切换、读写分离由数据库侧或代理层负责。

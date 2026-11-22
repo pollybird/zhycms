@@ -188,7 +188,15 @@ openGauss Lite 在 aarch64 上运行需要以下系统库，部分发行版默�
 - **`libatomic.so.1`**：提供 `__atomic_load_16`、`__atomic_store_16` 等 128 位原子操作。
   需安装 `libatomic`（GCC 运行时库），或编译带 `LIBATOMIC_1.0` 版本符号的 stub。
 
-Docker 镜像 `pollybird/opengauss:7.0.0` 已包含上述依赖，容器部署无需额外处理。
+已发布的 `pollybird/opengauss:7.0.0` 与 `pollybird/zhycms:opengauss` 均为 **x86_64** 构建，未发布多架构 manifest。ARM 环境不能直接复用这两个镜像：数据库需使用 ARM 版 openGauss 镜像（或外部 ARM 数据库实例），并确保 `libopenblas` 与 `libatomic` 可用；应用镜像需在 ARM 主机上本地构建，并显式指定 ARM 驱动地址：
+
+```bash
+docker build -t pollybird/zhycms:opengauss-arm \
+  --build-arg INSTALL_OPENGAUSS_DRIVER=1 \
+  --build-arg OPENGAUSS_PY_URL=https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/arm/openGauss-Python-7.0.0-openEuler22.03-aarch64.tar.gz .
+```
+
+`docker-compose.opengauss.yml` 的 `db-opengauss` 服务也需替换为 ARM 版镜像，或改用外部数据库地址。
 
 ### 实测结果（26 项全部通过）
 
@@ -200,7 +208,7 @@ Docker 镜像 `pollybird/opengauss:7.0.0` 已包含上述依赖，容器部署�
 | 业务读写 | 用户/角色/站点/栏目/文章/设置 CRUD | 通过 |
 | Webhook | 订阅 CRUD、事件投递 | 通过 |
 | 备份恢复 | `gs_dump` 导出、`gsql` 导入 | 通过 |
-| 健康检查 | `/healthz?detail=1` 输出 `db_dialect=openGauss` | 通过 |
+| 健康检查 | `/healthz?detail=1` 输出 `db_dialect=opengauss` | 通过 |
 | 集成测试 | `test_compat_integration.py`（openGauss 2 项） | 通过 |
 
 ### CI 矩阵
@@ -211,3 +219,6 @@ Docker 镜像 `pollybird/opengauss:7.0.0` 已包含上述依赖，容器部署�
 - aarch64：`ubuntu-24.04-arm` runner，ARM 驱动 URL
 
 `docker-compose.opengauss.yml` 也已添加 ARM 版本 `OPENGAUSS_PY_URL` 注释说明。
+
+> 说明：上述 26 项结果为贡献者在鲲鹏 ARM 环境的实测记录；双架构 CI 工作流已配置，
+> 首次运行结果以 GitHub Actions 页面为准，本文不将「CI 已通过」作为已完成的验证结论。
