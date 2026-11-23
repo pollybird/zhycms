@@ -13,7 +13,14 @@
 
 **当前版本：v3.3.0**（信创适配版：新增 openGauss 数据库与 openAMDC 缓存后端支持，内置方言零依赖、运行态自动识别后端类型；无数据库迁移，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[openGauss 部署](docs/DEPLOY_OPENGAUSS.md) 与 [openAMDC 部署](docs/DEPLOY_OPENAMDC.md)）
 
-**项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（在线演示与使用文档）
+**项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（官网与使用文档）
+
+**在线演示**
+
+- 前台：[https://demo.zhycms.tzzhy.cn/](https://demo.zhycms.tzzhy.cn/)
+- 后台：[https://demo.zhycms.tzzhy.cn/admin/login?next=/admin/](https://demo.zhycms.tzzhy.cn/admin/login?next=/admin/)
+- 后台演示账号：`admin` / `demo1234`
+- 会员演示账号：`demo` / `demo1234`
 
 > 如果这个项目对你有帮助，欢迎点个 **Star** 支持一下；也欢迎在 Gitee / GitHub 提 Issue、发 PR 一起共建。
 
@@ -63,7 +70,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 
 ## 界面预览
 
-以下截图取自内置演示数据（制造业主题），完整功能可在 [在线演示](https://zhycms.tzzhy.cn/) 体验。
+以下截图取自内置演示数据（制造业主题），完整功能可在 [在线演示](https://demo.zhycms.tzzhy.cn/) 体验（后台演示账号 `admin` / `demo1234`）。
 
 ### 前台
 
