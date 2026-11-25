@@ -126,7 +126,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 - **openGauss 支持**：`opengauss+psycopg2://` 连接 openGauss 7.0，内置轻量方言（版本解析 + Alembic DDL 注册，零新增依赖），初始化向导新增 openGauss 选项，健康检查输出 `db_dialect`，备份/恢复适配 `gs_dump` / `gsql`。无数据库迁移（仍为 `0020`）。
 - **openAMDC 支持**：Redis 兼容缓存后端，缓存 / 会话 / 限流 / JWT 吊销零代码改动；启动时按 `INFO server` 自动识别后端类型并在后台与 `/healthz?detail=1` 展示 `redis_flavor`。
 - **镜像与编排**：新增 `pollybird/zhycms:opengauss`、`pollybird/openamdc:1.0.0`、`pollybird/opengauss:7.0.0`；新增 `docker-compose.opengauss.yml`，通用编排增加 `openamdc` profile。
-- **文档与测试**：新增 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md) 与 [信创数据库适配专题](docs/XINCHUANG_ADAPTATION.md)（达梦/金仓/GBase/PolarDB 适配思路与贡献指南）；新增 54 项测试与兼容性 CI 工作流。openGauss 7.0 已在 x86_64 与 aarch64（鲲鹏）双架构端到端实测通过（26 项：方言注册、建表、CRUD、备份恢复、健康检查、Alembic DDL）。
+- **文档与测试**：新增 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md) 与 [信创数据库适配专题](docs/XINCHUANG_ADAPTATION.md)（达梦/金仓/GBase/PolarDB 适配思路与贡献指南）；新增 54 项测试与兼容性 CI 工作流。openGauss 7.0 已在 x86_64 与 aarch64（鲲鹏）双架构端到端实测通过（26 项：方言注册、建表、CRUD、备份恢复、健康检查、Alembic DDL）。openAMDC 1.0.0 已在 x86_64 与 aarch64（鲲鹏）双架构端到端实测通过（79 项：后端识别、缓存、会话、限流、JWT 吊销、Lua 脚本、分布式锁、Pipeline、事务、Hash/List/ZSet 操作）。
 
 ### v3.2.12（2026-11-21）
 
@@ -282,7 +282,7 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 | openGauss | 7.0.0（实测 7.0.0-RC3） | 已验证（x86_64 + aarch64/鲲鹏） | 需 openGauss 官方 psycopg2 驱动，见 [部署文档](docs/DEPLOY_OPENGAUSS.md) |
 | SQLite | 3.x | 仅开发/测试 | 不支持并发写入 |
 | Redis | 6.2+ | 完整支持 | 配置 `REDIS_URL` 启用 |
-| openAMDC | 1.0.0 | 已验证 | 协议兼容，见 [部署文档](docs/DEPLOY_OPENAMDC.md) |
+| openAMDC | 1.0.0 | 已验证（x86_64 + aarch64/鲲鹏） | 协议兼容，见 [部署文档](docs/DEPLOY_OPENAMDC.md) |
 | 达梦 / 金仓 / GBase / PolarDB | 以目标版本为准 | 规划中（未实现、未验证） | 仅提供适配思路，欢迎贡献，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
 
 ### 信创适配专题
@@ -359,7 +359,7 @@ docker compose -f docker-compose.opengauss.yml --profile openamdc up -d
 > - openGauss 镜像：`pollybird/opengauss:7.0.0`（官方 7.0.0 镜像 + openblas 运行时依赖）
 > - openAMDC 镜像：`pollybird/openamdc:1.0.0`（源码固定 commit 构建，可用 `--profile openamdc` 启动）
 > - 详细步骤与故障速查见 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md)
-> - 验证范围：openGauss 7.0 x86_64 + aarch64（鲲鹏）；openAMDC Sentinel 自动切换与 TLS 未经验证
+> - 验证范围：openGauss 7.0 x86_64 + aarch64（鲲鹏）；openAMDC 1.0.0 x86_64 + aarch64（鲲鹏）；openAMDC Sentinel 自动切换与 TLS 未经验证
 
 如需本地构建或使用 MariaDB 方案，仍可用通用编排文件：
 

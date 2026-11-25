@@ -159,9 +159,9 @@ DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
 
 ## 六、验证状态声明
 
-除 openGauss 7.0（x86_64 + aarch64/鲲鹏）外，本文提及的达梦、人大金仓、南大通用、PolarDB 等
-数据库均**未实现、未验证**。文中驱动名、工具名与差异点为适配方向，可能随产品
-版本变化，落地前请以目标环境的官方文档和实测结果为准。
+除 openGauss 7.0（x86_64 + aarch64/鲲鹏）与 openAMDC 1.0.0（x86_64 + aarch64/鲲鹏）外，
+本文提及的达梦、人大金仓、南大通用、PolarDB 等数据库均**未实现、未验证**。
+文中驱动名、工具名与差异点为适配方向，可能随产品版本变化，落地前请以目标环境的官方文档和实测结果为准。
 
 ## 七、openGauss ARM 架构（aarch64/鲲鹏）实测记录
 
@@ -227,3 +227,71 @@ docker build -t pollybird/zhycms:opengauss-arm \
 > 说明：上述 26 项结果为贡献者在鲲鹏 ARM 环境的实测记录。双架构 CI 已于 2026-11-22 在
 > GitHub Actions 跑通：`openGauss migration smoke (x86_64)`、`openGauss migration smoke (aarch64)`
 > 与 `openAMDC full test suite` 均通过（run 45018096964）。
+
+## 八、openAMDC ARM 架构（aarch64/鲲鹏）实测记录
+
+v3.3.0 发布后，在华为云鲲鹏 ARM 环境（Huawei Cloud EulerOS 3.0，aarch64）上对
+openAMDC 1.0.0 进行了端到端实测，验证结果如下：
+
+### 环境信息
+
+| 项目 | 值 |
+| --- | --- |
+| CPU 架构 | aarch64（鲲鹏） |
+| 操作系统 | Huawei Cloud EulerOS 3.0 |
+| openAMDC 版本 | 1.0.0 (git_sha1: 6758505d, build_id: 33e20a190bbc7819) |
+| openAMDC 模式 | standalone |
+| 编译器 | GCC 12.3.1 (openEuler) |
+| Python | 3.12.5 |
+| redis-py | 8.2.0 |
+
+### 编译与安装
+
+openAMDC 源码来自 [openeuler-mirror/openAMDC](https://github.com/openeuler-mirror/openAMDC)，
+在 ARM 环境上直接 `make -j$(nproc)` 编译，总耗时约 20 分钟（含 RocksDB）。
+
+**ARM 依赖注意事项**：RocksDB 依赖 `libsnappy`，部分 ARM 发行版默认未安装。
+当前环境无 cmake，需手动从 snappy 1.2.1 源码编译：生成 `snappy-stubs-public.h` 后
+用 g++ 直接编译 4 个 .cc 文件并创建 `libsnappy.a`。Docker 镜像中已预装此依赖，
+容器部署无需额外处理。
+
+### 实测结果（79 项全部通过）
+
+| 类别 | 验证项 | 数量 | 结果 |
+| --- | --- | --- | --- |
+| 后端识别 | `redis_backend.describe()` 返回 `flavor=openamdc`、`version=1.0.0` | 3 | 通过 |
+| 缓存读写与 TTL | SET/GET/DEL/TTL | 4 | 通过 |
+| 会话存储 | `zhycms:sess:` 前缀 key 读写 | 2 | 通过 |
+| 限流计数 | INCR 递增与 GET 回读 | 4 | 通过 |
+| JWT 吊销黑名单 | SET NX 吊销、重复 SET NX 失败、EXISTS | 3 | 通过 |
+| 健康检查 redis_flavor | INFO server 含 `openamdc_version`、无 `redis_version`、git_sha1 匹配 | 3 | 通过 |
+| scan_iter 回退 | scan_iter 匹配多个 key | 1 | 通过 |
+| 缓存前缀隔离 | `zhycms:cache:` 与 `zhycms:sess:` 互不干扰、清理缓存不影响会话 | 4 | 通过 |
+| Lua 脚本原子性 | Lua INCR 20 次顺序递增 | 2 | 通过 |
+| SET NX 分布式锁 | 获取锁、重复获取失败、GET 锁值 | 3 | 通过 |
+| EXPIRE / PERSIST | TTL 修改与持久化 | 3 | 通过 |
+| KEYS pattern | KEYS 匹配多个 key | 1 | 通过 |
+| DBSIZE | DBSIZE 返回整数 | 1 | 通过 |
+| Pipeline | 10 次 SET + 10 次 GET 批量操作 | 2 | 通过 |
+| Transaction | MULTI/EXEC 原子事务 | 1 | 通过 |
+| openAMDC 特有字段 | `worker_threads`、`openamdc_mode`、`openamdc_build_id` | 3 | 通过 |
+| 最大内存策略 | CONFIG GET maxmemory-policy | 1 | 通过 |
+| 复杂操作组合 | APPEND、SETRANGE | 2 | 通过 |
+| Hash 操作 | HSET/HGET/HSET mapping/HLEN/HDEL/HEXISTS | 6 | 通过 |
+| List 操作 | LPUSH/LRANGE/RPOP/LLEN | 4 | 通过 |
+| Sorted Set 操作 | ZADD/ZRANGE/ZSCORE/ZREM/ZCARD | 5 | 通过 |
+| SETEX / GETSET | SETEX/GET/GETSET | 3 | 通过 |
+| MSET / MGET | 批量设置与获取 5 个 key | 2 | 通过 |
+| TTL 语义 | 无 TTL key 的 TTL=-1、PERSIST 返回 False | 2 | 通过 |
+| EXISTS 多 key | EXISTS 单 key/不存在/多 key | 3 | 通过 |
+| TYPE 命令 | TYPE string/list | 2 | 通过 |
+| **ZhyCMS 集成测试** | `test_compat_integration.py` TestOpenAMDC 4 项 | 4 | 通过 |
+| **总计** | | **79** | **全部通过** |
+
+### 关键结论
+
+1. **openAMDC 1.0.0 在 ARM（aarch64/鲲鹏）上完全可用**：从源码编译、启动、到所有 Redis 协议操作均正常
+2. **ZhyCMS v3.3.0 的 openAMDC 适配在 ARM 上零问题**：后端识别、缓存、会话、限流、JWT 吊销、Lua 脚本、分布式锁全部通过
+3. **缓存前缀隔离修复已验证**：`zhycms:cache:` 与 `zhycms:sess:` 前缀互不干扰，清理缓存不会导致登出
+4. **openAMDC 特有字段正确暴露**：`openamdc_version`、`openamdc_git_sha1`、`openamdc_mode`、`worker_threads` 等
+5. **编译依赖注意事项**：ARM 上需手动安装 `libsnappy`（RocksDB 依赖），Docker 镜像中已预装
