@@ -7,7 +7,7 @@ ZhyCMS 通过标准 `REDIS_URL` 使用它，缓存、会话、限流与 JWT 吊�
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| openAMDC 1.0.0 | 已验证 | 源码 commit `6758505d722a7efa0fd64dec5164e19885942f87`，`INFO server` 返回 `openamdc_version:1.0.0` |
+| openAMDC 1.0.0 | 已验证（x86_64 + aarch64/鲲鹏） | 源码 commit `6758505d722a7efa0fd64dec5164e19885942f87`，`INFO server` 返回 `openamdc_version:1.0.0` |
 | 协议兼容 | 已验证 | RESP2 / RESP3、Lua、`SET NX EX`、`INCR`、`SCAN`、`FLUSHDB` 正常 |
 | 全量测试 | 已验证 | 以 `REDIS_URL` 指向 openAMDC 跑通全量 pytest |
 | 并发原子性 | 已验证 | 200 线程 `SET NX` 唯一持有者 1；Lua 限流 200 并发恰好放行 10 |
@@ -15,6 +15,10 @@ ZhyCMS 通过标准 `REDIS_URL` 使用它，缓存、会话、限流与 JWT 吊�
 | 哨兵 | 可用但需手工 | 镜像不创建 `openamdc-sentinel` 符号链接；本项目不内置哨兵逻辑 |
 | 集群模式 | 未验证 | 上游保留 `cluster-enabled`，本次未验证 |
 | TLS（`rediss://`） | 未验证 / 当前镜像未启用 | 镜像默认未开启 TLS，需自行重编译并配置证书 |
+
+> aarch64 上 79 项端到端实测（后端识别、缓存、会话、限流、JWT 吊销、Lua、分布式锁、
+> Pipeline、事务、Hash/List/ZSet 等）记录见
+> [信创适配专题](XINCHUANG_ADAPTATION.md) 第八节。
 
 ## 二、构建镜像
 
@@ -45,6 +49,7 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 - RocksDB 静态链接，首次构建耗时较长，需预留充足超时与磁盘空间；
 - aarch64 在 x86_64 主机上通过 QEMU 模拟编译，耗时明显长于本机构建；
 - aarch64 启动需忽略内核 COW 告警，默认配置已内置 `ignore-warnings ARM64-COW-BUG`；
+- ARM 源码编译需 `libsnappy`（RocksDB 依赖），镜像已内置，容器部署无需额外处理；
 - 运行期只依赖 `libstdc++`、`snappy`、`zlib`，无需编译工具链；
 - 容器以 uid 999 非 root 运行；
 - 许可证文件随镜像放在 `/usr/share/licenses/openamdc/LICENSE`。

@@ -2,18 +2,19 @@
 # zhycms Docker Compose — openGauss 7.0 版（独立编排文件）
 # 用法：
 #   cp docker/.env.example .env   # 按需修改 SECRET_KEY / OPENGAUSS_PASSWORD
-#   docker compose -f docker-compose.opengauss.yml up -d --build
+#   docker compose -f docker-compose.opengauss.yml up -d
+#   # 如需本地构建，追加 --build
 #   # 可选：追加 --profile redis / --profile openamdc / --profile search
 #
-# 镜像：
+# 镜像（均提供 x86_64 / aarch64 多架构，Docker 自动匹配当前架构）：
 #   pollybird/zhycms:opengauss（内置 openGauss 官方 psycopg2 驱动）
-#   pollybird/opengauss:7.0.0（官方镜像 + openblas 运行时依赖）
+#   pollybird/opengauss:7.0.0（官方镜像 + openblas / libatomic 运行时依赖）
 #
 # 注意：
 # - openGauss 密码必须同时包含大写、小写、数字与特殊字符；本文件默认用 `-`
 #   作为特殊字符，避免 `@` / `#` / `%` 破坏数据库 URI。安装器按同一规则生成。
-# - openGauss 官方镜像缺少 libopenblas.so.0，db-opengauss 通过
-#   docker/opengauss/Dockerfile 派生修复。
+# - ARM 本地构建应用镜像时，需将 OPENGAUSS_PY_URL 设为 aarch64 驱动包地址；
+#   直接使用已发布镜像则无需设置。
 # ============================================================
 
 services:

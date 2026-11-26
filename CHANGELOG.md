@@ -19,7 +19,7 @@
 - **备份与恢复**：`backup_utils` 按方言适配 openGauss——`gs_dump` 使用位置参数库名与 `-W` 密码、`gsql` 恢复、自动注入 `LD_LIBRARY_PATH`；工具路径支持 `ZHYCMS_DB_DUMP_BIN_DIR` / `OPENGAUSS_BIN` / `ZHYCMS_DB_DUMP_BIN`。
 - **openAMDC 缓存后端**：新增 `app/services/redis_backend.py`，按 `INFO server` 的 `openamdc_version` / `redis_version` 识别后端；启动日志、后台 Redis 页与 `/healthz?detail=1` 展示 `redis_flavor` 与版本。
 - **健康检查**：`/healthz?detail=1` 新增 `db_dialect` 与 `redis_flavor`；默认 `/healthz` 保持轻量。
-- **镜像与编排**：新增 `pollybird/zhycms:opengauss`、`pollybird/openamdc:1.0.0`、`pollybird/opengauss:7.0.0`；新增 `docker-compose.opengauss.yml`，`docker-compose.yml` 增加 `openamdc` profile 与 `app-sqlite` profile；根 `Dockerfile` 新增可选构建参数 `INSTALL_OPENGAUSS_DRIVER` / `OPENGAUSS_PY_URL`；安装器支持数据库四选一、缓存三选一。
+- **镜像与编排**：新增 `pollybird/zhycms:opengauss`、`pollybird/openamdc:1.0.0`、`pollybird/opengauss:7.0.0`（均提供 x86_64 / aarch64 多架构）；新增 `docker-compose.opengauss.yml`，`docker-compose.yml` 增加 `openamdc` profile 与 `app-sqlite` profile；根 `Dockerfile` 新增可选构建参数 `INSTALL_OPENGAUSS_DRIVER` / `OPENGAUSS_PY_URL`；安装器支持数据库四选一、缓存三选一。
 - **文档**：新增 `docs/DEPLOY_OPENGAUSS.md`、`docs/DEPLOY_OPENAMDC.md` 与 `docs/XINCHUANG_ADAPTATION.md`（信创数据库适配专题：官方仅实现 openGauss，附达梦 / 金仓 / GBase / PolarDB 适配思路、工作量评估与贡献指南）。
 - **测试与 CI**：新增 `tests/test_opengauss_v330.py`、`tests/test_openamdc_v330.py`、`tests/test_redis_backend_v330.py`、`tests/test_compat_integration.py`（默认 skip），以及 `.github/workflows/compat.yml`（openAMDC 全量 + openGauss 冒烟）。
 
@@ -31,7 +31,7 @@
 ### 升级注意
 
 - 无数据库迁移，覆盖代码 + 重启即可；MySQL / PostgreSQL / Redis 部署行为不变。
-- 切换 openGauss 需额外安装 openGauss 官方 psycopg2 驱动并配置 `LD_LIBRARY_PATH`，或用 `:opengauss` 镜像；aarch64 驱动未验证。
+- 切换 openGauss 需额外安装 openGauss 官方 psycopg2 驱动并配置 `LD_LIBRARY_PATH`，或用 `:opengauss` 镜像（x86_64 / aarch64 多架构，内置对应架构驱动）；aarch64 驱动已完成实测。
 - openAMDC 可直接作为 `REDIS_URL` 使用，应用自动识别；镜像默认关闭持久化，重启后会话失效属预期。
 - 回退：改回原 `ZHYCMS_DB_URI` / `REDIS_URL` 后重启即可，无结构变更。
 

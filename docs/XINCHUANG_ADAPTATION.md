@@ -163,6 +163,19 @@ DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
 本文提及的达梦、人大金仓、南大通用、PolarDB 等数据库均**未实现、未验证**。
 文中驱动名、工具名与差异点为适配方向，可能随产品版本变化，落地前请以目标环境的官方文档和实测结果为准。
 
+### 多架构镜像
+
+| 镜像 | x86_64 | aarch64 | 说明 |
+| --- | --- | --- | --- |
+| `pollybird/zhycms:mysql` / `:postgresql` / `:latest` | 已发布 | 已发布 | 同一 manifest，Docker 自动匹配当前架构 |
+| `pollybird/zhycms:opengauss` | 已发布 | 已发布 | 内置对应架构的 openGauss psycopg2 驱动 |
+| `pollybird/opengauss:7.0.0` | 已发布 | 已发布 | 内置 `openblas` 与 `libatomic` |
+| `pollybird/openamdc:1.0.0` | 已发布 | 已发布 | 内置 `snappy`；aarch64 默认忽略 COW 告警 |
+
+各镜像另提供 `*-amd64` / `*-arm64` 子标签便于单独拉取。应用镜像已完成双架构构建与
+初始化验证；openAMDC 镜像完成双架构启动与 `PING` 验证；openGauss 数据库镜像完成
+ARM 依赖与动态库校验，双架构启动由兼容性 CI 覆盖。
+
 ## 七、openGauss ARM 架构（aarch64/鲲鹏）实测记录
 
 v3.3.0 发布后，在华为云鲲鹏 ARM 环境（Huawei Cloud EulerOS 3.0，aarch64）上对
@@ -296,3 +309,6 @@ openAMDC 源码来自 [openeuler-mirror/openAMDC](https://github.com/openeuler-m
 3. **缓存前缀隔离修复已验证**：`zhycms:cache:` 与 `zhycms:sess:` 前缀互不干扰，清理缓存不会导致登出
 4. **openAMDC 特有字段正确暴露**：`openamdc_version`、`openamdc_git_sha1`、`openamdc_mode`、`worker_threads` 等
 5. **编译依赖注意事项**：ARM 上需手动安装 `libsnappy`（RocksDB 依赖），Docker 镜像中已预装
+
+> 说明：上述 79 项为贡献者在鲲鹏 ARM 环境的实测记录。项目发布的 `pollybird/openamdc:1.0.0`
+> 已提供 x86_64 / aarch64 多架构镜像，两个架构均完成启动与 `PING` 冒烟验证。

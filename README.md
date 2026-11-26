@@ -287,10 +287,11 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 
 ### 信创适配专题
 
-官方在信创数据库方面**目前仅实现并验证了 openGauss 7.0**。达梦 DM8、人大金仓
-KingbaseES、南大通用 GBase（8a / 8c / 8s）与 PolarDB（PostgreSQL 版 / PolarDB-X）
-尚未适配；[信创适配专题](docs/XINCHUANG_ADAPTATION.md) 给出了按「方言 / 驱动 / URI /
-备份工具」分层的适配思路、工作量与风险评估，以及贡献指南。
+官方在信创数据库方面**目前仅实现并验证了 openGauss 7.0**（x86_64 + aarch64/鲲鹏），
+并为 openGauss 与 openAMDC 场景提供 x86_64 / aarch64 多架构镜像；openAMDC 1.0.0
+已在双架构完成端到端实测。达梦 DM8、人大金仓 KingbaseES、南大通用 GBase（8a / 8c / 8s）
+与 PolarDB（PostgreSQL 版 / PolarDB-X）尚未适配；[信创适配专题](docs/XINCHUANG_ADAPTATION.md)
+给出了按「方言 / 驱动 / URI / 备份工具」分层的适配思路、工作量与风险评估，以及贡献指南。
 
 欢迎所有人提交适配代码、测试、部署文档或实测报告：可先开 Issue 说明数据库产品、
 版本、架构与已验证项，再按专题中的接入点提交 PR。未经实测的能力不会被声明为支持。
@@ -319,7 +320,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.3.0**，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.3.0**，全部提供 x86_64 / aarch64 多架构，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -340,7 +341,7 @@ docker compose -f docker-compose.postgresql.yml up -d
 > - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
 > - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
 >
-> 三个 tag（`mysql` / `postgresql` / `latest`）指向同一镜像，内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
+> 三个 tag（`mysql` / `postgresql` / `latest`）指向同一多架构镜像（x86_64 / aarch64），内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
 
 #### 信创部署（openGauss + openAMDC）
 
