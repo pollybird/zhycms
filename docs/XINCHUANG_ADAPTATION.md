@@ -188,7 +188,7 @@ openGauss Lite 在 aarch64 上运行需要以下系统库，部分发行版默�
 - **`libatomic.so.1`**：提供 `__atomic_load_16`、`__atomic_store_16` 等 128 位原子操作。
   需安装 `libatomic`（GCC 运行时库），或编译带 `LIBATOMIC_1.0` 版本符号的 stub。
 
-已发布的 `pollybird/opengauss:7.0.0` 与 `pollybird/zhycms:opengauss` 均为 **x86_64** 构建，未发布多架构 manifest。ARM 环境不能直接复用这两个镜像：数据库需使用 ARM 版 openGauss 镜像（或外部 ARM 数据库实例），并确保 `libopenblas` 与 `libatomic` 可用；应用镜像需在 ARM 主机上本地构建，并显式指定 ARM 驱动地址：
+已发布的 `pollybird/opengauss:7.0.0` 与 `pollybird/zhycms:opengauss` 均已提供 **x86_64 / aarch64 多架构**镜像：数据库镜像内置 `openblas` 与 `libatomic`，应用镜像内置对应架构的 openGauss psycopg2 驱动，ARM 环境可直接使用。如需自定义构建，可显式指定 ARM 驱动地址：
 
 ```bash
 docker build -t pollybird/zhycms:opengauss-arm \
@@ -196,7 +196,7 @@ docker build -t pollybird/zhycms:opengauss-arm \
   --build-arg OPENGAUSS_PY_URL=https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/arm/openGauss-Python-7.0.0-openEuler22.03-aarch64.tar.gz .
 ```
 
-`docker-compose.opengauss.yml` 的 `db-opengauss` 服务也需替换为 ARM 版镜像，或改用外部数据库地址。
+`docker-compose.opengauss.yml` 的两个服务均无需替换镜像（多架构标签会自动匹配当前架构）；如使用外部数据库，改用 `ZHYCMS_DB_URI` 指向即可。
 
 ### 实测结果（26 项全部通过）
 
@@ -216,17 +216,18 @@ docker build -t pollybird/zhycms:opengauss-arm \
 `.github/workflows/compat.yml` 已扩展为 x86_64 + aarch64 双架构矩阵：
 
 - x86_64：`ubuntu-latest` runner，数据库镜像 `pollybird/opengauss:7.0.0`，x86 驱动 URL
-- aarch64：`ubuntu-24.04-arm` runner，数据库镜像 `opengauss/opengauss:7.0.0-RC3.B025-arm64-openEuler22.03`，ARM 驱动 URL
+- aarch64：`ubuntu-24.04-arm` runner，数据库镜像 `pollybird/opengauss:7.0.0`，ARM 驱动 URL
 
-`pollybird/opengauss:7.0.0` 仅提供 x86_64，ARM job 因此改用 openGauss 官方 ARM 镜像；
-由于官方 ARM 镜像未内置 `libopenblas` 与 `libatomic`，CI 在启动前会先在容器内安装这两个依赖，
-再提交为本地镜像运行。两个 job 使用相同的 `GS_PASSWORD` / `GS_DB` 初始化参数与 ARM/x86 驱动。
+两个 job 使用同一个多架构标签，runner 架构决定实际拉取的镜像变体；镜像已内置
+`libopenblas` 与 `libatomic`，CI 无需再安装运行时依赖。两个 job 使用相同的
+`GS_PASSWORD` / `GS_DB` 初始化参数与 ARM/x86 驱动。
 
 `docker-compose.opengauss.yml` 也已添加 ARM 版本 `OPENGAUSS_PY_URL` 注释说明。
 
 > 说明：上述 26 项结果为贡献者在鲲鹏 ARM 环境的实测记录。双架构 CI 已于 2026-11-22 在
 > GitHub Actions 跑通：`openGauss migration smoke (x86_64)`、`openGauss migration smoke (aarch64)`
-> 与 `openAMDC full test suite` 均通过（run 45018096964）。
+> 与 `openAMDC full test suite` 均通过（run 45018096964）。多架构镜像发布后，aarch64 job
+> 已改为直接验证 `pollybird/opengauss:7.0.0`。
 
 ## 八、openAMDC ARM 架构（aarch64/鲲鹏）实测记录
 

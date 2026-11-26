@@ -13,7 +13,7 @@
 | 备份与恢复 | 已验证 | `gs_dump` 导出，`gsql` 恢复到新库，核心表行数一致 |
 | Docker Compose 编排 | 已验证 | `docker-compose.opengauss.yml` 完成迁移与向导 |
 | openGauss 官方 SQLAlchemy 方言 | 未验证 | `requirements-opengauss.txt` 为可选增强，默认走内置方言 |
-| aarch64 驱动 | 已验证（贡献者实测） | 预编译包地址见下文；本项目已发布镜像仍为 x86_64，ARM 需本地构建 |
+| aarch64 驱动 | 已验证（贡献者实测） | 预编译包地址见下文；`pollybird/opengauss:7.0.0` 已提供 x86_64 / aarch64 多架构镜像，内置 `openblas` 与 `libatomic` |
 | 哨兵 / 集群 | 不适用 | 本项目只使用单个数据库连接串，HA 属部署侧能力 |
 
 ## 二、拓扑 A：Docker Compose（推荐）
@@ -21,7 +21,7 @@
 仓库根目录的 `docker-compose.opengauss.yml` 会同时启动：
 
 - `app`：`pollybird/zhycms:opengauss`（内置 openGauss 驱动）；
-- `db-opengauss`：`pollybird/opengauss:7.0.0`（官方镜像 + `openblas` 运行时依赖）。
+- `db-opengauss`：`pollybird/opengauss:7.0.0`（官方镜像 + `openblas` / `libatomic` 运行时依赖，x86_64 / aarch64 多架构）。
 
 ```bash
 cp docker/.env.example .env
@@ -155,6 +155,9 @@ docker build -t pollybird/zhycms:opengauss \
 
 默认构建（`INSTALL_OPENGAUSS_DRIVER=0`）不改变现有 `mysql` / `postgresql` / `latest` 镜像。
 
+数据库镜像 `pollybird/opengauss:7.0.0` 已提供 x86_64 / aarch64 多架构，内置 `openblas`
+与 `libatomic`，ARM 环境可直接使用该标签，无需替换为官方 ARM 镜像。
+
 ## 五、运行验证
 
 ```bash
@@ -214,6 +217,6 @@ export ZHYCMS_DB_DUMP_BIN_DIR=/usr/local/opengauss/bin
 ## 八、限制说明
 
 - **版本**：目标为 openGauss 7.0.0 LTS；本次实测为 7.0.0-RC3（lite）镜像。
-- **架构**：x86_64 由官方验证；aarch64 为贡献者实测记录。已发布镜像仅提供 x86_64，ARM 环境需使用 ARM 版数据库镜像，并在 ARM 主机本地构建应用镜像（见 [信创适配专题](XINCHUANG_ADAPTATION.md)）。
+- **架构**：x86_64 由官方验证；aarch64 为贡献者实测记录。数据库镜像 `pollybird/opengauss:7.0.0` 与应用镜像 `pollybird/zhycms:opengauss` 均已提供 x86_64 / aarch64 多架构，ARM 环境可直接使用。
 - **方言**：内置方言覆盖版本解析与 Alembic DDL 注册，未实现 openGauss 特有语法扩展。
 - **高可用**：应用只接受单个 `ZHYCMS_DB_URI`，主备切换、读写分离由数据库侧或代理层负责。

@@ -125,7 +125,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 
 - **openGauss 支持**：`opengauss+psycopg2://` 连接 openGauss 7.0，内置轻量方言（版本解析 + Alembic DDL 注册，零新增依赖），初始化向导新增 openGauss 选项，健康检查输出 `db_dialect`，备份/恢复适配 `gs_dump` / `gsql`。无数据库迁移（仍为 `0020`）。
 - **openAMDC 支持**：Redis 兼容缓存后端，缓存 / 会话 / 限流 / JWT 吊销零代码改动；启动时按 `INFO server` 自动识别后端类型并在后台与 `/healthz?detail=1` 展示 `redis_flavor`。
-- **镜像与编排**：新增 `pollybird/zhycms:opengauss`、`pollybird/openamdc:1.0.0`、`pollybird/opengauss:7.0.0`；新增 `docker-compose.opengauss.yml`，通用编排增加 `openamdc` profile。
+- **镜像与编排**：新增 `pollybird/zhycms:opengauss`（x86_64 / aarch64 多架构）、`pollybird/openamdc:1.0.0`（x86_64 / aarch64 多架构）、`pollybird/opengauss:7.0.0`（x86_64 / aarch64 多架构）；新增 `docker-compose.opengauss.yml`，通用编排增加 `openamdc` profile。
 - **文档与测试**：新增 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md) 与 [信创数据库适配专题](docs/XINCHUANG_ADAPTATION.md)（达梦/金仓/GBase/PolarDB 适配思路与贡献指南）；新增 54 项测试与兼容性 CI 工作流。openGauss 7.0 已在 x86_64 与 aarch64（鲲鹏）双架构端到端实测通过（26 项：方言注册、建表、CRUD、备份恢复、健康检查、Alembic DDL）。openAMDC 1.0.0 已在 x86_64 与 aarch64（鲲鹏）双架构端到端实测通过（79 项：后端识别、缓存、会话、限流、JWT 吊销、Lua 脚本、分布式锁、Pipeline、事务、Hash/List/ZSet 操作）。
 
 ### v3.2.12（2026-11-21）
@@ -356,10 +356,11 @@ docker compose -f docker-compose.opengauss.yml --profile openamdc up -d
 # 并在 .env 设置 REDIS_URL=redis://openamdc:6379/0
 ```
 
-> - openGauss 镜像：`pollybird/opengauss:7.0.0`（官方 7.0.0 镜像 + openblas 运行时依赖）
-> - openAMDC 镜像：`pollybird/openamdc:1.0.0`（源码固定 commit 构建，可用 `--profile openamdc` 启动）
+> - openGauss 镜像：`pollybird/opengauss:7.0.0`（x86_64 / aarch64 多架构，内置 openblas 与 libatomic）
+> - 应用镜像：`pollybird/zhycms:opengauss`（x86_64 / aarch64 多架构，内置对应架构的 openGauss 驱动）
+> - openAMDC 镜像：`pollybird/openamdc:1.0.0`（x86_64 / aarch64 多架构，源码固定 commit 构建，可用 `--profile openamdc` 启动）
 > - 详细步骤与故障速查见 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md)
-> - 验证范围：openGauss 7.0 x86_64 + aarch64（鲲鹏）；openAMDC 1.0.0 x86_64 + aarch64（鲲鹏）；openAMDC Sentinel 自动切换与 TLS 未经验证
+> - 验证范围：openGauss 7.0 x86_64 + aarch64（鲲鹏）；openAMDC 1.0.0 x86_64 + aarch64（鲲鹏）；zhycms 应用镜像已完成双架构构建与初始化验证；openAMDC Sentinel 自动切换与 TLS 未经验证
 
 如需本地构建或使用 MariaDB 方案，仍可用通用编排文件：
 

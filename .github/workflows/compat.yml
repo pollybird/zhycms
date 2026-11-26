@@ -85,7 +85,7 @@ jobs:
             og_py_url: https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/x86/openGauss-Python-7.0.0-openEuler22.03-x86_64.tar.gz
           - arch: aarch64
             runner: ubuntu-24.04-arm
-            og_image: opengauss/opengauss:7.0.0-RC3.B025-arm64-openEuler22.03
+            og_image: pollybird/opengauss:7.0.0
             og_py_url: https://opengauss.obs.cn-south-1.myhuaweicloud.com/7.0.0/openEuler22.03/arm/openGauss-Python-7.0.0-openEuler22.03-aarch64.tar.gz
 
     env:
@@ -101,23 +101,12 @@ jobs:
           python-version: '3.12'
           cache: pip
 
-      - name: Prepare openGauss image
+      - name: Pull openGauss image
         run: |
           IMG="${{ matrix.og_image }}"
           docker pull "$IMG"
-          if [ "${{ matrix.arch }}" = "aarch64" ]; then
-            # ARM 版二进制依赖 libopenblas（及 libatomic），官方镜像未内置。
-            docker run -d --name og-prep --entrypoint sleep "$IMG" infinity
-            docker exec og-prep bash -lc \
-              'yum install -y --nogpgcheck openblas libatomic || (yum clean all && yum makecache && yum install -y --nogpgcheck openblas libatomic)'
-            docker commit \
-              --change 'ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]' \
-              --change 'CMD ["gaussdb"]' \
-              og-prep og-run:local
-            docker rm -f og-prep
-          else
-            docker tag "$IMG" og-run:local
-          fi
+          docker tag "$IMG" og-run:local
+          # 多架构镜像已内置 openblas / libatomic，无需再安装运行时依赖。
 
       - name: Start openGauss
         run: |

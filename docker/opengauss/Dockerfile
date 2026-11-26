@@ -7,11 +7,15 @@
 # Build:
 #   docker build -t pollybird/opengauss:7.0.0 docker/opengauss
 #
+# Multi-arch build (x86_64 + aarch64, needs buildx + QEMU binfmt):
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     -t pollybird/opengauss:7.0.0 --push docker/opengauss
+#
 # Optional build arg (local mirror / offline registry):
 #   BASE_IMAGE=<mirror>/opengauss/opengauss:7.0.0-RC3.B025-openEuler22.03
 # ============================================================
 ARG BASE_IMAGE=opengauss/opengauss:7.0.0-RC3.B025-openEuler22.03
 FROM ${BASE_IMAGE}
 
-RUN dnf install -y openblas \
+RUN dnf install -y openblas libatomic \
     && dnf clean all

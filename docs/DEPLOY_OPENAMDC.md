@@ -11,7 +11,7 @@ ZhyCMS 通过标准 `REDIS_URL` 使用它，缓存、会话、限流与 JWT 吊�
 | 协议兼容 | 已验证 | RESP2 / RESP3、Lua、`SET NX EX`、`INCR`、`SCAN`、`FLUSHDB` 正常 |
 | 全量测试 | 已验证 | 以 `REDIS_URL` 指向 openAMDC 跑通全量 pytest |
 | 并发原子性 | 已验证 | 200 线程 `SET NX` 唯一持有者 1；Lua 限流 200 并发恰好放行 10 |
-| Docker 镜像 | 已验证 | `pollybird/openamdc:1.0.0`（GHCR / ACR / Docker Hub） |
+| Docker 镜像 | 已验证 | `pollybird/openamdc:1.0.0`（x86_64 / aarch64 多架构；GHCR / ACR / Docker Hub） |
 | 哨兵 | 可用但需手工 | 镜像不创建 `openamdc-sentinel` 符号链接；本项目不内置哨兵逻辑 |
 | 集群模式 | 未验证 | 上游保留 `cluster-enabled`，本次未验证 |
 | TLS（`rediss://`） | 未验证 / 当前镜像未启用 | 镜像默认未开启 TLS，需自行重编译并配置证书 |
@@ -24,6 +24,13 @@ ZhyCMS 通过标准 `REDIS_URL` 使用它，缓存、会话、限流与 JWT 吊�
 docker build -t pollybird/openamdc:1.0.0 docker/openamdc
 ```
 
+同时支持 x86_64 与 aarch64 多架构镜像（需 buildx 与 QEMU binfmt）：
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t pollybird/openamdc:1.0.0 --push docker/openamdc
+```
+
 可覆盖构建参数：
 
 | 参数 | 默认值 | 说明 |
@@ -31,10 +38,13 @@ docker build -t pollybird/openamdc:1.0.0 docker/openamdc
 | `BASE_IMAGE` | `openeuler/openeuler:24.03-lts-sp1` | 信创基座；网络受限时可换本地镜像源 |
 | `OPENAMDC_REPO` | `https://atomgit.com/openeuler/openAMDC.git` | 源码地址 |
 | `OPENAMDC_REF` | `6758505d722a7efa0fd64dec5164e19885942f87` | 固定 commit，保证可复现 |
+| `MAKE_JOBS` | `nproc` | 编译并发数；QEMU 模拟 ARM 构建时建议设为 4 左右 |
 
 构建说明：
 
 - RocksDB 静态链接，首次构建耗时较长，需预留充足超时与磁盘空间；
+- aarch64 在 x86_64 主机上通过 QEMU 模拟编译，耗时明显长于本机构建；
+- aarch64 启动需忽略内核 COW 告警，默认配置已内置 `ignore-warnings ARM64-COW-BUG`；
 - 运行期只依赖 `libstdc++`、`snappy`、`zlib`，无需编译工具链；
 - 容器以 uid 999 非 root 运行；
 - 许可证文件随镜像放在 `/usr/share/licenses/openamdc/LICENSE`。
