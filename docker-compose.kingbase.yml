@@ -1,0 +1,139 @@
+# ============================================================
+# zhycms Docker Compose — KingbaseES（人大金仓）版（独立编排文件）
+#
+# 用法：
+#   cp docker/.env.example .env   # 按需修改 SECRET_KEY / KINGBASE_PASSWORD
+#   docker compose -f docker-compose.kingbase.yml up -d
+#   # 如需本地构建应用镜像，追加 --build
+#   # 可选缓存/搜索：追加 --profile redis / --profile meilisearch
+#
+# 授权声明（重要）：
+#   本项目仅实现对 KingbaseES 的适配支持。KingbaseES 为商业软件，其 Docker
+#   镜像、客户端工具与授权文件（license）需用户自行到
+#   https://www.kingbase.com.cn/download.html 下载并获取官方授权。
+#   使用本编排前，请先加载官方镜像（默认镜像名见下方 KINGBASE_IMAGE）：
+#     docker load -i KingbaseES_V009R001C010B0004_x86_64_Docker.tar
+#
+# 镜像：
+#   pollybird/zhycms:latest（默认镜像已含 psycopg2-binary，无需驱动变体）
+#   ${KINGBASE_IMAGE}（用户自行 load 的 KingbaseES 镜像）
+#
+# 设计说明：
+#   - 仅支持 KingbaseES 的 pg 兼容模式（DB_MODE=pg）。
+#   - 默认端口 54321、默认管理账号 system、默认库 test/kingbase/security；
+#     应用目标库 zhycms 由 db-init 服务首次启动时自动创建。
+#   - 备份/恢复所需客户端工具（sys_dump / ksql）由 db-init 从 KingbaseES
+#     镜像拷贝到共享卷 kingbase_client，应用以只读方式挂载到 /opt/kingbase；
+#     应用通过 ZHYCMS_KINGBASE_BIN + LD_LIBRARY_PATH 调用，密码经
+#     KINGBASE_PASSWORD 环境变量注入（ksql/sys_dump 不识别 PGPASSWORD）。
+# ============================================================
+
+services:
+  app:
+    image: ${ZHYCMS_IMAGE:-pollybird/zhycms:latest}
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        APT_MIRROR: ${APT_MIRROR:-}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5000}:5000"
+    environment:
+      ZHYCMS_ENV: production
+      ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      REDIS_URL: ${REDIS_URL:-}
+      ZHYCMS_DB_URI: kingbase+psycopg2://system:${KINGBASE_PASSWORD:-Kingbase123}@db-kingbase:54321/zhycms
+      # 备份/恢复客户端工具（由 db-init 填充到共享卷，只读挂载）
+      ZHYCMS_KINGBASE_BIN: /opt/kingbase/bin
+      LD_LIBRARY_PATH: /opt/kingbase/lib
+    volumes:
+      - ./instance:/app/instance
+      - ./app/static/uploads:/app/app/static/uploads
+      - kingbase_client:/opt/kingbase:ro
+    depends_on:
+      db-kingbase:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+
+  db-kingbase:
+    image: ${KINGBASE_IMAGE:-kingbase_v009r001c010b0004_single_x86:v1}
+    restart: unless-stopped
+    environment:
+      # PASSWORD 供镜像入口初始化使用；KINGBASE_PASSWORD 供 ksql/sys_dump 读取
+      PASSWORD: ${KINGBASE_PASSWORD:-Kingbase123}
+      KINGBASE_PASSWORD: ${KINGBASE_PASSWORD:-Kingbase123}
+      DB_USER: system
+      DB_MODE: pg
+      ENCODING: UTF-8
+      NEED_START: "yes"
+    volumes:
+      - kingbase_data:/home/kingbase/userdata
+    healthcheck:
+      test: ["CMD-SHELL", "ksql -h 127.0.0.1 -p 54321 -U system -d test -w -tAc 'select 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  # 一次性初始化：创建应用库 zhycms + 拷贝客户端工具到共享卷
+  db-init:
+    image: ${KINGBASE_IMAGE:-kingbase_v009r001c010b0004_single_x86:v1}
+    # 以 root 运行以便写入共享卷 kingbase_client（应用以只读挂载）
+    user: "0:0"
+    depends_on:
+      db-kingbase:
+        condition: service_healthy
+    environment:
+      KINGBASE_PASSWORD: ${KINGBASE_PASSWORD:-Kingbase123}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        KB=/home/kingbase/install/kingbase
+        until $$KB/bin/ksql -h db-kingbase -p 54321 -U system -d test -w -tAc 'select 1' >/dev/null 2>&1; do sleep 2; done
+        if ! $$KB/bin/ksql -h db-kingbase -p 54321 -U system -d test -w -tAc "SELECT 1 FROM pg_database WHERE datname='zhycms'" | grep -q 1; then
+          $$KB/bin/ksql -h db-kingbase -p 54321 -U system -d test -w -c 'CREATE DATABASE zhycms'
+        fi
+        mkdir -p /share/bin /share/lib
+        cp -a $$KB/bin/. /share/bin/
+        cp -a $$KB/lib/. /share/lib/
+        chmod -R a+rX /share
+        echo "db-init done: database zhycms ready, client tools copied"
+    volumes:
+      - kingbase_client:/share
+    restart: "no"
+
+  # ---- Redis（可选，缓存与 Session 后端）----
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles: ["redis"]
+
+  # ---- Meilisearch（可选，全文搜索后端）----
+  meilisearch:
+    image: getmeili/meilisearch:v1.8
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
+    volumes:
+      - meili_data:/meili_data
+    ports:
+      - "7700:7700"
+    profiles: ["meilisearch"]
+
+volumes:
+  kingbase_data:
+  kingbase_client:
+  redis_data:
+  meili_data:

@@ -3,15 +3,20 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.3.0-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.3.1-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MulanPSL--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-749%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-776%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.3.0**（信创适配版：新增 openGauss 数据库与 openAMDC 缓存后端支持，内置方言零依赖、运行态自动识别后端类型；无数据库迁移，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[openGauss 部署](docs/DEPLOY_OPENGAUSS.md) 与 [openAMDC 部署](docs/DEPLOY_OPENAMDC.md)）
+**当前版本：v3.3.1**（信创适配增量版：新增人大金仓 **KingbaseES V9**（pg 兼容模式）数据库支持，复用标准 `psycopg2-binary`、内置轻量方言；无数据库迁移、无新增必需依赖，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[KingbaseES 部署](docs/DEPLOY_KINGBASE.md) 与 [openAMDC 部署](docs/DEPLOY_OPENAMDC.md)）
+
+> **授权声明（人大金仓 KingbaseES）**：本项目**仅实现对 KingbaseES 的适配支持**。
+> KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）**需用户
+> 自行到官方下载并获取官方授权**：<https://www.kingbase.com.cn/download.html>。
+> 本仓库不提供、不分发 KingbaseES 的镜像、二进制或许可证。
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（官网与使用文档）
 
@@ -116,10 +121,19 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **站群模式（多站点）** | 一个后端实例 + 一个库按站点切分内容：独立域名 / 泛解析子域解析、后台站点 CRUD 与切换、站点级配置/主题/SEO、搜索与缓存按站隔离、会员共享或独立、插件站群 SDK；默认站点 0 单站点部署零感知 | v3.2.0 |
 | **数据库迁移插件** | 内置插件 `db_migrator`（默认不启用）：后台一键把 SQLite 开发库迁移到 MySQL/PostgreSQL，建表+数据复制+序列重置，目标库非空保护，支持迁移后免重启热切换 | v3.1.0 |
 | **信创适配** | 数据库新增 **openGauss 7.0**（内置方言、向导可选、备份恢复适配），缓存新增 **openAMDC 1.0.0**（协议零改动、运行态自动识别），提供信创镜像与 Compose 编排 | v3.3.0 |
+| **信创适配（增量）** | 数据库新增 **人大金仓 KingbaseES V9**（pg 兼容模式，内置方言、复用 `psycopg2-binary`、向导可选、备份恢复适配 `sys_dump`/`ksql`），新增 `docker-compose.kingbase.yml` 与部署文档；无迁移、无新增依赖 | v3.3.1 |
 
 ---
 
 ## 版本速览
+
+### v3.3.1（2026-11-26）
+
+- **人大金仓 KingbaseES V9 支持（pg 兼容模式）**：新增内置轻量方言 `kingbase`——KingbaseES 的 `select version()` 返回 `KingbaseES V009R001C010` 会导致标准 PostgreSQL 方言版本解析失败，本方言改用 `SHOW server_version`（实测 `12.1`）解析为 `(12, 1)` 并注册 `KingbaseImpl`；连接与迁移复用标准 `psycopg2-binary`，URI 形如 `kingbase+psycopg2://system:pwd@host:54321/db`。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖。
+- **向导 / 健康检查 / 备份恢复**：初始化向导新增「KingbaseES（信创推荐）」选项（默认端口 `54321`、账号 `system`）；`/healthz?detail=1` 返回 `db_dialect=kingbase`；备份用 `sys_dump`、恢复用 `ksql`，**密码通过 `KINGBASE_PASSWORD` 环境变量注入**（ksql / sys_dump 不识别 `PGPASSWORD`），工具路径支持 `ZHYCMS_KINGBASE_BIN`。
+- **镜像与编排**：新增 `docker-compose.kingbase.yml`；默认 `pollybird/zhycms:latest` 镜像已含 `psycopg2-binary`，**无需新增驱动构建参数或镜像变体**；备份/恢复所需客户端工具（ksql / sys_dump）由用户自行提供（见 [KingbaseES 部署](docs/DEPLOY_KINGBASE.md)）。
+- **文档**：新增 [KingbaseES 部署指南](docs/DEPLOY_KINGBASE.md)，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) 将 KingbaseES 从「规划中」改为「已实现（pg 模式）」；V9R1C10 x86_64 端到端实测通过（迁移 `0020` 建表 54 张、向导、业务读写、备份恢复、健康检查、Compose 编排）。
+- **授权声明**：本项目仅实现对 KingbaseES 的适配支持；KingbaseES 为商业软件，镜像与授权文件需用户自行到 <https://www.kingbase.com.cn/download.html> 下载并获取官方授权。
 
 ### v3.3.0（2026-11-22）
 
@@ -271,7 +285,7 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 ### 环境要求
 
 - Python 3.10+（CI 覆盖 3.10 / 3.11 / 3.12 / 3.13，3.14 实验性）
-- 数据库：**MySQL 5.7+** / **PostgreSQL 12+** / **openGauss 7.0**（v3.3.0 起；生产推荐其一）
+- 数据库：**MySQL 5.7+** / **PostgreSQL 12+** / **openGauss 7.0**（v3.3.0 起）/ **人大金仓 KingbaseES V9**（v3.3.1 起，pg 兼容模式；生产推荐其一）
 - 缓存（可选）：**Redis 6.2+** 或 **openAMDC 1.0.0**（v3.3.0 起，Redis 协议兼容）
 - SQLite 仅用于开发/测试（不支持并发写入）
 
@@ -280,17 +294,24 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 | MySQL / MariaDB | 5.7+ / 11.4 | 完整支持 | 默认生产方案 |
 | PostgreSQL | 12+ | 完整支持 | 默认生产方案 |
 | openGauss | 7.0.0（实测 7.0.0-RC3） | 已验证（x86_64 + aarch64/鲲鹏） | 需 openGauss 官方 psycopg2 驱动，见 [部署文档](docs/DEPLOY_OPENGAUSS.md) |
+| 人大金仓 KingbaseES | V9（实测 V9R1C10） | 已验证（pg 兼容模式，x86_64） | 复用标准 `psycopg2-binary`，无需专用驱动；备份/恢复需客户端工具，见 [部署文档](docs/DEPLOY_KINGBASE.md) |
 | SQLite | 3.x | 仅开发/测试 | 不支持并发写入 |
 | Redis | 6.2+ | 完整支持 | 配置 `REDIS_URL` 启用 |
 | openAMDC | 1.0.0 | 已验证（x86_64 + aarch64/鲲鹏） | 协议兼容，见 [部署文档](docs/DEPLOY_OPENAMDC.md) |
-| 达梦 / 金仓 / GBase / PolarDB | 以目标版本为准 | 规划中（未实现、未验证） | 仅提供适配思路，欢迎贡献，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
+| 达梦 / GBase / PolarDB | 以目标版本为准 | 规划中（未实现、未验证） | 仅提供适配思路，欢迎贡献，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
+
+> **授权声明（人大金仓 KingbaseES）**：本项目**仅实现对 KingbaseES 的适配支持**。
+> KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）**需用户
+> 自行到官方下载并获取官方授权**：<https://www.kingbase.com.cn/download.html>。
+> 本仓库不提供、不分发 KingbaseES 的镜像、二进制或许可证。
 
 ### 信创适配专题
 
-官方在信创数据库方面**目前仅实现并验证了 openGauss 7.0**（x86_64 + aarch64/鲲鹏），
-并为 openGauss 与 openAMDC 场景提供 x86_64 / aarch64 多架构镜像；openAMDC 1.0.0
-已在双架构完成端到端实测。达梦 DM8、人大金仓 KingbaseES、南大通用 GBase（8a / 8c / 8s）
-与 PolarDB（PostgreSQL 版 / PolarDB-X）尚未适配；[信创适配专题](docs/XINCHUANG_ADAPTATION.md)
+官方在信创数据库方面**已实现并验证 openGauss 7.0**（v3.3.0，x86_64 + aarch64/鲲鹏）与
+**人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64），并为 openGauss 与 openAMDC
+场景提供 x86_64 / aarch64 多架构镜像；openAMDC 1.0.0 已在双架构完成端到端实测。
+达梦 DM8、南大通用 GBase（8a / 8c / 8s）与 PolarDB（PostgreSQL 版 / PolarDB-X）尚未适配；
+[信创适配专题](docs/XINCHUANG_ADAPTATION.md)
 给出了按「方言 / 驱动 / URI / 备份工具」分层的适配思路、工作量与风险评估，以及贡献指南。
 
 欢迎所有人提交适配代码、测试、部署文档或实测报告：可先开 Issue 说明数据库产品、
@@ -320,7 +341,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.3.0**，全部提供 x86_64 / aarch64 多架构，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.3.1**，全部提供 x86_64 / aarch64 多架构，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -337,9 +358,9 @@ docker compose -f docker-compose.postgresql.yml up -d
 ```
 
 > 也可直接拉取镜像：
-> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
-> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
-> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.0`）
+> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.1`）
+> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.1`）
+> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.1`）
 >
 > 三个 tag（`mysql` / `postgresql` / `latest`）指向同一多架构镜像（x86_64 / aarch64），内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
 
@@ -362,6 +383,32 @@ docker compose -f docker-compose.opengauss.yml --profile openamdc up -d
 > - openAMDC 镜像：`pollybird/openamdc:1.0.0`（x86_64 / aarch64 多架构，源码固定 commit 构建，可用 `--profile openamdc` 启动）
 > - 详细步骤与故障速查见 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md)
 > - 验证范围：openGauss 7.0 x86_64 + aarch64（鲲鹏）；openAMDC 1.0.0 x86_64 + aarch64（鲲鹏）；zhycms 应用镜像已完成双架构构建与初始化验证；openAMDC Sentinel 自动切换与 TLS 未经验证
+
+#### 信创部署（人大金仓 KingbaseES）
+
+> **授权声明**：本项目**仅实现对 KingbaseES 的适配支持**。KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）需用户自行到 <https://www.kingbase.com.cn/download.html> 下载并获取官方授权；本仓库不分发其二进制或许可证。
+
+```bash
+# 0. 先加载官方 KingbaseES 镜像（镜像与授权请自行从官方获取）
+docker load -i KingbaseES_V009R001C010B0004_x86_64_Docker.tar
+
+# 1. 配置环境变量（修改 SECRET_KEY 与 KINGBASE_PASSWORD）
+cp docker/.env.example .env
+
+# 2. 启动 KingbaseES 编排（应用镜像复用默认 pollybird/zhycms:latest，无需驱动变体）
+docker compose -f docker-compose.kingbase.yml up -d
+
+# 3. 可选：启用 Redis / Meilisearch 作为缓存与搜索
+docker compose -f docker-compose.kingbase.yml --profile redis up -d
+docker compose -f docker-compose.kingbase.yml --profile meilisearch up -d
+```
+
+> - 应用镜像：`pollybird/zhycms:latest`（默认镜像已含 `psycopg2-binary`；KingbaseES 为 PG 协议兼容，连接与迁移无需专用驱动或新镜像变体）
+> - KingbaseES 镜像：需用户自行 `docker load` 官方镜像（默认镜像名 `kingbase_v009r001c010b0004_single_x86:v1`，可用 `.env` 中 `KINGBASE_IMAGE` 覆盖）
+> - 仅支持 `DB_MODE=pg`；默认端口 `54321`、管理账号 `system`；编排会自动创建应用库 `zhycms`，并把客户端工具（`sys_dump` / `ksql`）挂载给应用
+> - 备份/恢复密码经 `KINGBASE_PASSWORD` 环境变量注入（ksql / sys_dump 不识别 `PGPASSWORD`）；裸机部署需自行配置 `ZHYCMS_KINGBASE_BIN` 与 `LD_LIBRARY_PATH`
+> - 详细步骤、连接参数、备份恢复与故障速查见 [KingbaseES 部署](docs/DEPLOY_KINGBASE.md)
+> - 验证范围：KingbaseES V9R1C10 x86_64（pg 模式）；aarch64 / 鲲鹏镜像、oracle / mysql / sqlserver 兼容模式未验证
 
 如需本地构建或使用 MariaDB 方案，仍可用通用编排文件：
 
@@ -548,8 +595,9 @@ zhycms/
 | [docs/THEME_TEMPLATE_API.md](docs/THEME_TEMPLATE_API.md) | 主题模板开发 API：模板继承链、全局变量、Jinja 过滤器与函数、页面上下文 |
 | [docs/OPERATIONS_FAQ.md](docs/OPERATIONS_FAQ.md) | 运维故障排查 FAQ：常见报错、数据库迁移失败处理、缓存/主题/插件/伪静态/Docker 排障速查 |
 | [docs/DEPLOY_OPENGAUSS.md](docs/DEPLOY_OPENGAUSS.md) | openGauss 部署：两种拓扑、建库建号、pg_hba、驱动安装、备份工具与故障速查 |
+| [docs/DEPLOY_KINGBASE.md](docs/DEPLOY_KINGBASE.md) | KingbaseES（人大金仓）部署：镜像加载、Compose 编排、连接参数、备份恢复（KINGBASE_PASSWORD）、限制与授权声明 |
 | [docs/DEPLOY_OPENAMDC.md](docs/DEPLOY_OPENAMDC.md) | openAMDC 部署：镜像构建、Compose 用法、配置项、与 Redis 差异、哨兵与 TLS 说明 |
-| [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md) | 信创数据库适配专题：openGauss 现状、达梦/金仓/GBase/PolarDB 适配思路、工作量评估与贡献指南 |
+| [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md) | 信创数据库适配专题：openGauss 与 KingbaseES 已实现、达梦/GBase/PolarDB 适配思路、工作量评估与贡献指南 |
 | [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) | 插件依赖 / 继承 / 最低核心版本校验详解 |
 
 单页版文档见 [wiki.html](wiki.html)，在线 Wiki 见 Gitee / GitCode / GitHub 仓库 Wiki 页（三平台镜像同步）。
@@ -557,6 +605,16 @@ zhycms/
 ---
 
 ## 升级指南
+
+### v3.3.0 → v3.3.1
+
+覆盖代码 + 重启应用即可，**无数据库迁移、无新增必需依赖**（迁移仍为 `0020`，`requirements.txt` 不变）。MySQL / PostgreSQL / openGauss / Redis 部署行为不变。
+
+- 切换 KingbaseES：先 `docker load` 官方 KingbaseES 镜像，再 `docker compose -f docker-compose.kingbase.yml up -d`（或把 `ZHYCMS_DB_URI` 改为 `kingbase+psycopg2://system:密码@主机:54321/库名`，在初始化向导中选择「KingbaseES（信创推荐）」）；首次启动自动迁移至 `0020`，`/healthz?detail=1` 返回 `db_dialect=kingbase`
+- 备份/恢复：KingbaseES 客户端工具（`ksql` / `sys_dump`）需配置 `ZHYCMS_KINGBASE_BIN` 与 `LD_LIBRARY_PATH`（compose 已自动挂载），密码经 `KINGBASE_PASSWORD` 注入
+- 回退：改回原数据库 URI 后重启即可，无结构变更
+- 详见 [UPGRADE.md](./UPGRADE.md)、[KingbaseES 部署](docs/DEPLOY_KINGBASE.md)
+- 授权声明：KingbaseES 为商业软件，镜像与授权文件需用户自行到 <https://www.kingbase.com.cn/download.html> 下载并获取官方授权
 
 ### v3.2.12 → v3.3.0
 

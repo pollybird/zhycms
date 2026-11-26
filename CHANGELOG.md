@@ -7,6 +7,29 @@
 
 > **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
+## [3.3.1] - 2026-11-26
+
+**信创适配增量版**：新增人大金仓 **KingbaseES V9（pg 兼容模式）** 数据库支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖（复用标准 `psycopg2-binary`）。
+
+> **授权声明**：本项目仅实现对 KingbaseES 的适配支持。KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）需用户自行到 <https://www.kingbase.com.cn/download.html> 下载并获取官方授权；本仓库不提供、不分发 KingbaseES 二进制或许可证。
+
+### Added
+
+- **KingbaseES 数据库支持**：新增内置轻量方言 `app/utils/dialects/kingbase.py`——`KingbaseES` 为 PG 线协议兼容，直接使用标准 PyPI `psycopg2-binary` 驱动，无需专用驱动或 `LD_LIBRARY_PATH`；因 `select version()` 返回 `KingbaseES V009R001C010` 会导致标准 PostgreSQL 方言版本解析抛 `AssertionError`，本方言覆盖 `_get_server_version_info`，改用 `SHOW server_version`（实测 `12.1`）解析为 `(12, 1)`；注册 `KingbaseImpl` 供 Alembic 按 `dialect.name` 查表。连接串形如 `kingbase+psycopg2://system:pwd@host:54321/db`。
+- **连接与引擎参数**：`build_engine_options()` 对 KingbaseES 复用 openGauss 的连接池、`connect_timeout` 与 `application_name`；`dbconfig.py` 增加默认端口 `54321`，支持 TCP 与 Unix socket URI，驱动缺失、认证失败、连接拒绝分别给出可操作中文提示。
+- **初始化向导与显示**：向导新增「KingbaseES（信创推荐）」选项，未填端口时回退 `54321`；`_current_db_label()`、后台页脚与 `/healthz?detail=1` 的 `db_dialect` 显示 `kingbase`。
+- **备份与恢复**：`backup_utils` 按方言适配 KingbaseES——备份用 `sys_dump`（stdout 为纯 SQL，直接管道 gzip），恢复用 `ksql -w -d <db> -f <sql>`；**密码通过 `KINGBASE_PASSWORD` 环境变量注入**（ksql / sys_dump / sys_restore 不识别 `PGPASSWORD`），不在命令行明文出现；工具路径支持 `ZHYCMS_KINGBASE_BIN` / `KINGBASE_BIN` / `ZHYCMS_DB_DUMP_BIN_DIR`。
+- **镜像与编排**：新增 `docker-compose.kingbase.yml`；默认 `pollybird/zhycms` 镜像已含 `psycopg2-binary`，**无需新增驱动构建参数或镜像变体**；备份/恢复所需客户端工具（ksql / sys_dump）需用户自行提供（见 `docs/DEPLOY_KINGBASE.md`）。
+- **文档**：新增 `docs/DEPLOY_KINGBASE.md`（镜像加载、compose 启动、连接参数、备份恢复、授权声明、限制）；更新 `docs/XINCHUANG_ADAPTATION.md` 将 KingbaseES 从「规划中」改为「已实现（pg 模式）」；README 支持矩阵补充 KingbaseES 与授权声明。
+- **测试**：新增 `tests/test_kingbase.py`（离线覆盖方言注册/版本解析/Alembic impl/URI/错误提示/备份命令与 env 注入/向导；live 集成由 `ZHYCMS_TEST_KINGBASE_URL` 门控，默认跳过）。
+
+### 限制与注意
+
+- **仅支持 `DB_MODE=pg`**：oracle / mysql / sqlserver 兼容模式不在本轮目标范围内。
+- 默认端口 `54321`、默认管理账号 `system`、默认库 `test`；应用目标数据库需提前创建。
+- 客户端工具（`ksql` / `sys_dump`）需与应用进程同机可用（配置 `ZHYCMS_KINGBASE_BIN` 与 `LD_LIBRARY_PATH` 指向其 `lib`），否则应用内「备份/恢复」不可用（连接与迁移不受影响）。
+- 回退：改回原 `ZHYCMS_DB_URI` 后重启即可，无结构变更。
+
 ## [3.3.0] - 2026-11-22
 
 **信创适配版**：新增 openGauss 7.0 数据库与 openAMDC 1.0.0 缓存后端支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖。

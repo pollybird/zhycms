@@ -63,6 +63,8 @@ def _current_db_label():
     uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
     if uri.startswith('opengauss'):
         return 'openGauss'
+    if uri.startswith('kingbase'):
+        return 'KingbaseES'
     if uri.startswith('mysql'):
         return 'MySQL'
     if uri.startswith('postgresql'):
@@ -132,7 +134,7 @@ def setup():
             # 直接使用启动时已连通的引擎，表结构由启动迁移保证，
             # 向导不接收任何连接参数（忽略表单中的 db_type/主机等字段）
             pass
-        elif db_type in ('mysql', 'postgresql', 'opengauss'):
+        elif db_type in ('mysql', 'postgresql', 'opengauss', 'kingbase'):
             host = ctx['db_host']
             port = ctx['db_port'] or str(DEFAULT_PORTS[db_type])
             name = ctx['db_name']

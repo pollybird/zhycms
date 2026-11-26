@@ -116,13 +116,20 @@
         <div class="form-group">
           <label><strong>{{ _('数据库类型') }}</strong></label>
           <small class="text-muted d-block mb-2">
-            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+ / openGauss 7.0+（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
+            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+ / openGauss 7.0+ / KingbaseES V9（pg 模式）（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
           </small>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_opengauss" name="db_type" value="opengauss" {{ 'checked' if db_type == 'opengauss' else '' }}>
             <label for="db_opengauss">
               <strong>openGauss</strong> <span class="badge badge-success">{{ _('信创推荐') }}</span>
               <small class="text-muted d-block">{{ _('国产数据库（7.0+），需已创建目标数据库并安装 openGauss 官方 psycopg2 驱动') }}</small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="db_kingbase" name="db_type" value="kingbase" {{ 'checked' if db_type == 'kingbase' else '' }}>
+            <label for="db_kingbase">
+              <strong>KingbaseES</strong> <span class="badge badge-success">{{ _('信创推荐') }}</span>
+              <small class="text-muted d-block">{{ _('人大金仓（V9，pg 模式），默认端口 54321 / 账号 system，需提前创建目标数据库') }}</small>
             </label>
           </div>
           <div class="icheck-primary d-block mb-2">
@@ -307,8 +314,8 @@
 <script src="{{ url_for('static', filename='vendor/jquery/3.6.4/jquery.min.js') }}"></script>
 <script>
 (function () {
-  var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432, opengauss: 5432 };
-  var CONN_TYPES = ['mysql', 'postgresql', 'opengauss'];
+  var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432, opengauss: 5432, kingbase: 54321 };
+  var CONN_TYPES = ['mysql', 'postgresql', 'opengauss', 'kingbase'];
   var fields = document.getElementById('db-conn-fields');
   // 环境变量托管数据库时（Docker 部署）页面无数据库配置区，直接跳过
   if (!fields) { return; }

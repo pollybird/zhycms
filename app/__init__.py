@@ -835,6 +835,9 @@ def create_app(config_name=None):
     if _db_backend == 'opengauss':
         from .utils.dialects import register_opengauss_dialect
         register_opengauss_dialect()
+    elif _db_backend == 'kingbase':
+        from .utils.dialects import register_kingbase_dialect
+        register_kingbase_dialect()
 
     # 初始化扩展
     db.init_app(app)

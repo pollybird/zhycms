@@ -2,16 +2,20 @@
 
 本文说明 ZhyCMS 的信创数据库适配现状、后续适配思路与贡献方式。
 
-> **结论先行**：官方目前**仅实现并验证了 openGauss**（v3.3.0，x86_64 + aarch64/鲲鹏）。
-> 达梦、人大金仓、南大通用、PolarDB 等数据库**尚未实现、尚未验证**，本文给出的是
+> **结论先行**：官方已**实现并验证 openGauss**（v3.3.0，x86_64 + aarch64/鲲鹏）与
+> **人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64）。
+> 达梦、南大通用、PolarDB 等数据库**尚未实现、尚未验证**，本文给出的是
 > 适配思路与工作量评估，不构成支持承诺。欢迎社区按本文路径提交贡献。
+>
+> **授权提示**：KingbaseES 为商业软件，项目仅提供适配代码，镜像与授权文件需用户
+> 自行从 <https://www.kingbase.com.cn/download.html> 下载并获取官方授权。
 
 ## 一、适配现状
 
 | 数据库 | 兼容基础 | 官方状态 | 验证范围 |
 | --- | --- | --- | --- |
 | openGauss 7.0 | PostgreSQL 协议 + 自有方言差异 | **已实现**（v3.3.0） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复 |
-| 人大金仓 KingbaseES V8/V9 | PostgreSQL 协议（`sys_` 系工具与系统表） | 未实现 | 无 |
+| 人大金仓 KingbaseES V9 | PostgreSQL 协议（pg 模式，`sys_` 系工具与系统表） | **已实现**（v3.3.1，pg 模式） | x86_64；迁移 `0020`（54 表）、向导、业务读写、备份恢复、健康检查 |
 | PolarDB（PostgreSQL 版 / PolarDB-X） | PostgreSQL / MySQL 协议 | 未实现 | 无 |
 | 达梦 DM8 | Oracle 风格自有协议 | 未实现 | 无 |
 | 南大通用 GBase 8a | MySQL 协议（分析型 MPP） | 未实现 | 无 |
@@ -40,21 +44,40 @@ openGauss 的适配已经形成一套可复用的接入框架。新增数据库�
 
 ## 三、分库适配思路
 
-### 3.1 人大金仓 KingbaseES V8 / V9（预计工作量最低）
+### 3.1 人大金仓 KingbaseES V9（pg 兼容模式）—— 已实现（v3.3.1）
 
-KingbaseES 以 PostgreSQL 为兼容基础，是最接近 openGauss 的路径。
+KingbaseES 以 PostgreSQL 为兼容基础，是最接近 openGauss 的路径。v3.3.1 已在
+**V9R1C10 x86_64 的 pg 模式**下完成端到端适配与验证，详见下文「九、KingbaseES V9
+实测记录」与 [docs/DEPLOY_KINGBASE.md](DEPLOY_KINGBASE.md)。
 
-- **驱动与 URI**：优先使用金仓官方 `ksycopg2`，或复用 `psycopg2`（需实测协议兼容性）。
-  URI 可先尝试 `kingbase+psycopg2://`，方言内部复用 PostgreSQL 方言。
-- **方言与迁移**：参照 `app/utils/dialects/opengauss.py` 增加 `kingbase` 方言，
-  仅覆盖版本串解析与必要的 DDL 注册；先验证 Alembic 全量迁移与 `render_as_batch`。
-- **备份恢复**：金仓工具名为 `sys_dump` / `sys_restore` / `ksql`，不是 `pg_dump`。
-  需在 `backup_utils.py` 增加映射，并支持 `KINGBASE_BIN` 一类的工具目录变量。
-- **主要差异与风险**：默认端口 54321；`sys_` 前缀系统表；大小写折叠与
-  Oracle 兼容模式（`database_mode`）可能影响标识符与空串语义；`ON UPDATE`、
-  自增列等 DDL 细节需逐条核对迁移脚本。
-- **验证要点**：52 张表迁移、向导建号、中文/布尔/时间回读、序列不回退、
-  `sys_dump` 导出与恢复。
+- **驱动与 URI**：连接与迁移**复用标准 PyPI `psycopg2-binary`**（KingbaseES 为 PG 线
+  协议兼容，实测可直接连通），无需金仓官方专用驱动，也无需 `LD_LIBRARY_PATH` 即可
+  连接。URI 为 `kingbase+psycopg2://system:pwd@host:54321/db`。
+- **方言与迁移**：参照 [opengauss.py](../app/utils/dialects/opengauss.py) 新增
+  [kingbase.py](../app/utils/dialects/kingbase.py)，仅覆盖
+  `_get_server_version_info`（KingbaseES 的 `select version()` 返回
+  `KingbaseES V009R001C010`，标准 PG 方言会抛 `AssertionError`），改用
+  `SHOW server_version`（实测 `12.1`）解析为 `(12, 1)`，并注册 `KingbaseImpl`
+  供 Alembic 按 `dialect.name` 查表。全量迁移 `0001→0020` 成功，public 表数 54。
+- **备份恢复**：工具为 `sys_dump`（备份，stdout 纯 SQL，直接管道 gzip）/ `ksql`
+  （恢复）。**密码通过 `KINGBASE_PASSWORD` 环境变量注入**——KingbaseES 的
+  `ksql` / `sys_dump` / `sys_restore` **不识别 `PGPASSWORD`**（与 openGauss 不同，
+  openGauss 用 `-W` 参数）。工具路径支持 `ZHYCMS_KINGBASE_BIN` / `KINGBASE_BIN` /
+  `ZHYCMS_DB_DUMP_BIN_DIR`；`LD_LIBRARY_PATH` 需指向客户端 `lib`（应用不为 KingbaseES
+  自动注入，与 openGauss 不同）。
+- **与 openGauss 的关键差异**：
+  - openGauss 需要官方 psycopg2 驱动 fork + `LD_LIBRARY_PATH`；KingbaseES 连接复用
+    标准 `psycopg2-binary`，**无需驱动变体镜像**（默认 `pollybird/zhycms:latest` 即可）。
+  - 密码环境变量：openGauss 用 `GS_PASSWORD` + 命令行 `-W`；KingbaseES 用
+    `KINGBASE_PASSWORD`（不读 `PGPASSWORD`），命令行 `-w`。
+  - 备份 stdout：openGauss `gs_dump` 有进度日志污染，需先落临时文件；KingbaseES
+    `sys_dump` stdout 干净，可直接管道 gzip。
+  - 版本编码：KingbaseES `server_version_num` 为 `major*10000+minor`（120001→(12,1)），
+    非标准 PG 的 `major*10000+minor*100+patch`。
+- **未覆盖 / 待验证**：仅 `DB_MODE=pg`；`oracle` / `mysql` / `sqlserver` 兼容模式、
+  V8 系列、aarch64（鲲鹏）镜像暂未验证。
+- **授权**：KingbaseES 为商业软件，镜像与授权文件需用户自行从
+  <https://www.kingbase.com.cn/download.html> 获取；本项目不分发其二进制或许可证。
 
 ### 3.2 PolarDB（PostgreSQL 版 / PolarDB-X，预计工作量低到中）
 
@@ -103,7 +126,7 @@ DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
 
 | 数据库 | 方言改造 | 驱动接入 | 备份工具 | 迁移风险 | 综合评估 |
 | --- | --- | --- | --- | --- | --- |
-| KingbaseES | 小（复用 PG） | 小 | 小（`sys_dump`） | 低-中 | 优先适配 |
+| KingbaseES V9 | 小（复用 PG） | 小（复用 psycopg2-binary） | 小（`sys_dump`） | 低-中 | **已实现**（v3.3.1，pg 模式） |
 | PolarDB PG | 极小 | 极小 | 云平台为主 | 低 | 优先适配 |
 | PolarDB-X | 小 | 极小 | 云平台为主 | 中（分布式 DDL） | 可并行 |
 | 达梦 DM8 | 大 | 中 | 中（`dexp`/`dimp`） | 高 | 单独立项 |
@@ -159,8 +182,9 @@ DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
 
 ## 六、验证状态声明
 
-除 openGauss 7.0（x86_64 + aarch64/鲲鹏）与 openAMDC 1.0.0（x86_64 + aarch64/鲲鹏）外，
-本文提及的达梦、人大金仓、南大通用、PolarDB 等数据库均**未实现、未验证**。
+除 openGauss 7.0（x86_64 + aarch64/鲲鹏）、openAMDC 1.0.0（x86_64 + aarch64/鲲鹏）与
+**人大金仓 KingbaseES V9（pg 兼容模式，x86_64）**外，
+本文提及的达梦、南大通用（GBase 8a/8c/8s）、PolarDB 等数据库均**未实现、未验证**。
 文中驱动名、工具名与差异点为适配方向，可能随产品版本变化，落地前请以目标环境的官方文档和实测结果为准。
 
 ### 多架构镜像
@@ -312,3 +336,56 @@ openAMDC 源码来自 [openeuler-mirror/openAMDC](https://github.com/openeuler-m
 
 > 说明：上述 79 项为贡献者在鲲鹏 ARM 环境的实测记录。项目发布的 `pollybird/openamdc:1.0.0`
 > 已提供 x86_64 / aarch64 多架构镜像，两个架构均完成启动与 `PING` 冒烟验证。
+
+## 九、KingbaseES V9（pg 兼容模式，x86_64）实测记录
+
+v3.3.1 在 x86_64 环境用官方镜像 `kingbase_v009r001c010b0004_single_x86:v1`（V9R1C10，
+`DB_MODE=pg`）对 KingbaseES 进行了端到端实测，验证结果如下。
+
+> **授权提示**：KingbaseES 为商业软件，本项目不分发其镜像与授权文件；镜像与授权请
+> 自行从 <https://www.kingbase.com.cn/download.html> 获取。
+
+### 环境信息
+
+| 项目 | 值 |
+| --- | --- |
+| CPU 架构 | x86_64 |
+| KingbaseES 版本 | V009R001C010（`select version()`） |
+| 兼容模式 | `DB_MODE=pg` |
+| 端口 / 管理账号 | `54321` / `system` |
+| 版本串 | `SHOW server_version` = `12.1`；`SHOW server_version_num` = `120001` → `(12, 1)` |
+| Python 驱动 | 标准 PyPI `psycopg2-binary`（无需专用驱动） |
+| 客户端工具 | 镜像内 `/home/kingbase/install/kingbase/bin/{sys_dump,ksql,sys_restore}` + `lib/libkci.so` |
+
+### 关键差异结论（相对 PostgreSQL / openGauss）
+
+1. **必须自定义方言**：KingbaseES 的 `select version()` 返回 `KingbaseES V009R001C010`，
+   标准 `postgresql+psycopg2` 方言的版本解析会抛 `AssertionError`，故必须用
+   `kingbase+psycopg2://` 走内置方言。
+2. **`server_version_num` 编码与标准 PG 不同**：KingbaseES 为 `major*10000+minor`
+   （120001 → `(12,1)`），不是 PG 的 `major*10000+minor*100+patch`；方言按此解析。
+3. **客户端工具不识别 `PGPASSWORD`**：`ksql` / `sys_dump` / `sys_restore` 只认
+   `KINGBASE_PASSWORD`，应用据此注入，密码不进命令行。
+4. **`sys_dump` stdout 干净**：与 openGauss `gs_dump` 不同，KingbaseES `sys_dump`
+   的 stdout 是纯 SQL（无进度日志污染），可直接管道 gzip。
+5. **连接复用标准 psycopg2**：无需金仓官方 Python 驱动，也无需 `LD_LIBRARY_PATH`
+   即可连通；但备份/恢复的客户端工具需要 `LD_LIBRARY_PATH` 指向其 `lib`。
+
+### 实测结果
+
+| 类别 | 验证项 | 结果 |
+| --- | --- | --- |
+| 方言注册 | `kingbase+psycopg2://` URI 解析、方言版本返回 `(12, 1)` | 通过 |
+| Alembic DDL | `0001→0020` 迁移建表（54 张表），`alembic_version='0020'` | 通过 |
+| 初始化向导 | KingbaseES 选项可选、默认端口 54321 / 账号 system、连接测试通过 | 通过 |
+| 业务读写 | 中文 / 布尔 / 时间回读、序列不回退 | 通过 |
+| 备份恢复 | `sys_dump` 导出（gzip 首部 `-- Kingbase database dump`）、`ksql` 恢复到空库，表数一致 | 通过 |
+| 健康检查 | `/healthz?detail=1` 输出 `db_dialect=kingbase` | 通过 |
+| Compose 编排 | `docker-compose.kingbase.yml` 启动后应用连库建表、备份功能可用 | 通过 |
+| 单元测试 | `tests/test_kingbase.py` 离线 27 项 + live 集成 3 项 | 通过 |
+
+### CI 说明
+
+KingbaseES 为商业软件，镜像与授权需用户自行获取，**本轮未接入 GitHub Actions CI**
+（避免在公共 CI 中分发商业镜像）。集成测试 `tests/test_kingbase.py` 默认跳过，仅在
+设置 `ZHYCMS_TEST_KINGBASE_URL` 后启用，供本地与私有化环境回归。

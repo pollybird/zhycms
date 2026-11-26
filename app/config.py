@@ -109,8 +109,8 @@ def _resolve_database_uri():
 def build_engine_options(uri):
     """按数据库 URI 返回 SQLAlchemy 引擎参数。
 
-    openGauss 多部署在独立数据库主机上，显式约束连接池与超时，避免网络
-    异常时请求长时间阻塞；其它后端保持既有的 ``pool_pre_ping`` 行为。
+    openGauss / KingbaseES 多部署在独立数据库主机上，显式约束连接池与超时，
+    避免网络异常时请求长时间阻塞；其它后端保持既有的 ``pool_pre_ping`` 行为。
     """
     options = {'pool_pre_ping': True}
     try:
@@ -118,7 +118,7 @@ def build_engine_options(uri):
         backend = make_url(uri or '').get_backend_name()
     except Exception:
         return options
-    if backend == 'opengauss':
+    if backend in ('opengauss', 'kingbase'):
         options.update({
             'pool_size': 10,
             'max_overflow': 20,

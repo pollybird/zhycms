@@ -1,9 +1,11 @@
 """数据库连接配置工具。
 
-支持四种数据库：sqlite（默认）、mysql、postgresql、opengauss（v3.3.0）。
+支持五种数据库：sqlite（默认）、mysql、postgresql、opengauss（v3.3.0）、
+kingbase（v3.3.1，人大金仓 KingbaseES pg 模式）。
 
-- 初始化向导选择数据库类型后，mysql/postgresql/opengauss 的连接信息会以
-  ``instance/db_config.json`` 落盘（chmod 600），SQLite 则清除该文件走默认。
+- 初始化向导选择数据库类型后，mysql/postgresql/opengauss/kingbase 的连接
+  信息会以 ``instance/db_config.json`` 落盘（chmod 600），SQLite 则清除该
+  文件走默认。
 - 应用启动时的 URI 解析优先级见 ``app/config.py``：
   环境变量 ``ZHYCMS_DB_URI`` > ``db_config.json`` > 默认 sqlite。
 - host 以 ``/`` 开头时按 Unix socket 路径处理（信创环境常见本机 socket 连接）。
@@ -23,13 +25,15 @@ CONFIG_PATH = os.path.join(BASE_DIR, 'instance', 'db_config.json')
 logger = logging.getLogger(__name__)
 
 # 各数据库默认端口，供表单未填端口时回退使用
-DEFAULT_PORTS = {'mysql': 3306, 'postgresql': 5432, 'opengauss': 5432}
+DEFAULT_PORTS = {'mysql': 3306, 'postgresql': 5432, 'opengauss': 5432,
+                 'kingbase': 54321}
 
 # 数据库类型 -> SQLAlchemy 驱动方言
 _DRIVERS = {
     'mysql': 'mysql+pymysql',
     'postgresql': 'postgresql+psycopg2',
     'opengauss': 'opengauss+psycopg2',
+    'kingbase': 'kingbase+psycopg2',
 }
 
 
@@ -46,7 +50,7 @@ def build_uri(db_type, host, port, database, user, password):
     host = (host or '').strip()
     query = {'charset': 'utf8mb4'} if db_type == 'mysql' else {}
     if host.startswith('/'):
-        # Unix socket：MySQL 用 unix_socket，PostgreSQL/openGauss 用 host 参数
+        # Unix socket：MySQL 用 unix_socket，PostgreSQL/openGauss/KingbaseES 用 host 参数
         query['unix_socket' if db_type == 'mysql' else 'host'] = host
         host = None
         port = None
@@ -122,7 +126,9 @@ def test_connection(uri):
     from sqlalchemy import create_engine, text
     from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
-    is_opengauss = (uri or '').startswith('opengauss')
+    uri = uri or ''
+    is_opengauss = uri.startswith('opengauss')
+    is_kingbase = uri.startswith('kingbase')
     engine = None
     try:
         engine = create_engine(uri, pool_pre_ping=True)
@@ -133,13 +139,16 @@ def test_connection(uri):
         if is_opengauss:
             return False, (f'缺少 openGauss 数据库驱动：{e}。请安装 openGauss 官方 '
                            'psycopg2 驱动（参考 requirements-opengauss.txt 与信创部署文档）。')
+        if is_kingbase:
+            return False, (f'缺少 KingbaseES 数据库驱动：{e}。KingbaseES（pg 模式）'
+                           '复用标准 psycopg2-binary 驱动，请确认已安装 psycopg2-binary。')
         return False, f'缺少数据库驱动：{e}。请先安装对应驱动（PyMySQL / psycopg2-binary）。'
     except OperationalError as e:
         # v3.1.9 VULN-013：对外文案固定，不回显 e.orig（含主机/端口/驱动细节），
         # 详细信息仅写日志供运维排障。
         logger.warning('数据库连接失败（OperationalError）：%s', e, exc_info=True)
+        detail = str(getattr(e, 'orig', '') or e).lower()
         if is_opengauss:
-            detail = str(getattr(e, 'orig', '') or e).lower()
             if 'sha256' in detail:
                 return False, ('openGauss 认证失败：账号密码校验未通过（sha256 认证）。'
                                '请核对密码，并确认已安装支持 sha256 的 openGauss 官方驱动。')
@@ -147,6 +156,16 @@ def test_connection(uri):
                                          'timeout', 'timed out')):
                 return False, ('无法连接 openGauss：请检查主机/端口连通性、监听地址，'
                                '以及 pg_hba.conf 是否允许本机或客户端 TCP 连接。')
+        elif is_kingbase:
+            if any(k in detail for k in ('password', 'authentication', 'auth failed',
+                                         'no password supplied')):
+                return False, ('KingbaseES 认证失败：账号或密码不正确。请核对账号密码，'
+                               '并确认目标数据库已允许该账号连接（默认账号 system）。')
+            if any(k in detail for k in ('connection refused', 'could not connect',
+                                         'timeout', 'timed out')):
+                return False, ('无法连接 KingbaseES：请检查主机/端口连通性（默认端口 '
+                               '54321）、监听地址，以及 pg_hba.conf 是否允许本机或 '
+                               '客户端 TCP 连接。')
         return False, '无法连接数据库，请检查主机、端口、账号密码或数据库是否存在。'
     except SQLAlchemyError as e:
         logger.warning('数据库连接失败（SQLAlchemyError）：%s', e, exc_info=True)
@@ -180,6 +199,9 @@ def switch_engine(app, db, new_uri):
     if backend == 'opengauss':
         from app.utils.dialects import register_opengauss_dialect
         register_opengauss_dialect()
+    elif backend == 'kingbase':
+        from app.utils.dialects import register_kingbase_dialect
+        register_kingbase_dialect()
 
     options = build_engine_options(new_uri)
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = dict(options)

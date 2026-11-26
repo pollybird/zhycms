@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.3.0 使用手册</title>
+<title>ZhyCMS v3.3.1 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -162,7 +162,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.3.0</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.3.1</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -187,6 +187,7 @@
   <tr><td>对象存储 OSS</td><td>阿里云/腾讯云/七牛云，一键迁移，默认本地零变化</td><td>v2.4</td></tr>
   <tr><td>Docker 部署</td><td>官方镜像 pollybird/zhycms 已发布，MySQL/PostgreSQL 一键启动，支持本地构建</td><td>v2.4</td></tr>
   <tr><td>信创适配</td><td>数据库支持 openGauss 7.0（内置方言、向导可选、备份恢复适配），缓存支持 openAMDC 1.0.0（协议零改动、自动识别后端），提供信创镜像与 Compose 编排</td><td>v3.3.0</td></tr>
+  <tr><td>信创适配（增量）</td><td>数据库支持人大金仓 KingbaseES V9（pg 兼容模式）：内置方言、复用 psycopg2-binary、向导可选、备份恢复适配 sys_dump/ksql，新增 docker-compose.kingbase.yml 与部署文档</td><td>v3.3.1</td></tr>
   <tr><td>RBAC 权限</td><td>角色/权限点两级模型，菜单与按钮级授权，栏目级内容粒度</td><td>v2.0</td></tr>
   <tr><td>内容工作流</td><td>草稿 → 待审核 → 已发布/已驳回，版本快照与对比还原</td><td>v2.0</td></tr>
   <tr><td>后台编辑器双模式</td><td>富文本（CKEditor）/ Markdown 一键切换，实时预览，全局设置可改默认模式</td><td>v3.1.5</td></tr>
@@ -243,7 +244,7 @@
 <ul>
   <li>Python 3.10+（CI 覆盖 3.10 / 3.11 / 3.12 / 3.13，3.14 实验性）</li>
   <li>数据库：MySQL 5.7+ / PostgreSQL 12+（生产推荐）/ SQLite（仅开发）</li>
-  <li>信创可选：openGauss 7.0（数据库）与 openAMDC 1.0.0（缓存，Redis 协议兼容）</li>
+  <li>信创可选：openGauss 7.0 或人大金仓 KingbaseES V9（pg 兼容模式，v3.3.1 起，数据库）与 openAMDC 1.0.0（缓存，Redis 协议兼容）</li>
 </ul>
 <div class="warn"><b>生产环境请使用 MySQL、PostgreSQL 或 openGauss。</b>SQLite 不支持并发写入，容易锁表。</div>
 
@@ -259,7 +260,7 @@ python run.py</code></pre>
 <p>首次访问 <code>http://127.0.0.1:5000</code> 自动跳转 <code>/admin/setup</code>，需配置：</p>
 <ul>
   <li>管理员账号（≥3 字符）与密码（默认 ≥12 位且含大小写、数字、特殊字符，可在后台安全中调整）</li>
-  <li>数据库类型（MySQL / PostgreSQL / openGauss / SQLite）</li>
+  <li>数据库类型（MySQL / PostgreSQL / openGauss / KingbaseES / SQLite）</li>
   <li>演示数据：不生成 / 制造业 / 服务业 / 教育行业 / 餐饮行业 / Manufacturing (EN) / English Default</li>
 </ul>
 
@@ -269,10 +270,12 @@ python run.py</code></pre>
   <tr><td><b>MySQL</b></td><td>生产首选，默认端口 3306</td><td>主机、端口、库名、用户名、密码</td></tr>
   <tr><td><b>PostgreSQL</b></td><td>生产可选，默认端口 5432</td><td>主机、端口、库名、用户名、密码</td></tr>
   <tr><td><b>openGauss</b></td><td>信创数据库（v3.3.0），默认端口 5432，需官方 psycopg2 驱动</td><td>主机、端口、库名、用户名、密码</td></tr>
-  <tr><td><b>达梦 / 金仓 / GBase / PolarDB</b></td><td>规划中，<b>未实现、未验证</b>（GBase 8a/8c/8s 差异很大）</td><td>—</td></tr>
+  <tr><td><b>KingbaseES（人大金仓）</b></td><td>信创数据库（v3.3.1，pg 兼容模式），默认端口 54321，复用 psycopg2-binary，无需专用驱动</td><td>主机、端口、库名、用户名、密码</td></tr>
+  <tr><td><b>达梦 / GBase / PolarDB</b></td><td>规划中，<b>未实现、未验证</b>（GBase 8a/8c/8s 差异很大）</td><td>—</td></tr>
   <tr><td><b>SQLite</b></td><td>零配置，仅开发/测试</td><td>无</td></tr>
 </table>
-<div class="warn"><b>信创适配现状</b>：官方目前仅实现并验证了 openGauss 7.0（x86_64）。达梦 DM8、人大金仓 KingbaseES、南大通用 GBase、PolarDB 尚未适配；仓库 <code>docs/XINCHUANG_ADAPTATION.md</code> 提供了按方言 / 驱动 / URI / 备份工具分层的适配思路、工作量评估与贡献指南，欢迎所有人提交适配代码、测试与实测报告。未经实测的数据库不会被声明为支持。</div>
+<div class="warn"><b>信创适配现状</b>：官方已实现并验证 openGauss 7.0（x86_64 + aarch64/鲲鹏）与人大金仓 KingbaseES V9（pg 兼容模式，x86_64，v3.3.1 起）。达梦 DM8、南大通用 GBase、PolarDB 尚未适配；仓库 <code>docs/XINCHUANG_ADAPTATION.md</code> 提供了按方言 / 驱动 / URI / 备份工具分层的适配思路、工作量评估与贡献指南，欢迎所有人提交适配代码、测试与实测报告。未经实测的数据库不会被声明为支持。</div>
+<div class="warn"><b>授权声明（人大金仓 KingbaseES）</b>：本项目仅实现对 KingbaseES 的适配支持。KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）需用户自行到 <a href="https://www.kingbase.com.cn/download.html">https://www.kingbase.com.cn/download.html</a> 下载并获取官方授权；本仓库不提供、不分发 KingbaseES 的镜像、二进制或许可证。</div>
 <div class="note">数据库 URI 优先级：环境变量 <code>ZHYCMS_DB_URI</code> &gt; <code>instance/db_config.json</code> &gt; 默认 SQLite。</div>
 </section>
 
@@ -294,7 +297,7 @@ python -m gunicorn -w 4 -b 0.0.0.0:5000 wsgi:app</code></pre>
 <div class="warn">生产环境务必设置 <code>ZHYCMS_SECRET_KEY</code>；建议前置 Nginx 反向代理并托管静态资源。</div>
 
 <h3 id="deploy-docker">Docker 部署 <span class="tag tag-new">v2.4</span></h3>
-<p>官方镜像已发布到 Docker Hub（<code>pollybird/zhycms</code>）、GitHub Container Registry（<code>ghcr.io/pollybird/zhycms</code>）和阿里云 ACR（<code>crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms</code>），当前版本 <b>v3.3.0</b>，开箱即用，无需本地构建。一键安装（推荐，自动生成密钥与密码、配置镜像加速）：</p>
+<p>官方镜像已发布到 Docker Hub（<code>pollybird/zhycms</code>）、GitHub Container Registry（<code>ghcr.io/pollybird/zhycms</code>）和阿里云 ACR（<code>crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms</code>），当前版本 <b>v3.3.1</b>，开箱即用，无需本地构建。一键安装（推荐，自动生成密钥与密码、配置镜像加速）：</p>
 <pre><code>bash docker/install.sh</code></pre>
 <p>或手动配置（拉取预构建镜像）：</p>
 <pre><code>cp docker/.env.example .env
@@ -309,12 +312,17 @@ docker compose -f docker-compose.postgresql.yml up -d
 # openGauss 7.0 方案（镜像 pollybird/zhycms:opengauss）
 docker compose -f docker-compose.opengauss.yml up -d
 
+# 人大金仓 KingbaseES V9 方案（pg 模式，复用默认镜像 pollybird/zhycms:latest）
+# 需先自行 docker load 官方 KingbaseES 镜像（镜像与授权从官方获取）
+docker compose -f docker-compose.kingbase.yml up -d
+
 # 访问 http://localhost:5000 完成初始化</code></pre>
+<div class="warn"><b>授权声明（人大金仓 KingbaseES）</b>：本项目仅实现对 KingbaseES 的适配支持。KingbaseES 为商业软件，其镜像与授权文件需用户自行到 <a href="https://www.kingbase.com.cn/download.html">https://www.kingbase.com.cn/download.html</a> 下载并获取官方授权；本仓库不分发其二进制或许可证。仅支持 DB_MODE=pg，默认端口 54321。</div>
 <p>也可直接拉取镜像（Docker Hub / GitHub GHCR / 阿里云 ACR 任选其一，国内推荐阿里云）：</p>
 <ul>
-<li>Docker Hub：<code>docker pull pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.0</code>）</li>
-<li>GitHub GHCR：<code>docker pull ghcr.io/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.0</code>）</li>
-<li>阿里云 ACR（国内推荐）：<code>docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.0</code>）</li>
+<li>Docker Hub：<code>docker pull pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.1</code>）</li>
+<li>GitHub GHCR：<code>docker pull ghcr.io/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.1</code>）</li>
+<li>阿里云 ACR（国内推荐）：<code>docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.1</code>）</li>
 </ul>
 <p>信创缓存可选 <code>pollybird/openamdc:1.0.0</code>，在编排文件上追加 <code>--profile openamdc</code> 启动，并设置 <code>REDIS_URL=redis://openamdc:6379/0</code>。openGauss 需官方 psycopg2 驱动（<code>:opengauss</code> 镜像已内置），详细步骤见仓库 <code>docs/DEPLOY_OPENGAUSS.md</code> 与 <code>docs/DEPLOY_OPENAMDC.md</code>。</p>
 <p>三个 tag（<code>mysql</code> / <code>postgresql</code> / <code>latest</code>）指向同一镜像，内置 MySQL + PostgreSQL 驱动，通过 <code>ZHYCMS_DB_URI</code> 切换数据库；<code>opengauss</code> 为单独构建的驱动内置镜像。容器启动时自动执行：数据库迁移 → 恢复演示图片 → 编译 i18n → 启动 gunicorn。<code>instance/</code> 和上传目录通过 volume 持久化。卸载运行 <code>bash docker/uninstall.sh</code>。</p>
@@ -1419,14 +1427,14 @@ docker compose -f docker-compose.postgresql.yml up -d
 docker compose -f docker-compose.opengauss.yml up -d</code></pre>
 <p>也可直接拉取（Docker Hub / GitHub GHCR / 阿里云 ACR 任选其一，国内推荐阿里云）：</p>
 <ul>
-<li><code>docker pull pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.0</code>）</li>
-<li><code>docker pull ghcr.io/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.0</code>）</li>
-<li><code>docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.0</code>）</li>
+<li><code>docker pull pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.1</code>）</li>
+<li><code>docker pull ghcr.io/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.1</code>）</li>
+<li><code>docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql</code>（或 <code>:postgresql</code> / <code>:opengauss</code> / <code>:latest</code> / <code>:v3.3.1</code>）</li>
 </ul>
 
 <h3>镜像特点</h3>
 <ul>
-  <li><b>已发布到多镜像源</b>：Docker Hub（<code>pollybird/zhycms</code>）、GitHub GHCR（<code>ghcr.io/pollybird/zhycms</code>）、阿里云 ACR（<code>crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms</code>），均提供 <code>mysql</code> / <code>postgresql</code> / <code>latest</code> / <code>v3.3.0</code> 四个 tag（同一镜像，内置 MySQL + PostgreSQL 驱动，通过 <code>ZHYCMS_DB_URI</code> 切换）；另提供 <code>opengauss</code> tag（内置 openGauss 驱动，单独构建）。</li>
+  <li><b>已发布到多镜像源</b>：Docker Hub（<code>pollybird/zhycms</code>）、GitHub GHCR（<code>ghcr.io/pollybird/zhycms</code>）、阿里云 ACR（<code>crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms</code>），均提供 <code>mysql</code> / <code>postgresql</code> / <code>latest</code> / <code>v3.3.1</code> 四个 tag（同一镜像，内置 MySQL + PostgreSQL 驱动，通过 <code>ZHYCMS_DB_URI</code> 切换）；另提供 <code>opengauss</code> tag（内置 openGauss 驱动，单独构建）。</li>
   <li><b>信创镜像</b>：<code>pollybird/openamdc:1.0.0</code>（缓存）与 <code>pollybird/opengauss:7.0.0</code>（数据库，含 openblas 运行时依赖），均可匿名拉取。</li>
   <li><b>多阶段构建</b>：builder 阶段编译依赖，runtime 阶段基于 <code>python:3.12-slim</code>，体积约 495MB。</li>
   <li><b>非 root 运行</b>：uid 1000 的 <code>zhycms</code> 用户，增强安全性。</li>

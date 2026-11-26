@@ -24,7 +24,7 @@ def _db_type_and_path():
     """返回 (db_type, db_name_or_path, host, port, user, password)。
 
     统一用 ``make_url`` 解析，兼容用户名/密码中的特殊字符，并识别
-    openGauss 以及 host 位于 query 的 Unix socket 形态。
+    openGauss / KingbaseES 以及 host 位于 query 的 Unix socket 形态。
     """
     uri = current_app.config.get('SQLALCHEMY_DATABASE_URI', '') or ''
     try:
@@ -37,11 +37,11 @@ def _db_type_and_path():
 
     if backend == 'sqlite':
         return 'sqlite', url.database or '', None, None, None, None
-    if backend not in ('mysql', 'postgresql', 'opengauss'):
+    if backend not in ('mysql', 'postgresql', 'opengauss', 'kingbase'):
         return 'unknown', uri, None, None, None, None
 
     # v3.3.0：build_uri() 对 socket 连接把路径放在 query（MySQL: unix_socket，
-    # PostgreSQL/openGauss: host），此时 url.host 为空，需要回退到 query 取。
+    # PostgreSQL/openGauss/KingbaseES: host），此时 url.host 为空，需要回退到 query 取。
     socket_key = 'unix_socket' if backend == 'mysql' else 'host'
     host = url.query.get(socket_key) or url.host
     return backend, url.database or '', host, url.port, url.username or '', url.password or ''
@@ -50,11 +50,12 @@ def _db_type_and_path():
 def _bin_tool(name, db_type=None):
     """定位外部数据库工具路径（v3.3.0）。
 
-    优先级：``DB_DUMP_BIN_DIR`` 配置/环境变量 > openGauss ``OPENGAUSS_BIN`` >
+    优先级：``DB_DUMP_BIN_DIR`` 配置/环境变量 > 信创库专用 bin 目录
+    （openGauss ``OPENGAUSS_BIN`` / KingbaseES ``ZHYCMS_KINGBASE_BIN``） >
     ``ZHYCMS_DB_DUMP_BIN`` 显式文件（仅备份工具） > PATH。
     """
     from flask import has_app_context
-    dump_tools = ('mysqldump', 'pg_dump', 'gs_dump')
+    dump_tools = ('mysqldump', 'pg_dump', 'gs_dump', 'sys_dump')
     bin_dir = ''
     if has_app_context():
         bin_dir = current_app.config.get('DB_DUMP_BIN_DIR') or ''
@@ -70,6 +71,12 @@ def _bin_tool(name, db_type=None):
             candidate = os.path.join(og_bin, name) if os.path.isdir(og_bin) else og_bin
             if os.path.exists(candidate):
                 return candidate
+    if db_type == 'kingbase':
+        kb_bin = os.environ.get('ZHYCMS_KINGBASE_BIN', '') or os.environ.get('KINGBASE_BIN', '')
+        if kb_bin:
+            candidate = os.path.join(kb_bin, name) if os.path.isdir(kb_bin) else kb_bin
+            if os.path.exists(candidate):
+                return candidate
     if name in dump_tools:
         explicit = os.environ.get('ZHYCMS_DB_DUMP_BIN', '')
         if explicit and os.path.isfile(explicit):
@@ -78,10 +85,17 @@ def _bin_tool(name, db_type=None):
 
 
 def _tool_env(db_type, password=None):
-    """构造外部工具运行环境：密码 + openGauss 动态库搜索路径。"""
+    """构造外部工具运行环境：密码 + openGauss 动态库搜索路径。
+
+    KingbaseES 的客户端工具（ksql / sys_dump / sys_restore）不识别
+    ``PGPASSWORD``，必须通过 ``KINGBASE_PASSWORD`` 注入密码（v3.3.1 实测）。
+    """
     env = os.environ.copy()
     if password:
-        env['PGPASSWORD'] = password
+        if db_type == 'kingbase':
+            env['KINGBASE_PASSWORD'] = password
+        else:
+            env['PGPASSWORD'] = password
     if db_type == 'opengauss':
         libdir = (os.environ.get('ZHYCMS_OPENGAUSS_LIB')
                   or os.environ.get('OPENGAUSS_LIB') or '/usr/local/opengauss/lib')
@@ -136,6 +150,9 @@ def create_backup(trigger=TRIGGER_MANUAL, remark='', created_by=None):
         elif db_type == 'opengauss':
             ok = _backup_pg(dest_path, db_name_or_path, host, port or 5432, user, pwd,
                             db_type='opengauss')
+        elif db_type == 'kingbase':
+            ok = _backup_pg(dest_path, db_name_or_path, host, port or 54321, user, pwd,
+                            db_type='kingbase')
         else:
             ok = _backup_json(dest_path)  # 兜底：JSON 导出
     except Exception as e:
@@ -214,21 +231,25 @@ def _backup_mysql(dest_path, dbname, host, port, user, pwd):
 
 
 def _backup_pg(dest_path, dbname, host, port, user, pwd, db_type='postgresql'):
-    """调用 pg_dump（PostgreSQL）或 gs_dump（openGauss）导出纯 SQL。"""
+    """调用 pg_dump（PostgreSQL）/ gs_dump（openGauss）/ sys_dump（KingbaseES）导出纯 SQL。"""
     is_og = db_type == 'opengauss'
-    tool = _bin_tool('gs_dump' if is_og else 'pg_dump', db_type)
+    tool_name = ('sys_dump' if db_type == 'kingbase'
+                 else 'gs_dump' if is_og else 'pg_dump')
+    tool = _bin_tool(tool_name, db_type)
     env = _tool_env(db_type, pwd)
     cmd = [tool, f'--host={host or "localhost"}', f'--port={port}',
            f'--username={user or ""}', '--no-password']
     if is_og and pwd:
         # openGauss 的 gs_dump 不读取 PGPASSWORD，需显式 -W（M0 实测）。
         cmd.extend(['-W', pwd])
-    # M0 实测：gs_dump 不支持 -d，数据库名必须作为位置参数；pg_dump 同样接受
-    # 位置参数库名，因此两种后端保持一致的命令结构。
+    # KingbaseES：sys_dump 不识别 PGPASSWORD，密码经 _tool_env 注入的
+    # KINGBASE_PASSWORD 环境变量传递，不在命令行明文出现。
     if is_og:
         # gs_dump 会把进度日志写到 stdout，直接管道压缩会污染 SQL 流；
         # 改用 -f 输出到临时文件后再压缩。
         return _run_og_dump_with_gzip(cmd, dest_path, dbname, env)
+    # pg_dump / sys_dump：stdout 为纯 SQL（KingbaseES V9 实测 sys_dump 无进度污染），
+    # 直接管道压缩；数据库名作为位置参数（两者均支持）。
     cmd.append(dbname or '')
     return _run_dump_with_gzip(cmd, dest_path, env=env, fallback_json=True)
 
@@ -325,9 +346,7 @@ def restore_backup(record_or_filename):
             return _restore_sqlite(path)
         if db_type == 'mysql':
             return _restore_mysql(path)
-        if db_type == 'postgresql':
-            return _restore_pg(path)
-        if db_type == 'opengauss':
+        if db_type in ('postgresql', 'opengauss', 'kingbase'):
             return _restore_pg(path)
         # JSON 格式
         return _restore_json(path)
@@ -441,6 +460,7 @@ def _restore_mysql(gz_path):
 def _restore_pg(gz_path):
     db_type, dbname, host, port, user, pwd = _db_type_and_path()
     is_og = db_type == 'opengauss'
+    is_kb = db_type == 'kingbase'
     sql_path = gz_path + '.sql'
     env = _tool_env(db_type, pwd)
     try:
@@ -466,6 +486,13 @@ def _restore_pg(gz_path):
                    '-d', dbname or '', '-f', sql_path]
             if pwd:
                 cmd.extend(['-W', pwd])
+        elif is_kb:
+            # KingbaseES 用 ksql 导入；密码经 KINGBASE_PASSWORD 环境变量（env 中），
+            # -w 禁止交互提示，避免无密码时挂起（默认端口 54321）。
+            cmd = [_bin_tool('ksql', 'kingbase'),
+                   f'--host={host or "localhost"}', f'--port={port or 54321}',
+                   f'--username={user or ""}', '-w',
+                   '-d', dbname or '', '-f', sql_path]
         else:
             cmd = [_bin_tool('psql', 'postgresql'),
                    f'--host={host or "localhost"}', f'--port={port or 5432}',
@@ -474,9 +501,11 @@ def _restore_pg(gz_path):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
         _, err = proc.communicate(timeout=600)
         if proc.returncode != 0:
-            tool = 'gsql' if is_og else 'psql'
+            tool = 'gsql' if is_og else ('ksql' if is_kb else 'psql')
             return False, f'{tool} 导入失败: {(err or b"").decode("utf-8", errors="ignore")[:500]}'
-        return True, ('openGauss 恢复成功' if is_og else 'PostgreSQL 恢复成功')
+        ok_msg = ('openGauss 恢复成功' if is_og
+                  else 'KingbaseES 恢复成功' if is_kb else 'PostgreSQL 恢复成功')
+        return True, ok_msg
     finally:
         try:
             os.remove(sql_path)
@@ -577,7 +606,7 @@ def system_monitor_stats():
                 alt = os.path.join(_BD, db_name_or_path)
                 if os.path.exists(alt):
                     res['db_size_mb'] = round(os.path.getsize(alt) / (1024 * 1024), 2)
-        elif db_type in ('mysql', 'postgresql', 'opengauss'):
+        elif db_type in ('mysql', 'postgresql', 'opengauss', 'kingbase'):
             try:
                 if db_type == 'mysql':
                     r = db.session.execute(db.text(
