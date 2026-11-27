@@ -82,6 +82,7 @@ class KingbaseDialect(PGDialect_psycopg2):
             try:
                 raw = connection.exec_driver_sql(sql).scalar()
             except Exception:  # noqa: BLE001 任一 SHOW 失败即尝试下一项
+                logger.debug('kingbase version probe %r failed, trying next', sql)
                 continue
             text = str(raw or "").strip()
             if not text:
