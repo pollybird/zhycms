@@ -12,6 +12,14 @@
 - 本方言覆盖版本解析，改用 ``SHOW server_version``（V9R1C10 实测返回
   ``12.1``）解析为 ``(12, 1)``，让 SQLAlchemy / Alembic 按 PostgreSQL 12
   行为工作。
+- KingbaseES 对 FK 引用列的唯一性约束检查比 PostgreSQL 更严格：
+  PostgreSQL 允许 FK 引用仅有 ``UNIQUE INDEX`` 的列，而 KingbaseES 要求
+  显式 ``UNIQUE CONSTRAINT``。SQLAlchemy PG 方言对
+  ``Column(unique=True, index=True)`` 只生成独立 ``CREATE UNIQUE INDEX``
+  而不在 ``CREATE TABLE`` 中内联 ``UNIQUE`` 约束，导致 ``db.create_all()``
+  在 KingbaseES 上因 FK 约束检查失败。本方言通过自定义 DDL 编译器，
+  为 ``unique=True`` 但缺少 ``UniqueConstraint`` 的列补充内联 ``UNIQUE``，
+  确保 KingbaseES 的 FK 约束检查通过。
 
 注册名：``kingbase``、``kingbase.psycopg2``。
 """
@@ -20,11 +28,42 @@ from __future__ import annotations
 import logging
 import re
 
+from sqlalchemy import schema
+from sqlalchemy.dialects.postgresql.base import PGDDLCompiler
 from sqlalchemy.dialects.postgresql.psycopg2 import PGDialect_psycopg2
 
 logger = logging.getLogger(__name__)
 
 _KINGBASE_VERSION_RE = re.compile(r"(\d+)(?:\.(\d+))?(?:\.(\d+))?")
+
+
+class KingbaseDDLCompiler(PGDDLCompiler):
+    """KingbaseES DDL 编译器：补充 ``unique=True`` 列的内联 UNIQUE 约束。
+
+    SQLAlchemy PG 方言对 ``Column(unique=True, index=True)`` 只创建独立
+    ``CREATE UNIQUE INDEX``，不在 ``CREATE TABLE`` 中生成 ``UNIQUE`` 约束。
+    KingbaseES 比 PostgreSQL 更严格，FK 引用列必须有显式 ``UNIQUE CONSTRAINT``，
+    仅 ``UNIQUE INDEX`` 不够。此编译器为缺少 ``UniqueConstraint`` 的
+    ``unique=True`` 列在列定义中补充 ``UNIQUE`` 关键字。
+    """
+
+    def get_column_specification(self, column, **kwargs):
+        colspec = super().get_column_specification(column, **kwargs)
+        if not column.unique:
+            return colspec
+        # Column(unique=True) 不带 index 时，PG 方言已在表级生成
+        # UniqueConstraint，无需重复添加。Column(unique=True, index=True)
+        # 时，PG 方言只创建独立 UNIQUE INDEX，没有 UniqueConstraint，
+        # 需要在此补充列级 UNIQUE 约束以满足 KingbaseES FK 检查。
+        has_table_level_uc = any(
+            isinstance(c, schema.UniqueConstraint)
+            and len(c.columns) == 1
+            and c.columns[0].name == column.name
+            for c in column.table.constraints
+        )
+        if not has_table_level_uc:
+            colspec += " UNIQUE"
+        return colspec
 
 
 class KingbaseDialect(PGDialect_psycopg2):
@@ -34,6 +73,7 @@ class KingbaseDialect(PGDialect_psycopg2):
     driver = "psycopg2"
     supports_statement_cache = True
     supports_transactional_ddl = True
+    ddl_compiler = KingbaseDDLCompiler
 
     def _get_server_version_info(self, connection):
         # 优先 SHOW server_version（V9R1C10 返回 "12.1" → (12, 1)），
