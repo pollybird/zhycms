@@ -3,7 +3,7 @@
 本文说明 ZhyCMS 的信创数据库适配现状、后续适配思路与贡献方式。
 
 > **结论先行**：官方已**实现并验证 openGauss**（v3.3.0，x86_64 + aarch64/鲲鹏）与
-> **人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64）。
+> **人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏）。
 > 达梦、南大通用、PolarDB 等数据库**尚未实现、尚未验证**，本文给出的是
 > 适配思路与工作量评估，不构成支持承诺。欢迎社区按本文路径提交贡献。
 >
@@ -15,7 +15,7 @@
 | 数据库 | 兼容基础 | 官方状态 | 验证范围 |
 | --- | --- | --- | --- |
 | openGauss 7.0 | PostgreSQL 协议 + 自有方言差异 | **已实现**（v3.3.0） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复 |
-| 人大金仓 KingbaseES V9 | PostgreSQL 协议（pg 模式，`sys_` 系工具与系统表） | **已实现**（v3.3.1，pg 模式） | x86_64；迁移 `0020`（54 表）、向导、业务读写、备份恢复、健康检查 |
+| 人大金仓 KingbaseES V9 | PostgreSQL 协议（pg 模式，`sys_` 系工具与系统表） | **已实现**（v3.3.1，pg 模式） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复、健康检查 |
 | PolarDB（PostgreSQL 版 / PolarDB-X） | PostgreSQL / MySQL 协议 | 未实现 | 无 |
 | 达梦 DM8 | Oracle 风格自有协议 | 未实现 | 无 |
 | 南大通用 GBase 8a | MySQL 协议（分析型 MPP） | 未实现 | 无 |
@@ -47,8 +47,9 @@ openGauss 的适配已经形成一套可复用的接入框架。新增数据库�
 ### 3.1 人大金仓 KingbaseES V9（pg 兼容模式）—— 已实现（v3.3.1）
 
 KingbaseES 以 PostgreSQL 为兼容基础，是最接近 openGauss 的路径。v3.3.1 已在
-**V9R1C10 x86_64 的 pg 模式**下完成端到端适配与验证，详见下文「九、KingbaseES V9
-实测记录」与 [docs/DEPLOY_KINGBASE.md](DEPLOY_KINGBASE.md)。
+**V9R1C10 的 pg 模式**下完成端到端适配与验证，覆盖 **x86_64** 与
+**aarch64（鲲鹏）** 双架构，详见下文「九、KingbaseES V9 实测记录」与
+[docs/DEPLOY_KINGBASE.md](DEPLOY_KINGBASE.md)、[docs/KINGBASE_ARM_TEST_REPORT.md](KINGBASE_ARM_TEST_REPORT.md)。
 
 - **驱动与 URI**：连接与迁移**复用标准 PyPI `psycopg2-binary`**（KingbaseES 为 PG 线
   协议兼容，实测可直接连通），无需金仓官方专用驱动，也无需 `LD_LIBRARY_PATH` 即可
@@ -75,7 +76,7 @@ KingbaseES 以 PostgreSQL 为兼容基础，是最接近 openGauss 的路径。v
   - 版本编码：KingbaseES `server_version_num` 为 `major*10000+minor`（120001→(12,1)），
     非标准 PG 的 `major*10000+minor*100+patch`。
 - **未覆盖 / 待验证**：仅 `DB_MODE=pg`；`oracle` / `mysql` / `sqlserver` 兼容模式、
-  V8 系列、aarch64（鲲鹏）镜像暂未验证。
+  V8 系列暂未验证。
 - **授权**：KingbaseES 为商业软件，镜像与授权文件需用户自行从
   <https://www.kingbase.com.cn/download.html> 获取；本项目不分发其二进制或许可证。
 
@@ -126,7 +127,7 @@ DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
 
 | 数据库 | 方言改造 | 驱动接入 | 备份工具 | 迁移风险 | 综合评估 |
 | --- | --- | --- | --- | --- | --- |
-| KingbaseES V9 | 小（复用 PG） | 小（复用 psycopg2-binary） | 小（`sys_dump`） | 低-中 | **已实现**（v3.3.1，pg 模式） |
+| KingbaseES V9 | 小（复用 PG） | 小（复用 psycopg2-binary） | 小（`sys_dump`） | 低-中 | **已实现**（v3.3.1，pg 模式，x86_64 + aarch64/鲲鹏） |
 | PolarDB PG | 极小 | 极小 | 云平台为主 | 低 | 优先适配 |
 | PolarDB-X | 小 | 极小 | 云平台为主 | 中（分布式 DDL） | 可并行 |
 | 达梦 DM8 | 大 | 中 | 中（`dexp`/`dimp`） | 高 | 单独立项 |
@@ -183,7 +184,7 @@ DM8 是 Oracle 风格的自有数据库，协议与 SQL 方言差异最大。
 ## 六、验证状态声明
 
 除 openGauss 7.0（x86_64 + aarch64/鲲鹏）、openAMDC 1.0.0（x86_64 + aarch64/鲲鹏）与
-**人大金仓 KingbaseES V9（pg 兼容模式，x86_64）**外，
+**人大金仓 KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏）**外，
 本文提及的达梦、南大通用（GBase 8a/8c/8s）、PolarDB 等数据库均**未实现、未验证**。
 文中驱动名、工具名与差异点为适配方向，可能随产品版本变化，落地前请以目标环境的官方文档和实测结果为准。
 
@@ -337,9 +338,9 @@ openAMDC 源码来自 [openeuler-mirror/openAMDC](https://github.com/openeuler-m
 > 说明：上述 79 项为贡献者在鲲鹏 ARM 环境的实测记录。项目发布的 `pollybird/openamdc:1.0.0`
 > 已提供 x86_64 / aarch64 多架构镜像，两个架构均完成启动与 `PING` 冒烟验证。
 
-## 九、KingbaseES V9（pg 兼容模式，x86_64）实测记录
+## 九、KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏）实测记录
 
-v3.3.1 在 x86_64 环境用官方镜像 `kingbase_v009r001c010b0004_single_x86:v1`（V9R1C10，
+v3.3.1 在 **x86_64** 与 **aarch64（鲲鹏）** 双架构环境下，用官方镜像（V9R1C10，
 `DB_MODE=pg`）对 KingbaseES 进行了端到端实测，验证结果如下。
 
 > **授权提示**：KingbaseES 为商业软件，本项目不分发其镜像与授权文件；镜像与授权请
@@ -389,3 +390,34 @@ v3.3.1 在 x86_64 环境用官方镜像 `kingbase_v009r001c010b0004_single_x86:v
 KingbaseES 为商业软件，镜像与授权需用户自行获取，**本轮未接入 GitHub Actions CI**
 （避免在公共 CI 中分发商业镜像）。集成测试 `tests/test_kingbase.py` 默认跳过，仅在
 设置 `ZHYCMS_TEST_KINGBASE_URL` 后启用，供本地与私有化环境回归。
+
+### aarch64 / 鲲鹏架构实测
+
+v3.3.1 发布后，在华为云鲲鹏 ARM 环境（Huawei Cloud EulerOS 3.0，aarch64，kernel
+6.6.0）上对 KingbaseES V9R1C10（V009R001C010B0004，从 ARM aarch64 Docker 镜像提取，
+`DB_MODE=pg`，`SHOW server_version` = `12.1`）完成了端到端实测，详见
+[docs/KINGBASE_ARM_TEST_REPORT.md](KINGBASE_ARM_TEST_REPORT.md)。
+
+**环境**：Python 3.12.5 + 标准 `psycopg2-binary` 驱动，端口 `54321` / 账号 `system`。
+
+**发现并修复的 DDL 问题**：KingbaseES 比 PostgreSQL 更严格，FK 引用列必须有显式
+`UNIQUE CONSTRAINT`，仅 `UNIQUE INDEX` 不够——`Column(unique=True, index=True)` 在
+PG 方言下只生成独立 `CREATE UNIQUE INDEX`，导致 `db.create_all()` 时 FK 约束失败。
+为此在 [app/utils/dialects/kingbase.py](../app/utils/dialects/kingbase.py) 新增
+`KingbaseDDLCompiler`（覆盖 `get_column_specification`，为缺表级 `UniqueConstraint`
+的 `unique=True` 列补列级 `UNIQUE` 关键字），受影响列：`Permission.code`、`Role.code`、
+`User.username`、`Site.slug`、`Site.subdomain`。该修复仅作用于 KingbaseES 方言层，
+不影响 PostgreSQL 及其他后端。
+
+**实测结果（55 项全绿）**：
+
+| 类别 | 结果 |
+| --- | --- |
+| 单元测试 `tests/test_kingbase.py` | 修复前 28 passed / 2 failed → 修复后 **30 passed / 0 failed** |
+| 端到端集成 | **25 passed / 0 failed**（方言注册、`db.create_all()`、CRUD、健康检查、备份恢复、UNIQUE 约束、Alembic 迁移） |
+| `db.create_all()` | 51 张模型表全部创建成功 |
+| Alembic 迁移 | `0001→0020` 全部执行，`alembic_version='0020'`（使用 `KingbaseImpl`） |
+| `sys_dump` 备份 | 206,573 bytes，rc=0 |
+
+> 说明：上述 55 项为贡献者在鲲鹏 ARM（aarch64）环境的实测记录。x86_64 与 aarch64
+> 均已完成端到端验证，KingbaseES pg 兼容模式在双架构下可用。

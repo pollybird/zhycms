@@ -36,7 +36,7 @@ python run.py       # 或重启 gunicorn / 容器
 3. 首次启动自动执行迁移至 `0020`；`/healthz?detail=1` 应返回 `db_dialect=kingbase`。
 4. 备份恢复改用 `sys_dump` / `ksql`：客户端工具目录通过 `ZHYCMS_KINGBASE_BIN` 指定，`LD_LIBRARY_PATH` 指向其 `lib`（compose 已自动挂载），密码经 `KINGBASE_PASSWORD` 环境变量注入（ksql / sys_dump 不识别 `PGPASSWORD`）。
 
-> 限制：仅支持 `DB_MODE=pg`；oracle / mysql / sqlserver 兼容模式、V8 系列、aarch64（鲲鹏）镜像暂未验证。连接与迁移复用标准 `psycopg2-binary`，无需专用驱动；但备份/恢复的客户端工具需用户自行提供。详见 [docs/DEPLOY_KINGBASE.md](docs/DEPLOY_KINGBASE.md)。
+> 限制：仅支持 `DB_MODE=pg`；oracle / mysql / sqlserver 兼容模式、V8 系列暂未验证。x86_64 与 aarch64（鲲鹏）双架构均已端到端实测通过。连接与迁移复用标准 `psycopg2-binary`，无需专用驱动；但备份/恢复的客户端工具需用户自行提供。详见 [docs/DEPLOY_KINGBASE.md](docs/DEPLOY_KINGBASE.md)。
 
 ### 三、回退
 

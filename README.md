@@ -132,7 +132,7 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 - **人大金仓 KingbaseES V9 支持（pg 兼容模式）**：新增内置轻量方言 `kingbase`——KingbaseES 的 `select version()` 返回 `KingbaseES V009R001C010` 会导致标准 PostgreSQL 方言版本解析失败，本方言改用 `SHOW server_version`（实测 `12.1`）解析为 `(12, 1)` 并注册 `KingbaseImpl`；连接与迁移复用标准 `psycopg2-binary`，URI 形如 `kingbase+psycopg2://system:pwd@host:54321/db`。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖。
 - **向导 / 健康检查 / 备份恢复**：初始化向导新增「KingbaseES（信创推荐）」选项（默认端口 `54321`、账号 `system`）；`/healthz?detail=1` 返回 `db_dialect=kingbase`；备份用 `sys_dump`、恢复用 `ksql`，**密码通过 `KINGBASE_PASSWORD` 环境变量注入**（ksql / sys_dump 不识别 `PGPASSWORD`），工具路径支持 `ZHYCMS_KINGBASE_BIN`。
 - **镜像与编排**：新增 `docker-compose.kingbase.yml`；默认 `pollybird/zhycms:latest` 镜像已含 `psycopg2-binary`，**无需新增驱动构建参数或镜像变体**；备份/恢复所需客户端工具（ksql / sys_dump）由用户自行提供（见 [KingbaseES 部署](docs/DEPLOY_KINGBASE.md)）。
-- **文档**：新增 [KingbaseES 部署指南](docs/DEPLOY_KINGBASE.md)，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) 将 KingbaseES 从「规划中」改为「已实现（pg 模式）」；V9R1C10 x86_64 端到端实测通过（迁移 `0020` 建表 54 张、向导、业务读写、备份恢复、健康检查、Compose 编排）。
+- **文档**：新增 [KingbaseES 部署指南](docs/DEPLOY_KINGBASE.md)，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) 将 KingbaseES 从「规划中」改为「已实现（pg 模式）」；V9R1C10 x86_64 + aarch64（鲲鹏）双架构端到端实测通过（迁移 `0020` 建表、向导、业务读写、备份恢复、健康检查、Compose 编排）。
 - **授权声明**：本项目仅实现对 KingbaseES 的适配支持；KingbaseES 为商业软件，镜像与授权文件需用户自行到 <https://www.kingbase.com.cn/download.html> 下载并获取官方授权。
 
 ### v3.3.0（2026-11-22）
@@ -294,7 +294,7 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 | MySQL / MariaDB | 5.7+ / 11.4 | 完整支持 | 默认生产方案 |
 | PostgreSQL | 12+ | 完整支持 | 默认生产方案 |
 | openGauss | 7.0.0（实测 7.0.0-RC3） | 已验证（x86_64 + aarch64/鲲鹏） | 需 openGauss 官方 psycopg2 驱动，见 [部署文档](docs/DEPLOY_OPENGAUSS.md) |
-| 人大金仓 KingbaseES | V9（实测 V9R1C10） | 已验证（pg 兼容模式，x86_64） | 复用标准 `psycopg2-binary`，无需专用驱动；备份/恢复需客户端工具，见 [部署文档](docs/DEPLOY_KINGBASE.md) |
+| 人大金仓 KingbaseES | V9（实测 V9R1C10） | 已验证（pg 兼容模式，x86_64 + aarch64/鲲鹏） | 复用标准 `psycopg2-binary`，无需专用驱动；备份/恢复需客户端工具，见 [部署文档](docs/DEPLOY_KINGBASE.md) |
 | SQLite | 3.x | 仅开发/测试 | 不支持并发写入 |
 | Redis | 6.2+ | 完整支持 | 配置 `REDIS_URL` 启用 |
 | openAMDC | 1.0.0 | 已验证（x86_64 + aarch64/鲲鹏） | 协议兼容，见 [部署文档](docs/DEPLOY_OPENAMDC.md) |
@@ -308,7 +308,7 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 ### 信创适配专题
 
 官方在信创数据库方面**已实现并验证 openGauss 7.0**（v3.3.0，x86_64 + aarch64/鲲鹏）与
-**人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64），并为 openGauss 与 openAMDC
+**人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏），并为 openGauss 与 openAMDC
 场景提供 x86_64 / aarch64 多架构镜像；openAMDC 1.0.0 已在双架构完成端到端实测。
 达梦 DM8、南大通用 GBase（8a / 8c / 8s）与 PolarDB（PostgreSQL 版 / PolarDB-X）尚未适配；
 [信创适配专题](docs/XINCHUANG_ADAPTATION.md)
@@ -408,7 +408,7 @@ docker compose -f docker-compose.kingbase.yml --profile meilisearch up -d
 > - 仅支持 `DB_MODE=pg`；默认端口 `54321`、管理账号 `system`；编排会自动创建应用库 `zhycms`，并把客户端工具（`sys_dump` / `ksql`）挂载给应用
 > - 备份/恢复密码经 `KINGBASE_PASSWORD` 环境变量注入（ksql / sys_dump 不识别 `PGPASSWORD`）；裸机部署需自行配置 `ZHYCMS_KINGBASE_BIN` 与 `LD_LIBRARY_PATH`
 > - 详细步骤、连接参数、备份恢复与故障速查见 [KingbaseES 部署](docs/DEPLOY_KINGBASE.md)
-> - 验证范围：KingbaseES V9R1C10 x86_64（pg 模式）；aarch64 / 鲲鹏镜像、oracle / mysql / sqlserver 兼容模式未验证
+> - 验证范围：KingbaseES V9R1C10 x86_64 + aarch64（鲲鹏，pg 模式）；oracle / mysql / sqlserver 兼容模式未验证
 
 如需本地构建或使用 MariaDB 方案，仍可用通用编排文件：
 

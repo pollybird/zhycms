@@ -7,6 +7,16 @@
 
 > **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
+## [Unreleased]
+
+### Fixed
+
+- **KingbaseES DDL 约束修复**：在 `app/utils/dialects/kingbase.py` 新增 `KingbaseDDLCompiler`，覆盖 `get_column_specification`，为 `unique=True` 但缺表级 `UniqueConstraint` 的列补列级 `UNIQUE` 关键字。KingbaseES 比 PostgreSQL 更严格，FK 引用列必须有显式 `UNIQUE CONSTRAINT`，仅 `UNIQUE INDEX` 不够，否则 `db.create_all()` 时 FK 约束失败。受影响列：`Permission.code`、`Role.code`、`User.username`、`Site.slug`、`Site.subdomain`。该修复仅作用于 KingbaseES 方言层，不影响 PostgreSQL 及其他后端。
+
+### 验证
+
+- **KingbaseES aarch64 / 鲲鹏双架构验证**：在华为云鲲鹏 ARM（Huawei Cloud EulerOS 3.0，aarch64）上对 KingbaseES V9R1C10（V009R001C010B0004，`DB_MODE=pg`）完成端到端实测，**55 项全绿**（单元测试 30 passed / 0 failed + 集成 25 passed / 0 failed），详见 [docs/KINGBASE_ARM_TEST_REPORT.md](docs/KINGBASE_ARM_TEST_REPORT.md)。至此 KingbaseES pg 兼容模式已在 **x86_64 + aarch64/鲲鹏** 双架构完成端到端验证。
+
 ## [3.3.1] - 2026-11-26
 
 **信创适配增量版**：新增人大金仓 **KingbaseES V9（pg 兼容模式）** 数据库支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖（复用标准 `psycopg2-binary`）。

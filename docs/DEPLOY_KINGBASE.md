@@ -5,8 +5,8 @@
 > 自行到官方下载并获取官方授权**，下载地址：
 > <https://www.kingbase.com.cn/download.html>。
 > 本仓库**不提供、不分发** KingbaseES 的镜像、二进制或许可证；使用前请确认已获得
-> 合法授权。本文档中的镜像名、工具路径与命令均以官方 V9R1C10 x86_64 版本为例，
-> 请以你实际获取的官方版本为准。
+> 合法授权。本文档中的镜像名、工具路径与命令均以官方 V9R1C10 版本为例（x86_64 与
+> aarch64/鲲鹏均已端到端验证），请以你实际获取的官方版本为准。
 
 本文说明如何让 ZhyCMS 运行在人大金仓 KingbaseES V9 的 **pg 兼容模式**
 （`DB_MODE=pg`）上。应用侧通过内置方言支持 `kingbase+psycopg2://`，业务代码与
@@ -22,7 +22,7 @@
 | 备份与恢复 | 已验证 | `sys_dump` 导出纯 SQL（直接管道 gzip），`ksql` 恢复到新库，表数一致 |
 | Docker Compose 编排 | 已验证 | `docker-compose.kingbase.yml` 完成迁移与向导，应用镜像复用默认 `pollybird/zhycms:latest` |
 | 健康检查标识 | 已验证 | `/healthz?detail=1` 返回 `db_dialect=kingbase` |
-| aarch64 / 鲲鹏镜像 | 未验证 | 当前官方提供的 tar 为 x86_64；ARM 留待后续 |
+| aarch64 / 鲲鹏镜像 | 已验证 | 华为云鲲鹏 ARM（Huawei Cloud EulerOS 3.0，aarch64）实测通过，55 项全绿，详见 [docs/KINGBASE_ARM_TEST_REPORT.md](KINGBASE_ARM_TEST_REPORT.md) |
 | 哨兵 / 集群 | 不适用 | 本项目只使用单个数据库连接串，HA 属部署侧能力 |
 
 ## 二、拓扑 A：Docker Compose（推荐）
@@ -204,7 +204,7 @@ KingbaseES 的备份工具与 PostgreSQL 不通用，应用已按方言区分：
 
 - **兼容模式**：仅支持 KingbaseES 的 **pg 兼容模式**（`DB_MODE=pg`）；`oracle` /
   `mysql` / `sqlserver` 兼容模式不在支持范围内。
-- **架构**：当前实测为 x86_64；aarch64（鲲鹏）镜像待官方提供后验证。
+- **架构**：x86_64 与 aarch64（鲲鹏）双架构均已端到端实测通过；aarch64 在华为云鲲鹏 EulerOS 3.0 上 55 项全绿，详见 [docs/KINGBASE_ARM_TEST_REPORT.md](KINGBASE_ARM_TEST_REPORT.md)。
 - **默认端口与账号**：默认端口 `54321`、默认管理账号 `system`。
 - **驱动**：连接与迁移复用标准 `psycopg2-binary`，无需专用驱动；但备份/恢复所需的
   `ksql` / `sys_dump` 客户端工具需用户自行安装并配置 `ZHYCMS_KINGBASE_BIN` 与

@@ -274,7 +274,7 @@ python run.py</code></pre>
   <tr><td><b>达梦 / GBase / PolarDB</b></td><td>规划中，<b>未实现、未验证</b>（GBase 8a/8c/8s 差异很大）</td><td>—</td></tr>
   <tr><td><b>SQLite</b></td><td>零配置，仅开发/测试</td><td>无</td></tr>
 </table>
-<div class="warn"><b>信创适配现状</b>：官方已实现并验证 openGauss 7.0（x86_64 + aarch64/鲲鹏）与人大金仓 KingbaseES V9（pg 兼容模式，x86_64，v3.3.1 起）。达梦 DM8、南大通用 GBase、PolarDB 尚未适配；仓库 <code>docs/XINCHUANG_ADAPTATION.md</code> 提供了按方言 / 驱动 / URI / 备份工具分层的适配思路、工作量评估与贡献指南，欢迎所有人提交适配代码、测试与实测报告。未经实测的数据库不会被声明为支持。</div>
+<div class="warn"><b>信创适配现状</b>：官方已实现并验证 openGauss 7.0（x86_64 + aarch64/鲲鹏）与人大金仓 KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏，v3.3.1 起）。达梦 DM8、南大通用 GBase、PolarDB 尚未适配；仓库 <code>docs/XINCHUANG_ADAPTATION.md</code> 提供了按方言 / 驱动 / URI / 备份工具分层的适配思路、工作量评估与贡献指南，欢迎所有人提交适配代码、测试与实测报告。未经实测的数据库不会被声明为支持。</div>
 <div class="warn"><b>授权声明（人大金仓 KingbaseES）</b>：本项目仅实现对 KingbaseES 的适配支持。KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）需用户自行到 <a href="https://www.kingbase.com.cn/download.html">https://www.kingbase.com.cn/download.html</a> 下载并获取官方授权；本仓库不提供、不分发 KingbaseES 的镜像、二进制或许可证。</div>
 <div class="note">数据库 URI 优先级：环境变量 <code>ZHYCMS_DB_URI</code> &gt; <code>instance/db_config.json</code> &gt; 默认 SQLite。</div>
 </section>
