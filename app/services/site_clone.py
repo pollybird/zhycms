@@ -853,6 +853,7 @@ def move_site_to_recycle(site, deleted_by=None, days=RECYCLE_DAYS):
             purge_at=datetime.now() + timedelta(days=days),
             snapshot_json=json.dumps({
                 'slug': site.slug, 'domain': site.domain,
+                'domains': [row.domain for row in (site.domain_entries or [])],
                 'subdomain': site.subdomain, 'theme': site.theme,
                 'status': site.status,
             }, ensure_ascii=False),

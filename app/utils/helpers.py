@@ -2,6 +2,7 @@
 from functools import wraps
 import json
 import re
+import time
 from datetime import datetime
 
 
@@ -266,6 +267,65 @@ def audit_log(op_type, module, target_id=None, target_name=None, detail=None):
 # 缓存清除（模块8：内容变更时自动清相关页面缓存）
 # ============================================================
 
+def purge_cache_prefix(prefix=''):
+    """按前缀清理缓存，返回删除的键数；异常仅告警，不影响主流程。
+
+    flask-caching 2.5 没有 ``delete_pattern``，其 ``clear()`` 在 Redis 下是
+    ``KEYS <key_prefix>*`` 取回全部键 + 单条大 ``DEL``；缓存键较多时会长时间
+    阻塞 Redis 并把全部键加载进内存（v3.3.4 文章保存超时的根因）。这里改为：
+
+    - Redis 后端：``SCAN MATCH`` + 每 500 个键一批 ``DEL``，绝不使用 ``KEYS``；
+    - 内存后端：在锁内按前缀从内部字典删除；
+    - 其它后端：退回 ``cache.clear()``（仅内存/文件等本地后端，代价可控）。
+    """
+    from ..extensions import cache
+    started = time.monotonic()
+    deleted = 0
+    try:
+        backend = getattr(cache, 'cache', None)
+        key_prefix = getattr(backend, 'key_prefix', '') or ''
+        pattern = f'{key_prefix}{prefix}*'
+        client = getattr(backend, '_read_client', None)
+        if client is not None and hasattr(client, 'scan_iter'):
+            batch = []
+            for key in client.scan_iter(match=pattern, count=500):
+                batch.append(key)
+                if len(batch) >= 500:
+                    deleted += client.delete(*batch)
+                    batch = []
+            if batch:
+                deleted += client.delete(*batch)
+        else:
+            store = getattr(backend, '_cache', None)
+            if isinstance(store, dict):
+                lock = getattr(backend, '_lock', None)
+                lock_ctx = lock if hasattr(lock, '__enter__') else _NullLock()
+                with lock_ctx:
+                    hit = [k for k in list(store.keys())
+                           if str(k).startswith(f'{key_prefix}{prefix}')]
+                    for k in hit:
+                        store.pop(k, None)
+                deleted = len(hit)
+            else:
+                cache.clear()
+                deleted = -1
+    except Exception as e:
+        current_app.logger.warning('按前缀清理缓存失败（%s*）：%s', prefix, e)
+        return 0
+    current_app.logger.debug(
+        '清理缓存前缀 %s*：删除 %s 个键，耗时 %.3fs',
+        prefix, deleted, time.monotonic() - started)
+    return deleted
+
+
+class _NullLock:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
 def clear_content_cache(column_id=None, article_id=None):
     """内容新增/修改/删除/发布后，清除前台首页、栏目页、文章页相关缓存，
     并触发搜索索引更新（v2.4.0）。"""
@@ -287,18 +347,11 @@ def clear_content_cache(column_id=None, article_id=None):
             current_app.logger.exception('reindex_article failed')
     if Setting.get('cache_enable') != 'on':
         return
-    # v3.2.2：前台视图缓存键为 frontend/site{sid}/...，按当前站点前缀清理；
-    # 不支持模式删除的缓存后端回退为整体清空（与原行为一致）。
+    # v3.3.4：前台视图缓存键为 frontend/site{sid}/...，按站点前缀 SCAN 批量清理；
+    # 不再 cache.clear()（Redis 下会 KEYS + 单条大 DEL，且会清掉其它站点缓存）。
     from ..sites import current_site_id
     sid = current_site_id()
-    prefix = f'frontend/site{sid}'
-    cleared = False
-    try:
-        if hasattr(cache, 'delete_pattern'):
-            cache.delete_pattern(f'{prefix}/*')
-            cleared = True
-    except Exception as e:
-        current_app.logger.warning('按站点清理页面缓存失败：%s', e)
+    purge_cache_prefix(f'frontend/site{sid}/')
     # 兼容 v3.2.1 及更早版本的全局键（升级后残留 TTL 内仍可能命中）
     legacy_keys = ['frontend/index']
     if column_id:
@@ -310,12 +363,6 @@ def clear_content_cache(column_id=None, article_id=None):
             cache.delete(k)
         except Exception as e:
             current_app.logger.warning('清除页面缓存 %s 失败：%s', k, e)
-    if not cleared:
-        # 简单起见，直接清整站缓存（覆盖 sitemap 等关联）
-        try:
-            cache.clear()
-        except Exception as e:
-            current_app.logger.warning('清空页面缓存失败：%s', e)
 
 
 # ============================================================

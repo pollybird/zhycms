@@ -3,15 +3,15 @@
 一个基于 Flask 的轻量级企业内容管理系统，内置多主题模板引擎、栏目级模板选择、自定义字段、表单收集、SEO 优化、全文搜索、对象存储等能力，适合搭建企业官网、资讯门户、产品展示站等。
 
 <p>
-  <img alt="Version" src="https://img.shields.io/badge/version-3.3.1-2e6df6?style=flat-square">
+  <img alt="Version" src="https://img.shields.io/badge/version-3.3.4-2e6df6?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/license-MulanPSL--2.0-blue?style=flat-square">
   <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-776%20passed-brightgreen?style=flat-square">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-839%20passed-brightgreen?style=flat-square">
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.3.3**（信创适配增量版：新增 **PolarDB for PostgreSQL 15** 数据库支持，Apache 2.0 开源自托管，内置 `polardb_pg` 方言、向导可选、`pg_dump`/`psql` 备份恢复与独立 Docker 编排；无数据库迁移（仍为 `0020`），无新增 Python 依赖，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[PolarDB 部署](docs/DEPLOY_POLARDB.md)、[达梦 DM8 部署](docs/DEPLOY_DM.md)、[KingbaseES 部署](docs/DEPLOY_KINGBASE.md) 与 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)）
+**当前版本：v3.3.4**（缺陷修复与站群增强：修复文章保存时全量清缓存导致的 120s 超时、子域标签重复误报；新增 **单站点多独立域名**（如 example.com + example.com.cn）。数据库迁移 `0021`，无新增 Python 依赖，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[站群设计](docs/SITE_GROUP.md) 与 [多站点部署](docs/DEPLOY_MULTI_SITE.md)）
 
 > **授权声明（人大金仓 KingbaseES / 达梦 DM8）**：本项目**仅实现对上述数据库的适配支持**。
 > KingbaseES 与达梦 DM8 均为商业软件，其安装包、客户端工具与授权文件（license）
@@ -129,6 +129,13 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 ---
 
 ## 版本速览
+
+### v3.3.4（2026-11-28）
+
+- **修复：文章保存超时（504 / upstream prematurely closed）**：`flask-caching 2.5` 无 `delete_pattern`，文章保存后的 `cache.clear()` 在 Redis 下退化为 `KEYS <prefix>*` + 单条大 `DEL`，缓存键多时会阻塞 Redis 并占用大量内存，超过 gunicorn 超时后 worker 被杀。改为 `purge_cache_prefix()`：`SCAN` + 每 500 个键批量 `DEL`，仅清理当前站点前缀；同时为缓存客户端加 5s 超时，前端缓存键只保留 `page` 白名单参数，避免爬虫随机参数制造海量键；保存链路增加分段耗时日志与慢请求日志。
+- **修复：子域标签重复误报**：`sites.subdomain` 不再全局唯一，改为按“所属域名作用域”校验与解析——站点 A(a.com, www) 与站点 B(b.com, www) 可同时存在，分别由 `www.a.com` / `www.b.com` 访问；解析优先级为「精确域名 → 域名作用域子域 → 唯一子域回落」。
+- **新增：单站点多独立域名**：新增 `site_domains` 表保存附加域名（主域名仍为 `sites.domain`），后台站点表单支持每行一个附加域名；精确匹配、`site_hostnames`/nginx `server_name`、站点备份导入与 API 均支持多域名。
+- **迁移与文档**：新增迁移 `0021`（`site_domains` 表 + 子域索引改为普通索引），更新 [站群设计](docs/SITE_GROUP.md)、[多站点部署](docs/DEPLOY_MULTI_SITE.md) 与 [运维 FAQ](docs/OPERATIONS_FAQ.md)。
 
 ### v3.3.3（2026-11-28）
 

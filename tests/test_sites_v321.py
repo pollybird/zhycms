@@ -307,15 +307,18 @@ def test_site_host_normalization_and_validation(app):
     assert not Site.is_valid_domain('a' * 64 + '.com')
 
 
-def test_subdomain_unique_constraint(app):
-    """子域在数据库层唯一（并发创建也由唯一索引兜底）。"""
-    from sqlalchemy.exc import IntegrityError
-    _mk_site(app, slug='site-s1', subdomain='dup-sub')
+def test_subdomain_not_globally_unique(app):
+    """v3.3.4：子域不再全局唯一（www.a.com / www.b.com 可共存）。
+
+    唯一性改由站点保存校验按“所属域名作用域”保证，见
+    tests/test_sites_v334.py。
+    """
+    _mk_site(app, slug='site-s1', domain='a.com', subdomain='dup-sub')
     with app.app_context():
-        db.session.add(Site(name='重复子域', slug='site-s2', subdomain='dup-sub'))
-        with pytest.raises(IntegrityError):
-            db.session.commit()
-        db.session.rollback()
+        db.session.add(Site(name='重复子域', slug='site-s2',
+                            domain='b.com', subdomain='dup-sub'))
+        db.session.commit()
+        assert Site.query.filter_by(subdomain='dup-sub').count() == 2
 
 
 def test_site_create_invalid_sort_order(app, admin_client):

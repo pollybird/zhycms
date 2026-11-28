@@ -410,20 +410,20 @@ def test_flush_site_views_only_touches_site(app):
 
 
 def test_clear_content_cache_uses_site_prefix(app, monkeypatch):
-    from app.extensions import cache
+    """v3.3.4：按站点前缀 SCAN 批量清理，不再 cache.clear()。"""
     from app.models.setting import Setting
-    from app.utils.helpers import clear_content_cache
+    from app.utils import helpers
     calls = []
-    monkeypatch.setattr(cache, 'delete_pattern', lambda p: calls.append(p),
-                        raising=False)
+    monkeypatch.setattr(helpers, 'purge_cache_prefix',
+                        lambda prefix='': calls.append(prefix))
     with app.app_context():
         old = Setting.get('cache_enable')
         Setting.set('cache_enable', 'on')
         try:
-            clear_content_cache()
+            helpers.clear_content_cache()
         finally:
             Setting.set('cache_enable', old or 'off')
-    assert 'frontend/site0/*' in calls
+    assert 'frontend/site0/' in calls
 
 
 # ============================================================

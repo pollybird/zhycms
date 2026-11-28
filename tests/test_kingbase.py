@@ -479,7 +479,7 @@ class TestKingbaseLive:
                 tables = db.session.execute(text(
                     "SELECT count(*) FROM information_schema.tables "
                     "WHERE table_schema='public'")).scalar()
-            assert rev == '0020'
+            assert rev == '0021'
             assert tables >= 40
             client = kb_app.test_client()
             resp = client.get('/healthz?detail=1')

@@ -88,22 +88,61 @@ def _first_accessible_site(rows):
 
 
 def _match_host_site(rows):
-    """按当前请求 Host 匹配站点 id：精确 domain → 子域首标签。无匹配返回 None。"""
+    """按当前请求 Host 匹配站点 id。
+
+    v3.3.4 解析优先级：
+      ① 精确域名（主域名 / 附加域名）；
+      ② 域名作用域子域：`www.a.com` 的父域 `a.com` 属于某站点时，只有
+         该站点的 subdomain == `www` 才命中，不再按首标签全局猜测；
+      ③ 兼容回落：父域不属于任何站点时，若全站只有一个站点使用该子域
+         标签则命中（兼容 `*.主域名` 泛解析与开发环境 `b.localhost`）。
+    无匹配返回 None。
+    """
+    from .models.site import Site
+    from .services.site_domains import site_domain_map
+
     host = (request.host or '').split(':', 1)[0].strip().lower()
     if not host:
         return None
+    try:
+        mapping = site_domain_map()
+    except Exception as e:
+        logger.debug('附加域名读取失败，按空处理：%s', e)
+        mapping = {}
+
+    def _domains(site):
+        values = [Site.normalize_host(site.domain)]
+        values.extend(mapping.get(site.id, []))
+        return {v for v in values if v}
+
+    # ① 精确域名匹配（主域名 + 附加域名）
     for s in rows:
-        if s.domain and s.domain.strip().lower() == host:
+        if host in _domains(s):
             return s.id
-    # 子域首标签匹配（泛解析：b.main.com → subdomain=b）
+
     labels = host.split('.')
     # v3.2.1：开发环境允许两段式 b.localhost
     dev_two_label = len(labels) == 2 and labels[1] == 'localhost'
-    if len(labels) >= 3 or dev_two_label:
-        sub = labels[0]
-        for s in rows:
-            if s.subdomain and s.subdomain.strip().lower() == sub:
+    if len(labels) < 3 and not dev_two_label:
+        return None
+
+    sub = labels[0]
+    parent = '.'.join(labels[1:])
+
+    # ② 域名作用域：父域归属某站点时，只由该站点决定是否命中
+    for s in rows:
+        if parent in _domains(s):
+            if Site.normalize_host(s.subdomain) == sub:
                 return s.id
+            return None
+
+    # ③ 父域无归属：仅当子域标签在全站唯一时回落（多站同标签不猜测）
+    matched = [s for s in rows
+               if Site.normalize_host(s.subdomain) == sub]
+    if len(matched) == 1:
+        return matched[0].id
+    if len(matched) > 1:
+        logger.warning('子域标签 %s 被多个站点使用且无域名归属，回落默认站点', sub)
     return None
 
 

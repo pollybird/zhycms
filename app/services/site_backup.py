@@ -25,7 +25,7 @@ from ..models.audit import (
     AuditLog, MODULE_BACKUP, OP_BACKUP_RESTORE, OP_DELETE, OP_EXPORT, OP_OTHER,
 )
 from ..models.setting import Setting
-from ..models.site import Site, DEFAULT_SITE_ID
+from ..models.site import Site, SiteDomain, DEFAULT_SITE_ID
 from ..models.upload import UploadedFile
 
 logger = logging.getLogger(__name__)
@@ -323,6 +323,8 @@ def export_site(site_id, created_by=None, filename=None):
             'slug': site.slug,
             'domain': site.domain,
             'subdomain': site.subdomain,
+            # v3.3.4：附加域名（旧备份无该字段时导入按空列表处理）
+            'domains': [row.domain for row in (site.domain_entries or [])],
             'theme': site.theme,
             'seo_title': site.seo_title,
             'seo_keywords': site.seo_keywords,
@@ -447,6 +449,11 @@ def _existing_site_values():
     slugs = {r[0] for r in rows if r[0]}
     domains = {r[1] for r in rows if r[1]}
     subdomains = {r[2] for r in rows if r[2]}
+    # v3.3.4：附加域名参与导入改名去重
+    try:
+        domains |= {d for (d,) in db.session.query(SiteDomain.domain).all() if d}
+    except SQLAlchemyError as e:
+        logger.debug('读取附加域名失败，导入按仅有主域名处理：%s', e)
     return slugs, domains, subdomains
 
 
@@ -478,6 +485,8 @@ def _create_site_from_manifest(meta):
             n += 1
             new_domain = _rename_domain(domain, n)
         domain = new_domain
+    if domain:
+        domains.add(domain)
     if subdomain and subdomain in subdomains:
         base = subdomain
         n = 1
@@ -499,6 +508,22 @@ def _create_site_from_manifest(meta):
         sort_order=int(meta.get('sort_order') or 0),
     )
     db.session.add(site)
+    db.session.flush()
+
+    # v3.3.4：附加域名同样去重/改名后落表
+    for raw in (meta.get('domains') or []):
+        extra = Site.normalize_host(raw)
+        if not extra:
+            continue
+        if extra in domains:
+            n = 1
+            renamed = _rename_domain(extra, n)
+            while renamed in domains:
+                n += 1
+                renamed = _rename_domain(extra, n)
+            extra = renamed
+        domains.add(extra)
+        db.session.add(SiteDomain(site_id=site.id, domain=extra))
     db.session.commit()
     return site
 

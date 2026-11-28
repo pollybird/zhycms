@@ -38,9 +38,12 @@ DNS 生效后再继续，可用 `dig +short shop.example.com` 验证。
 1. 登录后台 →「全局设置 → 站点管理」→「新增站点」；
 2. 填写名称与唯一标识（slug）；
 3. 按需填写：
-   - **精确域名**：`shop.example.com`（优先匹配）；
-   - **子域标签**：`news`，配合基础域名 `example.com` 生成 `news.example.com`；
+   - **主域名**：`example.com`（优先匹配；也可填 `shop.example.com`）；
+   - **附加域名**（v3.3.4）：每行一个，如 `example.com.cn`、`example.net`，与主域名一起参与匹配与 `server_name`；
+   - **子域标签**：`news`，会为本站点每个域名生成 `news.example.com`、`news.example.com.cn`，并兼容基础域名 `news.<base-domain>`；
 4. 保存后记录站点 ID（文件名与日志路径会用到）。
+
+> 子域标签按“所属域名作用域”唯一：站点 A(a.com, `www`) 与站点 B(b.com, `www`) 可同时存在，分别由 `www.a.com` / `www.b.com` 访问；只有两个站点都没有独立域名时才要求子域标签全局唯一。
 
 默认站点（`id=0`）会生成 `server_name _;` 兜底块，承接未匹配任何域名的请求，与应用的解析回退行为一致。
 
@@ -63,8 +66,8 @@ python scripts/generate_nginx_sites.py --site-id 2 --stdout
 生成规则：
 
 - 每个站点一个 `zhycms-site{N}.conf`；
-- 独立域名写 `server_name shop.example.com;`；
-- 子域写 `server_name news.example.com;`；
+- 主域名与附加域名依次写入 `server_name`（如 `example.com example.com.cn;`）；
+- 子域为每个站点域名生成 `news.example.com`、`news.example.com.cn`，并保留 `news.<base-domain>`；
 - 默认站点追加 `_` 兜底并排在最后；
 - 含 `client_max_body_size`、访问/错误日志、ACME 验证目录与反代头；
 - 非法域名（含空格、`;`、`}` 等）会跳过并在 stderr 提示，不会写入配置。
@@ -97,7 +100,9 @@ sudo cp build/nginx/*.conf /etc/nginx/conf.d/
 sudo nginx -t && sudo nginx -s reload
 ```
 
-后台「站点管理 → 部署」会读取 `/etc/letsencrypt/live/{domain}/cert.pem` 并显示剩余天数；读不到时显示「未配置」，不影响页面访问。
+后台「站点管理 → 部署」会以**主域名**读取 `/etc/letsencrypt/live/{domain}/cert.pem` 并显示剩余天数；读不到时显示「未配置」，不影响页面访问。
+
+> 一个站点绑定多个域名时，请申请**覆盖全部域名的同一张证书**（多个 `-d`，即 SAN 证书），否则部分域名会因证书不匹配而告警。
 
 ## 七、Docker 部署
 

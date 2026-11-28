@@ -32,7 +32,7 @@
             <input type="text" name="domain" class="form-control" maxlength="255"
                    placeholder="www.example.com"
                    value="{{ (form.get('domain') if form else None) or (site.domain if site else '') }}">
-            <small class="form-text text-muted">{{ _('按 Host 精确匹配；留空表示不使用独立域名') }}</small>
+            <small class="form-text text-muted">{{ _('主域名，按 Host 精确匹配；留空表示不使用独立域名') }}</small>
           </div>
         </div>
         <div class="col-md-6">
@@ -41,9 +41,19 @@
             <input type="text" name="subdomain" class="form-control" maxlength="63"
                    placeholder="news"
                    value="{{ (form.get('subdomain') if form else None) or (site.subdomain if site else '') }}">
-            <small class="form-text text-muted">{{ _('配合泛解析 *.主域名，取 Host 首标签匹配') }}</small>
+            <small class="form-text text-muted">{{ _('作用域为本站点域名：www.a.com 与 www.b.com 可共存') }}</small>
           </div>
         </div>
+      </div>
+      {% set _domains_value = (form.get('domains') if form else None) %}
+      {% if _domains_value is none and site %}
+        {% set _domains_value = site.domain_entries | map(attribute='domain') | join('\n') %}
+      {% endif %}
+      <div class="form-group">
+        <label>{{ _('附加域名') }}</label>
+        <textarea name="domains" class="form-control" rows="3" maxlength="2000"
+                  placeholder="example.com.cn">{{ _domains_value or '' }}</textarea>
+        <small class="form-text text-muted">{{ _('每行一个（最多 10 个），与主域名一起构成站点完整域名集合；子域标签会同时作用于这些域名') }}</small>
       </div>
       <div class="row">
         <div class="col-md-6">

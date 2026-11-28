@@ -102,8 +102,19 @@ Redis 不可达时的自动降级，站点仍可用（本地内存缓存 + Cooki
 
 ### Q：改了内容/设置前台不生效（缓存不刷新）
 - 后台保存内容与设置时会自动清缓存；直改数据库不会。
-- 手工清空：重启应用（SimpleCache 即清），或 Redis 场景 `redis-cli FLUSHDB`（注意该库不要与其他系统混用）。
+- 手工清空：重启应用（SimpleCache 即清），或 Redis 场景按前缀清理：
+  `redis-cli --scan --pattern 'zhycms:cache:frontend/*' | xargs -r redis-cli DEL`
+  （不建议 `FLUSHDB`：该库可能同时存放 Session/限流等数据）。
 - 主题切换后页面仍旧样式：确认使用了 v2.6.3+（此版本修复了「缓存键含主题 + 切换清缓存」）。
+
+### Q：保存文章很慢 / 最后 nginx 报 504 或 `upstream prematurely closed connection`
+- v3.3.4 已修复主因：旧版本保存内容时执行 `cache.clear()`，在 Redis 下等价于 `KEYS zhycms:cache:*` + 单条超大 `DEL`，缓存键多时会阻塞 Redis 并占用大量内存，超过 gunicorn `--timeout 120` 后 worker 被杀。升级后改为 `SCAN` + 每 500 个键批量 `DEL`，只清理当前站点前缀。
+- 排查命令：
+  - `docker logs <容器> 2>&1 | grep -E 'WORKER TIMEOUT|SIGKILL|MemoryError'`
+  - `redis-cli DBSIZE`
+  - `redis-cli --scan --pattern 'zhycms:cache:*' | wc -l`
+- 若升级后仍偶发，查看应用日志中的“文章保存耗时 …（render=…, commit=…, snapshot=…, cache_index=…）”与“慢请求”，可定位具体阶段。
+- 反向代理建议 `proxy_read_timeout` 与 gunicorn `--timeout 120` 对齐（如 `proxy_read_timeout 120s;`），避免网关先于应用超时。
 
 ### Q：多 worker 下用户登录态丢失
 Session 依赖 Redis（服务端 Session）；Redis 掉线回退 Cookie Session 后，各 worker 密钥需一致（`SECRET_KEY` 固定，勿每次随机）。

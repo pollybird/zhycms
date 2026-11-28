@@ -339,7 +339,8 @@ def theme_activate(slug):
     # 这里无条件清空（不经过 clear_content_cache 的 cache_enable 早退判断），
     # 覆盖「先开缓存产生页面、再关缓存切主题」的边缘场景。
     try:
-        cache.clear()
+        from ...utils.helpers import purge_cache_prefix
+        purge_cache_prefix()
     except Exception as e:
         # 清缓存失败不阻断主题切换，旧缓存将在 TTL 到期后自然失效
         current_app.logger.warning('主题切换后清空前台缓存失败：%s', e)

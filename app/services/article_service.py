@@ -3,6 +3,7 @@
 从 app/admin/content/article.py 的 _save_article / _save_article_translations
 抽离而来。视图层只负责 HTTP 协议转换，业务逻辑在此独立可测。
 """
+import time
 from datetime import datetime
 
 from flask import current_app
@@ -35,6 +36,9 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
               messages 为 [(category, message), ...]，调用方负责 flash
     """
     messages = []
+    # v3.3.4：保存链路分段耗时（Markdown 渲染 / commit / 快照 / 清缓存+索引）
+    t_start = time.monotonic()
+    timings = {}
 
     def _flash(msg, category='info'):
         messages.append((category, msg))
@@ -56,7 +60,9 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
     article.title = title
     article.summary = (form_data.get('summary') or '').strip()
     # v3.1.5：双写（markdown 模式 content=渲染后的 HTML，content_md=原文）
+    t_stage = time.monotonic()
     apply_editor_form(article, form_data, 'content', 'content')
+    timings['render'] = time.monotonic() - t_stage
     article.author = (form_data.get('author') or '').strip()
     article.source = (form_data.get('source') or '').strip()
     article.sort_order = safe_int(form_data.get('sort_order'), 0)
@@ -158,6 +164,7 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
     # v2.5.0：保存各语种翻译（非默认语言）
     _save_article_translations(article, form_data)
 
+    t_stage = time.monotonic()
     try:
         db.session.commit()
     except Exception:
@@ -165,9 +172,11 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
         _flash(_gettext('文章保存失败（数据库错误）'), 'danger')
         current_app.logger.exception('article save DB error')
         return None, messages
+    timings['commit'] = time.monotonic() - t_stage
 
     # 保存版本快照（必须在 commit 后 article.id 已存在且字段值已写库）
     note = '新建' if is_new else '编辑修改'
+    t_stage = time.monotonic()
     try:
         ArticleVersion.snapshot(article, status_snapshot=article.status,
                                 note=note, created_by=uid)
@@ -179,9 +188,18 @@ def save_article(article, column, fields, *, form_data, files_data, current_user
             db.session.rollback()
         except Exception as rollback_err:
             current_app.logger.warning('文章快照失败后回滚失败：%s', rollback_err)
+    timings['snapshot'] = time.monotonic() - t_stage
 
     # 清缓存 + 审计日志
+    t_stage = time.monotonic()
     clear_content_cache(column_id=column.id, article_id=article.id)
+    timings['cache_index'] = time.monotonic() - t_stage
+    total = time.monotonic() - t_start
+    detail = ', '.join(f'{k}={v:.3f}s' for k, v in timings.items())
+    log = (current_app.logger.warning if total >= 3
+           else current_app.logger.debug)
+    log('文章保存耗时 %.2fs id=%s 正文长度=%s（%s）',
+        total, article.id, len(article.content or ''), detail)
     if is_new:
         _flash(_gettext('文章创建成功'), 'success')
         audit_log(OP_CREATE, MODULE_ARTICLE, article.id, article.title,

@@ -28,6 +28,10 @@ from ...models.audit import (
 )
 from ...utils.helpers import permission_required, audit_log
 from ...utils.themes import list_theme_records
+from ...services.site_domains import (
+    invalidate_site_domain_cache, parse_domain_lines, sync_site_domains,
+    validate_domain_ownership, validate_subdomain_scope,
+)
 from ...sites import SESSION_KEY, invalidate_site_cache, can_access_site, current_site_id
 from .. import admin_bp
 
@@ -65,6 +69,11 @@ def _validate(data, site=None):
     slug = _clean(data.get('slug')).lower()
     domain = Site.normalize_host(data.get('domain'))
     subdomain = Site.normalize_host(data.get('subdomain'))
+    extra_domains, domain_errors = parse_domain_lines(data.get('domains'))
+    errors.extend(domain_errors)
+    if domain and domain in extra_domains:
+        extra_domains = [d for d in extra_domains if d != domain]
+        errors.append(_gettext('附加域名不能与主域名相同：{}').format(domain))
     status = _clean(data.get('status')) or 'open'
     theme = _clean(data.get('theme'))
 
@@ -96,24 +105,24 @@ def _validate(data, site=None):
             q = q.filter(Site.id != site.id)
         if q.first() is not None:
             errors.append(_gettext('站点标识已被占用：{}').format(slug))
-    if domain:
-        q = Site.query.filter_by(domain=domain)
-        if site is not None:
-            q = q.filter(Site.id != site.id)
-        if q.first() is not None:
-            errors.append(_gettext('域名已被占用：{}').format(domain))
+    # v3.3.4：主域名与附加域名统一做全局唯一校验（其它站点主域名/附加域名）
+    errors.extend(validate_domain_ownership(
+        ([domain] if domain else []) + extra_domains,
+        site.id if site is not None else None))
+    # v3.3.4：子域标签按“所属域名作用域”唯一（www.a.com 与 www.b.com 可共存）
     if subdomain:
-        q = Site.query.filter_by(subdomain=subdomain)
-        if site is not None:
-            q = q.filter(Site.id != site.id)
-        if q.first() is not None:
-            errors.append(_gettext('子域标签已被占用：{}').format(subdomain))
+        scope_error = validate_subdomain_scope(
+            subdomain, ([domain] if domain else []) + extra_domains,
+            site.id if site is not None else None)
+        if scope_error:
+            errors.append(scope_error)
 
     cleaned = {
         'name': name,
         'slug': slug,
         'domain': domain or None,
         'subdomain': subdomain or None,
+        'domains': extra_domains,
         'status': status,
         'theme': theme or None,
         'seo_title': _clean(data.get('seo_title'))[:255] or None,
@@ -137,8 +146,10 @@ def _emit_site_status(site, old_status):
 def _invalidate_all():
     """站点变更后：失效请求级站点缓存 + 清前台整页缓存。"""
     invalidate_site_cache()
+    invalidate_site_domain_cache()
     try:
-        cache.clear()
+        from ...utils.helpers import purge_cache_prefix
+        purge_cache_prefix()
     except Exception as e:
         current_app.logger.warning('站点变更后清空前台缓存失败：%s', e)
 
@@ -346,10 +357,13 @@ def site_create():
             return render_template('admin/system/site_form.html', site=None,
                                    form=request.form, themes=_theme_slugs())
         site = Site(is_default=False)
+        domains = data.pop('domains', [])
         for k, v in data.items():
             setattr(site, k, v)
         db.session.add(site)
         try:
+            db.session.flush()
+            sync_site_domains(site, domains)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -359,7 +373,7 @@ def site_create():
         _invalidate_all()
         audit_log(OP_CREATE, MODULE_SITE, target_id=site.id, target_name=site.name,
                   detail={'slug': site.slug, 'domain': site.domain,
-                          'subdomain': site.subdomain})
+                          'subdomain': site.subdomain, 'domains': domains})
         flash(_gettext('站点「{}」创建成功').format(site.name), 'success')
         return redirect(url_for('admin.site_index'))
 
@@ -379,9 +393,11 @@ def site_edit(sid):
                 flash(e, 'danger')
             return render_template('admin/system/site_form.html', site=site,
                                    form=request.form, themes=_theme_slugs())
+        domains = data.pop('domains', [])
         for k, v in data.items():
             setattr(site, k, v)
         try:
+            sync_site_domains(site, domains)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -391,8 +407,8 @@ def site_edit(sid):
         _invalidate_all()
         audit_log(OP_UPDATE, MODULE_SITE, target_id=site.id, target_name=site.name,
                   detail={'slug': site.slug, 'domain': site.domain,
-                          'subdomain': site.subdomain, 'status': site.status,
-                          'theme': site.theme})
+                          'subdomain': site.subdomain, 'domains': domains,
+                          'status': site.status, 'theme': site.theme})
         flash(_gettext('站点「{}」已保存').format(site.name), 'success')
         if old_status != site.status:
             _emit_site_status(site, old_status)

@@ -27,7 +27,9 @@ class Site(db.Model):
     # 全量域名（精确匹配），如 www.b.com；空表示不按独立域名寻址
     domain = db.Column(db.String(255), unique=True)
     # 子域标签（配合泛解析 *.main.com），如 b；空值存 NULL（多 NULL 可共存）
-    subdomain = db.Column(db.String(100), unique=True, index=True)
+    # v3.3.4：按“所属域名作用域”唯一（www.a.com 与 www.b.com 可同时存在），
+    # 数据库层只建普通索引，唯一性由站点保存校验保证。
+    subdomain = db.Column(db.String(100), index=True)
     status = db.Column(db.String(16), default='open', nullable=False)  # open / closed
     theme = db.Column(db.String(64))  # 站点主题，空则回退全局 site_theme
     is_default = db.Column(db.Boolean, default=False, nullable=False)
@@ -39,6 +41,11 @@ class Site(db.Model):
     is_deleted = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    # v3.3.4：附加独立域名（主域名仍为 sites.domain，避免既有读取路径改动）
+    domain_entries = db.relationship(
+        'SiteDomain', backref='site', cascade='all, delete-orphan',
+        lazy='selectin')
 
     @classmethod
     def get_default(cls):
@@ -99,6 +106,28 @@ class Site(db.Model):
 
     def __repr__(self):
         return f'<Site {self.id} {self.slug}>'
+
+
+class SiteDomain(db.Model):
+    """站点附加独立域名（v3.3.4）。
+
+    仅存主域名之外的域名；`sites.domain` 仍是主域名（唯一），两者并集构成
+    站点的完整域名集合。删除站点时随 relationship 级联清理。
+    """
+    __tablename__ = 'site_domains'
+    __table_args__ = (
+        db.UniqueConstraint('domain', name='uq_site_domains_domain'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    site_id = db.Column(db.Integer,
+                        db.ForeignKey('sites.id', ondelete='CASCADE'),
+                        nullable=False, index=True)
+    domain = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+
+    def __repr__(self):
+        return f'<SiteDomain {self.site_id} {self.domain}>'
 
 
 class SiteScopedMixin:

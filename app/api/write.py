@@ -596,6 +596,7 @@ def sites_index():
         'id': s.id,
         'name': s.name,
         'domain': s.domain,
+        'domains': [row.domain for row in (s.domain_entries or [])],
         'subdomain': s.subdomain,
         'status': s.status,
     } for s in Site.query.order_by(Site.id.asc()).all()]

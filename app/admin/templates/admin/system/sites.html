@@ -56,7 +56,13 @@
             {% if s.id == current_site_id %}<span class="badge badge-success ml-1">{{ _('当前') }}</span>{% endif %}
           </td>
           <td><code>{{ s.slug }}</code></td>
-          <td>{{ s.domain or '-' }}</td>
+          <td>
+            {{ s.domain or '-' }}
+            {% set _extras = s.domain_entries | map(attribute='domain') | list %}
+            {% if _extras %}
+            <span class="badge badge-secondary ml-1" title="{{ _extras | join(', ') }}">+{{ _extras | length }}</span>
+            {% endif %}
+          </td>
           <td>{{ s.subdomain or '-' }}</td>
           <td>{{ s.theme or _('全局默认') }}</td>
           <td>

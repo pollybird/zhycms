@@ -71,8 +71,8 @@ class Site(db.Model):
     id           = db.Column(db.Integer, primary_key=True)   # 默认站点固定为 0
     name         = db.Column(db.String(100), nullable=False)
     slug         = db.Column(db.String(100), unique=True, nullable=False)  # 后台标识
-    domain       = db.Column(db.String(255), unique=True)        # 全量域名，如 www.b.com（精确匹配）
-    subdomain    = db.Column(db.String(100), index=True)          # 子域标签，如 b（配合泛解析 *.main.com）
+    domain       = db.Column(db.String(255), unique=True)        # 主域名，如 a.com（精确匹配）
+    subdomain    = db.Column(db.String(100), index=True)          # 子域标签，如 www（按所属域名作用域唯一）
     status       = db.Column(db.String(16), default='open')        # open / closed（站点级维护）
     theme        = db.Column(db.String(64))                        # 站点主题，空则回退全局 site_theme
     is_default   = db.Column(db.Boolean, default=False, nullable=False)  # 仅 site 0 为 True
@@ -86,7 +86,19 @@ class Site(db.Model):
     updated_at   = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 ```
 
-**domain 与 subdomain 并存**的原因：覆盖两种真实站群部署——① 独立域名（`www.a.com` / `www.b.com`）用 `domain` 精确匹配；② 泛解析子域（`*.main.com`，一条 DNS `*` 解析到同一实例）用 `subdomain` 标签匹配。两者皆可，解析器按「精确 domain 优先 → 子域标签 → 默认站点」回落。
+**domain 与 subdomain 并存**的原因：覆盖两种真实站群部署——① 独立域名（`www.a.com` / `www.b.com`）用 `domain` 精确匹配；② 泛解析子域（`*.main.com`，一条 DNS `*` 解析到同一实例）用 `subdomain` 标签匹配。两者皆可，解析器按「精确域名优先 → 域名作用域子域 → 唯一子域回落 → 默认站点」处理。
+
+> **v3.3.4 多域名**：新增 `site_domains` 表保存站点的**附加域名**（`sites.domain` 仍是主域名）：
+> ```python
+> class SiteDomain(db.Model):
+>     __tablename__ = 'site_domains'
+>     id = db.Column(db.Integer, primary_key=True)
+>     site_id = db.Column(db.Integer, db.ForeignKey('sites.id', ondelete='CASCADE'),
+>                         nullable=False, index=True)
+>     domain = db.Column(db.String(255), nullable=False)  # uq_site_domains_domain
+>     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+> ```
+> 站点的完整独立域名集合 = `sites.domain` ∪ `site_domains.domain`；附加域名与主域名一样参与精确匹配、nginx `server_name`、备份导入与 API 输出。`sites.subdomain` 去掉全局唯一索引——`www` 只在所属域名内唯一，`www.a.com` 与 `www.b.com` 可分别归属不同站点。
 
 > **MySQL 注意**：默认站点显式插入 `id=0`。SQLite/PostgreSQL 原生支持；MySQL 需在迁移内临时 `SET sql_mode=NO_AUTO_VALUE_ON_ZERO`（会话级），或将 `id` 改为非自增、由应用 `max(id)+1` 分配。本项目**默认 SQLite**（`config.py` 回退 `instance/zhycms.db`），首选前者。
 
@@ -163,13 +175,16 @@ def current_site_id():
 `_resolve_site_id()` 优先级（对齐 `select_locale()` 的「显式 → 持久 → 兜底」范式）：
 
 1. 后台/预览：`?site=<slug或id>`（写回 `session['admin_site_id']`）；
-2. **Host 精确匹配**：`request.host`（小写、去端口）== `sites.domain` → 该站；
-3. **子域标签匹配**：主域泛解析时，取 `sub.domain` 的首标签 → `sites.subdomain`；
-4. **兜底**：主域 / 未命中 → **默认站点 0**。
+2. **精确域名**：`request.host`（小写、去端口）== 站点主域名或任一附加域名 → 该站；
+3. **域名作用域子域**：`www.a.com` 取 `parent=a.com`；若 `a.com` 属于某站点，则只有该站点 `subdomain == www` 才命中；父域已归属但子域不匹配时不回落到其它站点（避免抢占域名子树）；
+4. **唯一子域回落**：父域不属于任何站点时，仅当全站只有一个站点使用该子域标签才命中（兼容 `*.主域名` 泛解析与开发环境 `b.localhost`）；
+5. **兜底**：未命中 → **默认站点 0**。
+
+> 子域唯一性也随之为“作用域唯一”：两个站点可同时使用 `www`，前提是双方都配置了独立域名且域名集合不相交；任一方没有域名（纯泛解析）时仍按全局唯一校验。
 
 注册时机：`create_app()` 中前台 `frontend_bp.before_request`（在 `check_site_status` 之前，使其改为**站点级**维护判断：读当前站点 `sites.status` / 站点化 `site_status`），后台蓝图同样挂载（后台以 `session['admin_site_id']` 为准，默认 0）。
 
-站点域名表做请求级缓存（`g._sites_by_host`），避免每请求两次查询；站点 CRUD 后由 service 层失效（与 `Column.invalidate_tree_cache` 同款手法）。
+站点列表与附加域名表分别做请求级缓存（`g._sites_all`、`g._site_domains_map`），每请求最多两次查询；站点 CRUD 后由 service 层失效（与 `Column.invalidate_tree_cache` 同款手法）。
 
 ---
 

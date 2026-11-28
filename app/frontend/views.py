@@ -12,6 +12,7 @@ import re
 import time
 from datetime import datetime
 from functools import wraps
+from urllib.parse import urlencode
 
 from flask import (
     render_template, redirect, url_for, request,
@@ -119,9 +120,14 @@ def _try_cache(key, ttl_setting_key, default_ttl=600, view_arg=None):
                 ttl = int(Setting.get(ttl_setting_key, default_ttl))
             except (TypeError, ValueError):
                 ttl = default_ttl
+            # v3.3.4：只把白名单查询参数纳入缓存键。原先拼接完整 query_string，
+            # 公开站点被爬虫带随机参数访问时会制造海量唯一缓存键，拖慢缓存清理。
             cache_key = f'frontend/site{current_site_id()}/{key}/' + '/'.join(
                 [str(v) for v in args] + [f'{k}={v}' for k, v in sorted(kwargs.items())]
-            ) + request.query_string.decode('utf-8', errors='ignore')
+            )
+            extra_args = [(k, request.args[k]) for k in ('page',) if k in request.args]
+            if extra_args:
+                cache_key += '?' + urlencode(extra_args)
             # v2.5.0：缓存键包含当前 locale，避免不同语言命中同一缓存
             try:
                 from ..i18n import select_locale

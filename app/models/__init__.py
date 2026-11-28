@@ -1,5 +1,5 @@
 from .user import User, LoginLog
-from .site import Site, SiteScopedMixin, DEFAULT_SITE_ID
+from .site import Site, SiteDomain, SiteScopedMixin, DEFAULT_SITE_ID
 from .column import Column, ColumnField, ColumnFieldValue
 from .article import Article, ArticleFieldValue
 from .fragment import Fragment, FragmentGroup
@@ -57,7 +57,7 @@ if 'search_index' not in _db.metadata.tables:
 
 __all__ = [
     'User', 'LoginLog',
-    'Site', 'SiteScopedMixin', 'DEFAULT_SITE_ID',
+    'Site', 'SiteDomain', 'SiteScopedMixin', 'DEFAULT_SITE_ID',
     'Column', 'ColumnField', 'ColumnFieldValue',
     'Article', 'ArticleFieldValue',
     'Fragment', 'FragmentGroup',

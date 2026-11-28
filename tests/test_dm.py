@@ -475,7 +475,7 @@ class TestDMLive:
                     text('SELECT version_num FROM alembic_version')).scalar()
                 tables = db.session.execute(
                     text('SELECT count(*) FROM user_tables')).scalar()
-            assert rev == '0020'
+            assert rev == '0021'
             assert tables >= 40
             client = dm_app.test_client()
             resp = client.get('/healthz?detail=1')

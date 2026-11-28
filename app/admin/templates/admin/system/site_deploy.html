@@ -23,8 +23,13 @@
           <dd class="col-sm-8">{{ site.name }}</dd>
           <dt class="col-sm-4">{{ _('站点标识') }}</dt>
           <dd class="col-sm-8"><code>{{ site.slug }}</code></dd>
-          <dt class="col-sm-4">{{ _('精确域名') }}</dt>
+          <dt class="col-sm-4">{{ _('主域名') }}</dt>
           <dd class="col-sm-8">{{ site.domain or '-' }}</dd>
+          <dt class="col-sm-4">{{ _('附加域名') }}</dt>
+          <dd class="col-sm-8">
+            {% set _extras = site.domain_entries | map(attribute='domain') | list %}
+            {{ _extras | join(', ') if _extras else '-' }}
+          </dd>
           <dt class="col-sm-4">{{ _('子域标签') }}</dt>
           <dd class="col-sm-8">{{ site.subdomain or '-' }}</dd>
           <dt class="col-sm-4">{{ _('状态') }}</dt>

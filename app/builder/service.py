@@ -315,8 +315,8 @@ def _default_name(scope, column_id):
 def _clear_cache():
     """布局发布/回滚后清整页缓存（与主题切换同一模式）。"""
     try:
-        from ..extensions import cache
-        cache.clear()
+        from ..utils.helpers import purge_cache_prefix
+        purge_cache_prefix()
     except Exception as e:
         # 清缓存失败不影响发布结果，旧缓存将在 TTL 到期后失效
         logger.warning('页面构建发布后清空缓存失败：%s', e)

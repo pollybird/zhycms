@@ -584,8 +584,8 @@ def _alembic_bootstrap(app, _pre_create_tables_exist=None):
 
     try:
         if is_new_install:
-            flask_stamp(directory='migrations', revision='0020')
-            app.logger.info('[Alembic] 新装 stamp 最新版本 0020')
+            flask_stamp(directory='migrations', revision='0021')
+            app.logger.info('[Alembic] 新装 stamp 最新版本 0021')
         elif not has_alembic:
             flask_stamp(directory='migrations', revision='0001')
             app.logger.info('[Alembic] 旧库 stamp baseline 0001（v2.3.0 兼容）')
@@ -869,6 +869,13 @@ def create_app(config_name=None):
             # cachelib 的 clear() 按前缀批量删除，旧前缀 `zhycms:` 会连带清空
             # Session，导致 Redis 模式下清缓存后用户被登出。
             'CACHE_KEY_PREFIX': app.config.get('CACHE_KEY_PREFIX', 'zhycms:cache:'),
+            # v3.3.4：缓存客户端超时，避免 Redis 异常时 worker 无限等待到
+            # gunicorn 超时被杀（表现为 nginx upstream prematurely closed）。
+            'CACHE_OPTIONS': {
+                'socket_connect_timeout': 3,
+                'socket_timeout': 5,
+                'retry_on_timeout': True,
+            },
         })
         # 服务端 Session
         import redis as _redis
@@ -1212,6 +1219,27 @@ def create_app(config_name=None):
             return
         # 新前缀未注册规则：在此一次性补上
         _register_dynamic_admin_rules(app, target_prefix=target)
+
+    # v3.3.4：慢请求可观测性（配合保存链路分段日志定位超时）
+    @app.before_request
+    def _record_request_start():
+        g._request_started = time.monotonic()
+
+    @app.after_request
+    def _log_slow_request(response):
+        started = getattr(g, '_request_started', None)
+        if started is not None:
+            cost = time.monotonic() - started
+            if cost >= 3:
+                try:
+                    user = (current_user.username
+                            if current_user.is_authenticated else '-')
+                except Exception:
+                    user = '-'
+                logger.warning('慢请求 %.2fs %s %s user=%s status=%s',
+                               cost, request.method, request.path,
+                               user, response.status_code)
+        return response
 
     # 安全响应头基线（v2.4.1）：全站统一注入，防点击劫持/MIME 嗅探/外带 Referrer
     @app.after_request

@@ -38,26 +38,50 @@ def is_default_site(site):
     return bool(getattr(site, 'is_default', False)) or getattr(site, 'id', None) == 0
 
 
-def site_hostnames(site, base_domain=None):
-    """返回站点可用于 server_name 的主机名列表。
-
-    - `domain` 非空且通过 DNS label 校验 → 精确域名；
-    - `subdomain` 非空且基础域名可用 → `{subdomain}.{base_domain}`；
-    - 非法值跳过并记录 warning，绝不原样写入 nginx 配置。
-    """
-    hosts = []
-    domain = Site.normalize_host(getattr(site, 'domain', None))
-    if domain:
-        if Site.is_valid_domain(domain):
-            hosts.append(domain)
-        else:
+def _own_domains(site):
+    """站点自身独立域名（主域名 + 附加域名），非法值跳过。"""
+    values = []
+    sites = [getattr(site, 'domain', None)]
+    for row in (getattr(site, 'domain_entries', None) or []):
+        # 兼容 ORM 行对象与测试里的纯字符串
+        values.append(getattr(row, 'domain', row))
+    sites.extend(values)
+    result = []
+    for raw in sites:
+        domain = Site.normalize_host(raw)
+        if not domain:
+            continue
+        if not Site.is_valid_domain(domain):
             logger.warning('站点 %s 的域名不合法，已跳过：%r',
                            getattr(site, 'id', '?'), domain)
+            continue
+        if domain not in result:
+            result.append(domain)
+    return result
+
+
+def site_hostnames(site, base_domain=None):
+    """返回站点可用于 server_name 的主机名列表（v3.3.4）。
+
+    - 主域名 + 附加域名（通过 DNS label 校验）→ 精确域名；
+    - `subdomain` 存在时，为每个自身域名补 `{subdomain}.{域名}`，
+      并兼容旧的 `{subdomain}.{base_domain}`（泛解析基础域）；
+    - 非法值跳过并记录 warning，绝不原样写入 nginx 配置。
+    """
+    own = _own_domains(site)
+    hosts = list(own)
 
     subdomain = Site.normalize_host(getattr(site, 'subdomain', None))
-    base = normalize_base_domain(base_domain)
-    if subdomain and SUBDOMAIN_RE.match(subdomain) and base:
-        hosts.append(f'{subdomain}.{base}')
+    if subdomain and SUBDOMAIN_RE.match(subdomain):
+        for domain in own:
+            sub_host = f'{subdomain}.{domain}'
+            if sub_host not in hosts:
+                hosts.append(sub_host)
+        base = normalize_base_domain(base_domain)
+        if base:
+            sub_host = f'{subdomain}.{base}'
+            if sub_host not in hosts:
+                hosts.append(sub_host)
     return hosts
 
 

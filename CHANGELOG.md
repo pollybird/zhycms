@@ -7,6 +7,24 @@
 
 > **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
+## [3.3.4] - 2026-11-28
+
+**缺陷修复与站群增强版**：修复文章保存超时与子域标签重复误报，新增单站点多独立域名。数据库迁移 `0020 → 0021`，`requirements.txt` 无新增依赖。
+
+### Fixed
+
+- **文章保存超时（504 / upstream prematurely closed）**：`flask-caching 2.5` 没有 `delete_pattern`，`clear_content_cache()` 实际走 `cache.clear()`；cachelib 的 Redis 实现是 `KEYS <prefix>*` 取回全部键后再执行单条大 `DEL`，缓存键较多时会长时间阻塞 Redis 并把全部键加载进内存，超过 gunicorn `--timeout 120` 后 worker 被终止，nginx 记录 `upstream prematurely closed connection`。改为 `purge_cache_prefix()`：Redis 用 `SCAN MATCH` + 每 500 个键一批 `DEL`，只清理当前站点 `frontend/site<sid>/` 前缀，不再波及其它站点缓存；站点设置、主题切换、页面构建器的 `cache.clear()` 同步替换。缓存客户端增加 `socket_connect_timeout=3` / `socket_timeout=5`，前端缓存键只保留 `page` 白名单参数（随机 `utm_*` 不再制造海量唯一键）。保存链路新增 Markdown 渲染 / commit / 版本快照 / 清缓存+索引分段耗时日志，以及 ≥3s 的慢请求日志。
+- **子域标签重复误报**：`sites.subdomain` 去掉全局唯一约束（迁移 `0021` 将唯一索引改为普通索引），改为按“所属域名作用域”校验与解析。站点 A(a.com, www) 与站点 B(b.com, www) 可同时存在，`www.a.com` / `www.b.com` 分别访问两个站点；解析优先级为「精确域名（主域/附加域）→ 域名作用域子域 → 全站唯一子域回落」，父域已归属站点时不再被其它站点的同名子域抢占。
+
+### Added
+
+- **单站点多独立域名**：新增 `site_domains` 表（`SiteDomain` 模型）保存附加域名，`sites.domain` 仍为主域名；后台站点表单新增“附加域名”多行输入（每行一个，最多 10 个），主域名与附加域名统一做格式/全局唯一/子域作用域校验。请求解析、`site_hostnames`（nginx `server_name`）、站点列表/部署页、站点备份导出导入、克隆冲突去重、`/api/v1/sites` 与回收站快照均支持多域名。
+
+### 迁移与测试
+
+- 迁移 `0021`：新建 `site_domains`（含 `domain` 唯一约束、`site_id` 索引、级联删除），`ix_sites_subdomain` 改为普通索引；降级前预检重复子域。
+- 新增 `tests/test_cache_purge_v334.py`（SCAN 分批清理、不再全量清空、缓存键白名单）与 `tests/test_sites_v334.py`（子域作用域解析、多域名保存/解析/部署主机名、迁移往返）；更新 `test_sites_v321` / `test_sites_v322` 既有断言。
+
 ## [3.3.3] - 2026-11-28
 
 **信创适配增量版**：新增 **PolarDB for PostgreSQL 15** 数据库支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增依赖。
