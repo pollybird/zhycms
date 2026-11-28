@@ -372,7 +372,7 @@ python run.py
 
 ### Docker 部署
 
-官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.3.1**，全部提供 x86_64 / aarch64 多架构，开箱即用，无需本地构建：
+官方镜像已发布到 **Docker Hub**（`pollybird/zhycms`）、**GitHub Container Registry**（`ghcr.io/pollybird/zhycms`）和 **阿里云 ACR**（`crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms`），当前版本 **v3.3.4**，全部提供 x86_64 / aarch64 多架构，开箱即用，无需本地构建：
 
 ```bash
 # 1. 配置环境变量
@@ -389,11 +389,11 @@ docker compose -f docker-compose.postgresql.yml up -d
 ```
 
 > 也可直接拉取镜像：
-> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.1`）
-> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.1`）
-> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.1`）
+> - Docker Hub：`docker pull pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.4` / `:opengauss` / `:polardb`）
+> - GitHub GHCR：`docker pull ghcr.io/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.4` / `:opengauss` / `:polardb`）
+> - 阿里云 ACR（国内推荐，速度快）：`docker pull crpi-9u7ztjb0thx22k1a.cn-hangzhou.personal.cr.aliyuncs.com/pollybird/zhycms:mysql`（或 `:postgresql` / `:latest` / `:v3.3.4` / `:opengauss` / `:polardb`）
 >
-> 三个 tag（`mysql` / `postgresql` / `latest`）指向同一多架构镜像（x86_64 / aarch64），内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
+> 四个 tag（`mysql` / `postgresql` / `latest` / `v3.3.4`）指向同一多架构镜像（x86_64 / aarch64），内置 MySQL / PostgreSQL 驱动，通过 `ZHYCMS_DB_URI` 切换数据库。GHCR 镜像默认与 GitHub 账号关联，如需匿名拉取请到 GitHub Packages 页面将可见性改为 Public。
 
 #### 信创部署（openGauss + openAMDC）
 
