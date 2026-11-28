@@ -25,10 +25,25 @@ class TestComposeProfile:
         assert '"CMD", "openamdc-cli", "ping"' in text
         assert 'pollybird/openamdc:1.0.0' in text
 
-    def test_opengauss_compose_has_openamdc_profile(self):
+    def test_opengauss_compose_uses_openamdc_by_default(self):
         text = _read('docker-compose.opengauss.yml')
         assert '\n  openamdc:\n' in text
-        assert 'profiles: ["openamdc"]' in text
+        assert 'profiles: ["openamdc"]' not in text
+        assert 'REDIS_URL: ${REDIS_URL:-redis://openamdc:6379/0}' in text
+        assert '\n  openamdc_data:\n' in text
+
+    def test_kingbase_compose_uses_openamdc_by_default(self):
+        text = _read('docker-compose.kingbase.yml')
+        assert '\n  openamdc:\n' in text
+        assert 'profiles: ["openamdc"]' not in text
+        assert 'REDIS_URL: ${REDIS_URL:-redis://openamdc:6379/0}' in text
+        assert '\n  openamdc_data:\n' in text
+
+    def test_polardb_compose_uses_openamdc_by_default(self):
+        text = _read('docker-compose.polardb.yml')
+        assert '\n  openamdc:\n' in text
+        assert 'profiles: ["openamdc"]' not in text
+        assert 'REDIS_URL: ${REDIS_URL:-redis://openamdc:6379/0}' in text
         assert '\n  openamdc_data:\n' in text
 
 
