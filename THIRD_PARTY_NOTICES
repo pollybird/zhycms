@@ -38,6 +38,7 @@ Mulan PSL v2。若本文件或仓库根目录 LICENSE 中的表述与某个第�
   Turndown              （未标注） MIT                                  HTML 转 Markdown；app/static/vendor/turndown/turndown.min.js
   openAMDC              1.0.0     Mulan PSL v2                        可选缓存后端；仅自建镜像 pollybird/openamdc 捆绑，许可证随镜像分发
   openGauss Python 驱动 7.0.0     LGPL-2.1（以官方包为准）             可选数据库驱动；仅 :opengauss 镜像捆绑，源码来自 openGauss 官方发布
+  PostgreSQL 客户端工具  15.x      PostgreSQL License                  可选备份工具（pg_dump / psql）；仅 :polardb 镜像捆绑，来自 Debian 软件包
 
 
 1. CKEditor 5
@@ -325,6 +326,13 @@ pytest 等）。
     请遵循 LGPL-2.1 关于源码提供的条款。
     说明：该驱动包自带旧版 OpenSSL 库，镜像构建时删除其中的 libssl.so.3 与
     libcrypto.so.3，仅保留 libpq 等运行期依赖。
+
+3. PostgreSQL 客户端工具 15.x（pg_dump / psql）
+    许可证：PostgreSQL License（https://www.postgresql.org/about/licence/）。
+    来源：Debian 软件包 postgresql-client（基础镜像 python:3.12-slim 的 bookworm 源）。
+    分发方式：仅在以 INSTALL_PG_CLIENT=1 构建的 pollybird/zhycms:polardb 镜像中
+    捆绑，用于 PolarDB for PostgreSQL 的备份与恢复；默认镜像不包含，
+    requirements.txt 也不依赖它。
 
 上述组件均由使用者可选部署，不改变本项目的许可证。
 

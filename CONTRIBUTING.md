@@ -87,7 +87,7 @@ python run.py
 | `release` | 版本发布（同时更新 `Setting.CMS_VERSION`、README、CHANGELOG，打 tag） |
 | `chore` | 依赖/工具等杂项 |
 
-重大变更（数据库结构、配置键、行为变更）请在 `CHANGELOG.md` 顶部新增对应版本段落，并同步相关文档（`README.md` / `wiki.html` / `UPGRADE.md`）。版本号以 `Setting.CMS_VERSION` 为准，发布前用 `python scripts/check_release.py --version <版本>` 校验各处一致。
+重大变更（数据库结构、配置键、行为变更）请在 `CHANGELOG.md` 顶部新增对应版本段落，并同步相关文档（`README.md` / `UPGRADE.md`）。版本号以 `Setting.CMS_VERSION` 为准，发布前用 `python scripts/check_release.py --version <版本>` 校验各处一致。
 
 ## Issue 与 Pull Request
 

@@ -56,18 +56,21 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 
 ## 三、Docker Compose 用法
 
-`docker-compose.yml` 与 `docker-compose.opengauss.yml` 均内置 `openamdc` 服务，
-以 profile 方式与 `redis` 并列，默认不启动：
+`docker-compose.yml` 内置 `openamdc` 服务，以 profile 方式与 `redis` 并列，默认不启动；
+**信创数据库专用编排（`docker-compose.opengauss.yml` / `docker-compose.kingbase.yml` /
+`docker-compose.polardb.yml`）默认启动 openAMDC，无需追加 profile**：
 
 ```bash
-# MySQL + openAMDC
+# MySQL + openAMDC（通用编排需显式指定 profile）
 docker compose --profile mysql --profile openamdc up -d
 
-# PostgreSQL + openAMDC
+# PostgreSQL + openAMDC（通用编排需显式指定 profile）
 docker compose --profile postgres --profile openamdc up -d
 
-# openGauss + openAMDC
-docker compose -f docker-compose.opengauss.yml --profile openamdc up -d
+# openGauss / KingbaseES / PolarDB + openAMDC（专用编排默认已启用）
+docker compose -f docker-compose.opengauss.yml up -d
+docker compose -f docker-compose.kingbase.yml up -d
+docker compose -f docker-compose.polardb.yml up -d --build
 ```
 
 应用侧只需把 `REDIS_URL` 指向该服务：

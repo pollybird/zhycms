@@ -837,6 +837,9 @@ def create_app(config_name=None):
     elif _db_backend == 'kingbase':
         from .utils.dialects import register_kingbase_dialect
         register_kingbase_dialect()
+    elif _db_backend == 'polardb_pg':
+        from .utils.dialects import register_polardb_dialect
+        register_polardb_dialect()
     elif _db_backend == 'dm':
         from .utils.dialects import register_dm_dialect
         if register_dm_dialect() != 'installed':

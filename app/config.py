@@ -109,9 +109,9 @@ def _resolve_database_uri():
 def build_engine_options(uri):
     """按数据库 URI 返回 SQLAlchemy 引擎参数。
 
-    openGauss / KingbaseES / 达梦 DM8 多部署在独立数据库主机上，显式约束
-    连接池与超时，避免网络异常时请求长时间阻塞；其它后端保持既有的
-    ``pool_pre_ping`` 行为。
+    openGauss / KingbaseES / PolarDB for PostgreSQL / 达梦 DM8 多部署在独立数据库
+    主机上，显式约束连接池与超时，避免网络异常时请求长时间阻塞；其它后端保持
+    既有的 ``pool_pre_ping`` 行为。
     """
     options = {'pool_pre_ping': True}
     try:
@@ -129,7 +129,7 @@ def build_engine_options(uri):
             'pool_timeout': 30,
             'connect_args': {'connection_timeout': 5},
         })
-    elif backend in ('opengauss', 'kingbase'):
+    elif backend in ('opengauss', 'kingbase', 'polardb_pg'):
         options.update({
             'pool_size': 10,
             'max_overflow': 20,
@@ -171,7 +171,7 @@ class Config:
     UPLOAD_FOLDER = os.path.join(BASE_DIR, 'app', 'static', 'uploads')
     BACKUP_FOLDER = os.path.join(BASE_DIR, 'instance', 'backups')
     # v3.3.0：外部数据库备份工具目录（openGauss 的 gs_dump/gsql 与 PostgreSQL
-    # 官方工具不通用）。未配置时按 PATH 查找。
+    # 官方工具不通用）。未配置时按 PATH 查找。PolarDB-PG 可复用 PostgreSQL 工具。
     DB_DUMP_BIN_DIR = os.environ.get('ZHYCMS_DB_DUMP_BIN', '')
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 默认 50MB，单字段可在数据库配置中再约束
 

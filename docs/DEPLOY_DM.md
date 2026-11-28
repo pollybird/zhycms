@@ -118,7 +118,20 @@ export LD_LIBRARY_PATH=/opt/dmdbms/bin:$LD_LIBRARY_PATH
 > 创建最小权限账号，并限制主机上的进程可见性。由于 `USERID` 以 `/`、`@` 分隔，
 > 备份账号密码请避免包含这两个字符。
 
-## 六、限制与注意
+## 六、缓存（信创主题）
+
+DM8 的镜像与授权需自行从官方获取，仓库不提供 DM8 专用 Compose。若自行编排 DM8，
+建议与其他信创编排保持一致，**默认使用 openAMDC 作为高速缓存**（Redis 协议兼容）：
+
+```bash
+docker run -d --name openamdc --restart unless-stopped \
+  -p 6379:6379 pollybird/openamdc:1.0.0
+```
+
+应用侧设置 `REDIS_URL=redis://openamdc:6379/0` 后重启即可。如需改用 Redis，把
+`REDIS_URL` 指向 `redis://redis:6379/0`；应用启动时会自动识别缓存后端类型。
+
+## 七、限制与注意
 
 - **整数主键自增**：`dmSQLAlchemy` 只识别 `autoincrement=True`，本项目已在方言层
   为 `Column(Integer, primary_key=True)` 补充 `IDENTITY(1, 1)`；复合主键不会自动

@@ -82,8 +82,14 @@ RUN if [ -n "$APT_MIRROR" ]; then \
     fi
 
 # 安装运行时系统依赖（gosu：entrypoint 以 root 修正挂载目录属主后降权到 uid 1000）
+# INSTALL_PG_CLIENT=1 时额外安装 PostgreSQL 客户端（pg_dump / psql），
+# 仅 :polardb 镜像变体使用；Debian bookworm 默认提供 15.x，与 PolarDB-PG 15 对齐。
+ARG INSTALL_PG_CLIENT=0
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 libpq5 default-mysql-client gosu \
+    && if [ "$INSTALL_PG_CLIENT" = "1" ]; then \
+         apt-get install -y --no-install-recommends postgresql-client; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制虚拟环境

@@ -28,9 +28,12 @@ cp docker/.env.example .env
 # 至少修改 SECRET_KEY 与 OPENGAUSS_PASSWORD
 docker compose -f docker-compose.opengauss.yml up -d --build
 
-# 可选缓存 / 搜索
-docker compose -f docker-compose.opengauss.yml --profile openamdc up -d
+# 默认已包含 openAMDC 缓存（随编排自动启动）
+docker compose -f docker-compose.opengauss.yml up -d --build
+
+# 可选搜索
 docker compose -f docker-compose.opengauss.yml --profile search up -d
+# 如需改用 Redis：追加 --profile redis 并设置 REDIS_URL=redis://redis:6379/0
 ```
 
 访问 `http://localhost:5000` 完成初始化向导。容器启动时自动执行迁移。

@@ -116,7 +116,7 @@
         <div class="form-group">
           <label><strong>{{ _('数据库类型') }}</strong></label>
           <small class="text-muted d-block mb-2">
-            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+ / openGauss 7.0+ / KingbaseES V9（pg 模式）/ 达梦 DM8（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
+            {{ _('生产环境请选择 MySQL 5.7+ / PostgreSQL 12+ / openGauss 7.0+ / KingbaseES V9（pg 模式）/ 达梦 DM8 / PolarDB for PostgreSQL 15（SQLite 不支持并发写入，容易锁表，仅适用于开发/测试）。') }}
           </small>
           <div class="icheck-primary d-block mb-2">
             <input type="radio" id="db_opengauss" name="db_type" value="opengauss" {{ 'checked' if db_type == 'opengauss' else '' }}>
@@ -137,6 +137,13 @@
             <label for="db_dm">
               <strong>达梦 DM8</strong> <span class="badge badge-success">{{ _('信创推荐') }}</span>
               <small class="text-muted d-block">{{ _('武汉达梦（DM8），默认端口 5236，需安装 dmpython / dmSQLAlchemy 驱动并提前创建 Schema') }}</small>
+            </label>
+          </div>
+          <div class="icheck-primary d-block mb-2">
+            <input type="radio" id="db_polardb_pg" name="db_type" value="polardb_pg" {{ 'checked' if db_type == 'polardb_pg' else '' }}>
+            <label for="db_polardb_pg">
+              <strong>PolarDB for PostgreSQL</strong> <span class="badge badge-success">{{ _('开源推荐') }}</span>
+              <small class="text-muted d-block">{{ _('阿里云开源（Apache 2.0，PG 15 兼容），默认端口 5432，需提前创建目标数据库与账号') }}</small>
             </label>
           </div>
           <div class="icheck-primary d-block mb-2">
@@ -322,8 +329,8 @@
 <script src="{{ url_for('static', filename='vendor/jquery/3.6.4/jquery.min.js') }}"></script>
 <script>
 (function () {
-  var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432, opengauss: 5432, kingbase: 54321, dm: 5236 };
-  var CONN_TYPES = ['mysql', 'postgresql', 'opengauss', 'kingbase', 'dm'];
+  var DEFAULT_PORTS = { mysql: 3306, postgresql: 5432, opengauss: 5432, kingbase: 54321, dm: 5236, polardb_pg: 5432 };
+  var CONN_TYPES = ['mysql', 'postgresql', 'opengauss', 'kingbase', 'dm', 'polardb_pg'];
   var fields = document.getElementById('db-conn-fields');
   // 环境变量托管数据库时（Docker 部署）页面无数据库配置区，直接跳过
   if (!fields) { return; }

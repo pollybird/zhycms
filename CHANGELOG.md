@@ -7,6 +7,33 @@
 
 > **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
+## [3.3.3] - 2026-11-28
+
+**信创适配增量版**：新增 **PolarDB for PostgreSQL 15** 数据库支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增依赖。
+
+> **许可说明**：PolarDB for PostgreSQL 源码遵循 Apache License 2.0，官方提供可自由拉取与分发的 Docker 镜像；本仓库直接提供 `docker-compose.polardb.yml` 并引用 `polardb/polardb_pg_binary:15`。
+
+### Added
+
+- **PolarDB for PostgreSQL 支持**：新增 `app/utils/dialects/polardb.py`，`PolarDBPGDialect` 继承 `PGDialect_psycopg2`，注册 `polardb_pg` / `polardb_pg.psycopg2` 与 `PolarDBPGImpl`（Alembic）。PolarDB 的 `version()` 返回 `PostgreSQL 15.x (PolarDB ...)`，标准 PG 方言可解析；解析失败时回退 `SHOW server_version`。连接串形如 `polardb_pg+psycopg2://user:pwd@host:5432/zhycms`，复用 `psycopg2-binary`，无新增 Python 依赖。
+- **连接与引擎参数**：`dbconfig.py` 增加默认端口 `5432` 与驱动 `polardb_pg+psycopg2`；驱动缺失 / 方言缺失 / 认证失败 / 连接拒绝分别给出中文提示；`build_engine_options()` 为其配置连接池与 `connect_args={'connect_timeout': 5, 'application_name': 'zhycms'}`。
+- **初始化向导与显示**：向导新增「PolarDB for PostgreSQL」选项（默认端口 5432）；`_current_db_label()` 显示「PolarDB for PostgreSQL」，`/healthz?detail=1` 返回 `db_dialect=polardb_pg`。
+- **备份与恢复**：`backup_utils` 增加 `polardb_pg` 分支——备份用 `pg_dump`（`PGPASSWORD` 环境变量传密码），恢复用 `psql`；工具路径支持 `ZHYCMS_POLARDB_BIN`（bin 目录或 `POLARDB_HOME`）与 `ZHYCMS_DB_DUMP_BIN_DIR`。
+- **Docker 编排**：新增 `docker-compose.polardb.yml` 与 `docker/polardb/init.sh`（幂等 initdb、创建应用账号/数据库、`scram-sha-256` 认证、优雅启停）；`Dockerfile` 新增 `INSTALL_PG_CLIENT` 构建参数，`pollybird/zhycms:polardb` 内置 `postgresql-client` 以支持原生备份恢复。
+- **信创编排默认缓存**：`docker-compose.opengauss.yml` / `docker-compose.kingbase.yml` / `docker-compose.polardb.yml` 默认启动并连接 **openAMDC**（`REDIS_URL=redis://openamdc:6379/0`），Redis 保留为 `--profile redis` 可选项；KingbaseES 编排补齐 openAMDC 服务。
+- **测试与 CI**：新增 `tests/test_polardb.py`（离线覆盖方言注册 / 版本解析 / URI / 引擎参数 / 错误提示 / 备份恢复命令 / 向导；live 由 `ZHYCMS_TEST_POLARDB_URL` 门控，默认跳过）；`compat.yml` 新增 `polardb` job（x86_64 / aarch64 迁移、备份恢复冒烟）。
+- **文档**：新增 [docs/DEPLOY_POLARDB.md](docs/DEPLOY_POLARDB.md)；更新 [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md)、README 与 `UPGRADE.md`。
+
+### Removed
+
+- **移除 `wiki.html`**：早期项目提供的离线单页手册不再维护，从仓库删除；相关版本门禁、发布清单、CI 路径过滤与文档引用已同步清理，在线 Wiki 与 `docs/` 文档保持可用。
+
+### Notes
+
+- **信创适配阶段性收尾**：v3.3.3 后官方不再新增信创数据库适配计划；**GBase（8a / 8c / 8s）官方不再计划适配**，[信创适配专题](docs/XINCHUANG_ADAPTATION.md) 中相关章节仅作自行适配参考，可参照 openGauss / KingbaseES / 达梦 DM8 / PolarDB 的代码、测试与部署文档自行完成。
+- 仅覆盖 **PolarDB for PostgreSQL**；PolarDB-X（MySQL 协议）与云上集群版管理接口不在本次范围。
+- 目标主版本为 15；`pg_dump` / `psql` 需与服务端同主版本，其它主版本镜像未做端到端验证。
+
 ## [3.3.2] - 2026-11-27
 
 **信创适配增量版**：新增 **达梦 DM8** 数据库支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖（达梦部署另装 `requirements-dm.txt`）。
@@ -19,7 +46,7 @@
 - **连接与引擎参数**：`dbconfig.py` 增加默认端口 `5236` 与驱动 `dm+dmPython`；驱动缺失 / 方言缺失 / 认证失败 / 连接拒绝分别给出中文提示；`build_engine_options()` 对 DM 使用连接池与 `connect_args={'connection_timeout': 5}`（dmPython 参数名，不使用 PostgreSQL 的 `connect_timeout` / `application_name`）。
 - **初始化向导与显示**：向导新增「达梦 DM8（信创推荐）」选项，未填端口回退 `5236`，并提示「数据库名」对应 Schema；`_current_db_label()` 显示「达梦 DM8」，`/healthz?detail=1` 返回 `db_dialect=dm`。
 - **备份与恢复**：`backup_utils` 增加 DM 分支——备份用 `dexp` 导出二进制 DMP 并 gzip 为 `zhycms_dm_<ts>.dmp.gz`，恢复用 `dimp`；密码经 `USERID=user/password@host:port` 传入（达梦工具不支持 `PGPASSWORD`），工具路径支持 `ZHYCMS_DM_BIN`（`bin` 目录或 `DM_HOME`）与 `ZHYCMS_DB_DUMP_BIN_DIR`。
-- **依赖与文档**：新增 `requirements-dm.txt`（`dmpython`、`dmSQLAlchemy`）与 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md)（授权声明、实例与 Schema 准备、向导填写、备份恢复、限制）；新增 [docs/DM8_ARM_TEST_REPORT.md](docs/DM8_ARM_TEST_REPORT.md)（aarch64 实测报告）；更新 `docs/XINCHUANG_ADAPTATION.md`、README 与 `wiki.html`，将达梦 DM8 从「规划中」改为「已实现（v3.3.2，x86_64 + aarch64/鲲鹏）」。
+- **依赖与文档**：新增 `requirements-dm.txt`（`dmpython`、`dmSQLAlchemy`）与 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md)（授权声明、实例与 Schema 准备、向导填写、备份恢复、限制）；新增 [docs/DM8_ARM_TEST_REPORT.md](docs/DM8_ARM_TEST_REPORT.md)（aarch64 实测报告）；更新 `docs/XINCHUANG_ADAPTATION.md` 与 README，将达梦 DM8 从「规划中」改为「已实现（v3.3.2，x86_64 + aarch64/鲲鹏）」。
 - **DM 兼容修复**：关闭方言的批量 `INSERT ... RETURNING`（`use_insertmanyvalues` / `insert_executemany_returning*`），修复 RBAC 初始化时 dmPython 多行 RETURNING 行数不可靠导致的失败；迁移 `0010` 对 DM 的 `TEXT`（CLOB）比较显式 `CAST` 为 `VARCHAR`；迁移 `0012` / `0014` 的唯一索引存在性判断同时检查 `get_unique_constraints()`，兼容 DM 为唯一约束自动命名底层索引的行为。
 - **测试**：新增 `tests/test_dm.py`（离线覆盖方言注册 / IDENTITY DDL / URI / 引擎参数 / 错误提示 / 备份恢复命令 / 向导；live 集成由 `ZHYCMS_TEST_DM_URL` 门控，默认跳过）。
 

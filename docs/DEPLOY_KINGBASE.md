@@ -32,7 +32,8 @@
 - `app`：`pollybird/zhycms:latest`（默认镜像已含 `psycopg2-binary`，**无需驱动变体**）；
 - `db-kingbase`：用户自行加载的 KingbaseES 镜像（默认镜像名见下文 `KINGBASE_IMAGE`）；
 - `db-init`：一次性容器，创建应用库 `zhycms`，并把 KingbaseES 的客户端工具
-  （`ksql` / `sys_dump` 等）与动态库拷贝到共享卷 `kingbase_client`，供应用以只读方式挂载。
+  （`ksql` / `sys_dump` 等）与动态库拷贝到共享卷 `kingbase_client`，供应用以只读方式挂载；
+- `openamdc`：默认信创缓存后端（Redis 协议兼容），随编排自动启动。
 
 ### 1. 加载官方镜像
 
@@ -51,9 +52,12 @@ cp docker/.env.example .env
 # 至少修改 SECRET_KEY 与 KINGBASE_PASSWORD
 docker compose -f docker-compose.kingbase.yml up -d
 
-# 可选缓存 / 搜索
-docker compose -f docker-compose.kingbase.yml --profile redis up -d
+# 默认已包含 openAMDC 缓存（随编排自动启动）
+docker compose -f docker-compose.kingbase.yml up -d
+
+# 可选搜索
 docker compose -f docker-compose.kingbase.yml --profile meilisearch up -d
+# 如需改用 Redis：追加 --profile redis 并设置 REDIS_URL=redis://redis:6379/0
 ```
 
 访问 `http://localhost:5000` 完成初始化向导。容器启动时自动执行迁移。

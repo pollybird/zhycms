@@ -1,0 +1,127 @@
+# ============================================================
+# zhycms Docker Compose — PolarDB for PostgreSQL 15 版（独立编排文件）
+# 用法：
+#   cp docker/.env.example .env   # 按需修改 SECRET_KEY / POLARDB_PASSWORD
+#   docker compose -f docker-compose.polardb.yml up -d --build
+#   # 默认外部缓存：openAMDC（随编排自动启动）
+#   # 如需改用 Redis：追加 --profile redis 并设置 REDIS_URL=redis://redis:6379/0
+#   # 可选搜索：追加 --profile search
+#
+# 镜像：
+#   pollybird/zhycms:polardb（内置 PostgreSQL 客户端 pg_dump / psql，用于备份恢复）
+#   polardb/polardb_pg_binary:15（PolarDB for PostgreSQL 15 官方二进制镜像）
+#
+# 说明：
+# - PolarDB for PostgreSQL 源码遵循 Apache License 2.0，可自由拉取与分发镜像。
+# - 官方镜像同时提供 linux/amd64 与 linux/arm64，Docker 自动匹配当前架构。
+# - 该镜像只含二进制、无启动脚本，由 docker/polardb/init.sh 幂等完成
+#   initdb / 建账号 / 建库 / 启动；数据目录挂载到容器内 /var/polardb。
+# - PolarDB 要求 --privileged 与 SYS_PTRACE；建议宿主机内存 4GB 以上。
+# - 应用镜像需按服务端主版本安装同主版本 pg_dump；本编排固定 15。
+#   修改 POLARDB_IMAGE 为其它主版本时，需同步调整 Dockerfile 中的客户端。
+# - 生产环境建议把 POLARDB_IMAGE 固定为精确标签（如 15.20.5.0）而非 :15。
+# ============================================================
+
+services:
+  app:
+    image: pollybird/zhycms:polardb
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        APT_MIRROR: ${APT_MIRROR:-}
+        # 仅 :polardb 变体安装 postgresql-client（bookworm 默认 15），
+        # 供 pg_dump / psql 备份恢复使用。
+        INSTALL_PG_CLIENT: "1"
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5000}:5000"
+    environment:
+      ZHYCMS_ENV: production
+      ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
+      REDIS_URL: ${REDIS_URL:-redis://openamdc:6379/0}
+      ZHYCMS_DB_URI: polardb_pg+psycopg2://zhycms:${POLARDB_PASSWORD:-Zhycms-2026pdb}@db-polardb:5432/zhycms
+    volumes:
+      - ./instance:/app/instance
+      - ./app/static/uploads:/app/app/static/uploads
+    depends_on:
+      db-polardb:
+        condition: service_healthy
+      openamdc:
+        condition: service_healthy
+
+  db-polardb:
+    image: ${POLARDB_IMAGE:-polardb/polardb_pg_binary:15}
+    # 镜像默认用户为 postgres；以 root 启动以便修正数据卷属主，再 su postgres 运行数据库。
+    user: root
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - SYS_PTRACE
+    shm_size: 512m
+    stop_grace_period: 60s
+    environment:
+      TZ: Asia/Shanghai
+      POLARDB_PORT: 5432
+      POLARDB_USER: zhycms
+      POLARDB_DB: zhycms
+      POLARDB_PASSWORD: ${POLARDB_PASSWORD:-Zhycms-2026pdb}
+    volumes:
+      - polardb_data:/var/polardb
+      - ./docker/polardb/init.sh:/opt/polardb-init.sh:ro
+    command: ["bash", "/opt/polardb-init.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "/u01/polardb_pg/bin/pg_isready -h 127.0.0.1 -p 5432 -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    ports:
+      # 仅便于本机验证/排障；生产可删除。与已有 PostgreSQL 编排同机运行时改端口。
+      - "${POLARDB_HOST_PORT:-5432}:5432"
+
+  # ---- Meilisearch（可选）----
+  meilisearch:
+    image: getmeili/meilisearch:v1.8
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
+    volumes:
+      - meili_data:/meili_data
+    ports:
+      - "7700:7700"
+    profiles: ["search"]
+
+  # ---- Redis（可选；显式 --profile redis 时启动，默认使用 openAMDC）----
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    profiles: ["redis"]
+
+  # ---- openAMDC（默认信创缓存后端，随编排自动启动）----
+  openamdc:
+    image: ${OPENAMDC_IMAGE:-pollybird/openamdc:1.0.0}
+    restart: unless-stopped
+    command: ["/etc/openamdc/openamdc.conf", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - openamdc_data:/data
+    healthcheck:
+      test: ["CMD", "openamdc-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  polardb_data:
+  meili_data:
+  redis_data:
+  openamdc_data:

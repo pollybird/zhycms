@@ -2,7 +2,8 @@
 
 支持：
 - SQLite：直接复制 .db 文件 + gzip 压缩
-- MySQL / PostgreSQL：优先调用 system `mysqldump` / `pg_dump`，失败则回退到应用层导出为 JSON（数据行数有限制时可用）
+- MySQL / PostgreSQL / PolarDB for PostgreSQL：优先调用 system `mysqldump` / `pg_dump`，失败则回退到应用层导出为 JSON（数据行数有限制时可用）
+- openGauss / KingbaseES / 达梦 DM8：调用各自厂商工具
 """
 import os
 import io
@@ -37,7 +38,8 @@ def _db_type_and_path():
 
     if backend == 'sqlite':
         return 'sqlite', url.database or '', None, None, None, None
-    if backend not in ('mysql', 'postgresql', 'opengauss', 'kingbase', 'dm'):
+    if backend not in ('mysql', 'postgresql', 'opengauss', 'kingbase', 'dm',
+                       'polardb_pg'):
         return 'unknown', uri, None, None, None, None
 
     # v3.3.0：build_uri() 对 socket 连接把路径放在 query（MySQL: unix_socket，
@@ -52,7 +54,7 @@ def _bin_tool(name, db_type=None):
 
     优先级：``DB_DUMP_BIN_DIR`` 配置/环境变量 > 信创库专用 bin 目录
     （openGauss ``OPENGAUSS_BIN`` / KingbaseES ``ZHYCMS_KINGBASE_BIN`` /
-    达梦 ``ZHYCMS_DM_BIN`` 或 ``DM_HOME``） >
+    达梦 ``ZHYCMS_DM_BIN`` 或 ``DM_HOME`` / PolarDB ``ZHYCMS_POLARDB_BIN``） >
     ``ZHYCMS_DB_DUMP_BIN`` 显式文件（仅备份工具） > PATH。
     """
     from flask import has_app_context
@@ -88,6 +90,18 @@ def _bin_tool(name, db_type=None):
                     candidate = os.path.join(dm_bin, 'bin', name)
             else:
                 candidate = dm_bin
+            if os.path.exists(candidate):
+                return candidate
+    if db_type == 'polardb_pg':
+        # ZHYCMS_POLARDB_BIN 可指向 PolarDB 客户端 bin 目录或 POLARDB_HOME（自动补 bin/）
+        pdb_bin = os.environ.get('ZHYCMS_POLARDB_BIN', '') or os.environ.get('POLARDB_HOME', '')
+        if pdb_bin:
+            if os.path.isdir(pdb_bin):
+                candidate = os.path.join(pdb_bin, name)
+                if not os.path.exists(candidate):
+                    candidate = os.path.join(pdb_bin, 'bin', name)
+            else:
+                candidate = pdb_bin
             if os.path.exists(candidate):
                 return candidate
     if name in dump_tools:
@@ -162,6 +176,9 @@ def create_backup(trigger=TRIGGER_MANUAL, remark='', created_by=None):
             ok = _backup_mysql(dest_path, db_name_or_path, host, port or 3306, user, pwd)
         elif db_type == 'postgresql':
             ok = _backup_pg(dest_path, db_name_or_path, host, port or 5432, user, pwd)
+        elif db_type == 'polardb_pg':
+            ok = _backup_pg(dest_path, db_name_or_path, host, port or 5432, user, pwd,
+                            db_type='polardb_pg')
         elif db_type == 'opengauss':
             ok = _backup_pg(dest_path, db_name_or_path, host, port or 5432, user, pwd,
                             db_type='opengauss')
@@ -248,7 +265,7 @@ def _backup_mysql(dest_path, dbname, host, port, user, pwd):
 
 
 def _backup_pg(dest_path, dbname, host, port, user, pwd, db_type='postgresql'):
-    """调用 pg_dump（PostgreSQL）/ gs_dump（openGauss）/ sys_dump（KingbaseES）导出纯 SQL。"""
+    """调用 pg_dump（PostgreSQL / PolarDB-PG）/ gs_dump（openGauss）/ sys_dump（KingbaseES）导出纯 SQL。"""
     is_og = db_type == 'opengauss'
     tool_name = ('sys_dump' if db_type == 'kingbase'
                  else 'gs_dump' if is_og else 'pg_dump')
@@ -414,7 +431,7 @@ def restore_backup(record_or_filename):
             return _restore_sqlite(path)
         if db_type == 'mysql':
             return _restore_mysql(path)
-        if db_type in ('postgresql', 'opengauss', 'kingbase'):
+        if db_type in ('postgresql', 'opengauss', 'kingbase', 'polardb_pg'):
             return _restore_pg(path)
         if db_type == 'dm':
             return _restore_dm(path)
@@ -531,6 +548,7 @@ def _restore_pg(gz_path):
     db_type, dbname, host, port, user, pwd = _db_type_and_path()
     is_og = db_type == 'opengauss'
     is_kb = db_type == 'kingbase'
+    is_pdb = db_type == 'polardb_pg'
     sql_path = gz_path + '.sql'
     env = _tool_env(db_type, pwd)
     try:
@@ -564,7 +582,7 @@ def _restore_pg(gz_path):
                    f'--username={user or ""}', '-w',
                    '-d', dbname or '', '-f', sql_path]
         else:
-            cmd = [_bin_tool('psql', 'postgresql'),
+            cmd = [_bin_tool('psql', db_type),
                    f'--host={host or "localhost"}', f'--port={port or 5432}',
                    f'--username={user or ""}', '-w',
                    '-f', sql_path, dbname or '']
@@ -574,7 +592,9 @@ def _restore_pg(gz_path):
             tool = 'gsql' if is_og else ('ksql' if is_kb else 'psql')
             return False, f'{tool} 导入失败: {(err or b"").decode("utf-8", errors="ignore")[:500]}'
         ok_msg = ('openGauss 恢复成功' if is_og
-                  else 'KingbaseES 恢复成功' if is_kb else 'PostgreSQL 恢复成功')
+                  else 'KingbaseES 恢复成功' if is_kb
+                  else 'PolarDB for PostgreSQL 恢复成功' if is_pdb
+                  else 'PostgreSQL 恢复成功')
         return True, ok_msg
     finally:
         try:

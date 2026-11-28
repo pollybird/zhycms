@@ -4,7 +4,9 @@
 #   cp docker/.env.example .env   # 按需修改 SECRET_KEY / OPENGAUSS_PASSWORD
 #   docker compose -f docker-compose.opengauss.yml up -d
 #   # 如需本地构建，追加 --build
-#   # 可选：追加 --profile redis / --profile openamdc / --profile search
+#   # 默认外部缓存：openAMDC（随编排自动启动）
+#   # 如需改用 Redis：追加 --profile redis 并设置 REDIS_URL=redis://redis:6379/0
+#   # 可选搜索：追加 --profile search
 #
 # 镜像（均提供 x86_64 / aarch64 多架构，Docker 自动匹配当前架构）：
 #   pollybird/zhycms:opengauss（内置 openGauss 官方 psycopg2 驱动）
@@ -34,13 +36,15 @@ services:
       ZHYCMS_ENV: production
       ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
-      REDIS_URL: ${REDIS_URL:-}
+      REDIS_URL: ${REDIS_URL:-redis://openamdc:6379/0}
       ZHYCMS_DB_URI: opengauss+psycopg2://gaussdb:${OPENGAUSS_PASSWORD:-Zhycms-2026og}@db-opengauss:5432/zhycms
     volumes:
       - ./instance:/app/instance
       - ./app/static/uploads:/app/app/static/uploads
     depends_on:
       db-opengauss:
+        condition: service_healthy
+      openamdc:
         condition: service_healthy
 
   db-opengauss:
@@ -75,7 +79,7 @@ services:
       - "7700:7700"
     profiles: ["search"]
 
-  # ---- Redis（可选，缓存与 Session 后端）----
+  # ---- Redis（可选；显式 --profile redis 时启动，默认使用 openAMDC）----
   redis:
     image: redis:8-alpine
     restart: unless-stopped
@@ -89,7 +93,7 @@ services:
       retries: 3
     profiles: ["redis"]
 
-  # ---- openAMDC（可选，信创缓存后端；与 redis 二选一）----
+  # ---- openAMDC（默认信创缓存后端，随编排自动启动）----
   openamdc:
     image: ${OPENAMDC_IMAGE:-pollybird/openamdc:1.0.0}
     restart: unless-stopped
@@ -101,7 +105,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-    profiles: ["openamdc"]
 
 volumes:
   opengauss_data:

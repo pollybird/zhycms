@@ -1,6 +1,7 @@
 name: Compatibility
 
 # v3.3.0 信创适配：openGauss + openAMDC 兼容性验证。
+# v3.3.3：新增 PolarDB for PostgreSQL（Apache 2.0）迁移与备份恢复验证。
 # 与 ci.yml 的 Python 矩阵解耦，只在相关路径变化时运行，控制耗时。
 
 on:
@@ -24,6 +25,7 @@ on:
       - 'tests/test_opengauss_v330.py'
       - 'tests/test_redis_backend_v330.py'
       - 'tests/test_openamdc_v330.py'
+      - 'tests/test_polardb.py'
       - 'tests/test_compat_integration.py'
       - '.github/workflows/compat.yml'
   pull_request:
@@ -184,3 +186,112 @@ jobs:
         env:
           ZHYCMS_TEST_OPENGAUSS_URL: opengauss+psycopg2://gaussdb:Zhycms-2026og@127.0.0.1:5432/zhycms
         run: pytest tests/test_compat_integration.py tests/test_opengauss_v330.py -q --timeout=120
+
+  polardb:
+    name: PolarDB-PG migration smoke (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+
+    env:
+      POLARDB_PASSWORD: Zhycms-2026pdb
+      POLARDB_URL: polardb_pg+psycopg2://zhycms:Zhycms-2026pdb@127.0.0.1:5432/zhycms
+      ZHYCMS_SECRET_KEY: ci-only-secret-key
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Pull PolarDB image
+        run: docker pull polardb/polardb_pg_binary:15
+
+      - name: Start PolarDB
+        run: |
+          mkdir -p .ci/polardb
+          chmod 777 .ci/polardb
+          docker run -d --name polardb --privileged --cap-add=SYS_PTRACE \
+            -p 5432:5432 \
+            -v "$PWD/.ci/polardb:/var/polardb" \
+            -v "$PWD/docker/polardb/init.sh:/opt/polardb-init.sh:ro" \
+            -e POLARDB_PORT=5432 \
+            -e POLARDB_USER=zhycms \
+            -e POLARDB_DB=zhycms \
+            -e POLARDB_PASSWORD="$POLARDB_PASSWORD" \
+            --user root \
+            polardb/polardb_pg_binary:15 \
+            bash /opt/polardb-init.sh
+
+      - name: Wait for PolarDB ready
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec polardb /u01/polardb_pg/bin/pg_isready \
+              -h 127.0.0.1 -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "PolarDB ready (attempt ${attempt})"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker logs polardb
+          exit 1
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run migration smoke
+        env:
+          ZHYCMS_ENV: production
+          ZHYCMS_SECRET_KEY: ci-only-secret-key
+          ZHYCMS_DB_URI: polardb_pg+psycopg2://zhycms:Zhycms-2026pdb@127.0.0.1:5432/zhycms
+        run: |
+          python -c "from app import create_app; create_app(); print('migration ok')"
+          python - "$POLARDB_URL" <<'PY'
+          import sys
+
+          from sqlalchemy import create_engine, text
+
+          from app.utils.dialects import register_polardb_dialect
+
+          register_polardb_dialect()
+          engine = create_engine(sys.argv[1], pool_pre_ping=True)
+          with engine.connect() as conn:
+              revision = conn.execute(text('select version_num from alembic_version')).scalar()
+              tables = conn.execute(text(
+                  "select count(*) from information_schema.tables "
+                  "where table_schema = 'public'")).scalar()
+          print(f'alembic={revision} tables={tables}')
+          assert revision == '0020', revision
+          assert tables >= 40, tables
+          PY
+
+      - name: Backup / restore smoke
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          export PGPASSWORD="$POLARDB_PASSWORD"
+          pg_dump -h 127.0.0.1 -p 5432 -U zhycms -d zhycms --no-owner > /tmp/zhycms.sql
+          grep -q 'CREATE TABLE' /tmp/zhycms.sql
+          psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c 'CREATE DATABASE zhycms_restore'
+          psql -h 127.0.0.1 -p 5432 -U postgres -d zhycms_restore \
+            -v ON_ERROR_STOP=1 -q -f /tmp/zhycms.sql
+          TABLES=$(psql -tA -h 127.0.0.1 -p 5432 -U postgres -d zhycms_restore \
+            -c "select count(*) from information_schema.tables where table_schema = 'public'")
+          echo "restored tables=$TABLES"
+          test "$TABLES" -ge 40
+          psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c 'DROP DATABASE zhycms_restore'
+
+      - name: Run compatibility tests
+        env:
+          ZHYCMS_TEST_POLARDB_URL: polardb_pg+psycopg2://zhycms:Zhycms-2026pdb@127.0.0.1:5432/zhycms
+        run: pytest tests/test_polardb.py -q --timeout=300

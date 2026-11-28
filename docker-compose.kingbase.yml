@@ -5,7 +5,9 @@
 #   cp docker/.env.example .env   # 按需修改 SECRET_KEY / KINGBASE_PASSWORD
 #   docker compose -f docker-compose.kingbase.yml up -d
 #   # 如需本地构建应用镜像，追加 --build
-#   # 可选缓存/搜索：追加 --profile redis / --profile meilisearch
+#   # 默认外部缓存：openAMDC（随编排自动启动）
+#   # 如需改用 Redis：追加 --profile redis 并设置 REDIS_URL=redis://redis:6379/0
+#   # 可选搜索：追加 --profile meilisearch
 #
 # 授权声明（重要）：
 #   本项目仅实现对 KingbaseES 的适配支持。KingbaseES 为商业软件，其 Docker
@@ -43,7 +45,7 @@ services:
       ZHYCMS_ENV: production
       ZHYCMS_SECRET_KEY: ${SECRET_KEY:-changeme}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
-      REDIS_URL: ${REDIS_URL:-}
+      REDIS_URL: ${REDIS_URL:-redis://openamdc:6379/0}
       ZHYCMS_DB_URI: kingbase+psycopg2://system:${KINGBASE_PASSWORD:-Kingbase123}@db-kingbase:54321/zhycms
       # 备份/恢复客户端工具（由 db-init 填充到共享卷，只读挂载）
       ZHYCMS_KINGBASE_BIN: /opt/kingbase/bin
@@ -57,6 +59,8 @@ services:
         condition: service_healthy
       db-init:
         condition: service_completed_successfully
+      openamdc:
+        condition: service_healthy
 
   db-kingbase:
     image: ${KINGBASE_IMAGE:-kingbase_v009r001c010b0004_single_x86:v1}
@@ -106,7 +110,20 @@ services:
       - kingbase_client:/share
     restart: "no"
 
-  # ---- Redis（可选，缓存与 Session 后端）----
+  # ---- openAMDC（默认信创缓存后端，随编排自动启动）----
+  openamdc:
+    image: ${OPENAMDC_IMAGE:-pollybird/openamdc:1.0.0}
+    restart: unless-stopped
+    command: ["/etc/openamdc/openamdc.conf", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - openamdc_data:/data
+    healthcheck:
+      test: ["CMD", "openamdc-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ---- Redis（可选；显式 --profile redis 时启动，默认使用 openAMDC）----
   redis:
     image: redis:8-alpine
     restart: unless-stopped
@@ -135,5 +152,6 @@ services:
 volumes:
   kingbase_data:
   kingbase_client:
+  openamdc_data:
   redis_data:
   meili_data:

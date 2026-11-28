@@ -8,6 +8,7 @@
 # 若不想本地构建，可直接用独立 compose 文件拉取预构建镜像：
 #   docker compose -f docker-compose.mysql.yml up -d       # MySQL
 #   docker compose -f docker-compose.postgresql.yml up -d  # PostgreSQL
+#   docker compose -f docker-compose.polardb.yml up -d --build  # PolarDB for PostgreSQL 15
 # 三个 tag（mysql/postgresql/latest）指向同一镜像。
 # 本脚本走本地构建路径，适合需要定制 Dockerfile 的场景。
 # ============================================================

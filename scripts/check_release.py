@@ -2,7 +2,7 @@
 """发布一致性检查：校验版本号在各处一致。
 
 v2.6.0 新增。检查 CMS_VERSION（setting.py）、插件 manifest.json + Plugin.version、
-CHANGELOG 顶部版本号与日期、README 当前版本、wiki.html 标题等是否一致。
+CHANGELOG 顶部版本号与日期、README 当前版本等是否一致。
 
 用法：
     python scripts/check_release.py                    # 检查所有版本号一致性
@@ -63,13 +63,6 @@ def get_readme_version():
     return m.group(1) if m else None
 
 
-def get_wiki_title_version():
-    """提取 wiki.html 标题中的版本号。"""
-    text = _read('wiki.html')
-    m = re.search(r'<title>[^<]*v([\d.]+)', text)
-    return m.group(1) if m else None
-
-
 def check(target_version=None):
     """执行全部检查，返回违规列表。"""
     violations = []
@@ -103,15 +96,7 @@ def check(target_version=None):
         violations.append(
             f'README.md: 当前版本 v{rd_ver} ≠ 目标 v{target_version}')
 
-    # 4. wiki.html 标题版本
-    wk_ver = get_wiki_title_version()
-    if wk_ver is None:
-        violations.append('wiki.html: 标题版本号未找到')
-    elif target_version and wk_ver != target_version:
-        violations.append(
-            f'wiki.html: 标题版本 v{wk_ver} ≠ 目标 v{target_version}')
-
-    # 5. 插件 manifest 版本（仅提示，不阻断——插件版本独立）
+    # 4. 插件 manifest 版本（仅提示，不阻断——插件版本独立）
     plugin_vers = get_plugin_versions()
     # 插件版本号不强制等于核心版本号，仅列出供参考
 
@@ -120,7 +105,6 @@ def check(target_version=None):
         'changelog_version': cl_ver,
         'changelog_date': cl_date,
         'readme_version': rd_ver,
-        'wiki_title_version': wk_ver,
         'plugin_versions': plugin_vers,
     }
 
@@ -142,7 +126,6 @@ if __name__ == '__main__':
     print(f"  CMS_VERSION:          {info['cms_version']}")
     print(f"  CHANGELOG 顶部版本:   {info['changelog_version']} ({info['changelog_date']})")
     print(f"  README 当前版本:      v{info['readme_version']}")
-    print(f"  wiki.html 标题版本:  v{info['wiki_title_version']}")
     print(f"  插件版本:")
     for slug, ver in info['plugin_versions'].items():
         print(f"    {slug}: {ver}")

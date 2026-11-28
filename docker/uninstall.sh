@@ -63,6 +63,7 @@ for profile in mysql mariadb postgres sqlite search redis openamdc; do
     "${COMPOSE_CMD[@]}" --profile "$profile" down --remove-orphans 2>/dev/null || true
 done
 "${COMPOSE_CMD[@]}" -f docker-compose.opengauss.yml down --remove-orphans 2>/dev/null || true
+"${COMPOSE_CMD[@]}" -f docker-compose.polardb.yml down --remove-orphans 2>/dev/null || true
 "${COMPOSE_CMD[@]}" down --remove-orphans 2>/dev/null || true
 info "容器已清理 ✓"
 echo ""

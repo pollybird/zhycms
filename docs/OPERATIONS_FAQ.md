@@ -198,7 +198,7 @@ install.sh 内置多源回退（daocloud → 1ms.run → xuanyuan.me → hub.rat
 - **内置备份**：后台「备份与恢复」，产物存 `instance/backups/`（含数据库 + uploads）。
 - **手动兜底**：数据库 `mysqldump`/`pg_dump`/SQLite 文件复制 + `app/static/uploads/` + `instance/` 目录。
 - **恢复后注意**：`alembic_version` 随库走，恢复到旧版本库后直接启动新代码会自动 `upgrade head` 补齐迁移。
-- 恢复演练建议每季度一次（详见 wiki「备份与恢复」）。
+- 恢复演练建议每季度一次。
 
 ---
 
@@ -220,7 +220,7 @@ openGauss 必须使用官方 psycopg2 fork，PyPI 的 `psycopg2-binary` 不能�
 `curl 'http://127.0.0.1:5000/healthz?detail=1'` 查看 `db_dialect`；后台页脚与初始化向导也会显示数据库类型。迁移版本应为 `0020`、约 52 张表。
 
 ### Q：openAMDC 连接失败，日志回退 SimpleCache
-检查 `openamdc` 容器是否启动（`docker compose --profile openamdc ps`）、`REDIS_URL` 是否为 `redis://openamdc:6379/0`，并用 `docker compose exec openamdc openamdc-cli ping` 验证。openAMDC 与 Redis 二选一，不要同时启动后指向错误端口。
+检查 `openamdc` 容器是否启动（信创专用编排 `opengauss` / `kingbase` / `polardb` 默认启动；通用编排需追加 `--profile openamdc`，可用 `docker compose ps` 查看）、`REDIS_URL` 是否为 `redis://openamdc:6379/0`，并用 `docker compose exec openamdc openamdc-cli ping` 验证。openAMDC 与 Redis 二选一，不要同时启动后指向错误端口。
 
 ### Q：healthz 的 `redis_flavor` 为什么是 `unknown`
 后端启动时无法从 `INFO server` 读到 `openamdc_version` 或 `redis_version`。确认连接的是 openAMDC/Redis 而非代理或错误服务；查看启动日志 `backend=openamdc version=1.0.0`。

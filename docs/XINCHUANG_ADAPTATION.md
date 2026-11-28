@@ -1,12 +1,15 @@
 # 信创数据库适配专题
 
-本文说明 ZhyCMS 的信创数据库适配现状、后续适配思路与贡献方式。
+本文说明 ZhyCMS 的信创数据库适配现状、已验证范围，以及 GBase 等未适配数据库的自行适配参考。
 
 > **结论先行**：官方已**实现并验证 openGauss**（v3.3.0，x86_64 + aarch64/鲲鹏）、
-> **人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏）与
-> **达梦 DM8**（v3.3.2，x86_64 + aarch64/鲲鹏）。
-> 南大通用、PolarDB 等数据库**尚未实现、尚未验证**，本文给出的是
-> 适配思路与工作量评估，不构成支持承诺。欢迎社区按本文路径提交贡献。
+> **人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏）、
+> **达梦 DM8**（v3.3.2，x86_64 + aarch64/鲲鹏）与
+> **PolarDB for PostgreSQL**（v3.3.3，Apache 2.0 开源自托管；x86_64 已实测，aarch64 由 CI 覆盖）。
+> **信创适配阶段性收尾（v3.3.3）**：官方信创数据库适配到此告一段落，后续不再新增数据库适配计划。
+> 南大通用 GBase 系列（8a / 8c / 8s）**官方不再计划适配**，本文相关章节仅作为自行适配的参考资料，
+> 不构成支持承诺。如有需要，可参照 openGauss / KingbaseES / 达梦 DM8 / PolarDB 的代码、测试与部署文档
+> 自行完成适配。
 >
 > **授权提示**：KingbaseES 与达梦 DM8 均为商业软件，项目仅提供适配代码，
 > 安装包、客户端工具与授权文件需用户自行从官方下载并获取官方授权
@@ -20,12 +23,14 @@
 | openGauss 7.0 | PostgreSQL 协议 + 自有方言差异 | **已实现**（v3.3.0） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复 |
 | 人大金仓 KingbaseES V9 | PostgreSQL 协议（pg 模式，`sys_` 系工具与系统表） | **已实现**（v3.3.1，pg 模式） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复、健康检查 |
 | 达梦 DM8 | Oracle 风格自有协议（`dmPython` 驱动 + `dmSQLAlchemy` 方言） | **已实现**（v3.3.2） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、初始化向导、自增主键、备份恢复、健康检查 |
-| PolarDB（PostgreSQL 版 / PolarDB-X） | PostgreSQL / MySQL 协议 | 未实现 | 无 |
-| 南大通用 GBase 8a | MySQL 协议（分析型 MPP） | 未实现 | 无 |
-| 南大通用 GBase 8c | PostgreSQL / openGauss 系（分布式） | 未实现 | 无 |
-| 南大通用 GBase 8s | Informix 系自有协议 | 未实现 | 无 |
+| PolarDB for PostgreSQL 15 | PostgreSQL 协议（Apache 2.0 开源） | **已实现**（v3.3.3） | x86_64 已实测；aarch64 由 CI 覆盖；迁移 `0020`、向导、业务读写、备份恢复、健康检查、Compose 编排 |
+| PolarDB-X | MySQL 协议（分布式） | 未实现 | 无 |
+| 南大通用 GBase 8a | MySQL 协议（分析型 MPP） | **官方不再计划适配** | 无 |
+| 南大通用 GBase 8c | PostgreSQL / openGauss 系（分布式） | **官方不再计划适配** | 无 |
+| 南大通用 GBase 8s | Informix 系自有协议 | **官方不再计划适配** | 无 |
 
-说明：GBase 三条产品线差异很大，适配前必须先确认具体产品线与版本，不能一概而论。
+说明：GBase 三条产品线差异很大，官方不再计划适配；如需自行适配，请先确认具体产品线与版本，
+并参照下方「3.4 南大通用 GBase」及已被官方验证的同类协议实现（KingbaseES / 达梦 DM8 / PolarDB）自行完成。
 
 ## 二、通用适配架构
 
@@ -83,18 +88,35 @@ KingbaseES 以 PostgreSQL 为兼容基础，是最接近 openGauss 的路径。v
 - **授权**：KingbaseES 为商业软件，镜像与授权文件需用户自行从
   <https://www.kingbase.com.cn/download.html> 获取；本项目不分发其二进制或许可证。
 
-### 3.2 PolarDB（PostgreSQL 版 / PolarDB-X，预计工作量低到中）
+### 3.2 PolarDB for PostgreSQL —— 已实现（v3.3.3）
 
-- **PolarDB for PostgreSQL**：协议与 PostgreSQL 基本一致，可复用
-  `postgresql+psycopg2`；主要工作是版本识别、云上连接参数与备份策略。
-- **PolarDB-X（MySQL 版）**：可复用 `mysql+pymysql`；需关注分布式拆分规则、
-  全局二级索引、跨分片事务限制，以及 DDL 中是否必须携带分区键。
-- **方言与迁移**：优先复用现有 PostgreSQL / MySQL 方言，仅补充版本正则；
-  若云版对 `information_schema` 或 DDL 有差异，再新增最小方言覆盖。
-- **备份恢复**：云上优先使用平台快照 / 备份服务；`pg_dump` / `mysqldump`
-  的兼容性需在目标实例实测，不建议直接假定可用。
-- **主要差异与风险**：连接串参数（SSL、集群地址）、只读节点路由、分布式
-  表的 DDL 限制；这些通常属于部署侧配置，不应写死到业务代码。
+PolarDB for PostgreSQL 以 PostgreSQL 15 为兼容基础，源码遵循 **Apache License 2.0**，
+是信创/开源场景中迁移成本最低的路径。v3.3.3 已完成端到端适配：**x86_64 已实测**，
+**aarch64（鲲鹏）由 CI 矩阵覆盖**（官方镜像本身提供 `linux/arm64`），详见
+[docs/DEPLOY_POLARDB.md](DEPLOY_POLARDB.md)。
+
+- **驱动与 URI**：连接与迁移**复用标准 PyPI `psycopg2-binary`**（已在
+  `requirements.txt`，无新增依赖），URI 形如
+  `polardb_pg+psycopg2://user:password@host:5432/zhycms`。
+- **方言与迁移**：新增 [polardb.py](../app/utils/dialects/polardb.py)，
+  `PolarDBPGDialect` 继承 `PGDialect_psycopg2`，只做两件事：注册独立后端标识
+  `polardb_pg`（便于向导、`/healthz` 与备份分支区分），以及父类版本解析失败时
+  回退 `SHOW server_version`。PolarDB 的 `select version()` 返回
+  `PostgreSQL 15.x (PolarDB 15.x.x.x build ...)`，标准 PG 正则可直接解析；
+  DDL 完全复用 PostgreSQL，无需定制编译器。另注册 `PolarDBPGImpl` 供 Alembic
+  按 `dialect.name` 查表。
+- **备份恢复**：与 PostgreSQL 一致，使用 `pg_dump`（备份）与 `psql`（恢复），
+  密码通过 `PGPASSWORD` 环境变量注入。工具路径支持
+  `ZHYCMS_POLARDB_BIN`（可指向 `bin` 目录或 `POLARDB_HOME`）、
+  `ZHYCMS_DB_DUMP_BIN_DIR` 与 PATH。`pg_dump` 主版本需与服务端一致（15）。
+- **向导与健康检查**：初始化向导新增「PolarDB for PostgreSQL」选项，默认端口
+  `5432`；`/healthz?detail=1` 返回 `db_dialect=polardb_pg`。
+- **镜像与编排**：新增 `docker-compose.polardb.yml`，使用官方多架构镜像
+  `polardb/polardb_pg_binary:15`（也提供阿里云 ACR 地址），应用镜像为
+  `pollybird/zhycms:polardb`（内置 `postgresql-client`）。Apache 2.0 许可允许
+  仓库直接编排并分发镜像名，无需像金仓/达梦那样由用户自行获取。
+- **未覆盖**：PolarDB-X 为 MySQL 协议、云上集群版的管理接口与共享存储（PFS）
+  部署均未验证；11 / 17 主版本镜像存在但未做端到端验证。
 
 ### 3.3 达梦 DM8 —— 已实现（v3.3.2）
 
@@ -125,16 +147,24 @@ DM8 是 Oracle 风格的自有数据库。v3.3.2 已基于 PyPI 的 `dmpython` �
 - **授权**：达梦 DM8 为商业软件，安装包、客户端工具与授权需用户自行从
   <https://www.dameng.com/> 获取；本项目不分发其二进制或许可证。
 
-### 3.4 南大通用 GBase（按产品线分别评估）
+### 3.4 南大通用 GBase（官方不再计划适配，仅供参考）
 
-- **GBase 8a（MySQL 协议，分析型 MPP）**：可尝试复用 `mysql+pymysql`。需重点验证
-  外键、事务、`AUTO_INCREMENT`、字符集与分布式表 DDL 限制；部分引擎对事务和
-  外键支持有限，可能影响现有模型与迁移脚本。备份工具为集群侧 `gcdump` 等，
-  需按版本核验。
+**官方不再计划适配 GBase 系列。** 本节仅保留自行适配的参考思路，不构成支持承诺。
+建议先阅读已被官方验证的同类协议实现，按「方言 / 驱动 / URI / 备份工具 / 向导 / 测试」分层自行落地：
+
+- [DEPLOY_KINGBASE.md](DEPLOY_KINGBASE.md)：pg 协议、复用 `psycopg2-binary`、`sys_dump` / `ksql` 备份恢复；
+- [DEPLOY_DM.md](DEPLOY_DM.md)：自有协议 + 专用驱动（`dmpython` + `dmSQLAlchemy`）、`dexp` / `dimp`；
+- [DEPLOY_POLARDB.md](DEPLOY_POLARDB.md)：开源 pg 协议、内置方言、`pg_dump` / `psql` 与 Docker 编排。
+
+若自行适配 GBase，可按产品线参考：
+
+- **GBase 8a（MySQL 协议，分析型 MPP）**：可尝试复用 `mysql+pymysql`。需自行验证
+  外键、事务、`AUTO_INCREMENT`、字符集与分布式表 DDL 限制；备份工具为集群侧
+  `gcdump` 等，需按版本核验。
 - **GBase 8c（PostgreSQL / openGauss 系，分布式）**：可复用 openGauss / PostgreSQL
   方言作为起点；重点是分布式建表所需的分布键、节点拓扑与 DDL 限制，以及
   `gs_dump` 类工具的可用性。
-- **GBase 8s（Informix 系）**：协议与 SQL 方言均不同，预计工作量最高；需要专用
+- **GBase 8s（Informix 系）**：协议与 SQL 方言均不同，工作量最高；需要专用
   驱动与独立方言，备份工具为 Informix 系（`dbexport` / `dbimport` 等），
   不建议与 8a/8c 共用适配方案。
 
@@ -143,19 +173,20 @@ DM8 是 Oracle 风格的自有数据库。v3.3.2 已基于 PyPI 的 `dmpython` �
 | 数据库 | 方言改造 | 驱动接入 | 备份工具 | 迁移风险 | 综合评估 |
 | --- | --- | --- | --- | --- | --- |
 | KingbaseES V9 | 小（复用 PG） | 小（复用 psycopg2-binary） | 小（`sys_dump`） | 低-中 | **已实现**（v3.3.1，pg 模式，x86_64 + aarch64/鲲鹏） |
-| PolarDB PG | 极小 | 极小 | 云平台为主 | 低 | 优先适配 |
-| PolarDB-X | 小 | 极小 | 云平台为主 | 中（分布式 DDL） | 可并行 |
+| PolarDB for PostgreSQL 15 | 极小（复用 PG） | 极小（复用 psycopg2-binary） | 小（`pg_dump`/`psql`） | 低 | **已实现**（v3.3.3，Apache 2.0；x86_64 已实测，aarch64 由 CI 覆盖） |
+| PolarDB-X | 小 | 极小 | 云平台为主 | 中（分布式 DDL） | 未实现（MySQL 协议，不在本次范围） |
 | 达梦 DM8 | 中（复用 dmSQLAlchemy） | 小（`dmpython` wheel） | 中（`dexp`/`dimp`） | 中-高 | **已实现**（v3.3.2，x86_64 + aarch64/鲲鹏） |
-| GBase 8a | 中 | 小 | 中 | 中-高（事务/外键） | 先做可行性验证 |
-| GBase 8c | 中 | 小 | 中 | 中（分布键） | 可复用 openGauss |
-| GBase 8s | 大 | 大 | 大 | 高 | 最后评估 |
+| GBase 8a | 中 | 小 | 中 | 中-高（事务/外键） | 官方不再计划适配；可自行参照 KingbaseES / openGauss 文档 |
+| GBase 8c | 中 | 小 | 中 | 中（分布键） | 官方不再计划适配；可自行参照 openGauss 文档 |
+| GBase 8s | 大 | 大 | 大 | 高 | 官方不再计划适配；预计自行适配成本最高 |
 
 以上为经验判断，实际以目标版本、部署形态与业务 SQL 复杂度为准。
 
 ## 五、贡献指南
 
-欢迎所有人提交信创数据库适配贡献，包括但不限于代码、测试、部署文档、实测报告与
-问题反馈。提交前建议先开 Issue 对齐范围，避免重复投入。
+官方已不再新增信创数据库适配计划（含 GBase 系列）。社区如需自行适配，可参考本文的
+分层思路、已验证后端（openGauss / KingbaseES / 达梦 DM8 / PolarDB）的代码与测试，
+以及下方提交要求；官方不对 GBase 等未适配数据库提供支持承诺。
 
 ### 1. Issue 需提供的信息
 
@@ -199,9 +230,12 @@ DM8 是 Oracle 风格的自有数据库。v3.3.2 已基于 PyPI 的 `dmpython` �
 ## 六、验证状态声明
 
 除 openGauss 7.0（x86_64 + aarch64/鲲鹏）、openAMDC 1.0.0（x86_64 + aarch64/鲲鹏）、
-**人大金仓 KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏）**与
-**达梦 DM8（v3.3.2，x86_64 + aarch64/鲲鹏）**外，
-本文提及的南大通用（GBase 8a/8c/8s）、PolarDB 等数据库均**未实现、未验证**。
+**人大金仓 KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏）**、
+**达梦 DM8（v3.3.2，x86_64 + aarch64/鲲鹏）**与
+**PolarDB for PostgreSQL 15（v3.3.3，Apache 2.0；x86_64 已实测，aarch64 由 CI 覆盖）**外，
+本文提及的南大通用 GBase 8a/8c/8s **官方不再计划适配**，PolarDB-X 尚未适配，均未验证；
+相关章节仅作为自行适配的参考资料，不构成支持承诺。如需自行适配，请参照 KingbaseES、
+达梦 DM8、PolarDB 等已验证后端的代码、测试与部署文档。
 文中驱动名、工具名与差异点为适配方向，可能随产品版本变化，落地前请以目标环境的官方文档和实测结果为准。
 
 ### 多架构镜像
@@ -212,6 +246,8 @@ DM8 是 Oracle 风格的自有数据库。v3.3.2 已基于 PyPI 的 `dmpython` �
 | `pollybird/zhycms:opengauss` | 已发布 | 已发布 | 内置对应架构的 openGauss psycopg2 驱动 |
 | `pollybird/opengauss:7.0.0` | 已发布 | 已发布 | 内置 `openblas` 与 `libatomic` |
 | `pollybird/openamdc:1.0.0` | 已发布 | 已发布 | 内置 `snappy`；aarch64 默认忽略 COW 告警 |
+| `pollybird/zhycms:polardb` | 随 v3.3.3 发布 | 随 v3.3.3 发布 | 内置 `postgresql-client`（`pg_dump` / `psql`） |
+| `polardb/polardb_pg_binary:15` | 官方已发布 | 官方已发布 | PolarDB 官方多架构二进制镜像 |
 
 各镜像另提供 `*-amd64` / `*-arm64` 子标签便于单独拉取。应用镜像已完成双架构构建与
 初始化验证；openAMDC 镜像完成双架构启动与 `PING` 验证；openGauss 数据库镜像完成
@@ -437,3 +473,30 @@ PG 方言下只生成独立 `CREATE UNIQUE INDEX`，导致 `db.create_all()` 时
 
 > 说明：上述 55 项为贡献者在鲲鹏 ARM（aarch64）环境的实测记录。x86_64 与 aarch64
 > 均已完成端到端验证，KingbaseES pg 兼容模式在双架构下可用。
+
+## 十、PolarDB for PostgreSQL 15 实测记录（v3.3.3）
+
+在 Linux x86_64 + Docker 环境使用官方镜像
+`registry.cn-hangzhou.aliyuncs.com/polardb_pg/polardb_pg_binary:15`
+（与 Docker Hub `polardb/polardb_pg_binary:15` 同源）完成端到端验证，实测版本：
+
+```text
+PostgreSQL 15.20 (PolarDB 15.20.5.0 build unknown) on x86_64-linux-gnu
+```
+
+| 类别 | 结果 |
+| --- | --- |
+| 实例初始化 | `docker/polardb/init.sh` 完成 `initdb -k`、创建 `zhycms` 账号与数据库、启动实例 |
+| 容器重启 | `stop` 触发 `pg_ctl -m fast stop`；再次 `start` 跳过 initdb 与建库，幂等通过 |
+| Alembic 迁移 | `alembic_version='0020'` |
+| 建表 | `public` schema 共 **52** 张表（含 `alembic_version`） |
+| 默认站点 | `sites` 表存在 `id=0`、`name=默认站点` |
+| 联机测试 `tests/test_polardb.py` | 设置 `ZHYCMS_TEST_POLARDB_URL` 后 **27 passed / 0 failed**（含方言注册、CRUD、迁移、`/healthz`） |
+| 离线测试 | 未设置联机地址时 **23 passed / 4 skipped** |
+| `pg_dump` 备份 | **131,882 bytes**，含 52 条 `CREATE TABLE`，rc=0 |
+| `psql` 恢复 | 导入全新数据库后 `public` 表数 **52**，rc=0 |
+| 初始化向导 | `test_setup_accepts_polardb` 覆盖 `polardb_pg` 提交、默认端口 5432 与 URI 落盘 |
+| aarch64 | 官方镜像含 `linux/arm64`，由 `compat.yml` 的 `polardb (aarch64)` job 覆盖；本地未实测 |
+
+> 备份恢复使用 PolarDB 自带 `/u01/polardb_pg/bin/pg_dump` 与 `psql`，与 PostgreSQL
+> 原生工具链一致；应用内备份分支已按 `polardb_pg` 后端接入。

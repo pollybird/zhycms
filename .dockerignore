@@ -26,7 +26,6 @@ app/translations/*/LC_MESSAGES/*.mo
 plugins/*/translations/*/LC_MESSAGES/*.mo
 
 # 文档（体积大，Docker 不需要）
-wiki.html
 *.md
 DESIGN-*.md
 UPGRADE.md

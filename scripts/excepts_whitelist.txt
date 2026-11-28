@@ -9,13 +9,13 @@ app/plugin_system.py:792:演示数据钩子错误逐条收集后返回调用方�
 app/config.py:120:build_engine_options 解析非法 URI 时返回默认引擎参数（显式降级）
 app/__init__.py:831:解析数据库后端失败时按未知后端处理，不阻断启动（显式降级）
 app/services/redis_backend.py:27:INFO 读取失败返回 unknown，不影响缓存与会话（显式处理）
-app/utils/backup_utils.py:175:create_backup 记录 err_msg 写入备份记录并返回调用方（显式处理）
-app/utils/backup_utils.py:423:restore_backup 统一返回 (False, 错误信息)（显式处理）
-app/utils/backup_utils.py:440:SQLite 备份文件损坏时返回用户可读错误（显式处理）
-app/utils/backup_utils.py:463:回写数据库文件失败时返回用户可读错误（显式处理）
-app/utils/backup_utils.py:482:gzip 解压失败清理中间文件并返回错误（显式处理）
-app/utils/backup_utils.py:539:PostgreSQL 解压失败清理中间文件并返回错误（显式处理）
-app/utils/dbconfig.py:217:switch_engine 解析非法 URI 时按未知后端处理（显式降级）
+app/utils/backup_utils.py:192:create_backup 记录 err_msg 写入备份记录并返回调用方（显式处理）
+app/utils/backup_utils.py:440:restore_backup 统一返回 (False, 错误信息)（显式处理）
+app/utils/backup_utils.py:457:SQLite 备份文件损坏时返回用户可读错误（显式处理）
+app/utils/backup_utils.py:480:回写数据库文件失败时返回用户可读错误（显式处理）
+app/utils/backup_utils.py:499:gzip 解压失败清理中间文件并返回错误（显式处理）
+app/utils/backup_utils.py:557:PostgreSQL 解压失败清理中间文件并返回错误（显式处理）
+app/utils/dbconfig.py:236:switch_engine 解析非法 URI 时按未知后端处理（显式降级）
 app/utils/search.py:752:索引健康检查返回错误信息（显式处理）
 app/utils/search.py:908:Meilisearch 健康检查返回错误信息（显式处理）
 app/api/views.py:157:JWT 校验失败返回 401 错误响应（显式处理）

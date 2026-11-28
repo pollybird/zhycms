@@ -208,4 +208,4 @@ pip install dmpython==2.6.1 dmSQLAlchemy==2.0.17
 
 ### 6.6 aarch64 状态同步
 
-本次实测通过后，已将 `docs/DEPLOY_DM.md`、`docs/XINCHUANG_ADAPTATION.md`、`README.md`、`wiki.html`、`CHANGELOG.md`、`UPGRADE.md` 中达梦 DM8 的 aarch64 状态由「未验证」更新为「已验证」，并与本文档保持一致。
+本次实测通过后，已将 `docs/DEPLOY_DM.md`、`docs/XINCHUANG_ADAPTATION.md`、`README.md`、`CHANGELOG.md`、`UPGRADE.md` 中达梦 DM8 的 aarch64 状态由「未验证」更新为「已验证」，并与本文档保持一致。

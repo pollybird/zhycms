@@ -11,7 +11,7 @@
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.3.2**（信创适配增量版：新增 **达梦 DM8** 数据库支持，基于 `dmpython` + `dmSQLAlchemy`，内置方言补齐自增主键、向导可选、`dexp`/`dimp` 备份恢复；无数据库迁移（仍为 `0020`），详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[达梦 DM8 部署](docs/DEPLOY_DM.md)、[KingbaseES 部署](docs/DEPLOY_KINGBASE.md) 与 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)）
+**当前版本：v3.3.3**（信创适配增量版：新增 **PolarDB for PostgreSQL 15** 数据库支持，Apache 2.0 开源自托管，内置 `polardb_pg` 方言、向导可选、`pg_dump`/`psql` 备份恢复与独立 Docker 编排；无数据库迁移（仍为 `0020`），无新增 Python 依赖，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[PolarDB 部署](docs/DEPLOY_POLARDB.md)、[达梦 DM8 部署](docs/DEPLOY_DM.md)、[KingbaseES 部署](docs/DEPLOY_KINGBASE.md) 与 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)）
 
 > **授权声明（人大金仓 KingbaseES / 达梦 DM8）**：本项目**仅实现对上述数据库的适配支持**。
 > KingbaseES 与达梦 DM8 均为商业软件，其安装包、客户端工具与授权文件（license）
@@ -124,16 +124,24 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **信创适配** | 数据库新增 **openGauss 7.0**（内置方言、向导可选、备份恢复适配），缓存新增 **openAMDC 1.0.0**（协议零改动、运行态自动识别），提供信创镜像与 Compose 编排 | v3.3.0 |
 | **信创适配（增量）** | 数据库新增 **人大金仓 KingbaseES V9**（pg 兼容模式，内置方言、复用 `psycopg2-binary`、向导可选、备份恢复适配 `sys_dump`/`ksql`），新增 `docker-compose.kingbase.yml` 与部署文档；无迁移、无新增依赖 | v3.3.1 |
 | **信创适配（达梦）** | 数据库新增 **达梦 DM8**（`dmpython` + `dmSQLAlchemy`，内置方言补齐整数主键 `IDENTITY`、向导可选、备份恢复适配 `dexp`/`dimp`），新增 `requirements-dm.txt` 与部署文档；无数据库迁移、`requirements.txt` 不变 | v3.3.2 |
+| **信创适配（PolarDB）** | 数据库新增 **PolarDB for PostgreSQL 15**（Apache 2.0 开源，内置 `polardb_pg` 方言、复用 `psycopg2-binary`、向导可选、备份恢复适配 `pg_dump`/`psql`），新增 `docker-compose.polardb.yml` 与部署文档；无数据库迁移、无新增 Python 依赖 | v3.3.3 |
 
 ---
 
 ## 版本速览
 
+### v3.3.3（2026-11-28）
+
+- **PolarDB for PostgreSQL 支持**：新增内置方言 [app/utils/dialects/polardb.py](app/utils/dialects/polardb.py)，`PolarDBPGDialect` 继承 PostgreSQL 方言并注册 `polardb_pg` / `polardb_pg.psycopg2`；复用标准 `psycopg2-binary`（`requirements.txt` 不变），URI 形如 `polardb_pg+psycopg2://user:pwd@host:5432/zhycms`。父类版本解析失败时回退 `SHOW server_version`，并注册 `PolarDBPGImpl` 供 Alembic 查表。
+- **向导 / 健康检查 / 备份恢复**：初始化向导新增「PolarDB for PostgreSQL」选项（默认端口 `5432`）；`/healthz?detail=1` 返回 `db_dialect=polardb_pg`；备份用 `pg_dump`、恢复用 `psql`，工具路径支持 `ZHYCMS_POLARDB_BIN`。
+- **镜像与编排**：新增 `docker-compose.polardb.yml`（官方多架构镜像 `polardb/polardb_pg_binary:15`）与 `docker/polardb/init.sh`（幂等 initdb / 建账号建库 / 优雅启停）；新增应用镜像 `pollybird/zhycms:polardb`（`INSTALL_PG_CLIENT=1` 内置 `postgresql-client`）。
+- **文档与测试**：新增 [PolarDB 部署指南](docs/DEPLOY_POLARDB.md)，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) 与 README；新增 `tests/test_polardb.py`（离线 + `ZHYCMS_TEST_POLARDB_URL` 门控 live），CI 增加 x86_64 / aarch64 迁移与备份恢复冒烟。
+
 ### v3.3.2（2026-11-27）
 
 - **达梦 DM8 支持**：新增内置方言 `app/utils/dialects/dm.py`，基于 PyPI `dmpython` + `dmSQLAlchemy` 注册 `dm` / `dm.dmPython`，并注册 `DMImpl` 供 Alembic 查表；上游方言只在 `autoincrement=True` 时生成 `IDENTITY`，本方言为 `Column(Integer, primary_key=True)`（默认 `'auto'`）补齐 `IDENTITY(1, 1)`。URI 形如 `dm+dmPython://user:pwd@host:5236/SCHEMA`（database 段即 Schema）。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖。
 - **向导 / 健康检查 / 备份恢复**：初始化向导新增「达梦 DM8」选项（默认端口 `5236`，「数据库名」对应 Schema）；`/healthz?detail=1` 返回 `db_dialect=dm`；备份用 `dexp` 导出二进制 DMP 并 gzip 为 `.dmp.gz`，恢复用 `dimp`，工具路径支持 `ZHYCMS_DM_BIN`。
-- **文档与测试**：新增 [达梦 DM8 部署指南](docs/DEPLOY_DM.md) 与 `requirements-dm.txt`，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md)、README 与 `wiki.html`；新增 `tests/test_dm.py`（离线 + `ZHYCMS_TEST_DM_URL` 门控 live）。x86_64 与华为云鲲鹏 ARM（aarch64，EulerOS 3.0）均完成端到端验证，详见 [达梦 DM8 ARM 实测报告](docs/DM8_ARM_TEST_REPORT.md)。
+- **文档与测试**：新增 [达梦 DM8 部署指南](docs/DEPLOY_DM.md) 与 `requirements-dm.txt`，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) 与 README；新增 `tests/test_dm.py`（离线 + `ZHYCMS_TEST_DM_URL` 门控 live）。x86_64 与华为云鲲鹏 ARM（aarch64，EulerOS 3.0）均完成端到端验证，详见 [达梦 DM8 ARM 实测报告](docs/DM8_ARM_TEST_REPORT.md)。
 - **DM8 兼容性修复**：`dm.py` 内置 `_patch_sqlalchemy_compat()`，在导入 `dmSQLAlchemy` 前补齐 SQLAlchemy 2.1 移除的 API；新装改为直接 stamp 最新迁移版本 `0020`（不执行增量迁移），并在启动期幂等确保默认站点（id=0）存在，避免新装触发增量迁移时产生「列已存在」冲突。
 - **授权声明**：本项目仅实现对达梦 DM8 的适配支持；达梦 DM8 为商业软件，安装包与授权文件需用户自行到 <https://www.dameng.com/> 下载并获取官方授权。
 
@@ -306,10 +314,11 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 | openGauss | 7.0.0（实测 7.0.0-RC3） | 已验证（x86_64 + aarch64/鲲鹏） | 需 openGauss 官方 psycopg2 驱动，见 [部署文档](docs/DEPLOY_OPENGAUSS.md) |
 | 人大金仓 KingbaseES | V9（实测 V9R1C10） | 已验证（pg 兼容模式，x86_64 + aarch64/鲲鹏） | 复用标准 `psycopg2-binary`，无需专用驱动；备份/恢复需客户端工具，见 [部署文档](docs/DEPLOY_KINGBASE.md) |
 | 达梦 DM8 | DM8（x86_64） | 已验证（x86_64 本地验证） | 需安装 `dmpython` + `dmSQLAlchemy`；备份/恢复需 `dexp`/`dimp`，见 [部署文档](docs/DEPLOY_DM.md) |
+| PolarDB for PostgreSQL | 15（实测 15.20.5.0） | 已验证（x86_64；aarch64 由 CI 覆盖） | Apache 2.0 开源，复用标准 `psycopg2-binary`；备份/恢复用 `pg_dump`/`psql`，见 [部署文档](docs/DEPLOY_POLARDB.md) |
 | SQLite | 3.x | 仅开发/测试 | 不支持并发写入 |
 | Redis | 6.2+ | 完整支持 | 配置 `REDIS_URL` 启用 |
 | openAMDC | 1.0.0 | 已验证（x86_64 + aarch64/鲲鹏） | 协议兼容，见 [部署文档](docs/DEPLOY_OPENAMDC.md) |
-| GBase / PolarDB | 以目标版本为准 | 规划中（未实现、未验证） | 仅提供适配思路，欢迎贡献，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
+| GBase | 8a / 8c / 8s | 官方不再计划适配 | 不提供官方支持；如需使用，可参照 KingbaseES / 达梦 / PolarDB 文档自行适配，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
 
 > **授权声明（人大金仓 KingbaseES / 达梦 DM8）**：本项目**仅实现对上述数据库的适配支持**。
 > KingbaseES 与达梦 DM8 均为商业软件，其安装包、客户端工具与授权文件（license）
@@ -323,9 +332,11 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 **人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏）与
 **达梦 DM8**（v3.3.2，x86_64 本地验证），并为 openGauss 与 openAMDC
 场景提供 x86_64 / aarch64 多架构镜像；openAMDC 1.0.0 已在双架构完成端到端实测。
-南大通用 GBase（8a / 8c / 8s）与 PolarDB（PostgreSQL 版 / PolarDB-X）尚未适配；
+南大通用 GBase（8a / 8c / 8s）**官方不再计划适配**，PolarDB-X（MySQL 协议）尚未适配。
+至此 v3.3.3 信创数据库适配阶段性收尾；如需自行适配 GBase，可参照已验证后端
+（openGauss / KingbaseES / 达梦 DM8 / PolarDB）的代码与部署文档，
 [信创适配专题](docs/XINCHUANG_ADAPTATION.md)
-给出了按「方言 / 驱动 / URI / 备份工具」分层的适配思路、工作量与风险评估，以及贡献指南。
+提供了按「方言 / 驱动 / URI / 备份工具」分层的参考思路与提交要求。
 
 欢迎所有人提交适配代码、测试、部署文档或实测报告：可先开 Issue 说明数据库产品、
 版本、架构与已验证项，再按专题中的接入点提交 PR。未经实测的能力不会被声明为支持。
@@ -383,17 +394,17 @@ docker compose -f docker-compose.postgresql.yml up -d
 # 1. 配置环境变量（OPENGAUSS_PASSWORD 需含大小写、数字与特殊字符）
 cp docker/.env.example .env
 
-# 2. 启动 openGauss 编排（镜像 pollybird/zhycms:opengauss）
+# 2. 启动 openGauss 编排（默认启用 openAMDC 缓存，镜像 pollybird/zhycms:opengauss）
 docker compose -f docker-compose.opengauss.yml up -d
 
-# 3. 可选：启用 openAMDC 作为缓存后端
-docker compose -f docker-compose.opengauss.yml --profile openamdc up -d
-# 并在 .env 设置 REDIS_URL=redis://openamdc:6379/0
+# 3. 如需改用 Redis（默认使用 openAMDC）
+docker compose -f docker-compose.opengauss.yml --profile redis up -d
+# 并在 .env 设置 REDIS_URL=redis://redis:6379/0
 ```
 
 > - openGauss 镜像：`pollybird/opengauss:7.0.0`（x86_64 / aarch64 多架构，内置 openblas 与 libatomic）
 > - 应用镜像：`pollybird/zhycms:opengauss`（x86_64 / aarch64 多架构，内置对应架构的 openGauss 驱动）
-> - openAMDC 镜像：`pollybird/openamdc:1.0.0`（x86_64 / aarch64 多架构，源码固定 commit 构建，可用 `--profile openamdc` 启动）
+> - openAMDC 镜像：`pollybird/openamdc:1.0.0`（x86_64 / aarch64 多架构，源码固定 commit 构建，信创专用编排默认启动）
 > - 详细步骤与故障速查见 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[openAMDC 部署](docs/DEPLOY_OPENAMDC.md)
 > - 验证范围：openGauss 7.0 x86_64 + aarch64（鲲鹏）；openAMDC 1.0.0 x86_64 + aarch64（鲲鹏）；zhycms 应用镜像已完成双架构构建与初始化验证；openAMDC Sentinel 自动切换与 TLS 未经验证
 
@@ -408,12 +419,13 @@ docker load -i KingbaseES_V009R001C010B0004_x86_64_Docker.tar
 # 1. 配置环境变量（修改 SECRET_KEY 与 KINGBASE_PASSWORD）
 cp docker/.env.example .env
 
-# 2. 启动 KingbaseES 编排（应用镜像复用默认 pollybird/zhycms:latest，无需驱动变体）
+# 2. 启动 KingbaseES 编排（默认启用 openAMDC 缓存；应用镜像复用默认 pollybird/zhycms:latest）
 docker compose -f docker-compose.kingbase.yml up -d
 
-# 3. 可选：启用 Redis / Meilisearch 作为缓存与搜索
-docker compose -f docker-compose.kingbase.yml --profile redis up -d
+# 3. 可选搜索；如需改用 Redis（默认使用 openAMDC）
 docker compose -f docker-compose.kingbase.yml --profile meilisearch up -d
+docker compose -f docker-compose.kingbase.yml --profile redis up -d
+# 并在 .env 设置 REDIS_URL=redis://redis:6379/0
 ```
 
 > - 应用镜像：`pollybird/zhycms:latest`（默认镜像已含 `psycopg2-binary`；KingbaseES 为 PG 协议兼容，连接与迁移无需专用驱动或新镜像变体）
@@ -611,10 +623,11 @@ zhycms/
 | [docs/DEPLOY_KINGBASE.md](docs/DEPLOY_KINGBASE.md) | KingbaseES（人大金仓）部署：镜像加载、Compose 编排、连接参数、备份恢复（KINGBASE_PASSWORD）、限制与授权声明 |
 | [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md) | 达梦 DM8 部署：驱动安装、实例与 Schema 准备、向导填写、dexp/dimp 备份恢复、限制与授权声明 |
 | [docs/DEPLOY_OPENAMDC.md](docs/DEPLOY_OPENAMDC.md) | openAMDC 部署：镜像构建、Compose 用法、配置项、与 Redis 差异、哨兵与 TLS 说明 |
-| [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md) | 信创数据库适配专题：openGauss、KingbaseES 与达梦 DM8 已实现、GBase/PolarDB 适配思路、工作量评估与贡献指南 |
+| [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md) | 信创数据库适配专题：openGauss、KingbaseES、达梦 DM8 与 PolarDB for PostgreSQL 已实现；GBase 官方不再计划适配（仅作自行适配参考） |
+| [docs/DEPLOY_POLARDB.md](docs/DEPLOY_POLARDB.md) | PolarDB for PostgreSQL 15 部署指南（Docker Compose / 外部实例、备份恢复、故障速查） |
 | [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) | 插件依赖 / 继承 / 最低核心版本校验详解 |
 
-单页版文档见 [wiki.html](wiki.html)，在线 Wiki 见 Gitee / GitCode / GitHub 仓库 Wiki 页（三平台镜像同步）。
+在线 Wiki 见 Gitee / GitCode / GitHub 仓库 Wiki 页（三平台镜像同步）。
 
 ---
 
