@@ -40,8 +40,8 @@
 |------|-----|
 | 版本 | DM Database Server 64 V8 |
 | 构建号 | 03134284044-20230417-187846-20040 |
-| 安装来源 | Docker 镜像 `sizx/dm8:kp-qlv10-1-3-12-2023.04.17-187846-20040-ENT` (arm64) |
-| 安装路径 | /opt/dmdbms (从镜像提取) |
+| 安装来源 | 达梦官方 ARM (aarch64) 版安装包（实例与授权由测试环境运维自备，本仓库不分发） |
+| 安装路径 | /opt/dmdbms |
 | 数据路径 | /opt/dmdbms/data/DAMENG |
 | 端口 | 5236 |
 | 初始化参数 | PAGE_SIZE=16, CHARSET=1 (UTF-8), LENGTH_IN_CHAR=1, CASE_SENSITIVE=0 |
@@ -176,7 +176,7 @@ tests/test_dm.py ..............................                          [100%]
 
 ### 6.1 DM8 安装
 
-从 Docker 镜像 `sizx/dm8:kp-qlv10-1-3-12-2023.04.17-187846-20040-ENT` (arm64) 提取安装文件，或从达梦官网下载 ARM 版安装包。
+从达梦官网（<https://www.dameng.com/>）下载 ARM (aarch64) 版安装包并按官方文档安装；实例与授权由部署方自备，本仓库不分发任何 DM8 镜像、二进制或许可证。
 
 ### 6.2 初始化参数
 
@@ -204,8 +204,8 @@ pip install dmpython==2.6.1 dmSQLAlchemy==2.0.17
 
 ### 6.5 SQLAlchemy 2.1 兼容性
 
-当前 `dmSQLAlchemy 2.0.17` 不兼容 SQLAlchemy 2.1。ZhyCMS 的 `dm.py` 已内置 `_patch_sqlalchemy_compat()` 补丁，但 `create_engine` 通过 entry point 导入时绕过了该补丁。临时方案：手动修补 `dmasync.py` 或降级 SQLAlchemy 至 2.0.x。正式方案：等待 dmSQLAlchemy 发布兼容 SQLAlchemy 2.1 的版本。
+当前 `dmSQLAlchemy 2.0.17` 不兼容 SQLAlchemy 2.1（其 `dmasync.py` 引用了 2.1 移除的 `sqlalchemy.util.await_fallback` 与 `AsyncAdaptFallback_dbapi_connection`）。ZhyCMS 的 `app/utils/dialects/dm.py` 已内置 `_patch_sqlalchemy_compat()`，在 `register_dm_dialect()` 中、导入 `dmSQLAlchemy` **之前**注入兼容性别名；而 `register_dm_dialect()` 在应用启动时先于引擎创建执行（见 `app/__init__.py`），因此正常启动路径下无需手动干预。若在应用之外直接 `create_engine` 且触发 `ImportError`，可降级 SQLAlchemy 至 2.0.x 作为兜底；正式方案仍是等待 `dmSQLAlchemy` 发布兼容 SQLAlchemy 2.1 的版本。
 
-### 6.6 aarch64 状态更新
+### 6.6 aarch64 状态同步
 
-`docs/DEPLOY_DM.md` 中 aarch64 状态应从"未验证"更新为"已验证"。
+本次实测通过后，已将 `docs/DEPLOY_DM.md`、`docs/XINCHUANG_ADAPTATION.md`、`README.md`、`wiki.html`、`CHANGELOG.md`、`UPGRADE.md` 中达梦 DM8 的 aarch64 状态由「未验证」更新为「已验证」，并与本文档保持一致。

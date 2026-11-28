@@ -14,13 +14,13 @@
 
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
-| 达梦 DM8（x86_64） | 已验证 | 本地环境完成端到端验证（实例与授权由开发/运维人员自备） |
-| 迁移至 `0020` | 已验证 | `db.create_all()` 与启动引导中的 Alembic 增量升级均成功 |
+| 达梦 DM8（x86_64 + aarch64/鲲鹏） | 已验证 | 本地 x86_64 与华为云鲲鹏 ARM（aarch64，EulerOS 3.0）均完成端到端验证（实例与授权由开发/运维人员自备） |
+| 迁移至 `0020` | 已验证 | `db.create_all()` 与启动引导中的 Alembic 处理均成功（新装直接 stamp `0020`，旧库增量升级） |
 | 初始化向导 / 建表 | 已验证 | 向导切换后建表 52 张，管理员与默认设置写入成功 |
 | 整数主键自增 | 已验证 | 插入不带主键的记录后由 `IDENTITY(1, 1)` 生成 |
 | 备份与恢复 | 已验证 | `dexp` 导出二进制 DMP（gzip 为 `.dmp.gz`），`dimp` 恢复 |
 | 健康检查标识 | 已验证 | `/healthz?detail=1` 返回 `db_dialect=dm` |
-| aarch64 | 未验证 | `dmpython` 提供 aarch64 wheel，但本项目未在 ARM 上实测 |
+| aarch64（鲲鹏） | 已验证 | 华为云鲲鹏 ARM 端到端实测通过，30 项测试全绿，详见 [DM8_ARM_TEST_REPORT.md](DM8_ARM_TEST_REPORT.md) |
 | 集群 / 读写分离 | 不适用 | 本项目只使用单个数据库连接串，HA 属部署侧能力 |
 
 ## 二、安装 Python 驱动
@@ -76,9 +76,9 @@ python run.py
 | 密码 | 上述账号密码 |
 
 保存后应用会热切换引擎并自动建表（表结构即当前版本）；`alembic_version` 记录会在
-应用**下次启动**时由启动引导补齐（stamp `0001` 后增量升级至 `0020`，与其它数据库
-的向导流程一致）。启动完成后访问 `/healthz?detail=1`，应返回 `db_dialect=dm`、
-`database=ok`。
+应用**下次启动**时由启动引导补齐：**全新库直接 stamp 最新版本 `0020`（不执行增量
+迁移）**，**存量旧库则 stamp `0001` 后增量升级至 `0020`**，与其它数据库的向导流程
+一致。启动完成后访问 `/healthz?detail=1`，应返回 `db_dialect=dm`、`database=ok`。
 
 ## 五、备份与恢复
 
@@ -127,5 +127,5 @@ export LD_LIBRARY_PATH=/opt/dmdbms/bin:$LD_LIBRARY_PATH
   与账号命名一致，避免迁移与查询找不到对象。
 - **工具缺失**：未安装 `dexp` / `dimp` 时，连接、迁移与业务读写不受影响，仅后台
   备份/恢复不可用，页面会给出中文提示。
-- **aarch64**：驱动 wheel 提供 aarch64 版本，但本项目暂未在 ARM 环境完成实测。
+- **aarch64（鲲鹏）**：已在华为云鲲鹏 ARM（EulerOS 3.0）完成端到端实测（30 项测试全绿），详见 [DM8_ARM_TEST_REPORT.md](DM8_ARM_TEST_REPORT.md)。两点注意：① 若使用 SQLAlchemy 2.1.x，应用启动时内置的兼容性补丁会在导入方言前自动生效，无需手动改包；应用之外直接 `create_engine` 报 `ImportError` 时可降级 SQLAlchemy 至 2.0.x 兜底。② 旧库增量迁移若报系统表（如 `SYSCOLUMNS`）无查询权限，请使用 SYSDBA 或授予系统表查询权限的账号执行迁移。
 - **回退**：把 `ZHYCMS_DB_URI` 改回原数据库并重启即可，无结构变更。

@@ -30,10 +30,10 @@ python run.py       # 或重启 gunicorn / 容器
 2. 安装驱动：`pip install -r requirements-dm.txt`。
 3. 创建应用账号与同名 Schema，并授予 DBA（示例见 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md)）。
 4. 将 `ZHYCMS_DB_URI` 设为 `dm+dmPython://用户:密码@主机:5236/Schema`，或在初始化向导中选择「达梦 DM8」（默认端口 5236）。
-5. 首次启动自动建表并执行迁移至 `0020`；`/healthz?detail=1` 应返回 `db_dialect=dm`。
+5. 首次启动自动建表并补齐迁移版本（全新库 stamp `0020`，旧库增量升级至 `0020`）；`/healthz?detail=1` 应返回 `db_dialect=dm`。
 6. 备份/恢复改用 `dexp` / `dimp`，工具目录通过 `ZHYCMS_DM_BIN` 指定（可指向 `bin` 目录或 `DM_HOME`）；如工具报动态库缺失，需把达梦客户端 `bin` 目录加入运行应用进程的 `LD_LIBRARY_PATH`。
 
-> 限制：仅 x86_64 完成本地验证；Schema 即「数据库名」；未安装 `dexp` / `dimp` 时仅后台备份/恢复不可用。详见 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md)。
+> 限制：x86_64 与 aarch64（鲲鹏）均已验证；Schema 即「数据库名」；未安装 `dexp` / `dimp` 时仅后台备份/恢复不可用。详见 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md) 与 [docs/DM8_ARM_TEST_REPORT.md](docs/DM8_ARM_TEST_REPORT.md)。
 
 ### 三、回退
 

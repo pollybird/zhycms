@@ -1087,10 +1087,14 @@ def create_app(config_name=None):
             from .models.rbac import Role, Permission
             Permission.ensure_presets()
             Role.ensure_presets()
+            # 默认站点（id=0）兜底：新装跳过增量迁移后不再由迁移 0012 创建，
+            # 此处幂等补齐，避免新装缺失默认站点导致站点解析 / 外键校验异常。
+            from .models.site import Site
+            Site.ensure_default()
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            app.logger.warning('初始化 RBAC 预设角色/权限失败：%s', e)
+            app.logger.warning('初始化 RBAC 预设角色/权限 / 默认站点失败：%s', e)
 
         # ===== 兼容旧 Article 数据：补 status 字段值 =====
         try:

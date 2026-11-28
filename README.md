@@ -133,7 +133,8 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 
 - **达梦 DM8 支持**：新增内置方言 `app/utils/dialects/dm.py`，基于 PyPI `dmpython` + `dmSQLAlchemy` 注册 `dm` / `dm.dmPython`，并注册 `DMImpl` 供 Alembic 查表；上游方言只在 `autoincrement=True` 时生成 `IDENTITY`，本方言为 `Column(Integer, primary_key=True)`（默认 `'auto'`）补齐 `IDENTITY(1, 1)`。URI 形如 `dm+dmPython://user:pwd@host:5236/SCHEMA`（database 段即 Schema）。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖。
 - **向导 / 健康检查 / 备份恢复**：初始化向导新增「达梦 DM8」选项（默认端口 `5236`，「数据库名」对应 Schema）；`/healthz?detail=1` 返回 `db_dialect=dm`；备份用 `dexp` 导出二进制 DMP 并 gzip 为 `.dmp.gz`，恢复用 `dimp`，工具路径支持 `ZHYCMS_DM_BIN`。
-- **文档与测试**：新增 [达梦 DM8 部署指南](docs/DEPLOY_DM.md) 与 `requirements-dm.txt`，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md)、README 与 `wiki.html`；新增 `tests/test_dm.py`（离线 + `ZHYCMS_TEST_DM_URL` 门控 live）。x86_64 本地完成端到端验证。
+- **文档与测试**：新增 [达梦 DM8 部署指南](docs/DEPLOY_DM.md) 与 `requirements-dm.txt`，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md)、README 与 `wiki.html`；新增 `tests/test_dm.py`（离线 + `ZHYCMS_TEST_DM_URL` 门控 live）。x86_64 与华为云鲲鹏 ARM（aarch64，EulerOS 3.0）均完成端到端验证，详见 [达梦 DM8 ARM 实测报告](docs/DM8_ARM_TEST_REPORT.md)。
+- **DM8 兼容性修复**：`dm.py` 内置 `_patch_sqlalchemy_compat()`，在导入 `dmSQLAlchemy` 前补齐 SQLAlchemy 2.1 移除的 API；新装改为直接 stamp 最新迁移版本 `0020`（不执行增量迁移），并在启动期幂等确保默认站点（id=0）存在，避免新装触发增量迁移时产生「列已存在」冲突。
 - **授权声明**：本项目仅实现对达梦 DM8 的适配支持；达梦 DM8 为商业软件，安装包与授权文件需用户自行到 <https://www.dameng.com/> 下载并获取官方授权。
 
 ### v3.3.1（2026-11-26）

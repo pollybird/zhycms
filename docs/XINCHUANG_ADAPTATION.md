@@ -4,7 +4,7 @@
 
 > **结论先行**：官方已**实现并验证 openGauss**（v3.3.0，x86_64 + aarch64/鲲鹏）、
 > **人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏）与
-> **达梦 DM8**（v3.3.2，x86_64 本地验证）。
+> **达梦 DM8**（v3.3.2，x86_64 + aarch64/鲲鹏）。
 > 南大通用、PolarDB 等数据库**尚未实现、尚未验证**，本文给出的是
 > 适配思路与工作量评估，不构成支持承诺。欢迎社区按本文路径提交贡献。
 >
@@ -19,7 +19,7 @@
 | --- | --- | --- | --- |
 | openGauss 7.0 | PostgreSQL 协议 + 自有方言差异 | **已实现**（v3.3.0） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复 |
 | 人大金仓 KingbaseES V9 | PostgreSQL 协议（pg 模式，`sys_` 系工具与系统表） | **已实现**（v3.3.1，pg 模式） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、向导、业务读写、备份恢复、健康检查 |
-| 达梦 DM8 | Oracle 风格自有协议（`dmPython` 驱动 + `dmSQLAlchemy` 方言） | **已实现**（v3.3.2） | x86_64 本地验证；迁移 `0020`、初始化向导、自增主键、备份恢复、健康检查 |
+| 达梦 DM8 | Oracle 风格自有协议（`dmPython` 驱动 + `dmSQLAlchemy` 方言） | **已实现**（v3.3.2） | x86_64 + aarch64（鲲鹏）；迁移 `0020`、初始化向导、自增主键、备份恢复、健康检查 |
 | PolarDB（PostgreSQL 版 / PolarDB-X） | PostgreSQL / MySQL 协议 | 未实现 | 无 |
 | 南大通用 GBase 8a | MySQL 协议（分析型 MPP） | 未实现 | 无 |
 | 南大通用 GBase 8c | PostgreSQL / openGauss 系（分布式） | 未实现 | 无 |
@@ -99,8 +99,9 @@ KingbaseES 以 PostgreSQL 为兼容基础，是最接近 openGauss 的路径。v
 ### 3.3 达梦 DM8 —— 已实现（v3.3.2）
 
 DM8 是 Oracle 风格的自有数据库。v3.3.2 已基于 PyPI 的 `dmpython` 驱动与
-`dmSQLAlchemy` 方言完成端到端适配，并在 **x86_64 本地环境**完成验证，详见
-[docs/DEPLOY_DM.md](DEPLOY_DM.md)。
+`dmSQLAlchemy` 方言完成端到端适配，并在 **x86_64 本地** 与 **华为云鲲鹏 ARM
+（aarch64，EulerOS 3.0）** 完成验证（30 项测试全绿），详见
+[docs/DEPLOY_DM.md](DEPLOY_DM.md) 与 [docs/DM8_ARM_TEST_REPORT.md](DM8_ARM_TEST_REPORT.md)。
 
 - **驱动与 URI**：`pip install -r requirements-dm.txt` 安装 `dmpython` 与
   `dmSQLAlchemy`（均为 PyPI wheel，x86_64 / aarch64 均有产物），无需安装达梦
@@ -144,7 +145,7 @@ DM8 是 Oracle 风格的自有数据库。v3.3.2 已基于 PyPI 的 `dmpython` �
 | KingbaseES V9 | 小（复用 PG） | 小（复用 psycopg2-binary） | 小（`sys_dump`） | 低-中 | **已实现**（v3.3.1，pg 模式，x86_64 + aarch64/鲲鹏） |
 | PolarDB PG | 极小 | 极小 | 云平台为主 | 低 | 优先适配 |
 | PolarDB-X | 小 | 极小 | 云平台为主 | 中（分布式 DDL） | 可并行 |
-| 达梦 DM8 | 中（复用 dmSQLAlchemy） | 小（`dmpython` wheel） | 中（`dexp`/`dimp`） | 中-高 | **已实现**（v3.3.2，x86_64 本地验证） |
+| 达梦 DM8 | 中（复用 dmSQLAlchemy） | 小（`dmpython` wheel） | 中（`dexp`/`dimp`） | 中-高 | **已实现**（v3.3.2，x86_64 + aarch64/鲲鹏） |
 | GBase 8a | 中 | 小 | 中 | 中-高（事务/外键） | 先做可行性验证 |
 | GBase 8c | 中 | 小 | 中 | 中（分布键） | 可复用 openGauss |
 | GBase 8s | 大 | 大 | 大 | 高 | 最后评估 |
@@ -199,7 +200,7 @@ DM8 是 Oracle 风格的自有数据库。v3.3.2 已基于 PyPI 的 `dmpython` �
 
 除 openGauss 7.0（x86_64 + aarch64/鲲鹏）、openAMDC 1.0.0（x86_64 + aarch64/鲲鹏）、
 **人大金仓 KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏）**与
-**达梦 DM8（v3.3.2，x86_64 本地验证）**外，
+**达梦 DM8（v3.3.2，x86_64 + aarch64/鲲鹏）**外，
 本文提及的南大通用（GBase 8a/8c/8s）、PolarDB 等数据库均**未实现、未验证**。
 文中驱动名、工具名与差异点为适配方向，可能随产品版本变化，落地前请以目标环境的官方文档和实测结果为准。
 

@@ -46,6 +46,30 @@ class Site(db.Model):
         return cls.query.filter_by(id=DEFAULT_SITE_ID, is_deleted=False).first()
 
     @classmethod
+    def ensure_default(cls):
+        """幂等确保默认站点（id=0）存在，返回该站点。
+
+        v3.3.2 起新装改为直接 stamp 最新迁移版本、跳过增量迁移，默认站点
+        不再由迁移 0012 创建；在此兜底，保证任何启动路径（新装 / 旧库升级 /
+        已管理）下默认站点都存在。已存在时为 no-op。
+        """
+        from sqlalchemy import text
+        existing = cls.query.filter_by(id=DEFAULT_SITE_ID).first()
+        if existing is not None:
+            return existing
+        # MySQL 下显式插入 id=0 会被当作自增值，需临时关闭该行为（同迁移 0012）
+        if db.engine.dialect.name == 'mysql':
+            db.session.execute(text(
+                "SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_AUTO_VALUE_ON_ZERO')"))
+        site = cls(
+            id=DEFAULT_SITE_ID, name='默认站点', slug='default',
+            status='open', is_default=True, sort_order=0, is_deleted=False,
+        )
+        db.session.add(site)
+        db.session.flush()
+        return site
+
+    @classmethod
     def active_sites(cls):
         """返回未删除站点（按 sort_order 降序、id 升序）。"""
         return cls.query.filter_by(is_deleted=False).order_by(

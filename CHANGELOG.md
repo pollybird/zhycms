@@ -19,22 +19,26 @@
 - **连接与引擎参数**：`dbconfig.py` 增加默认端口 `5236` 与驱动 `dm+dmPython`；驱动缺失 / 方言缺失 / 认证失败 / 连接拒绝分别给出中文提示；`build_engine_options()` 对 DM 使用连接池与 `connect_args={'connection_timeout': 5}`（dmPython 参数名，不使用 PostgreSQL 的 `connect_timeout` / `application_name`）。
 - **初始化向导与显示**：向导新增「达梦 DM8（信创推荐）」选项，未填端口回退 `5236`，并提示「数据库名」对应 Schema；`_current_db_label()` 显示「达梦 DM8」，`/healthz?detail=1` 返回 `db_dialect=dm`。
 - **备份与恢复**：`backup_utils` 增加 DM 分支——备份用 `dexp` 导出二进制 DMP 并 gzip 为 `zhycms_dm_<ts>.dmp.gz`，恢复用 `dimp`；密码经 `USERID=user/password@host:port` 传入（达梦工具不支持 `PGPASSWORD`），工具路径支持 `ZHYCMS_DM_BIN`（`bin` 目录或 `DM_HOME`）与 `ZHYCMS_DB_DUMP_BIN_DIR`。
-- **依赖与文档**：新增 `requirements-dm.txt`（`dmpython`、`dmSQLAlchemy`）与 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md)（授权声明、实例与 Schema 准备、向导填写、备份恢复、限制）；更新 `docs/XINCHUANG_ADAPTATION.md`、README 支持矩阵与 `wiki.html`，将达梦 DM8 从「规划中」改为「已实现（v3.3.2，x86_64 本地验证）」。
+- **依赖与文档**：新增 `requirements-dm.txt`（`dmpython`、`dmSQLAlchemy`）与 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md)（授权声明、实例与 Schema 准备、向导填写、备份恢复、限制）；新增 [docs/DM8_ARM_TEST_REPORT.md](docs/DM8_ARM_TEST_REPORT.md)（aarch64 实测报告）；更新 `docs/XINCHUANG_ADAPTATION.md`、README 与 `wiki.html`，将达梦 DM8 从「规划中」改为「已实现（v3.3.2，x86_64 + aarch64/鲲鹏）」。
 - **DM 兼容修复**：关闭方言的批量 `INSERT ... RETURNING`（`use_insertmanyvalues` / `insert_executemany_returning*`），修复 RBAC 初始化时 dmPython 多行 RETURNING 行数不可靠导致的失败；迁移 `0010` 对 DM 的 `TEXT`（CLOB）比较显式 `CAST` 为 `VARCHAR`；迁移 `0012` / `0014` 的唯一索引存在性判断同时检查 `get_unique_constraints()`，兼容 DM 为唯一约束自动命名底层索引的行为。
 - **测试**：新增 `tests/test_dm.py`（离线覆盖方言注册 / IDENTITY DDL / URI / 引擎参数 / 错误提示 / 备份恢复命令 / 向导；live 集成由 `ZHYCMS_TEST_DM_URL` 门控，默认跳过）。
 
 ### Fixed
 
 - **KingbaseES DDL 约束修复**：在 `app/utils/dialects/kingbase.py` 新增 `KingbaseDDLCompiler`，覆盖 `get_column_specification`，为 `unique=True` 但缺表级 `UniqueConstraint` 的列补列级 `UNIQUE` 关键字。KingbaseES 比 PostgreSQL 更严格，FK 引用列必须有显式 `UNIQUE CONSTRAINT`，仅 `UNIQUE INDEX` 不够，否则 `db.create_all()` 时 FK 约束失败。受影响列：`Permission.code`、`Role.code`、`User.username`、`Site.slug`、`Site.subdomain`。该修复仅作用于 KingbaseES 方言层，不影响 PostgreSQL 及其他后端。
+- **DM8 新装引导与默认站点**：`_alembic_bootstrap` 改为在 `db.create_all()` 之前检测核心表是否存在，全新库直接 stamp 最新迁移版本 `0020`（不执行增量迁移），避免在 DM8 上因 inspector 系统表权限不足导致「列已存在」冲突；同时在启动期（`Site.ensure_default()`）幂等确保默认站点（id=0）存在，补齐新装跳过增量迁移后不再由迁移 0012 创建默认站点的缺口（旧库已存在时为 no-op，不影响存量升级）。
+- **DM8 SQLAlchemy 2.1 兼容**：`app/utils/dialects/dm.py` 新增 `_patch_sqlalchemy_compat()`，在导入 `dmSQLAlchemy` 前为其补齐 SQLAlchemy 2.1 移除的 `await_fallback` 与 `AsyncAdaptFallback_dbapi_connection` 符号；`register_dm_dialect()` 在应用启动时先于引擎创建执行，正常部署无需手动干预。
+- **测试环境 sqlite3 回退**：`tests/conftest.py` 在导入顶部增加 `pysqlite3` 自动回退，兼容内置 `sqlite3` 因符号缺失无法导入的环境。
 
 ### 验证
 
 - **达梦 DM8（x86_64）**：`db.create_all()` 与 Alembic `0001→0020` 全量迁移通过；初始化向导（建表、管理员与默认设置写入）、整数主键自增、`dexp`/`dimp` 备份恢复、`/healthz?detail=1`（`database=ok`、`db_dialect=dm`）均已完成端到端验证。
+- **达梦 DM8（aarch64 / 鲲鹏）**：在华为云鲲鹏 ARM（Huawei Cloud EulerOS 3.0，aarch64）上对 DM8（`DM Database Server 64 V8`）完成端到端实测，**30 项测试全绿**（连接、自增、全量迁移、健康检查、备份恢复命令构造），并修复 3 个兼容性问题（SQLAlchemy 2.1 符号、新装引导误判、测试环境 sqlite3），详见 [docs/DM8_ARM_TEST_REPORT.md](docs/DM8_ARM_TEST_REPORT.md)。至此达梦 DM8 已在 **x86_64 + aarch64/鲲鹏** 双架构完成端到端验证。
 - **KingbaseES aarch64 / 鲲鹏双架构验证**：在华为云鲲鹏 ARM（Huawei Cloud EulerOS 3.0，aarch64）上对 KingbaseES V9R1C10（V009R001C010B0004，`DB_MODE=pg`）完成端到端实测，**55 项全绿**（单元测试 30 passed / 0 failed + 集成 25 passed / 0 failed），详见 [docs/KINGBASE_ARM_TEST_REPORT.md](docs/KINGBASE_ARM_TEST_REPORT.md)。至此 KingbaseES pg 兼容模式已在 **x86_64 + aarch64/鲲鹏** 双架构完成端到端验证。
 
 ### 限制与注意
 
-- 达梦 DM8 仅验证 x86_64；`dmpython` 提供 aarch64 wheel，但本项目未在 ARM 实测。
+- 达梦 DM8 已在 x86_64 与 aarch64（鲲鹏）验证；旧库增量迁移若遇系统表（如 `SYSCOLUMNS`）无查询权限，请使用 SYSDBA 或授予系统表查询权限的账号执行。
 - DM8 的「数据库名」即 Schema，向导与 URI 请填写 Schema（建议与用户名同名、大写）。
 - 若未安装 `dexp` / `dimp`，连接、迁移与业务读写不受影响，仅后台备份/恢复不可用（页面给出中文提示）。
 - 回退：改回原 `ZHYCMS_DB_URI` 后重启即可，无结构变更。
