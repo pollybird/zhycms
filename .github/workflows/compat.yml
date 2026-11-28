@@ -178,7 +178,7 @@ jobs:
                   "select count(*) from information_schema.tables "
                   "where table_schema = 'public'")).scalar()
           print(f'alembic={revision} tables={tables}')
-          assert revision == '0020', revision
+          assert revision == '0021', revision
           assert tables >= 40, tables
           PY
 
@@ -271,7 +271,7 @@ jobs:
                   "select count(*) from information_schema.tables "
                   "where table_schema = 'public'")).scalar()
           print(f'alembic={revision} tables={tables}')
-          assert revision == '0020', revision
+          assert revision == '0021', revision
           assert tables >= 40, tables
           PY
 
