@@ -275,21 +275,27 @@ jobs:
           assert tables >= 40, tables
           PY
 
+      # 使用镜像内自带的 PG15 客户端（与应用镜像 pollybird/zhycms:polardb 一致）：
+      # runner 默认 apt 源可能装到 PG17 客户端，其 dump 头部含 PG17 才有的
+      # `SET transaction_timeout`，恢复到 PG15 会直接失败。
       - name: Backup / restore smoke
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client
-          export PGPASSWORD="$POLARDB_PASSWORD"
-          pg_dump -h 127.0.0.1 -p 5432 -U zhycms -d zhycms --no-owner > /tmp/zhycms.sql
+          PGBIN=/u01/polardb_pg/bin
+          docker exec -e PGPASSWORD="$POLARDB_PASSWORD" polardb \
+            $PGBIN/pg_dump -h 127.0.0.1 -p 5432 -U zhycms -d zhycms --no-owner > /tmp/zhycms.sql
           grep -q 'CREATE TABLE' /tmp/zhycms.sql
-          psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c 'CREATE DATABASE zhycms_restore'
-          psql -h 127.0.0.1 -p 5432 -U postgres -d zhycms_restore \
-            -v ON_ERROR_STOP=1 -q -f /tmp/zhycms.sql
-          TABLES=$(psql -tA -h 127.0.0.1 -p 5432 -U postgres -d zhycms_restore \
+          docker exec -e PGPASSWORD="$POLARDB_PASSWORD" polardb \
+            $PGBIN/psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c 'CREATE DATABASE zhycms_restore'
+          docker exec -i -e PGPASSWORD="$POLARDB_PASSWORD" polardb \
+            $PGBIN/psql -h 127.0.0.1 -p 5432 -U postgres -d zhycms_restore \
+            -v ON_ERROR_STOP=1 -q < /tmp/zhycms.sql
+          TABLES=$(docker exec -e PGPASSWORD="$POLARDB_PASSWORD" polardb \
+            $PGBIN/psql -tA -h 127.0.0.1 -p 5432 -U postgres -d zhycms_restore \
             -c "select count(*) from information_schema.tables where table_schema = 'public'")
           echo "restored tables=$TABLES"
           test "$TABLES" -ge 40
-          psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c 'DROP DATABASE zhycms_restore'
+          docker exec -e PGPASSWORD="$POLARDB_PASSWORD" polardb \
+            $PGBIN/psql -h 127.0.0.1 -p 5432 -U postgres -d postgres -c 'DROP DATABASE zhycms_restore'
 
       - name: Run compatibility tests
         env:
