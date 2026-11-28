@@ -558,12 +558,16 @@ def _dedupe_alembic_version(app):
     app.logger.warning('[Alembic] 检测到 alembic_version 重复记录 %s，已清理并保留 %s', rows, keep)
 
 
-def _alembic_bootstrap(app):
+def _alembic_bootstrap(app, _pre_create_tables_exist=None):
     """在 create_app 的 app_context 内调用。
     检测数据库状态，执行 stamp 或 upgrade：
-    - 新装（无核心表）：db.create_all() 已建表 → stamp baseline
-    - 旧库（有核心表无 alembic_version）：stamp baseline → upgrade 增量
+    - 新装（db.create_all() 之前无核心表）：stamp 最新版本
+    - 旧库（db.create_all() 之前已有核心表无 alembic_version）：stamp baseline → upgrade 增量
     - 已管理（有 alembic_version）：upgrade 增量
+
+    ``_pre_create_tables_exist`` 由调用方在 ``db.create_all()`` 之前传入，
+    用于区分「全新安装」与「旧库升级」——两者在 ``db.create_all()`` 之后
+    都有核心表且无 ``alembic_version``，仅靠 post-create 检测无法区分。
     """
     from sqlalchemy import inspect as sqla_inspect
     from flask_migrate import upgrade as flask_upgrade, stamp as flask_stamp
@@ -572,30 +576,25 @@ def _alembic_bootstrap(app):
     insp = sqla_inspect(engine)
 
     has_alembic = insp.has_table('alembic_version')
-    has_users = insp.has_table('users')
-    has_articles = insp.has_table('articles')
 
     if has_alembic:
         _dedupe_alembic_version(app)
 
+    is_new_install = _pre_create_tables_exist is False
+
     try:
-        if not has_users or not has_articles:
-            # 全新安装：db.create_all() 已建全部表，仅 stamp baseline
-            flask_stamp(directory='migrations', revision='0001')
-            app.logger.info('[Alembic] 新装 stamp baseline 0001')
+        if is_new_install:
+            flask_stamp(directory='migrations', revision='0020')
+            app.logger.info('[Alembic] 新装 stamp 最新版本 0020')
         elif not has_alembic:
-            # v2.3.0 及更早旧库：stamp baseline 后执行增量
             flask_stamp(directory='migrations', revision='0001')
             app.logger.info('[Alembic] 旧库 stamp baseline 0001（v2.3.0 兼容）')
             flask_upgrade(directory='migrations')
             app.logger.info('[Alembic] 增量迁移完成')
         else:
-            # 已纳入 Alembic 管理：执行增量
             flask_upgrade(directory='migrations')
             app.logger.info('[Alembic] 增量迁移完成')
     except SystemExit as e:
-        # Flask-Migrate 的 catch_errors 会把迁移异常转成 sys.exit(1)，
-        # SystemExit 不属于 Exception，会直接击穿 create_app 导致进程静默退出
         raise RuntimeError(f'Alembic 迁移失败（exit={e.code}），详见上方日志') from None
 
 
@@ -1051,14 +1050,14 @@ def create_app(config_name=None):
         from . import models  # noqa: F401  保证模型被导入
         from .plugin_system import discover_and_load
         discover_and_load(app, import_models_only=True)
+
+        from sqlalchemy import inspect as _sqla_inspect
+        _pre_has_users = _sqla_inspect(db.engine).has_table('users')
+
         db.create_all()
 
-        # ===== v2.4.0：Alembic 迁移 bootstrap =====
-        # 新装：db.create_all() 已建全部表，stamp baseline
-        # 旧库（v2.3.0 及更早）：检测已有核心表但无 alembic_version 表 → stamp
-        # 然后执行增量迁移（0002 search_index 表、0003 搜索设置种子等）
         try:
-            _alembic_bootstrap(app)
+            _alembic_bootstrap(app, _pre_create_tables_exist=_pre_has_users)
         except Exception as e:
             # 迁移未完成会导致后续版本的结构/数据变更（含安全修复）全部缺失，
             # 不能按「非致命」静默跳过：记录 error 并在后台所有页面常驻告警。

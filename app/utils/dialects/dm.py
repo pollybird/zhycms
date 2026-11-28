@@ -27,6 +27,29 @@ _INSTALL_HINT = ('缺少达梦 DM8 数据库驱动，请先安装：'
 _DIALECT_CLASS_NAME = 'ZHDMDialect'
 
 
+def _patch_sqlalchemy_compat():
+    """为 dmSQLAlchemy 2.0.x 补齐 SQLAlchemy 2.1 移除的 API。
+
+    dmSQLAlchemy 2.0.17 的 ``dmasync.py`` 依赖以下在 SQLAlchemy 2.1 中
+    被移除的符号：
+
+    - ``sqlalchemy.util.await_fallback`` → 别名到 ``await_only``
+    - ``sqlalchemy.connectors.asyncio.AsyncAdaptFallback_dbapi_connection``
+      → 别名到 ``AsyncAdapt_dbapi_connection``
+
+    ZhyCMS 不使用 DM8 async 连接，这些别名仅满足导入需求。
+    """
+    import sqlalchemy.util as su
+    if not hasattr(su, 'await_fallback'):
+        su.await_fallback = su.await_only
+
+    from sqlalchemy.connectors import asyncio as _sca
+    if not hasattr(_sca, 'AsyncAdaptFallback_dbapi_connection'):
+        class _FallbackConn(_sca.AsyncAdapt_dbapi_connection):
+            __slots__ = ()
+        _sca.AsyncAdaptFallback_dbapi_connection = _FallbackConn
+
+
 def _build_classes():
     """按需导入 dmSQLAlchemy 并生成方言 / DDL 编译器子类。
 
@@ -35,6 +58,8 @@ def _build_classes():
     生成的类挂到模块全局，供 ``sqlalchemy.dialects.registry`` 按名加载。
     """
     global ZHDMDialect, ZHDMDDLCompiler
+
+    _patch_sqlalchemy_compat()
 
     from sqlalchemy import types as sqltypes
     from dmSQLAlchemy.base import DMDDLCompiler
