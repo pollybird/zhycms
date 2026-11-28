@@ -11,9 +11,17 @@
   admin_client → 超管登录的客户端（session 注入，绕验证码）
   app          → Flask 应用实例
 """
+import sys
+try:
+    import sqlite3
+    sqlite3.sqlite_version
+except Exception:
+    import pysqlite3
+    sys.modules['sqlite3'] = pysqlite3
+    sys.modules['sqlite3.dbapi2'] = pysqlite3.dbapi2
+
 import os
 import re
-import sys
 import tempfile
 from pathlib import Path
 
