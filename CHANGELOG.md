@@ -7,7 +7,21 @@
 
 > **许可证说明**：自 v3.2.7 起，本项目许可证由 Apache License 2.0 变更为木兰宽松许可证第2版（Mulan PSL v2），全文见 [LICENSE](./LICENSE)；v3.2.6 及之前版本仍按 Apache License 2.0 提供，全文见 [LICENSE-APACHE-2.0](./LICENSE-APACHE-2.0)。
 
-## [Unreleased]
+## [3.3.2] - 2026-11-27
+
+**信创适配增量版**：新增 **达梦 DM8** 数据库支持。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖（达梦部署另装 `requirements-dm.txt`）。
+
+> **授权声明**：本项目仅实现对达梦 DM8 的适配支持。达梦 DM8 为商业软件，其安装包、客户端工具与授权文件（license）需用户自行到 <https://www.dameng.com/> 下载并获取官方授权；本仓库不提供、不分发达梦的二进制或许可证。
+
+### Added
+
+- **达梦 DM8 数据库支持**：新增 `app/utils/dialects/dm.py`，基于 PyPI `dmpython 2.6.1` + `dmSQLAlchemy 2.0.17` 注册 `dm` / `dm.dmPython` 方言。上游方言只在 `autoincrement is True` 时生成 `IDENTITY`，本项目模型使用 `Column(Integer, primary_key=True)`（默认 `'auto'`），故方言层覆盖 `get_column_specification`，为单列整数主键补齐 `IDENTITY(1, 1)`（复合主键与显式 `autoincrement=False` 不补）；注册 `DMImpl` 供 Alembic 按 `dialect.name` 查表。连接串形如 `dm+dmPython://user:password@host:5236/SCHEMA`（database 段即 Schema）。
+- **连接与引擎参数**：`dbconfig.py` 增加默认端口 `5236` 与驱动 `dm+dmPython`；驱动缺失 / 方言缺失 / 认证失败 / 连接拒绝分别给出中文提示；`build_engine_options()` 对 DM 使用连接池与 `connect_args={'connection_timeout': 5}`（dmPython 参数名，不使用 PostgreSQL 的 `connect_timeout` / `application_name`）。
+- **初始化向导与显示**：向导新增「达梦 DM8（信创推荐）」选项，未填端口回退 `5236`，并提示「数据库名」对应 Schema；`_current_db_label()` 显示「达梦 DM8」，`/healthz?detail=1` 返回 `db_dialect=dm`。
+- **备份与恢复**：`backup_utils` 增加 DM 分支——备份用 `dexp` 导出二进制 DMP 并 gzip 为 `zhycms_dm_<ts>.dmp.gz`，恢复用 `dimp`；密码经 `USERID=user/password@host:port` 传入（达梦工具不支持 `PGPASSWORD`），工具路径支持 `ZHYCMS_DM_BIN`（`bin` 目录或 `DM_HOME`）与 `ZHYCMS_DB_DUMP_BIN_DIR`。
+- **依赖与文档**：新增 `requirements-dm.txt`（`dmpython`、`dmSQLAlchemy`）与 [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md)（授权声明、实例与 Schema 准备、向导填写、备份恢复、限制）；更新 `docs/XINCHUANG_ADAPTATION.md`、README 支持矩阵与 `wiki.html`，将达梦 DM8 从「规划中」改为「已实现（v3.3.2，x86_64 本地验证）」。
+- **DM 兼容修复**：关闭方言的批量 `INSERT ... RETURNING`（`use_insertmanyvalues` / `insert_executemany_returning*`），修复 RBAC 初始化时 dmPython 多行 RETURNING 行数不可靠导致的失败；迁移 `0010` 对 DM 的 `TEXT`（CLOB）比较显式 `CAST` 为 `VARCHAR`；迁移 `0012` / `0014` 的唯一索引存在性判断同时检查 `get_unique_constraints()`，兼容 DM 为唯一约束自动命名底层索引的行为。
+- **测试**：新增 `tests/test_dm.py`（离线覆盖方言注册 / IDENTITY DDL / URI / 引擎参数 / 错误提示 / 备份恢复命令 / 向导；live 集成由 `ZHYCMS_TEST_DM_URL` 门控，默认跳过）。
 
 ### Fixed
 
@@ -15,7 +29,15 @@
 
 ### 验证
 
+- **达梦 DM8（x86_64）**：`db.create_all()` 与 Alembic `0001→0020` 全量迁移通过；初始化向导（建表、管理员与默认设置写入）、整数主键自增、`dexp`/`dimp` 备份恢复、`/healthz?detail=1`（`database=ok`、`db_dialect=dm`）均已完成端到端验证。
 - **KingbaseES aarch64 / 鲲鹏双架构验证**：在华为云鲲鹏 ARM（Huawei Cloud EulerOS 3.0，aarch64）上对 KingbaseES V9R1C10（V009R001C010B0004，`DB_MODE=pg`）完成端到端实测，**55 项全绿**（单元测试 30 passed / 0 failed + 集成 25 passed / 0 failed），详见 [docs/KINGBASE_ARM_TEST_REPORT.md](docs/KINGBASE_ARM_TEST_REPORT.md)。至此 KingbaseES pg 兼容模式已在 **x86_64 + aarch64/鲲鹏** 双架构完成端到端验证。
+
+### 限制与注意
+
+- 达梦 DM8 仅验证 x86_64；`dmpython` 提供 aarch64 wheel，但本项目未在 ARM 实测。
+- DM8 的「数据库名」即 Schema，向导与 URI 请填写 Schema（建议与用户名同名、大写）。
+- 若未安装 `dexp` / `dimp`，连接、迁移与业务读写不受影响，仅后台备份/恢复不可用（页面给出中文提示）。
+- 回退：改回原 `ZHYCMS_DB_URI` 后重启即可，无结构变更。
 
 ## [3.3.1] - 2026-11-26
 

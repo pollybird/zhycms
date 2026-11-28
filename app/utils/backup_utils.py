@@ -37,7 +37,7 @@ def _db_type_and_path():
 
     if backend == 'sqlite':
         return 'sqlite', url.database or '', None, None, None, None
-    if backend not in ('mysql', 'postgresql', 'opengauss', 'kingbase'):
+    if backend not in ('mysql', 'postgresql', 'opengauss', 'kingbase', 'dm'):
         return 'unknown', uri, None, None, None, None
 
     # v3.3.0：build_uri() 对 socket 连接把路径放在 query（MySQL: unix_socket，
@@ -51,11 +51,12 @@ def _bin_tool(name, db_type=None):
     """定位外部数据库工具路径（v3.3.0）。
 
     优先级：``DB_DUMP_BIN_DIR`` 配置/环境变量 > 信创库专用 bin 目录
-    （openGauss ``OPENGAUSS_BIN`` / KingbaseES ``ZHYCMS_KINGBASE_BIN``） >
+    （openGauss ``OPENGAUSS_BIN`` / KingbaseES ``ZHYCMS_KINGBASE_BIN`` /
+    达梦 ``ZHYCMS_DM_BIN`` 或 ``DM_HOME``） >
     ``ZHYCMS_DB_DUMP_BIN`` 显式文件（仅备份工具） > PATH。
     """
     from flask import has_app_context
-    dump_tools = ('mysqldump', 'pg_dump', 'gs_dump', 'sys_dump')
+    dump_tools = ('mysqldump', 'pg_dump', 'gs_dump', 'sys_dump', 'dexp')
     bin_dir = ''
     if has_app_context():
         bin_dir = current_app.config.get('DB_DUMP_BIN_DIR') or ''
@@ -75,6 +76,18 @@ def _bin_tool(name, db_type=None):
         kb_bin = os.environ.get('ZHYCMS_KINGBASE_BIN', '') or os.environ.get('KINGBASE_BIN', '')
         if kb_bin:
             candidate = os.path.join(kb_bin, name) if os.path.isdir(kb_bin) else kb_bin
+            if os.path.exists(candidate):
+                return candidate
+    if db_type == 'dm':
+        # ZHYCMS_DM_BIN 可指向达梦客户端 bin 目录或 DM_HOME（自动补 bin/）
+        dm_bin = os.environ.get('ZHYCMS_DM_BIN', '') or os.environ.get('DM_HOME', '')
+        if dm_bin:
+            if os.path.isdir(dm_bin):
+                candidate = os.path.join(dm_bin, name)
+                if not os.path.exists(candidate):
+                    candidate = os.path.join(dm_bin, 'bin', name)
+            else:
+                candidate = dm_bin
             if os.path.exists(candidate):
                 return candidate
     if name in dump_tools:
@@ -135,7 +148,9 @@ def create_backup(trigger=TRIGGER_MANUAL, remark='', created_by=None):
     db_type, db_name_or_path, host, port, user, pwd = _db_type_and_path()
     backup_dir = _backup_dir()
     os.makedirs(backup_dir, exist_ok=True)
-    filename = f'zhycms_{db_type}_{_ts()}.sql.gz'
+    # 达梦使用 dexp 导出二进制 DMP（.dmp.gz），其它后端为纯 SQL / JSON
+    suffix = '.dmp.gz' if db_type == 'dm' else '.sql.gz'
+    filename = f'zhycms_{db_type}_{_ts()}{suffix}'
     dest_path = os.path.join(backup_dir, filename)
 
     ok = False
@@ -153,6 +168,8 @@ def create_backup(trigger=TRIGGER_MANUAL, remark='', created_by=None):
         elif db_type == 'kingbase':
             ok = _backup_pg(dest_path, db_name_or_path, host, port or 54321, user, pwd,
                             db_type='kingbase')
+        elif db_type == 'dm':
+            ok = _backup_dm(dest_path, db_name_or_path, host, port or 5236, user, pwd)
         else:
             ok = _backup_json(dest_path)  # 兜底：JSON 导出
     except Exception as e:
@@ -254,6 +271,57 @@ def _backup_pg(dest_path, dbname, host, port, user, pwd, db_type='postgresql'):
     return _run_dump_with_gzip(cmd, dest_path, env=env, fallback_json=True)
 
 
+def _backup_dm(dest_path, schema, host, port, user, pwd):
+    """调用达梦 ``dexp`` 导出 SCHEMAS 为二进制 DMP，再 gzip 压缩。
+
+    dexp 无 ``PGPASSWORD`` 之类的环境变量密码机制，连接串只能通过
+    ``USERID=user/pwd@host:port`` 传入（达梦工具固有约束）。
+    """
+    tool = _bin_tool('dexp', 'dm')
+    if not (os.path.isfile(tool) or shutil.which(tool)):
+        raise RuntimeError('未找到达梦 dexp 备份工具，请安装达梦客户端并配置 '
+                           'ZHYCMS_DM_BIN（或 DM_HOME）')
+    tmp_dmp = dest_path + '.tmp.dmp'
+    tmp_log = dest_path + '.tmp.log'
+    userid = f'{user or ""}{"/" + pwd if pwd else ""}@{host or "localhost"}:{port}'
+    cmd = [tool, f'USERID={userid}', f'FILE={tmp_dmp}', f'LOG={tmp_log}']
+    if schema:
+        cmd.append(f'SCHEMAS={schema}')
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, err = proc.communicate(timeout=600)
+        if (proc.returncode != 0 or not os.path.exists(tmp_dmp)
+                or os.path.getsize(tmp_dmp) == 0):
+            log_text = ''
+            try:
+                if os.path.exists(tmp_log):
+                    with open(tmp_log, 'r', encoding='utf-8', errors='ignore') as f:
+                        log_text = f.read()[:500]
+            except OSError:
+                pass
+            err_text = (err or b'').decode('utf-8', errors='ignore')[:500]
+            if pwd:
+                # dexp 日志/标准错误可能回显 USERID，避免密码落盘到应用日志
+                err_text = err_text.replace(pwd, '***')
+                log_text = log_text.replace(pwd, '***')
+            current_app.logger.warning(
+                'dexp 失败（rc=%s）：%s %s', proc.returncode, err_text, log_text)
+            return False
+        with open(tmp_dmp, 'rb') as f_in, gzip.open(dest_path, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+        return True
+    except Exception as e:
+        current_app.logger.warning('dexp 执行失败：%s', e)
+        return False
+    finally:
+        for _p in (tmp_dmp, tmp_log):
+            try:
+                if os.path.exists(_p):
+                    os.remove(_p)
+            except OSError:
+                pass
+
+
 def _run_og_dump_with_gzip(cmd, dest_path, dbname, env):
     """gs_dump 输出到临时文件，成功后 gzip 压缩并清理。"""
     tmp_sql = dest_path + '.tmp.sql'
@@ -348,6 +416,8 @@ def restore_backup(record_or_filename):
             return _restore_mysql(path)
         if db_type in ('postgresql', 'opengauss', 'kingbase'):
             return _restore_pg(path)
+        if db_type == 'dm':
+            return _restore_dm(path)
         # JSON 格式
         return _restore_json(path)
     except Exception as e:
@@ -511,6 +581,63 @@ def _restore_pg(gz_path):
             os.remove(sql_path)
         except OSError:
             pass
+
+
+def _restore_dm(gz_path):
+    """解压 ``.dmp.gz`` 后通过达梦 ``dimp`` 导入当前 Schema。"""
+    _, schema, host, port, user, pwd = _db_type_and_path()
+    tool = _bin_tool('dimp', 'dm')
+    if not (os.path.isfile(tool) or shutil.which(tool)):
+        return False, ('未找到达梦 dimp 恢复工具，请安装达梦客户端并配置 '
+                       'ZHYCMS_DM_BIN（或 DM_HOME）')
+    dmp_path = gz_path + '.dmp'
+    log_path = gz_path + '.dimp.log'
+    try:
+        with gzip.open(gz_path, 'rb') as f_in, open(dmp_path, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    except Exception as e:
+        current_app.logger.warning('达梦备份解压失败：%s', e)
+        for _p in (dmp_path, log_path):
+            try:
+                if os.path.exists(_p):
+                    os.remove(_p)
+            except OSError:
+                pass
+        return False, '备份文件解压失败（文件损坏或格式不符）'
+    try:
+        # 结束当前会话事务并丢弃连接池，避免导入时被应用连接占用的对象锁阻塞
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.warning('恢复前提交/结束会话失败：%s', e)
+        db.engine.dispose()
+        userid = f'{user or ""}{"/" + pwd if pwd else ""}@{host or "localhost"}:{port}'
+        cmd = [tool, f'USERID={userid}', f'FILE={dmp_path}', f'LOG={log_path}']
+        if schema:
+            cmd.append(f'SCHEMAS={schema}')
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        _, err = proc.communicate(timeout=600)
+        if proc.returncode != 0:
+            detail = (err or b'').decode('utf-8', errors='ignore')[:500]
+            try:
+                if os.path.exists(log_path):
+                    with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        detail = (detail + ' ' + f.read()[:500]).strip()
+            except OSError:
+                pass
+            if pwd:
+                # dimp 日志可能回显 USERID，避免密码出现在页面错误信息中
+                detail = detail.replace(pwd, '***')
+            return False, f'dimp 导入失败: {detail}'
+        return True, '达梦 DM8 恢复成功'
+    finally:
+        for _p in (dmp_path, log_path):
+            try:
+                if os.path.exists(_p):
+                    os.remove(_p)
+            except OSError:
+                pass
 
 
 def _restore_json(gz_path):

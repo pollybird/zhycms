@@ -11,12 +11,13 @@
   <a href="https://github.com/pollybird/zhycms/stargazers"><img alt="GitHub Stars" src="https://img.shields.io/github/stars/pollybird/zhycms?style=flat-square&logo=github&label=star"></a>
 </p>
 
-**当前版本：v3.3.1**（信创适配增量版：新增人大金仓 **KingbaseES V9**（pg 兼容模式）数据库支持，复用标准 `psycopg2-binary`、内置轻量方言；无数据库迁移、无新增必需依赖，详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[openGauss 部署](docs/DEPLOY_OPENGAUSS.md)、[KingbaseES 部署](docs/DEPLOY_KINGBASE.md) 与 [openAMDC 部署](docs/DEPLOY_OPENAMDC.md)）
+**当前版本：v3.3.2**（信创适配增量版：新增 **达梦 DM8** 数据库支持，基于 `dmpython` + `dmSQLAlchemy`，内置方言补齐自增主键、向导可选、`dexp`/`dimp` 备份恢复；无数据库迁移（仍为 `0020`），详见 [CHANGELOG](CHANGELOG.md)、[UPGRADE](UPGRADE.md)、[达梦 DM8 部署](docs/DEPLOY_DM.md)、[KingbaseES 部署](docs/DEPLOY_KINGBASE.md) 与 [openGauss 部署](docs/DEPLOY_OPENGAUSS.md)）
 
-> **授权声明（人大金仓 KingbaseES）**：本项目**仅实现对 KingbaseES 的适配支持**。
-> KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）**需用户
-> 自行到官方下载并获取官方授权**：<https://www.kingbase.com.cn/download.html>。
-> 本仓库不提供、不分发 KingbaseES 的镜像、二进制或许可证。
+> **授权声明（人大金仓 KingbaseES / 达梦 DM8）**：本项目**仅实现对上述数据库的适配支持**。
+> KingbaseES 与达梦 DM8 均为商业软件，其安装包、客户端工具与授权文件（license）
+> **需用户自行到官方下载并获取官方授权**（KingbaseES：
+> <https://www.kingbase.com.cn/download.html>；达梦：<https://www.dameng.com/>）。
+> 本仓库不提供、不分发上述产品的二进制或许可证。
 
 **项目官网：[https://zhycms.tzzhy.cn/](https://zhycms.tzzhy.cn/)**（官网与使用文档）
 
@@ -122,10 +123,18 @@ ZhyCMS 采用 **Flask + SQLAlchemy + Jinja2** 技术栈，以「插件优先、�
 | **数据库迁移插件** | 内置插件 `db_migrator`（默认不启用）：后台一键把 SQLite 开发库迁移到 MySQL/PostgreSQL，建表+数据复制+序列重置，目标库非空保护，支持迁移后免重启热切换 | v3.1.0 |
 | **信创适配** | 数据库新增 **openGauss 7.0**（内置方言、向导可选、备份恢复适配），缓存新增 **openAMDC 1.0.0**（协议零改动、运行态自动识别），提供信创镜像与 Compose 编排 | v3.3.0 |
 | **信创适配（增量）** | 数据库新增 **人大金仓 KingbaseES V9**（pg 兼容模式，内置方言、复用 `psycopg2-binary`、向导可选、备份恢复适配 `sys_dump`/`ksql`），新增 `docker-compose.kingbase.yml` 与部署文档；无迁移、无新增依赖 | v3.3.1 |
+| **信创适配（达梦）** | 数据库新增 **达梦 DM8**（`dmpython` + `dmSQLAlchemy`，内置方言补齐整数主键 `IDENTITY`、向导可选、备份恢复适配 `dexp`/`dimp`），新增 `requirements-dm.txt` 与部署文档；无数据库迁移、`requirements.txt` 不变 | v3.3.2 |
 
 ---
 
 ## 版本速览
+
+### v3.3.2（2026-11-27）
+
+- **达梦 DM8 支持**：新增内置方言 `app/utils/dialects/dm.py`，基于 PyPI `dmpython` + `dmSQLAlchemy` 注册 `dm` / `dm.dmPython`，并注册 `DMImpl` 供 Alembic 查表；上游方言只在 `autoincrement=True` 时生成 `IDENTITY`，本方言为 `Column(Integer, primary_key=True)`（默认 `'auto'`）补齐 `IDENTITY(1, 1)`。URI 形如 `dm+dmPython://user:pwd@host:5236/SCHEMA`（database 段即 Schema）。无数据库迁移（仍为 `0020`），`requirements.txt` 无新增必需依赖。
+- **向导 / 健康检查 / 备份恢复**：初始化向导新增「达梦 DM8」选项（默认端口 `5236`，「数据库名」对应 Schema）；`/healthz?detail=1` 返回 `db_dialect=dm`；备份用 `dexp` 导出二进制 DMP 并 gzip 为 `.dmp.gz`，恢复用 `dimp`，工具路径支持 `ZHYCMS_DM_BIN`。
+- **文档与测试**：新增 [达梦 DM8 部署指南](docs/DEPLOY_DM.md) 与 `requirements-dm.txt`，更新 [信创适配专题](docs/XINCHUANG_ADAPTATION.md)、README 与 `wiki.html`；新增 `tests/test_dm.py`（离线 + `ZHYCMS_TEST_DM_URL` 门控 live）。x86_64 本地完成端到端验证。
+- **授权声明**：本项目仅实现对达梦 DM8 的适配支持；达梦 DM8 为商业软件，安装包与授权文件需用户自行到 <https://www.dameng.com/> 下载并获取官方授权。
 
 ### v3.3.1（2026-11-26）
 
@@ -285,7 +294,7 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 ### 环境要求
 
 - Python 3.10+（CI 覆盖 3.10 / 3.11 / 3.12 / 3.13，3.14 实验性）
-- 数据库：**MySQL 5.7+** / **PostgreSQL 12+** / **openGauss 7.0**（v3.3.0 起）/ **人大金仓 KingbaseES V9**（v3.3.1 起，pg 兼容模式；生产推荐其一）
+- 数据库：**MySQL 5.7+** / **PostgreSQL 12+** / **openGauss 7.0**（v3.3.0 起）/ **人大金仓 KingbaseES V9**（v3.3.1 起，pg 兼容模式）/ **达梦 DM8**（v3.3.2 起；生产推荐其一）
 - 缓存（可选）：**Redis 6.2+** 或 **openAMDC 1.0.0**（v3.3.0 起，Redis 协议兼容）
 - SQLite 仅用于开发/测试（不支持并发写入）
 
@@ -295,22 +304,25 @@ OpenAPI 公开版。内容 API 新增 OpenAPI 3.0 契约注册表与 `GET /api/v
 | PostgreSQL | 12+ | 完整支持 | 默认生产方案 |
 | openGauss | 7.0.0（实测 7.0.0-RC3） | 已验证（x86_64 + aarch64/鲲鹏） | 需 openGauss 官方 psycopg2 驱动，见 [部署文档](docs/DEPLOY_OPENGAUSS.md) |
 | 人大金仓 KingbaseES | V9（实测 V9R1C10） | 已验证（pg 兼容模式，x86_64 + aarch64/鲲鹏） | 复用标准 `psycopg2-binary`，无需专用驱动；备份/恢复需客户端工具，见 [部署文档](docs/DEPLOY_KINGBASE.md) |
+| 达梦 DM8 | DM8（x86_64） | 已验证（x86_64 本地验证） | 需安装 `dmpython` + `dmSQLAlchemy`；备份/恢复需 `dexp`/`dimp`，见 [部署文档](docs/DEPLOY_DM.md) |
 | SQLite | 3.x | 仅开发/测试 | 不支持并发写入 |
 | Redis | 6.2+ | 完整支持 | 配置 `REDIS_URL` 启用 |
 | openAMDC | 1.0.0 | 已验证（x86_64 + aarch64/鲲鹏） | 协议兼容，见 [部署文档](docs/DEPLOY_OPENAMDC.md) |
-| 达梦 / GBase / PolarDB | 以目标版本为准 | 规划中（未实现、未验证） | 仅提供适配思路，欢迎贡献，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
+| GBase / PolarDB | 以目标版本为准 | 规划中（未实现、未验证） | 仅提供适配思路，欢迎贡献，见 [信创适配专题](docs/XINCHUANG_ADAPTATION.md) |
 
-> **授权声明（人大金仓 KingbaseES）**：本项目**仅实现对 KingbaseES 的适配支持**。
-> KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）**需用户
-> 自行到官方下载并获取官方授权**：<https://www.kingbase.com.cn/download.html>。
-> 本仓库不提供、不分发 KingbaseES 的镜像、二进制或许可证。
+> **授权声明（人大金仓 KingbaseES / 达梦 DM8）**：本项目**仅实现对上述数据库的适配支持**。
+> KingbaseES 与达梦 DM8 均为商业软件，其安装包、客户端工具与授权文件（license）
+> **需用户自行到官方下载并获取官方授权**（KingbaseES：
+> <https://www.kingbase.com.cn/download.html>；达梦：<https://www.dameng.com/>）。
+> 本仓库不提供、不分发上述产品的二进制或许可证。
 
 ### 信创适配专题
 
-官方在信创数据库方面**已实现并验证 openGauss 7.0**（v3.3.0，x86_64 + aarch64/鲲鹏）与
-**人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏），并为 openGauss 与 openAMDC
+官方在信创数据库方面**已实现并验证 openGauss 7.0**（v3.3.0，x86_64 + aarch64/鲲鹏）、
+**人大金仓 KingbaseES V9**（v3.3.1，pg 兼容模式，x86_64 + aarch64/鲲鹏）与
+**达梦 DM8**（v3.3.2，x86_64 本地验证），并为 openGauss 与 openAMDC
 场景提供 x86_64 / aarch64 多架构镜像；openAMDC 1.0.0 已在双架构完成端到端实测。
-达梦 DM8、南大通用 GBase（8a / 8c / 8s）与 PolarDB（PostgreSQL 版 / PolarDB-X）尚未适配；
+南大通用 GBase（8a / 8c / 8s）与 PolarDB（PostgreSQL 版 / PolarDB-X）尚未适配；
 [信创适配专题](docs/XINCHUANG_ADAPTATION.md)
 给出了按「方言 / 驱动 / URI / 备份工具」分层的适配思路、工作量与风险评估，以及贡献指南。
 
@@ -596,8 +608,9 @@ zhycms/
 | [docs/OPERATIONS_FAQ.md](docs/OPERATIONS_FAQ.md) | 运维故障排查 FAQ：常见报错、数据库迁移失败处理、缓存/主题/插件/伪静态/Docker 排障速查 |
 | [docs/DEPLOY_OPENGAUSS.md](docs/DEPLOY_OPENGAUSS.md) | openGauss 部署：两种拓扑、建库建号、pg_hba、驱动安装、备份工具与故障速查 |
 | [docs/DEPLOY_KINGBASE.md](docs/DEPLOY_KINGBASE.md) | KingbaseES（人大金仓）部署：镜像加载、Compose 编排、连接参数、备份恢复（KINGBASE_PASSWORD）、限制与授权声明 |
+| [docs/DEPLOY_DM.md](docs/DEPLOY_DM.md) | 达梦 DM8 部署：驱动安装、实例与 Schema 准备、向导填写、dexp/dimp 备份恢复、限制与授权声明 |
 | [docs/DEPLOY_OPENAMDC.md](docs/DEPLOY_OPENAMDC.md) | openAMDC 部署：镜像构建、Compose 用法、配置项、与 Redis 差异、哨兵与 TLS 说明 |
-| [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md) | 信创数据库适配专题：openGauss 与 KingbaseES 已实现、达梦/GBase/PolarDB 适配思路、工作量评估与贡献指南 |
+| [docs/XINCHUANG_ADAPTATION.md](docs/XINCHUANG_ADAPTATION.md) | 信创数据库适配专题：openGauss、KingbaseES 与达梦 DM8 已实现、GBase/PolarDB 适配思路、工作量评估与贡献指南 |
 | [PLUGIN_DEPENDENCIES.md](PLUGIN_DEPENDENCIES.md) | 插件依赖 / 继承 / 最低核心版本校验详解 |
 
 单页版文档见 [wiki.html](wiki.html)，在线 Wiki 见 Gitee / GitCode / GitHub 仓库 Wiki 页（三平台镜像同步）。

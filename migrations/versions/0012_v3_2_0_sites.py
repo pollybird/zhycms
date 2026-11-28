@@ -118,6 +118,23 @@ def _has_index(table, name):
                for ix in sa.inspect(op.get_bind()).get_indexes(table))
 
 
+def _has_unique(table, name, columns):
+    """同名唯一索引/约束或同列唯一索引/约束是否已存在。
+
+    达梦 DM8 为唯一约束生成自动命名的底层索引（如 INDEX33555475），
+    get_indexes() 看不到约束名，需同时检查 get_unique_constraints()。
+    """
+    if not _has_table(table):
+        return False
+    insp = sa.inspect(op.get_bind())
+    if any(ix.get('unique') and list(ix.get('column_names') or []) == list(columns)
+           for ix in insp.get_indexes(table)):
+        return True
+    return any(
+        uc.get('name') == name or list(uc.get('column_names') or []) == list(columns)
+        for uc in insp.get_unique_constraints(table))
+
+
 def _drop_single_unique(table, column):
     """删除仅包含该列的唯一索引/唯一约束（SQLite 唯一索引优先）。"""
     insp = sa.inspect(op.get_bind())
@@ -203,7 +220,7 @@ def upgrade():
             continue
         _drop_single_unique(table, column)
         _ensure_single_column_index(table, column)
-        if not _has_index(table, unique_name):
+        if not _has_unique(table, unique_name, cols):
             op.create_index(unique_name, table, cols, unique=True)
 
     # ---------- 4. 默认站点 id=0 ----------

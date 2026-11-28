@@ -1,9 +1,9 @@
 """数据库连接配置工具。
 
-支持五种数据库：sqlite（默认）、mysql、postgresql、opengauss（v3.3.0）、
-kingbase（v3.3.1，人大金仓 KingbaseES pg 模式）。
+支持六种数据库：sqlite（默认）、mysql、postgresql、opengauss（v3.3.0）、
+kingbase（v3.3.1，人大金仓 KingbaseES pg 模式）、dm（v3.3.2，达梦 DM8）。
 
-- 初始化向导选择数据库类型后，mysql/postgresql/opengauss/kingbase 的连接
+- 初始化向导选择数据库类型后，mysql/postgresql/opengauss/kingbase/dm 的连接
   信息会以 ``instance/db_config.json`` 落盘（chmod 600），SQLite 则清除该
   文件走默认。
 - 应用启动时的 URI 解析优先级见 ``app/config.py``：
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # 各数据库默认端口，供表单未填端口时回退使用
 DEFAULT_PORTS = {'mysql': 3306, 'postgresql': 5432, 'opengauss': 5432,
-                 'kingbase': 54321}
+                 'kingbase': 54321, 'dm': 5236}
 
 # 数据库类型 -> SQLAlchemy 驱动方言
 _DRIVERS = {
@@ -34,6 +34,7 @@ _DRIVERS = {
     'postgresql': 'postgresql+psycopg2',
     'opengauss': 'opengauss+psycopg2',
     'kingbase': 'kingbase+psycopg2',
+    'dm': 'dm+dmPython',
 }
 
 
@@ -124,11 +125,12 @@ def test_connection(uri):
     - 其它 SQLAlchemy 错误
     """
     from sqlalchemy import create_engine, text
-    from sqlalchemy.exc import OperationalError, SQLAlchemyError
+    from sqlalchemy.exc import NoSuchModuleError, OperationalError, SQLAlchemyError
 
     uri = uri or ''
     is_opengauss = uri.startswith('opengauss')
     is_kingbase = uri.startswith('kingbase')
+    is_dm = uri.startswith('dm+') or uri.startswith('dm:')
     engine = None
     try:
         engine = create_engine(uri, pool_pre_ping=True)
@@ -142,7 +144,17 @@ def test_connection(uri):
         if is_kingbase:
             return False, (f'缺少 KingbaseES 数据库驱动：{e}。KingbaseES（pg 模式）'
                            '复用标准 psycopg2-binary 驱动，请确认已安装 psycopg2-binary。')
+        if is_dm:
+            return False, (f'缺少达梦 DM8 数据库驱动：{e}。请安装 dmpython 与 '
+                           'dmSQLAlchemy（pip install -r requirements-dm.txt）。')
         return False, f'缺少数据库驱动：{e}。请先安装对应驱动（PyMySQL / psycopg2-binary）。'
+    except NoSuchModuleError as e:
+        # 方言包未安装时 create_engine 阶段抛此异常（早于建立连接）
+        logger.warning('数据库方言加载失败：%s', e, exc_info=True)
+        if is_dm:
+            return False, ('缺少达梦 DM8 数据库方言：请安装 dmpython 与 dmSQLAlchemy'
+                           '（pip install -r requirements-dm.txt）。')
+        return False, '数据库方言加载失败，请确认已安装对应数据库驱动。'
     except OperationalError as e:
         # v3.1.9 VULN-013：对外文案固定，不回显 e.orig（含主机/端口/驱动细节），
         # 详细信息仅写日志供运维排障。
@@ -166,6 +178,15 @@ def test_connection(uri):
                 return False, ('无法连接 KingbaseES：请检查主机/端口连通性（默认端口 '
                                '54321）、监听地址，以及 pg_hba.conf 是否允许本机或 '
                                '客户端 TCP 连接。')
+        elif is_dm:
+            if any(k in detail for k in ('密码', '口令', 'password', 'authentication',
+                                         'invalid user', '无效的用')):
+                return False, ('达梦 DM8 认证失败：用户名或密码不正确。请核对账号密码，'
+                               '并确认该账号拥有目标 Schema 的访问权限。')
+            if any(k in detail for k in ('connection refused', 'could not connect',
+                                         'timeout', 'timed out', '通信')):
+                return False, ('无法连接达梦 DM8：请检查主机/端口连通性（默认端口 5236）'
+                               '与实例监听状态。')
         return False, '无法连接数据库，请检查主机、端口、账号密码或数据库是否存在。'
     except SQLAlchemyError as e:
         logger.warning('数据库连接失败（SQLAlchemyError）：%s', e, exc_info=True)
@@ -202,6 +223,12 @@ def switch_engine(app, db, new_uri):
     elif backend == 'kingbase':
         from app.utils.dialects import register_kingbase_dialect
         register_kingbase_dialect()
+    elif backend == 'dm':
+        from app.utils.dialects import register_dm_dialect
+        if register_dm_dialect() != 'installed':
+            raise RuntimeError(
+                '缺少达梦 DM8 数据库驱动，请先安装 dmpython 与 dmSQLAlchemy'
+                '（pip install -r requirements-dm.txt）')
 
     options = build_engine_options(new_uri)
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = dict(options)

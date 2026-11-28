@@ -3,7 +3,7 @@
 v3.1.4 将内置全文搜索引擎由 Whoosh 切换为 Tantivy（Whoosh/jieba 已停止维护）。
 本迁移把存量站 settings 表中的 search_engine='whoosh' 改写为 'tantivy'；
 已选择 meilisearch / sql 的站点不受影响。
-无表结构变更。兼容 SQLite / MySQL / PostgreSQL。
+无表结构变更。兼容 SQLite / MySQL / PostgreSQL / openGauss / KingbaseES / 达梦 DM8。
 
 注意：索引文件不在迁移中处理——应用启动时检测 tantivy 索引缺失会自动
 后台重建（见 app/__init__.py），重建期间搜索走 SQL LIKE 兜底。
@@ -34,10 +34,15 @@ def _settings_table():
 
 def _switch(conn, old_value, new_value):
     settings = _settings_table()
+    value_col = settings.c.value
+    if conn.dialect.name == 'dm':
+        # 达梦 DM8 把 Text 映射为 CLOB，CLOB 与 VARCHAR 绑定参数直接比较会抛
+        # [CODE:-6105] 数据类型不匹配；显式 CAST 为 VARCHAR 后按精确值比较。
+        value_col = sa.cast(value_col, sa.String(8000))
     conn.execute(
         settings.update()
         .where(sa.and_(settings.c.key == 'search_engine',
-                       settings.c.value == old_value))
+                       value_col == old_value))
         .values(value=new_value))
 
 

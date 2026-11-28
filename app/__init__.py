@@ -838,6 +838,12 @@ def create_app(config_name=None):
     elif _db_backend == 'kingbase':
         from .utils.dialects import register_kingbase_dialect
         register_kingbase_dialect()
+    elif _db_backend == 'dm':
+        from .utils.dialects import register_dm_dialect
+        if register_dm_dialect() != 'installed':
+            raise RuntimeError(
+                '缺少达梦 DM8 数据库驱动，请先安装 dmpython 与 dmSQLAlchemy'
+                '（pip install -r requirements-dm.txt）')
 
     # 初始化扩展
     db.init_app(app)

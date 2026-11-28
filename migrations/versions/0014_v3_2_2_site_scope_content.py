@@ -121,7 +121,8 @@ def _abort_if_duplicates(prefix, conflicts):
 
 
 def _ensure_unique_index(table, name, columns):
-    if _has_index(table, name):
+    # DM8 的唯一约束底层索引自动命名，需按列比对而非仅按名字判断
+    if _has_index(table, name) or _find_unique(table, columns):
         return
     _abort_if_duplicates(f'0014（{table}.{name}）', _duplicate_rows(table, columns))
     op.create_index(name, table, columns, unique=True)

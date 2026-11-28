@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ZhyCMS v3.3.1 使用手册</title>
+<title>ZhyCMS v3.3.2 使用手册</title>
 <style>
   :root { --brand:#2e6df6; --brand-dark:#1b4fd0; --bg:#f6f8fb; --code-bg:#f2f4f8; --border:#e2e8f0; }
   * { box-sizing:border-box; }
@@ -162,7 +162,7 @@
 <main>
 
 <header class="hero">
-  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.3.1</span></h1>
+  <h1>ZhyCMS 使用手册 <span class="version-badge">v3.3.2</span></h1>
   <p>基于 Flask 的轻量级企业网站 CMS — 快速入门 · 使用指南 · 扩展开发 · 运维进阶</p>
 </header>
 
@@ -188,6 +188,7 @@
   <tr><td>Docker 部署</td><td>官方镜像 pollybird/zhycms 已发布，MySQL/PostgreSQL 一键启动，支持本地构建</td><td>v2.4</td></tr>
   <tr><td>信创适配</td><td>数据库支持 openGauss 7.0（内置方言、向导可选、备份恢复适配），缓存支持 openAMDC 1.0.0（协议零改动、自动识别后端），提供信创镜像与 Compose 编排</td><td>v3.3.0</td></tr>
   <tr><td>信创适配（增量）</td><td>数据库支持人大金仓 KingbaseES V9（pg 兼容模式）：内置方言、复用 psycopg2-binary、向导可选、备份恢复适配 sys_dump/ksql，新增 docker-compose.kingbase.yml 与部署文档</td><td>v3.3.1</td></tr>
+  <tr><td>信创适配（达梦）</td><td>数据库支持达梦 DM8：dmpython + dmSQLAlchemy、内置方言补齐整数主键 IDENTITY、向导可选、备份恢复适配 dexp/dimp，新增 requirements-dm.txt 与部署文档</td><td>v3.3.2</td></tr>
   <tr><td>RBAC 权限</td><td>角色/权限点两级模型，菜单与按钮级授权，栏目级内容粒度</td><td>v2.0</td></tr>
   <tr><td>内容工作流</td><td>草稿 → 待审核 → 已发布/已驳回，版本快照与对比还原</td><td>v2.0</td></tr>
   <tr><td>后台编辑器双模式</td><td>富文本（CKEditor）/ Markdown 一键切换，实时预览，全局设置可改默认模式</td><td>v3.1.5</td></tr>
@@ -244,7 +245,7 @@
 <ul>
   <li>Python 3.10+（CI 覆盖 3.10 / 3.11 / 3.12 / 3.13，3.14 实验性）</li>
   <li>数据库：MySQL 5.7+ / PostgreSQL 12+（生产推荐）/ SQLite（仅开发）</li>
-  <li>信创可选：openGauss 7.0 或人大金仓 KingbaseES V9（pg 兼容模式，v3.3.1 起，数据库）与 openAMDC 1.0.0（缓存，Redis 协议兼容）</li>
+  <li>信创可选：openGauss 7.0、人大金仓 KingbaseES V9（pg 兼容模式，v3.3.1 起）或达梦 DM8（v3.3.2 起，数据库）与 openAMDC 1.0.0（缓存，Redis 协议兼容）</li>
 </ul>
 <div class="warn"><b>生产环境请使用 MySQL、PostgreSQL 或 openGauss。</b>SQLite 不支持并发写入，容易锁表。</div>
 
@@ -260,7 +261,7 @@ python run.py</code></pre>
 <p>首次访问 <code>http://127.0.0.1:5000</code> 自动跳转 <code>/admin/setup</code>，需配置：</p>
 <ul>
   <li>管理员账号（≥3 字符）与密码（默认 ≥12 位且含大小写、数字、特殊字符，可在后台安全中调整）</li>
-  <li>数据库类型（MySQL / PostgreSQL / openGauss / KingbaseES / SQLite）</li>
+  <li>数据库类型（MySQL / PostgreSQL / openGauss / KingbaseES / 达梦 DM8 / SQLite）</li>
   <li>演示数据：不生成 / 制造业 / 服务业 / 教育行业 / 餐饮行业 / Manufacturing (EN) / English Default</li>
 </ul>
 
@@ -271,11 +272,12 @@ python run.py</code></pre>
   <tr><td><b>PostgreSQL</b></td><td>生产可选，默认端口 5432</td><td>主机、端口、库名、用户名、密码</td></tr>
   <tr><td><b>openGauss</b></td><td>信创数据库（v3.3.0），默认端口 5432，需官方 psycopg2 驱动</td><td>主机、端口、库名、用户名、密码</td></tr>
   <tr><td><b>KingbaseES（人大金仓）</b></td><td>信创数据库（v3.3.1，pg 兼容模式），默认端口 54321，复用 psycopg2-binary，无需专用驱动</td><td>主机、端口、库名、用户名、密码</td></tr>
-  <tr><td><b>达梦 / GBase / PolarDB</b></td><td>规划中，<b>未实现、未验证</b>（GBase 8a/8c/8s 差异很大）</td><td>—</td></tr>
+  <tr><td><b>达梦 DM8</b></td><td>信创数据库（v3.3.2），默认端口 5236，需安装 dmpython / dmSQLAlchemy；「库名」对应 Schema（通常与用户名同名）</td><td>主机、端口、Schema、用户名、密码</td></tr>
+  <tr><td><b>GBase / PolarDB</b></td><td>规划中，<b>未实现、未验证</b>（GBase 8a/8c/8s 差异很大）</td><td>—</td></tr>
   <tr><td><b>SQLite</b></td><td>零配置，仅开发/测试</td><td>无</td></tr>
 </table>
-<div class="warn"><b>信创适配现状</b>：官方已实现并验证 openGauss 7.0（x86_64 + aarch64/鲲鹏）与人大金仓 KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏，v3.3.1 起）。达梦 DM8、南大通用 GBase、PolarDB 尚未适配；仓库 <code>docs/XINCHUANG_ADAPTATION.md</code> 提供了按方言 / 驱动 / URI / 备份工具分层的适配思路、工作量评估与贡献指南，欢迎所有人提交适配代码、测试与实测报告。未经实测的数据库不会被声明为支持。</div>
-<div class="warn"><b>授权声明（人大金仓 KingbaseES）</b>：本项目仅实现对 KingbaseES 的适配支持。KingbaseES 为商业软件，其 Docker 镜像、客户端工具与授权文件（license）需用户自行到 <a href="https://www.kingbase.com.cn/download.html">https://www.kingbase.com.cn/download.html</a> 下载并获取官方授权；本仓库不提供、不分发 KingbaseES 的镜像、二进制或许可证。</div>
+<div class="warn"><b>信创适配现状</b>：官方已实现并验证 openGauss 7.0（x86_64 + aarch64/鲲鹏）、人大金仓 KingbaseES V9（pg 兼容模式，x86_64 + aarch64/鲲鹏，v3.3.1 起）与达梦 DM8（x86_64 本地验证，v3.3.2 起）。南大通用 GBase、PolarDB 尚未适配；仓库 <code>docs/XINCHUANG_ADAPTATION.md</code> 提供了按方言 / 驱动 / URI / 备份工具分层的适配思路、工作量评估与贡献指南，欢迎所有人提交适配代码、测试与实测报告。未经实测的数据库不会被声明为支持。</div>
+<div class="warn"><b>授权声明（人大金仓 KingbaseES / 达梦 DM8）</b>：本项目仅实现对上述数据库的适配支持。KingbaseES 与达梦 DM8 均为商业软件，其安装包、客户端工具与授权文件（license）需用户自行到官方下载并获取官方授权（KingbaseES：<a href="https://www.kingbase.com.cn/download.html">https://www.kingbase.com.cn/download.html</a>；达梦：<a href="https://www.dameng.com/">https://www.dameng.com/</a>）；本仓库不提供、不分发上述产品的二进制或许可证。</div>
 <div class="note">数据库 URI 优先级：环境变量 <code>ZHYCMS_DB_URI</code> &gt; <code>instance/db_config.json</code> &gt; 默认 SQLite。</div>
 </section>
 

@@ -1,0 +1,14 @@
+# ZhyCMS v3.3.2 可选依赖：达梦 DM8（信创数据库）
+#
+# 默认镜像不安装本文件：仅使用达梦 DM8 的项目需要安装。
+# 安装后应用以内置方言（app/utils/dialects/dm.py）连接 dm+dmPython://，
+# 无需安装达梦客户端即可读写；备份/恢复另需官方 dexp/dimp 工具。
+#
+# 用法：
+#   pip install -r requirements-dm.txt
+#
+# 说明：dmSQLAlchemy 提供 SQLAlchemy 2.x 方言，dmpython 为其依赖的
+# DB-API 驱动（PyPI 提供 x86_64 与 aarch64 wheel）。达梦数据库本体、
+# 客户端工具与授权请通过达梦官方渠道获取。
+dmpython==2.6.1
+dmSQLAlchemy==2.0.17
